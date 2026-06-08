@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
+  m_Name: Maranga Berry_Item
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  id: 13
+  itemName: "\uD0C0\uB77C\uD504\uC5F4\uB9E4"
+  itemNameEn: Maranga Berry
+  description: "\uC790\uC2E0\uC744 \uACF5\uACA9 \uC911\uC778 \uC801 1\uBA85\uB2F9
+    \uBC29\uC5B4\uB825/\uD2B9\uC218\uBC29\uC5B4 +X"
+  hpBonus: 0
+  maxHpPct: 0
+  hpRegenPercent: 0
+  healTakenDmgPct: 0
+  shieldPctOnFatalHit: 0
+  attackBonus: 0
+  spAtkPct: 0
+  attackSpeedBonus: 0
+  moveSpdPctOnKill: 0
+  defenseBonus: 0
+  spDefBonus: 0
+  reflectPhysPct: 0
+  reflectSpPct: 0
+  defSpDefPerAttacker: 0
+  criPct: 0
+  criDmgPct: 0
+  burnNearOnPhysHit: 0
+  ccImmune: 0
+  icon: {fileID: 0}
