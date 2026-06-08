@@ -37,11 +37,30 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
     }
 
+    private Coroutine _connectTimeoutRoutine;
+
     public void Connect()
     {
         if (PhotonNetwork.IsConnected) return;
         Debug.Log("[Network] Photon 서버 연결 시도...");
         PhotonNetwork.ConnectUsingSettings();
+
+        if (_connectTimeoutRoutine != null)
+            StopCoroutine(_connectTimeoutRoutine);
+        _connectTimeoutRoutine = StartCoroutine(ConnectTimeoutRoutine());
+    }
+
+    private System.Collections.IEnumerator ConnectTimeoutRoutine()
+    {
+        yield return new WaitForSeconds(CONNECT_TIMEOUT);
+
+        if (!PhotonNetwork.IsConnectedAndReady)
+        {
+            Debug.LogWarning($"[Network] 연결 타임아웃 ({CONNECT_TIMEOUT}s) — 연결 시도 중단");
+            PhotonNetwork.Disconnect();
+        }
+
+        _connectTimeoutRoutine = null;
     }
 
     public void Disconnect()
@@ -124,6 +143,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
+        if (_connectTimeoutRoutine != null)
+        {
+            StopCoroutine(_connectTimeoutRoutine);
+            _connectTimeoutRoutine = null;
+        }
+
         Debug.Log("[Network] Photon Master 서버 연결 완료");
         PhotonNetwork.JoinLobby();
     }
@@ -171,11 +196,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void OnRoomFull()
     {
         // 2인 모두 입장 → 방 닫고 게임 시작
-        if (IsMasterClient)
-            PhotonNetwork.CurrentRoom.IsOpen = false;
-
         Debug.Log("[Network] 2인 모두 입장 — 게임 시작");
-        GameEvents.RoundChanged(1);
+
+        if (!IsMasterClient) return;
+
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        BroadcastRoundStart(1);
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)
