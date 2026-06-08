@@ -1,0 +1,118 @@
+[
+  {
+    "id": 1,
+    "name": "자뭉열매",
+    "nameEn": "Sitrus Berry",
+    "description": "최대체력 +18%",
+    "statKey": "maxHpPct",
+    "statValue": 18
+  },
+  {
+    "id": 2,
+    "name": "리샘열매",
+    "nameEn": "Lum Berry",
+    "description": "첫 CC무효화",
+    "statKey": "ccImmune",
+    "statValue": 1
+  },
+  {
+    "id": 3,
+    "name": "캄라열매",
+    "nameEn": "Salac Berry",
+    "description": "공격속도 +40%",
+    "statKey": "atkSpdPct",
+    "statValue": 40
+  },
+  {
+    "id": 4,
+    "name": "치리열매",
+    "nameEn": "Liechi Berry",
+    "description": "물리 공격력 +45",
+    "statKey": "atk",
+    "statValue": 45
+  },
+  {
+    "id": 5,
+    "name": "야타비열매",
+    "nameEn": "Petaya Berry",
+    "description": "특수 공격력 +50%",
+    "statKey": "spAtkPct",
+    "statValue": 50
+  },
+  {
+    "id": 6,
+    "name": "랑사열매",
+    "nameEn": "Lansat Berry",
+    "description": "치명타율 +25%, 치명타 피해 +30%",
+    "statKey": "criPct",
+    "statValue": 25,
+    "statKey2": "criDmgPct",
+    "statValue2": 30
+  },
+  {
+    "id": 7,
+    "name": "미클열매",
+    "nameEn": "Micle Berry",
+    "description": "공격속도 +30%, 적 처치시 이동속도 +30%",
+    "statKey": "atkSpdPct",
+    "statValue": 30,
+    "statKey2": "moveSpdPctOnKill",
+    "statValue2": 30
+  },
+  {
+    "id": 8,
+    "name": "용아열매",
+    "nameEn": "Ganlon Berry",
+    "description": "방어력 +30, 물리 피격 시 받은 피해의 15% 반사",
+    "statKey": "def",
+    "statValue": 30,
+    "statKey2": "reflectPhysPct",
+    "statValue2": 15
+  },
+  {
+    "id": 9,
+    "name": "규살열매",
+    "nameEn": "Apicot Berry",
+    "description": "특수방어 +30, 특수 피격 시 받은 피해의 15% 반사",
+    "statKey": "spDef",
+    "statValue": 30,
+    "statKey2": "reflectSpPct",
+    "statValue2": 15
+  },
+  {
+    "id": 10,
+    "name": "의문열매",
+    "nameEn": "Enigma Berry",
+    "description": "치명적 피해 받을 시 최대 HP 30% 보호막 발동(1회)",
+    "statKey": "shieldPctOnFatalHit",
+    "statValue": 30
+  },
+  {
+    "id": 11,
+    "name": "과사열매",
+    "nameEn": "Leppa Berry",
+    "description": "최대 HP +200, 피격 피해의 10% HP 흡수",
+    "statKey": "hp",
+    "statValue": 200,
+    "statKey2": "healTakenDmgPct",
+    "statValue2": 10
+  },
+  {
+    "id": 12,
+    "name": "악키열매",
+    "nameEn": "Kee Berry",
+    "description": "방어력 +40, 물리 피격 시 1칸내 적에게 화상",
+    "statKey": "def",
+    "statValue": 40,
+    "statKey2": "burnNearOnPhysHit",
+    "statValue2": 1
+  },
+  {
+    "id": 13,
+    "name": "타라프열매",
+    "nameEn": "Maranga Berry",
+    "description": "자신을 공격 중인 적 1명당 방어력/특수방어 +X",
+    "statKey": "defSpDefPerAttacker",
+    "statValue": 0
+  }
+]
