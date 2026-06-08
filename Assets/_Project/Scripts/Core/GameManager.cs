@@ -7,22 +7,26 @@ using UnityEngine;
 public class GameManager : Singleton<GameManager>
 {
     [Header("매니저 참조")]
-    [SerializeField] private NetworkManager _networkManager;
-    [SerializeField] private BoardManager _boardManager;
-    [SerializeField] private BattleManager _battleManager;
-    [SerializeField] private ShopManager _shopManager;
-    [SerializeField] private SynergyManager _synergyManager;
-    [SerializeField] private ItemManager _itemManager;
-    [SerializeField] private UIManager _uiManager;
+    [SerializeField] private NetworkManager    _networkManager;
+    [SerializeField] private RoundPhaseManager _roundPhaseManager;
+    [SerializeField] private BoardManager      _boardManager;
+    [SerializeField] private BattleManager     _battleManager;
+    [SerializeField] private ShopManager       _shopManager;
+    [SerializeField] private SynergyManager    _synergyManager;
+    [SerializeField] private ItemManager       _itemManager;
+    [SerializeField] private AugmentManager    _augmentManager;
+    [SerializeField] private UIManager         _uiManager;
 
     // 외부에서 읽기 전용 접근
-    public NetworkManager Network   => _networkManager;
-    public BoardManager   Board     => _boardManager;
-    public BattleManager  Battle    => _battleManager;
-    public ShopManager    Shop      => _shopManager;
-    public SynergyManager Synergy   => _synergyManager;
-    public ItemManager    Item      => _itemManager;
-    public UIManager      UI        => _uiManager;
+    public NetworkManager    Network   => _networkManager;
+    public RoundPhaseManager Phase     => _roundPhaseManager;
+    public BoardManager      Board     => _boardManager;
+    public BattleManager     Battle    => _battleManager;
+    public ShopManager       Shop      => _shopManager;
+    public SynergyManager    Synergy   => _synergyManager;
+    public ItemManager       Item      => _itemManager;
+    public AugmentManager    Augment   => _augmentManager;
+    public UIManager         UI        => _uiManager;
 
     protected override void Awake()
     {

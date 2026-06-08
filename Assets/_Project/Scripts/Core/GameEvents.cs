@@ -28,6 +28,13 @@ public static class GameEvents
     public static event Action<int> OnLevelChanged;
 
     // ──────────────────────────────────────────
+    // 증강
+    // ──────────────────────────────────────────
+
+    /// <summary>증강 선택 완료</summary>
+    public static event Action<AugmentData> OnAugmentSelected;
+
+    // ──────────────────────────────────────────
     // 유닛
     // ──────────────────────────────────────────
 
@@ -48,16 +55,20 @@ public static class GameEvents
     public static event Action OnShopRerolled;
 
     // ──────────────────────────────────────────
-    // 라운드
+    // 라운드 / 페이즈
     // ──────────────────────────────────────────
 
     /// <summary>라운드 번호 변경. 인자 = 새 라운드 번호</summary>
     public static event Action<int> OnRoundChanged;
 
+    /// <summary>페이즈 전환. 인자 = 새 페이즈</summary>
+    public static event Action<GamePhase> OnPhaseChanged;
+
     // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
     // ──────────────────────────────────────────
 
+    public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
@@ -65,6 +76,7 @@ public static class GameEvents
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
-    public static void ShopRerolled()          => OnShopRerolled?.Invoke();
-    public static void RoundChanged(int round) => OnRoundChanged?.Invoke(round);
+    public static void ShopRerolled()               => OnShopRerolled?.Invoke();
+    public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
+    public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
 }

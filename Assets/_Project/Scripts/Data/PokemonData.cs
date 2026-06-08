@@ -32,6 +32,10 @@ public class PokemonData : ScriptableObject
     [Header("스킬")]
     public PokemonSkillData skill;
 
+    [Header("진화")]
+    /// <summary>3마리 모았을 때 변환될 포켓몬 영문명. 최종 진화형은 비워둠.</summary>
+    public string evolvesIntoEn;
+
     [Header("에셋 참조")]
     public GameObject modelPrefab;
     public Sprite icon;

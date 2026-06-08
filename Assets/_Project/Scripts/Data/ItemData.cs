@@ -1,11 +1,4 @@
-using System.Collections.Generic;
 using UnityEngine;
-
-public enum ItemCategory
-{
-    Ingredient,  // 재료 열매
-    Result       // 조합 결과
-}
 
 [CreateAssetMenu(menuName = "PokeChess/Item", fileName = "NewItem_Data")]
 public class ItemData : ScriptableObject
@@ -14,23 +7,33 @@ public class ItemData : ScriptableObject
     public int id;
     public string itemName;
     public string itemNameEn;
-    public ItemCategory category;
 
     [TextArea]
     public string description;
 
-    [Header("조합")]
-    /// <summary>조합 재료 이름 목록. 재료 열매는 빈 리스트.</summary>
-    public List<string> recipe = new();
-
     [Header("스탯 효과")]
-    // TODO: 아이템 효과 확정 후 필드 추가
-    // 예시 필드들 (필요한 것만 남기고 나머지 삭제)
-    public float hpBonus;
-    public float attackBonus;
-    public float defenseBonus;
-    public float attackSpeedBonus;
-    public float hpRegenPercent;    // 매 초 최대 HP의 N% 회복
+    public float hpBonus;               // hp
+    public float maxHpPct;              // maxHpPct
+    public float hpRegenPercent;        // hpRegenPercent — 매 초 최대 HP의 N% 회복
+    public float healTakenDmgPct;       // healTakenDmgPct — 피격 피해의 N% 흡수
+    public float shieldPctOnFatalHit;   // shieldPctOnFatalHit — 치명적 피해 시 최대HP N% 보호막
+
+    public float attackBonus;           // atk
+    public float spAtkPct;              // spAtkPct
+    public float attackSpeedBonus;      // atkSpdPct
+    public float moveSpdPctOnKill;      // moveSpdPctOnKill — 적 처치 시 이동속도 N%
+
+    public float defenseBonus;          // def
+    public float spDefBonus;            // spDef
+    public float reflectPhysPct;        // reflectPhysPct — 물리 피해 N% 반사
+    public float reflectSpPct;          // reflectSpPct — 특수 피해 N% 반사
+    public float defSpDefPerAttacker;   // defSpDefPerAttacker — 공격 중인 적 1명당 방/특방 +N
+
+    public float criPct;                // criPct — 치명타율 N%
+    public float criDmgPct;             // criDmgPct — 치명타 피해 N%
+
+    public bool  burnNearOnPhysHit;     // burnNearOnPhysHit — 물리 피격 시 주변 적 화상
+    public bool  ccImmune;              // ccImmune — 첫 CC 무효화
 
     [Header("에셋 참조")]
     public Sprite icon;

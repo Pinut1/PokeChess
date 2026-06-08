@@ -18,9 +18,11 @@ public static class PokeChessImporter
     // JSON 데이터 클래스 (JsonUtility용 래퍼)
     // ──────────────────────────────────────────
 
-    [Serializable] private class PokemonDatabase    { public List<PokemonEntry> pokemon; }
-    [Serializable] private class ItemDatabase       { public List<ItemEntry>    items;   }
-    [Serializable] private class SynergyDatabase    { public List<SynergyEntry> synergies; }
+    [Serializable] private class PokemonDatabase    { public List<PokemonEntry>    pokemon;    }
+    [Serializable] private class ItemDatabase       { public List<ItemEntry>       items;      }
+    [Serializable] private class SynergyDatabase    { public List<SynergyEntry>    synergies;  }
+    [Serializable] private class ConsumableDatabase { public List<ConsumableEntry> consumables;}
+    [Serializable] private class StoneDatabase      { public List<StoneEntry> stones; }
 
     [Serializable]
     private class PokemonEntry
@@ -33,6 +35,7 @@ public static class PokeChessImporter
         public List<string> synergies;
         public string attackType;
         public SkillEntry skill;
+        public string evolvesInto;   // 진화 후 포켓몬 영문명 (최종형은 빈 문자열)
         public string modelPath, iconPath;
     }
 
@@ -50,8 +53,9 @@ public static class PokeChessImporter
     private class ItemEntry
     {
         public int id;
-        public string name, nameEn, category, description;
-        public List<string> recipe;
+        public string name, nameEn, description;
+        public string statKey, statKey2;
+        public float  statValue, statValue2;
     }
 
     [Serializable]
@@ -67,6 +71,21 @@ public static class PokeChessImporter
     {
         public int count;
         public string effect;
+    }
+
+    [Serializable]
+    private class ConsumableEntry
+    {
+        public int id;
+        public string name, nameEn, consumableType, description;
+    }
+
+    [Serializable]
+    private class StoneEntry
+    {
+        public int id;
+        public string name, nameEn, stoneType, description;
+        public string targetPokemon, evolvedPokemon;   // 매핑 (행마다 하나씩)
     }
 
     // ──────────────────────────────────────────
@@ -113,6 +132,8 @@ public static class PokeChessImporter
                 lineLength  = e.skill.lineLength
             };
 
+            so.evolvesIntoEn = e.evolvesInto ?? "";
+
             // modelPrefab / icon 은 덮어쓰지 않음 (Inspector 수동 연결 보호)
             EditorUtility.SetDirty(so);
         }
@@ -127,7 +148,12 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/item_data");
         if (json == null) { Debug.LogError("[PokeChess] item_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<ItemDatabase>(json.text);
+        // 루트가 배열([])로 export된 경우 래핑
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"items\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<ItemDatabase>(jsonText);
         string dir = $"{SO_PATH}/Items";
         EnsureDir(dir);
 
@@ -139,15 +165,96 @@ public static class PokeChessImporter
             so.id          = e.id;
             so.itemName    = e.name;
             so.itemNameEn  = e.nameEn;
-            so.category    = e.category == "ingredient" ? ItemCategory.Ingredient : ItemCategory.Result;
             so.description = e.description;
-            so.recipe      = e.recipe ?? new List<string>();
+
+            if (!string.IsNullOrEmpty(e.statKey))  ApplyItemStat(so, e.statKey,  e.statValue);
+            if (!string.IsNullOrEmpty(e.statKey2)) ApplyItemStat(so, e.statKey2, e.statValue2);
 
             EditorUtility.SetDirty(so);
         }
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 아이템 {db.items.Count}종 Import 완료");
+    }
+
+    [MenuItem("PokeChess/Import Consumable JSON")]
+    public static void ImportConsumables()
+    {
+        var json = Resources.Load<TextAsset>("Data/consumable_data");
+        if (json == null) { Debug.LogError("[PokeChess] consumable_data.json 없음"); return; }
+
+        var db  = JsonUtility.FromJson<ConsumableDatabase>(json.text);
+        string dir = $"{SO_PATH}/Consumables";
+        EnsureDir(dir);
+
+        foreach (var e in db.consumables)
+        {
+            string path = $"{dir}/{e.nameEn}_Consumable.asset";
+            var so = LoadOrCreate<ConsumableData>(path);
+
+            so.id              = e.id;
+            so.consumableName  = e.name;
+            so.consumableNameEn = e.nameEn;
+            so.consumableType  = e.consumableType;
+            so.description     = e.description;
+
+            EditorUtility.SetDirty(so);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 소모템 {db.consumables.Count}종 Import 완료");
+    }
+
+    [MenuItem("PokeChess/Import EvolutionStone JSON")]
+    public static void ImportEvolutionStones()
+    {
+        var json = Resources.Load<TextAsset>("Data/evolution_stone_data");
+        if (json == null) { Debug.LogError("[PokeChess] evolution_stone_data.json 없음"); return; }
+
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"stones\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<StoneDatabase>(jsonText);
+
+        // id로 그룹핑 → SO 1개당 매핑 여러 개
+        var groups = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<StoneEntry>>();
+        foreach (var e in db.stones)
+        {
+            if (!groups.ContainsKey(e.id))
+                groups[e.id] = new System.Collections.Generic.List<StoneEntry>();
+            groups[e.id].Add(e);
+        }
+
+        string dir = $"{SO_PATH}/EvolutionStones";
+        EnsureDir(dir);
+
+        foreach (var kv in groups)
+        {
+            var first = kv.Value[0];
+            string path = $"{dir}/{first.nameEn}_Stone.asset";
+            var so = LoadOrCreate<EvolutionStoneData>(path);
+
+            so.id          = first.id;
+            so.stoneName   = first.name;
+            so.stoneNameEn = first.nameEn;
+            so.stoneType   = first.stoneType;
+            so.description = first.description;
+
+            so.mappings.Clear();
+            foreach (var e in kv.Value)
+                if (!string.IsNullOrEmpty(e.targetPokemon))
+                    so.mappings.Add(new EvolutionMapping
+                    {
+                        targetPokemon  = e.targetPokemon,
+                        evolvedPokemon = e.evolvedPokemon
+                    });
+
+            EditorUtility.SetDirty(so);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료");
     }
 
     [MenuItem("PokeChess/Import Synergy JSON")]
@@ -183,6 +290,32 @@ public static class PokeChessImporter
     // ──────────────────────────────────────────
     // 유틸
     // ──────────────────────────────────────────
+
+    private static void ApplyItemStat(ItemData so, string key, float value)
+    {
+        switch (key)
+        {
+            case "hp":                  so.hpBonus              = value; break;
+            case "maxHpPct":            so.maxHpPct             = value; break;
+            case "hpRegenPercent":      so.hpRegenPercent       = value; break;
+            case "healTakenDmgPct":     so.healTakenDmgPct      = value; break;
+            case "shieldPctOnFatalHit": so.shieldPctOnFatalHit  = value; break;
+            case "atk":                 so.attackBonus          = value; break;
+            case "spAtkPct":            so.spAtkPct             = value; break;
+            case "atkSpdPct":           so.attackSpeedBonus     = value; break;
+            case "moveSpdPctOnKill":    so.moveSpdPctOnKill     = value; break;
+            case "def":                 so.defenseBonus         = value; break;
+            case "spDef":               so.spDefBonus           = value; break;
+            case "reflectPhysPct":      so.reflectPhysPct       = value; break;
+            case "reflectSpPct":        so.reflectSpPct         = value; break;
+            case "defSpDefPerAttacker": so.defSpDefPerAttacker  = value; break;
+            case "criPct":              so.criPct               = value; break;
+            case "criDmgPct":           so.criDmgPct            = value; break;
+            case "burnNearOnPhysHit":   so.burnNearOnPhysHit    = value > 0; break;
+            case "ccImmune":            so.ccImmune             = value > 0; break;
+            default: Debug.LogWarning($"[PokeChess] 알 수 없는 statKey: {key}"); break;
+        }
+    }
 
     private static T LoadOrCreate<T>(string path) where T : ScriptableObject
     {
