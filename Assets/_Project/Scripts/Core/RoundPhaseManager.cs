@@ -31,14 +31,16 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnRoundChanged += HandleRoundChanged;
-        GameEvents.OnBattleEnd    += HandleBattleEnd;
+        GameEvents.OnRoundChanged   += HandleRoundChanged;
+        GameEvents.OnBattleEnd      += HandleBattleEnd;
+        GameEvents.OnAllPlayersReady += HandleAllPlayersReady;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnRoundChanged -= HandleRoundChanged;
-        GameEvents.OnBattleEnd    -= HandleBattleEnd;
+        GameEvents.OnRoundChanged   -= HandleRoundChanged;
+        GameEvents.OnBattleEnd      -= HandleBattleEnd;
+        GameEvents.OnAllPlayersReady -= HandleAllPlayersReady;
     }
 
     // ─────────────────────────────────────────
@@ -54,6 +56,12 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleBattleEnd(bool isWin)
     {
         EnterPhase(GamePhase.Result);
+    }
+
+    private void HandleAllPlayersReady()
+    {
+        if (CurrentPhase != GamePhase.Shopping) return;
+        EnterPhase(GamePhase.Battle);
     }
 
     // ─────────────────────────────────────────
@@ -110,11 +118,26 @@ public class RoundPhaseManager : MonoBehaviour
 
     /// <summary>
     /// 쇼핑 페이즈에서 준비 완료 버튼 누를 때 호출.
-    /// TODO: 2인 모두 준비 시 즉시 전투 돌입 — 기획 확정 후 구현.
+    /// 2인 모두 준비되면 GameEvents.OnAllPlayersReady를 통해 전투 페이즈로 전환됨.
     /// </summary>
     public void PlayerReady()
     {
         if (CurrentPhase != GamePhase.Shopping) return;
-        EnterPhase(GamePhase.Battle);
+        GameManager.Instance.Network.BroadcastPlayerReady();
+    }
+
+    // ─────────────────────────────────────────
+    // 임시 디버그 UI
+    // ─────────────────────────────────────────
+
+    private void OnGUI()
+    {
+        if (CurrentPhase != GamePhase.Shopping) return;
+
+        var style = new GUIStyle(GUI.skin.button) { fontSize = 36 };
+        var rect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
+
+        if (GUI.Button(rect, "Ready", style))
+            PlayerReady();
     }
 }

@@ -41,6 +41,8 @@ MonoBehaviour:
   - RespawnSpaceship
   - RPC_OnBattleStart
   - RPC_OnRoundStart
+  - RPC_OnAllPlayersReady
+  - RPC_OnPlayerReady
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

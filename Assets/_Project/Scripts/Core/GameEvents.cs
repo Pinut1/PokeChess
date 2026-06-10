@@ -17,6 +17,9 @@ public static class GameEvents
     /// <summary>전투 종료. true = 승, false = 패</summary>
     public static event Action<bool> OnBattleEnd;
 
+    /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
+    public static event Action OnAllPlayersReady;
+
     // ──────────────────────────────────────────
     // 골드 / 레벨
     // ──────────────────────────────────────────
@@ -71,6 +74,7 @@ public static class GameEvents
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
+    public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);

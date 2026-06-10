@@ -27,6 +27,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool IsMasterClient => PhotonNetwork.IsMasterClient;
     public int  PlayerCount   => PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
 
+    /// <summary>MasterClient에서만 집계되는 "준비 완료" 인원 수</summary>
+    private int _readyCount = 0;
+
     // ─────────────────────────────────────────
     // 연결
     // ─────────────────────────────────────────
@@ -119,6 +122,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
     }
 
+    /// <summary>쇼핑 페이즈에서 "준비 완료" 버튼 누를 때 호출. MasterClient에 보고.</summary>
+    public void BroadcastPlayerReady()
+    {
+        photonView.RPC(nameof(RPC_OnPlayerReady), RpcTarget.MasterClient);
+    }
+
     // ─────────────────────────────────────────
     // RPC 수신
     // ─────────────────────────────────────────
@@ -127,7 +136,31 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_OnRoundStart(int round)
     {
         Debug.Log($"[Network] 라운드 {round} 시작 수신");
+        _readyCount = 0;
         GameEvents.RoundChanged(round);
+    }
+
+    /// <summary>MasterClient만 처리. 준비 인원이 모이면 전체에 알림.</summary>
+    [PunRPC]
+    private void RPC_OnPlayerReady()
+    {
+        if (!IsMasterClient) return;
+
+        _readyCount++;
+        Debug.Log($"[Network] 준비 완료 {_readyCount}/{PlayerCount}");
+
+        if (_readyCount >= PlayerCount)
+        {
+            _readyCount = 0;
+            photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
+        }
+    }
+
+    [PunRPC]
+    private void RPC_OnAllPlayersReady()
+    {
+        Debug.Log("[Network] 2인 모두 준비 완료");
+        GameEvents.AllPlayersReady();
     }
 
     [PunRPC]
@@ -242,6 +275,9 @@ public class NetworkManager : MonoBehaviour
     public void LeaveRoom()         { }
     public void BroadcastRoundStart(int round) => GameEvents.RoundChanged(round);
     public void BroadcastBattleStart()         => GameEvents.BattleStart();
+
+    /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
+    public void BroadcastPlayerReady()         => GameEvents.AllPlayersReady();
 }
 
 #endif
