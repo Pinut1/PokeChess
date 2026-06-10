@@ -105,7 +105,7 @@ namespace PokeChess.Managers
             {
                 Debug.Log($"[BoardManager] 빈 타일입니다. 유닛을 배치합니다.");
                 _battleField[targetCoords] = unit;
-                // GameEvents.UnitPlaced(unit); // 이벤트 발송 (추후 연결)
+                GameEvents.UnitPlaced(unit);
             }
         }
     }
