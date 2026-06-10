@@ -43,6 +43,7 @@ MonoBehaviour:
   - RPC_OnRoundStart
   - RPC_OnAllPlayersReady
   - RPC_OnPlayerReady
+  - RPC_SetTarget
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

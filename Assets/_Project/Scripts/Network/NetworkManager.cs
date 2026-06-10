@@ -36,7 +36,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void Start()
     {
-        PhotonNetwork.AutomaticallySyncScene = false;
+        PhotonNetwork.AutomaticallySyncScene = true;
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
     }
 
@@ -234,6 +234,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!IsMasterClient) return;
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.LoadLevel("GameSceneTest");
         BroadcastRoundStart(1);
     }
 
