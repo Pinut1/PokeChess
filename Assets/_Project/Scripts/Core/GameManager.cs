@@ -34,7 +34,8 @@ public class GameManager : Singleton<GameManager>
         if (Instance != this) return; // 중복 인스턴스는 base.Awake에서 이미 Destroy됨
 
         ValidateReferences();
-        // TODO: 매니저 초기화 순서 확정 후 Init() 호출 추가
+        // 각 매니저는 Awake/OnEnable/Start로 자체 초기화하며 GameEvents로만 통신하므로
+        // 별도의 Init() 순서 제어는 불필요. 매니저 간 직접 의존이 생기면 그때 도입.
     }
 
     private void ValidateReferences()
