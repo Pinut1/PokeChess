@@ -18,6 +18,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private const int   MAX_PLAYERS = 2;
     private const float CONNECT_TIMEOUT = 10f;
 
+    /// <summary>연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용.</summary>
+    private const float RECONNECT_GRACE_PERIOD = 60f;
+
+    /// <summary>JoinRandomRoom 실패(빈 방 없음) 시 생성/입장할 고정 방 이름. 양쪽 클라이언트가 같은 이름을 써야 서로 만날 수 있음.</summary>
+    private const string FALLBACK_ROOM_NAME = "PokeChessRoom";
+
     // ─────────────────────────────────────────
     // 상태 프로퍼티 (읽기 전용)
     // ─────────────────────────────────────────
@@ -30,6 +36,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>MasterClient에서만 집계되는 "준비 완료" 인원 수</summary>
     private int _readyCount = 0;
 
+    /// <summary>상대방 재접속 유예 타이머</summary>
+    private Coroutine _opponentGraceRoutine;
+
+    /// <summary>본인 재접속 시도 타이머</summary>
+    private Coroutine _selfReconnectRoutine;
+
     // ─────────────────────────────────────────
     // 연결
     // ─────────────────────────────────────────
@@ -38,6 +50,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         PhotonNetwork.AutomaticallySyncScene = true;
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
+
+        // ReconnectAndRejoin이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
+        // AuthValues를 미리 고정해두지 않으면 재접속 시 새 UserId가 발급되어
+        // "User does not exist in this game" 오류로 입장이 거부됨.
+        PhotonNetwork.AuthValues = new AuthenticationValues(System.Guid.NewGuid().ToString());
     }
 
     private Coroutine _connectTimeoutRoutine;
@@ -78,7 +95,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public void CreateRoom(string roomName)
     {
-        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS, IsVisible = true };
+        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS, IsVisible = true, PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000) };
         PhotonNetwork.CreateRoom(roomName, options);
     }
 
@@ -89,7 +106,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public void JoinOrCreateRoom(string roomName)
     {
-        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS };
+        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS, PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000) };
         PhotonNetwork.JoinOrCreateRoom(roomName, options, TypedLobby.Default);
     }
 
@@ -201,6 +218,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
         Debug.LogError($"[Network] 룸 생성 실패 ({returnCode}): {message}");
+
+        // 그 사이 다른 클라이언트가 같은 이름의 방을 먼저 만든 경우 → 그 방으로 입장
+        if (returnCode == ErrorCode.GameIdAlreadyExists)
+        {
+            Debug.Log($"[Network] '{FALLBACK_ROOM_NAME}' 방이 이미 존재 → 입장 시도");
+            JoinRoom(FALLBACK_ROOM_NAME);
+        }
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
@@ -210,20 +234,53 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRandomFailed(short returnCode, string message)
     {
-        Debug.LogWarning("[Network] 랜덤 룸 없음 → 새 룸 생성");
-        CreateRoom($"Room_{Random.Range(1000, 9999)}");
+        Debug.LogWarning($"[Network] 랜덤 룸 없음 → '{FALLBACK_ROOM_NAME}' 생성/입장 시도");
+        CreateRoom(FALLBACK_ROOM_NAME);
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         Debug.Log($"[Network] {newPlayer.NickName} 입장 | 인원: {PlayerCount}/{MAX_PLAYERS}");
+
+        if (_opponentGraceRoutine != null)
+        {
+            StopCoroutine(_opponentGraceRoutine);
+            _opponentGraceRoutine = null;
+            Debug.Log("[Network] 상대 재접속 성공 — 유예 타이머 취소");
+            GameEvents.OpponentReconnected();
+        }
+
         if (PlayerCount == MAX_PLAYERS)
             OnRoomFull();
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        Debug.Log($"[Network] {otherPlayer.NickName} 퇴장");
+        Debug.Log($"[Network] {otherPlayer.NickName} 퇴장 (Inactive: {otherPlayer.IsInactive})");
+
+        if (!otherPlayer.IsInactive)
+        {
+            // 자진 퇴장(룸 영구 이탈) — 유예 없이 바로 처리
+            GameEvents.GracePeriodExpired(false);
+            return;
+        }
+
+        if (_opponentGraceRoutine != null)
+            StopCoroutine(_opponentGraceRoutine);
+        _opponentGraceRoutine = StartCoroutine(OpponentGraceRoutine());
+
+        GameEvents.OpponentDisconnected(RECONNECT_GRACE_PERIOD);
+    }
+
+    /// <summary>상대방 연결 끊김 후 재접속 유예 타이머. 시간 내 재접속하면 OnPlayerEnteredRoom에서 취소됨.</summary>
+    private System.Collections.IEnumerator OpponentGraceRoutine()
+    {
+        yield return new WaitForSeconds(RECONNECT_GRACE_PERIOD);
+        _opponentGraceRoutine = null;
+
+        bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
+        Debug.LogWarning($"[Network] 상대 재접속 유예시간 종료 (둘 다 끊김: {bothDisconnected})");
+        GameEvents.GracePeriodExpired(bothDisconnected);
     }
 
     private void OnRoomFull()
@@ -246,6 +303,38 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnDisconnected(DisconnectCause cause)
     {
         Debug.LogWarning($"[Network] 연결 끊김: {cause}");
+
+        // 자진 퇴장(LeaveRoom/Disconnect 직접 호출)은 재접속 시도 안 함
+        if (cause == DisconnectCause.DisconnectByClientLogic) return;
+
+        if (_selfReconnectRoutine != null)
+            StopCoroutine(_selfReconnectRoutine);
+        _selfReconnectRoutine = StartCoroutine(SelfReconnectRoutine());
+    }
+
+    /// <summary>본인 연결이 끊겼을 때 유예시간 동안 재접속 시도. 실패 시 세션 종료(패배 처리).</summary>
+    private System.Collections.IEnumerator SelfReconnectRoutine()
+    {
+        Debug.Log($"[Network] 재접속 시도 시작 (유예 {RECONNECT_GRACE_PERIOD}초)");
+        PhotonNetwork.ReconnectAndRejoin();
+
+        float elapsed = 0f;
+        while (elapsed < RECONNECT_GRACE_PERIOD)
+        {
+            if (PhotonNetwork.InRoom)
+            {
+                Debug.Log("[Network] 재접속 성공");
+                _selfReconnectRoutine = null;
+                yield break;
+            }
+
+            yield return new WaitForSeconds(1f);
+            elapsed += 1f;
+        }
+
+        Debug.LogWarning("[Network] 재접속 실패 — 세션 종료(패배 처리)");
+        _selfReconnectRoutine = null;
+        GameEvents.SessionEnded();
     }
 }
 
