@@ -5,8 +5,8 @@ using UnityEngine.SceneManagement;
 using Photon.Pun;
 
 /// <summary>
-/// 씬 전환 동기화 확인용 임시 스크립트. 검증 후 삭제 예정.
-/// GameSceneTest 씬에 배치 — 양쪽 클라이언트가 같은 씬으로 전환됐는지 화면에 표시.
+/// 씬 전환 동기화 디버그 표시용. GameSceneTest 씬에 배치 — 양쪽 클라이언트가 같은 씬으로 전환됐는지 화면에 표시.
+/// (6/10 검증 완료, 추후 네트워크 동작 확인용으로 유지)
 /// </summary>
 public class SceneSyncDebugTest : MonoBehaviour
 {

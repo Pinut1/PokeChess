@@ -1,6 +1,7 @@
 using UnityEngine;
 
 #if PHOTON_UNITY_NETWORKING
+using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 
@@ -18,6 +19,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private const int   MAX_PLAYERS = 2;
     private const float CONNECT_TIMEOUT = 10f;
 
+    /// <summary>"준비 완료" 여부를 Player CustomProperties에 저장할 때 쓰는 키</summary>
+    private const string READY_PROP_KEY = "Ready";
+
     /// <summary>연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용.</summary>
     private const float RECONNECT_GRACE_PERIOD = 60f;
 
@@ -32,9 +36,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool IsInRoom      => PhotonNetwork.InRoom;
     public bool IsMasterClient => PhotonNetwork.IsMasterClient;
     public int  PlayerCount   => PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
-
-    /// <summary>MasterClient에서만 집계되는 "준비 완료" 인원 수</summary>
-    private int _readyCount = 0;
 
     /// <summary>상대방 재접속 유예 타이머</summary>
     private Coroutine _opponentGraceRoutine;
@@ -139,10 +140,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
     }
 
-    /// <summary>쇼핑 페이즈에서 "준비 완료" 버튼 누를 때 호출. MasterClient에 보고.</summary>
+    /// <summary>쇼핑 페이즈에서 "준비 완료" 버튼 누를 때 호출. 자신의 준비 상태를 CustomProperties에 기록.</summary>
     public void BroadcastPlayerReady()
     {
-        photonView.RPC(nameof(RPC_OnPlayerReady), RpcTarget.MasterClient);
+        var props = new Hashtable { { READY_PROP_KEY, true } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
     // ─────────────────────────────────────────
@@ -153,24 +155,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_OnRoundStart(int round)
     {
         Debug.Log($"[Network] 라운드 {round} 시작 수신");
-        _readyCount = 0;
+
+        // 각 클라이언트가 자기 자신의 준비 상태를 리셋
+        var props = new Hashtable { { READY_PROP_KEY, false } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
         GameEvents.RoundChanged(round);
-    }
-
-    /// <summary>MasterClient만 처리. 준비 인원이 모이면 전체에 알림.</summary>
-    [PunRPC]
-    private void RPC_OnPlayerReady()
-    {
-        if (!IsMasterClient) return;
-
-        _readyCount++;
-        Debug.Log($"[Network] 준비 완료 {_readyCount}/{PlayerCount}");
-
-        if (_readyCount >= PlayerCount)
-        {
-            _readyCount = 0;
-            photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
-        }
     }
 
     [PunRPC]
@@ -293,6 +283,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.LoadLevel("GameSceneTest");
         BroadcastRoundStart(1);
+    }
+
+    /// <summary>
+    /// 플레이어의 CustomProperties(준비 상태)가 바뀔 때마다 호출됨.
+    /// MasterClient만 검사 — 모든 플레이어가 준비 완료면 전체에 알림.
+    /// _readyCount(로컬 변수) 대신 Player CustomProperties를 직접 조회하므로
+    /// MasterClient가 교체돼도 준비 상태가 유실되지 않음.
+    /// </summary>
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        if (!IsMasterClient) return;
+        if (!changedProps.ContainsKey(READY_PROP_KEY)) return;
+
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            bool isReady = player.CustomProperties.TryGetValue(READY_PROP_KEY, out object ready) && (bool)ready;
+            if (!isReady) return;
+        }
+
+        photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)
