@@ -68,6 +68,22 @@ public static class GameEvents
     public static event Action<GamePhase> OnPhaseChanged;
 
     // ──────────────────────────────────────────
+    // 연결 끊김 / 재접속
+    // ──────────────────────────────────────────
+
+    /// <summary>상대방 연결 끊김(재접속 대기 중). 인자 = 유예 시간(초)</summary>
+    public static event Action<float> OnOpponentDisconnected;
+
+    /// <summary>상대방이 유예시간 내 재접속함</summary>
+    public static event Action OnOpponentReconnected;
+
+    /// <summary>재접속 유예시간 종료. 인자 = 둘 다 끊겼는지 여부 (true면 세션 종료)</summary>
+    public static event Action<bool> OnGracePeriodExpired;
+
+    /// <summary>세션 종료(패배 처리). 전적 기록은 미구현 — 로그로만 처리</summary>
+    public static event Action OnSessionEnded;
+
+    // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
     // ──────────────────────────────────────────
 
@@ -83,4 +99,9 @@ public static class GameEvents
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
+
+    public static void OpponentDisconnected(float graceSeconds) => OnOpponentDisconnected?.Invoke(graceSeconds);
+    public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();
+    public static void GracePeriodExpired(bool bothDisconnected) => OnGracePeriodExpired?.Invoke(bothDisconnected);
+    public static void SessionEnded()               => OnSessionEnded?.Invoke();
 }
