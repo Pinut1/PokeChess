@@ -50,6 +50,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         PhotonNetwork.AutomaticallySyncScene = true;
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
+
+        // ReconnectAndRejoin이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
+        // AuthValues를 미리 고정해두지 않으면 재접속 시 새 UserId가 발급되어
+        // "User does not exist in this game" 오류로 입장이 거부됨.
+        PhotonNetwork.AuthValues = new AuthenticationValues(System.Guid.NewGuid().ToString());
     }
 
     private Coroutine _connectTimeoutRoutine;
