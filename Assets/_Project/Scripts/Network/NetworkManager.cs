@@ -21,6 +21,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용.</summary>
     private const float RECONNECT_GRACE_PERIOD = 60f;
 
+    /// <summary>JoinRandomRoom 실패(빈 방 없음) 시 생성/입장할 고정 방 이름. 양쪽 클라이언트가 같은 이름을 써야 서로 만날 수 있음.</summary>
+    private const string FALLBACK_ROOM_NAME = "PokeChessRoom";
+
     // ─────────────────────────────────────────
     // 상태 프로퍼티 (읽기 전용)
     // ─────────────────────────────────────────
@@ -210,6 +213,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
         Debug.LogError($"[Network] 룸 생성 실패 ({returnCode}): {message}");
+
+        // 그 사이 다른 클라이언트가 같은 이름의 방을 먼저 만든 경우 → 그 방으로 입장
+        if (returnCode == ErrorCode.GameIdAlreadyExists)
+        {
+            Debug.Log($"[Network] '{FALLBACK_ROOM_NAME}' 방이 이미 존재 → 입장 시도");
+            JoinRoom(FALLBACK_ROOM_NAME);
+        }
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
@@ -219,8 +229,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRandomFailed(short returnCode, string message)
     {
-        Debug.LogWarning("[Network] 랜덤 룸 없음 → 새 룸 생성");
-        CreateRoom($"Room_{Random.Range(1000, 9999)}");
+        Debug.LogWarning($"[Network] 랜덤 룸 없음 → '{FALLBACK_ROOM_NAME}' 생성/입장 시도");
+        CreateRoom(FALLBACK_ROOM_NAME);
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
