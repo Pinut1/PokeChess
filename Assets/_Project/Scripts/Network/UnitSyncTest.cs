@@ -4,9 +4,9 @@ using UnityEngine;
 using Photon.Pun;
 
 /// <summary>
-/// 네트워크 동기화 검증용 임시 스크립트. 검증 후 삭제 예정.
-/// MasterClient가 주기적으로 각 유닛(큐브)의 목표 위치를 랜덤으로 정해 RPC로 전체에 브로드캐스트.
+/// RPC 기반 위치 동기화 패턴 디버그용. MasterClient가 주기적으로 각 유닛(큐브)의 목표 위치를 랜덤으로 정해 RPC로 전체에 브로드캐스트.
 /// 모든 클라이언트는 수신한 목표 위치로만 이동 — 직접 랜덤을 굴리지 않음.
+/// (6/10 검증 완료, 추후 RPC 동작 확인용으로 유지)
 /// </summary>
 public class UnitSyncTest : MonoBehaviourPun
 {
