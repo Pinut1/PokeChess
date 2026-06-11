@@ -12,8 +12,20 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private int _cols = 7; // 가로 (TFT 기준 7)
     [SerializeField] private int _rows = 4; // 세로 (TFT 기준 4)
 
+    [Header("Bench Settings")]
+    [SerializeField] private int _benchSize = 9; // TFT 기준 벤치 슬롯 수
+
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
+
+    // TODO(UnitField): 벤치 슬롯. 1차원 배열로 시작 (인덱스 = 슬롯 번호).
+    // 다음 작업: TryPlaceInBench/RemoveFromBench/GetUnitsInBench 구현 + BenchTile(IDropTarget) 연동
+    private PokemonUnit[] _bench;
+
+    private void Awake()
+    {
+        _bench = new PokemonUnit[_benchSize];
+    }
 
     private void Start()
     {
@@ -78,6 +90,21 @@ public class BoardManager : MonoBehaviour
             Vector3 centerOffset = sumPosition / totalTiles;
             boardAnchor.transform.position = -centerOffset;
         }
+    }
+
+    /// <summary>
+    /// 현재 보드 위에 배치된 유닛 목록을 반환합니다.
+    /// SynergyManager 등이 OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 시 이 API로 직접 조회(pull)합니다.
+    /// </summary>
+    public List<PokemonUnit> GetUnitsOnBoard()
+    {
+        List<PokemonUnit> units = new List<PokemonUnit>();
+        foreach (PokemonUnit unit in _battleField.Values)
+        {
+            if (unit != null)
+                units.Add(unit);
+        }
+        return units;
     }
 
     /// <summary>
