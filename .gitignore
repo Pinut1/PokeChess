@@ -75,3 +75,6 @@ Thumbs.db
 # Rider
 .idea/
 *.choices
+
+# Unity crash recovery snapshots
+/[Aa]ssets/_Recovery/
