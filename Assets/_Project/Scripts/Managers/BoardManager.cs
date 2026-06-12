@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 전장(Board) 헥스 타일을 생성하고, 타일 위에 놓인 유닛들의 배치를 통제하는 매니저.
+/// 전장(Board) 헥스 타일을 생성하고, 타일/벤치 위에 놓인 유닛들의 배치를 통제하는 매니저.
+/// 보드 상태(_battleField)와 벤치 상태(_bench)의 단일 진실 공급원.
+/// 다른 매니저는 GameEvents 트리거 수신 후 GetUnitsOnBoard()/GetUnitsInBench()로 pull.
 /// </summary>
 public class BoardManager : MonoBehaviour
 {
@@ -18,8 +20,7 @@ public class BoardManager : MonoBehaviour
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
 
-    // TODO(UnitField): 벤치 슬롯. 1차원 배열로 시작 (인덱스 = 슬롯 번호).
-    // 다음 작업: TryPlaceInBench/RemoveFromBench/GetUnitsInBench 구현 + BenchTile(IDropTarget) 연동
+    // 벤치 슬롯. 인덱스 = 슬롯 번호. null = 빈 슬롯.
     private PokemonUnit[] _bench;
 
     private void Awake()
@@ -72,7 +73,8 @@ public class BoardManager : MonoBehaviour
                 newTile.transform.localPosition = worldPos;
 
                 // 타일에게 콜백 무전기 주입! (이름도 예쁘게 세팅)
-                newTile.Initialize(coords, TryPlaceUnit, $"Tile_{row}_{col}");
+                // TryPlaceUnit은 bool을 반환하므로 Action으로 받기 위해 람다로 감싼다(반환값 무시).
+                newTile.Initialize(coords, (unit, c) => TryPlaceUnit(unit, c), $"Tile_{row}_{col}");
 
                 // 금고에 빈 타일 등록
                 _battleField.Add(coords, null);
@@ -92,6 +94,10 @@ public class BoardManager : MonoBehaviour
         }
     }
 
+    // ──────────────────────────────────────────
+    // 조회 API (pull)
+    // ──────────────────────────────────────────
+
     /// <summary>
     /// 현재 보드 위에 배치된 유닛 목록을 반환합니다.
     /// SynergyManager 등이 OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 시 이 API로 직접 조회(pull)합니다.
@@ -107,29 +113,166 @@ public class BoardManager : MonoBehaviour
         return units;
     }
 
-    /// <summary>
-    /// 타일에서 마우스 드롭이 일어났을 때 콜백(Action)으로 호출되는 함수입니다.
-    /// </summary>
-    public void TryPlaceUnit(PokemonUnit unit, HexCoords targetCoords)
+    /// <summary>현재 벤치에 있는 유닛 목록을 반환합니다.</summary>
+    public List<PokemonUnit> GetUnitsInBench()
     {
-        // 아직 PlayerController나 PokemonUnit 더미가 없으므로 로그만 찍습니다.
-        Debug.Log($"[BoardManager] 유닛을 {targetCoords} 좌표에 배치하려고 시도합니다!");
-
-        // 1. targetCoords가 딕셔너리에 존재하는지 확인
-        if (!_battleField.ContainsKey(targetCoords)) return;
-
-        // 2. 이미 누군가 있는지 확인 (추후 Swap 로직 연결)
-        PokemonUnit occupant = _battleField[targetCoords];
-        if (occupant != null)
+        List<PokemonUnit> units = new List<PokemonUnit>();
+        foreach (PokemonUnit unit in _bench)
         {
-            Debug.Log($"[BoardManager] 해당 타일에는 이미 누군가 있습니다. (스왑 필요)");
-            // Swap 로직 추가 예정
+            if (unit != null)
+                units.Add(unit);
+        }
+        return units;
+    }
+
+    /// <summary>보드 위 빈 좌표→유닛 매핑(읽기 전용 스냅샷). 전투 스냅샷 등에서 위치가 필요할 때 사용.</summary>
+    public IReadOnlyDictionary<HexCoords, PokemonUnit> GetBoardSnapshot() => _battleField;
+
+    // ──────────────────────────────────────────
+    // 보드 배치
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 타일에서 마우스 드롭이 일어났을 때 콜백으로 호출되거나, 외부(샵 등)에서 직접 호출.
+    /// 빈 타일이면 이동/배치, 점유된 타일이면 스왑. 성공 시 true.
+    /// </summary>
+    public bool TryPlaceUnit(PokemonUnit unit, HexCoords targetCoords)
+    {
+        if (unit == null) return false;
+        if (!_battleField.ContainsKey(targetCoords)) return false;
+
+        PokemonUnit occupant = _battleField[targetCoords];
+        if (occupant == unit) return true; // 자기 자리에 그대로 드롭 — 변화 없음
+
+        // 들어오는 유닛이 원래 보드 위에 있었다면 그 좌표를 기억(스왑/비우기용)
+        bool fromBoard = TryFindBoardCoords(unit, out HexCoords fromCoords);
+
+        if (occupant == null)
+        {
+            // 빈 타일: 단순 이동/신규 배치
+            if (fromBoard) _battleField[fromCoords] = null;
+            else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
+
+            _battleField[targetCoords] = unit;
+            unit.isOnBoard = true;
+        }
+        else if (fromBoard)
+        {
+            // 보드 ↔ 보드 스왑 (둘 다 보드에 남음)
+            _battleField[fromCoords] = occupant;
+            _battleField[targetCoords] = unit;
         }
         else
         {
-            Debug.Log($"[BoardManager] 빈 타일입니다. 유닛을 배치합니다.");
+            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체
+            int benchSlot = FindBenchSlot(unit);
             _battleField[targetCoords] = unit;
-            GameEvents.UnitPlaced(unit);
+            unit.isOnBoard = true;
+
+            if (benchSlot >= 0)
+            {
+                _bench[benchSlot] = occupant;
+                occupant.isOnBoard = false;
+            }
         }
+
+        GameEvents.UnitPlaced(unit);
+        return true;
+    }
+
+    // ──────────────────────────────────────────
+    // 벤치 배치
+    // ──────────────────────────────────────────
+
+    /// <summary>지정한 슬롯에 유닛을 놓습니다. 슬롯이 비어있어야 성공(같은 유닛은 멱등).</summary>
+    public bool TryPlaceInBench(PokemonUnit unit, int slot)
+    {
+        if (unit == null) return false;
+        if (slot < 0 || slot >= _benchSize) return false;
+
+        PokemonUnit occupant = _bench[slot];
+        if (occupant == unit) return true;        // 같은 자리 멱등
+        if (occupant != null) return false;       // 점유됨 — 스왑은 호출측 책임
+
+        RemoveUnitFromCurrentLocation(unit);
+        _bench[slot] = unit;
+        unit.isOnBoard = false;
+
+        GameEvents.UnitBenched(unit);
+        return true;
+    }
+
+    /// <summary>빈 슬롯 아무 곳에나 유닛을 놓습니다(샵 구매 등). 벤치가 가득 차면 실패.</summary>
+    public bool TryPlaceInBench(PokemonUnit unit)
+    {
+        int slot = FirstEmptyBenchSlot();
+        if (slot < 0)
+        {
+            Debug.Log("[BoardManager] 벤치가 가득 찼습니다.");
+            return false;
+        }
+        return TryPlaceInBench(unit, slot);
+    }
+
+    /// <summary>지정 슬롯을 비웁니다(판매/제거 시). 반환된 유닛 파괴 등은 호출측 책임.</summary>
+    public PokemonUnit RemoveFromBench(int slot)
+    {
+        if (slot < 0 || slot >= _benchSize) return null;
+        PokemonUnit removed = _bench[slot];
+        _bench[slot] = null;
+        return removed;
+    }
+
+    /// <summary>벤치에 빈 슬롯이 있는지.</summary>
+    public bool HasBenchSpace() => FirstEmptyBenchSlot() >= 0;
+
+    // ──────────────────────────────────────────
+    // 내부 헬퍼
+    // ──────────────────────────────────────────
+
+    /// <summary>보드에서 유닛의 현재 좌표를 역으로 찾음.</summary>
+    private bool TryFindBoardCoords(PokemonUnit unit, out HexCoords coords)
+    {
+        foreach (var kv in _battleField)
+        {
+            if (kv.Value == unit)
+            {
+                coords = kv.Key;
+                return true;
+            }
+        }
+        coords = default;
+        return false;
+    }
+
+    /// <summary>벤치에서 유닛의 슬롯 인덱스를 찾음. 없으면 -1.</summary>
+    private int FindBenchSlot(PokemonUnit unit)
+    {
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] == unit) return i;
+        return -1;
+    }
+
+    private int FirstEmptyBenchSlot()
+    {
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] == null) return i;
+        return -1;
+    }
+
+    /// <summary>벤치에서 해당 유닛 참조를 찾아 비움(있을 때만).</summary>
+    private void RemoveFromBenchByRef(PokemonUnit unit)
+    {
+        int slot = FindBenchSlot(unit);
+        if (slot >= 0) _bench[slot] = null;
+    }
+
+    /// <summary>유닛이 현재 어디(보드/벤치)에 있든 그 자리를 비움.</summary>
+    private void RemoveUnitFromCurrentLocation(PokemonUnit unit)
+    {
+        if (TryFindBoardCoords(unit, out HexCoords coords))
+            _battleField[coords] = null;
+        else
+            RemoveFromBenchByRef(unit);
     }
 }
