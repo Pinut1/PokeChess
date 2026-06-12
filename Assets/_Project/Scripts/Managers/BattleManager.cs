@@ -42,6 +42,9 @@ public class BattleManager : MonoBehaviour
     private const float TICK_INTERVAL = 0.1f;
     private const int MAX_TICKS = 300; // 30초 타임아웃
 
+    // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
+    private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
+
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
@@ -137,7 +140,7 @@ public class BattleManager : MonoBehaviour
             tile.name = $"MirrorBoardTile_{mirrored}";
             tile.transform.localScale = new Vector3(0.95f, 0.05f, 0.95f);
             tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 상대 보드 표시(연빨강)
-            tile.transform.position = board.CoordsToWorldPosition(mirrored);
+            tile.transform.position = board.CoordsToWorldPosition(mirrored) + ENEMY_BOARD_OFFSET;
 
             _mirrorTiles.Add(tile);
         }
@@ -182,6 +185,7 @@ public class BattleManager : MonoBehaviour
     {
         if (bu.visual == null) return;
         Vector3 pos = GameManager.Instance.Board.CoordsToWorldPosition(bu.coords);
+        if (bu.team == BattleTeam.Enemy) pos += ENEMY_BOARD_OFFSET;
         bu.visual.transform.position = pos + Vector3.up * 0.5f;
     }
 
