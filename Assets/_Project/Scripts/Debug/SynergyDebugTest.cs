@@ -28,8 +28,11 @@ public class SynergyDebugTest : MonoBehaviour
 
         if (GUI.Button(new Rect(10, 160, 200, 40), "마지막 유닛 벤치로"))
         {
-            if (_lastPlaced != null)
-                GameManager.Instance.Board.TryPlaceInBench(_lastPlaced);
+            if (_lastPlaced != null && GameManager.Instance.Board.TryPlaceInBench(_lastPlaced))
+            {
+                // 벤치 타일은 없으므로 보드 옆쪽으로 시각적으로만 이동
+                _lastPlaced.transform.position = new Vector3(-3f, 0.5f, -5f);
+            }
         }
 
         if (GUI.Button(new Rect(10, 205, 200, 40), "오타 시너지 유닛 배치"))
@@ -52,10 +55,17 @@ public class SynergyDebugTest : MonoBehaviour
         unit.data = data;
         _spawned.Add(unit);
 
+        // 보이는 실린더 (실제 모델 없으니 placeholder)
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        visual.transform.SetParent(go.transform);
+        visual.transform.localPosition = Vector3.zero;
+        visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
+
         if (FindEmptyTile(out HexCoords coords))
         {
             GameManager.Instance.Board.TryPlaceUnit(unit, coords);
             _lastPlaced = unit;
+            MoveUnitToTile(unit, coords);
             Debug.Log($"[SynergyTest] {data.pokemonName}({synergy}) 배치 → {coords}");
         }
         else
@@ -77,6 +87,20 @@ public class SynergyDebugTest : MonoBehaviour
         }
         coords = default;
         return false;
+    }
+
+    /// <summary>해당 좌표의 HexTile을 씬에서 찾아 그 위치 + 높이 오프셋으로 유닛을 이동시킴.</summary>
+    private static void MoveUnitToTile(PokemonUnit unit, HexCoords coords)
+    {
+        foreach (var tile in FindObjectsByType<HexTile>(FindObjectsSortMode.None))
+        {
+            if (tile.GetCoords() == coords)
+            {
+                unit.transform.position = tile.transform.position + Vector3.up * 0.5f;
+                return;
+            }
+        }
+        Debug.LogWarning($"[SynergyTest] {coords}에 해당하는 HexTile을 찾지 못함");
     }
 
     private static void LogSynergyStatuses()
