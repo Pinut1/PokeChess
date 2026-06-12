@@ -195,12 +195,25 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void OnGUI()
     {
-        if (CurrentPhase != GamePhase.Shopping) return;
-
         var style = new GUIStyle(GUI.skin.button) { fontSize = 36 };
-        var rect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
 
-        if (GUI.Button(rect, "Ready", style))
-            PlayerReady();
+        switch (CurrentPhase)
+        {
+            case GamePhase.Shopping:
+                var readyRect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
+                if (GUI.Button(readyRect, "Ready", style))
+                    PlayerReady();
+                break;
+
+            // BattleManager 미구현 동안 수동으로 전투를 끝내는 임시 버튼 (루프 테스트용)
+            case GamePhase.Battle:
+                var winRect  = new Rect(Screen.width / 2f - 310f, Screen.height - 150f, 300f, 100f);
+                var loseRect = new Rect(Screen.width / 2f + 10f,  Screen.height - 150f, 300f, 100f);
+                if (GUI.Button(winRect, "승리(임시)", style))
+                    GameEvents.BattleEnd(true);
+                if (GUI.Button(loseRect, "패배(임시)", style))
+                    GameEvents.BattleEnd(false);
+                break;
+        }
     }
 }

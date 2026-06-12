@@ -27,8 +27,20 @@ public class UnitSyncTest : MonoBehaviourPun
     private Vector3[] _velocities;
     private float _timer;
 
+    /// <summary>인스펙터에 _units 자체를 비워두면 Unity가 "요소 1개, 미할당 참조" 배열을 만들어
+    /// _units == null/Length == 0 검사를 통과해버리므로 각 요소를 직접 검사해야 함.</summary>
+    private bool IsValid()
+    {
+        if (_units == null || _units.Length == 0) return false;
+        foreach (var t in _units)
+            if (t == null) return false;
+        return true;
+    }
+
     private void Start()
     {
+        if (!IsValid()) return;
+
         _targets = new Vector3[_units.Length];
         _velocities = new Vector3[_units.Length];
         for (int i = 0; i < _units.Length; i++)
@@ -37,6 +49,8 @@ public class UnitSyncTest : MonoBehaviourPun
 
     private void Update()
     {
+        if (!IsValid()) return;
+
         // 이동 적용 (양쪽 클라이언트 공통) — 에어하키 퍽처럼 감속하며 도착
         for (int i = 0; i < _units.Length; i++)
             _units[i].position = Vector3.SmoothDamp(_units[i].position, _targets[i], ref _velocities[i], _smoothTime);
@@ -65,6 +79,8 @@ public class UnitSyncTest : MonoBehaviourPun
 
     private void OnGUI()
     {
+        if (!IsValid()) return;
+
         GUILayout.BeginArea(new Rect(10, 140, 320, 150));
         GUILayout.Label($"Is Master : {PhotonNetwork.IsMasterClient}");
         for (int i = 0; i < _units.Length; i++)

@@ -12,6 +12,10 @@ using Photon.Realtime;
 /// </summary>
 public class NetworkManager : MonoBehaviourPunCallbacks
 {
+    [Header("테스트")]
+    [Tooltip("체크하면 Photon 없이 1인 오프라인 루프로 동작 (테스트 전용)")]
+    [SerializeField] private bool _soloMode;
+
     // ─────────────────────────────────────────
     // 상수
     // ─────────────────────────────────────────
@@ -34,8 +38,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public bool IsConnected   => PhotonNetwork.IsConnected;
     public bool IsInRoom      => PhotonNetwork.InRoom;
-    public bool IsMasterClient => PhotonNetwork.IsMasterClient;
-    public int  PlayerCount   => PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
+    public bool IsMasterClient => _soloMode || PhotonNetwork.IsMasterClient;
+    public int  PlayerCount   => _soloMode ? 1 : PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
 
     /// <summary>상대방 재접속 유예 타이머</summary>
     private Coroutine _opponentGraceRoutine;
@@ -49,6 +53,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void Start()
     {
+        if (_soloMode)
+        {
+            Debug.LogWarning("[Network] 솔로 모드 — Photon 미사용, 즉시 라운드 1 시작");
+            BroadcastRoundStart(1);
+            return;
+        }
+
         PhotonNetwork.AutomaticallySyncScene = true;
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
 
@@ -62,6 +73,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public void Connect()
     {
+        if (_soloMode) { Debug.Log("[Network] 솔로 모드 — 연결 생략"); return; }
         if (PhotonNetwork.IsConnected) return;
         Debug.Log("[Network] Photon 서버 연결 시도...");
         PhotonNetwork.ConnectUsingSettings();
@@ -129,6 +141,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>MasterClient가 다음 라운드 시작을 전체에 알림</summary>
     public void BroadcastRoundStart(int round)
     {
+        if (_soloMode) { GameEvents.RoundChanged(round); return; }
+
         if (!IsMasterClient) return;
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
     }
@@ -136,6 +150,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>MasterClient가 전투 시작을 전체에 알림</summary>
     public void BroadcastBattleStart()
     {
+        if (_soloMode) { GameEvents.BattleStart(); return; }
+
         if (!IsMasterClient) return;
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
     }
@@ -143,6 +159,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>쇼핑 페이즈에서 "준비 완료" 버튼 누를 때 호출. 자신의 준비 상태를 CustomProperties에 기록.</summary>
     public void BroadcastPlayerReady()
     {
+        // 솔로 모드: 1인 = 전원 준비 완료
+        if (_soloMode) { GameEvents.AllPlayersReady(); return; }
+
         var props = new Hashtable { { READY_PROP_KEY, true } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
