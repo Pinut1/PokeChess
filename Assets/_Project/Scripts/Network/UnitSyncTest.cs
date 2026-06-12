@@ -29,6 +29,8 @@ public class UnitSyncTest : MonoBehaviourPun
 
     private void Start()
     {
+        if (_units == null) return;
+
         _targets = new Vector3[_units.Length];
         _velocities = new Vector3[_units.Length];
         for (int i = 0; i < _units.Length; i++)
@@ -37,6 +39,8 @@ public class UnitSyncTest : MonoBehaviourPun
 
     private void Update()
     {
+        if (_units == null || _units.Length == 0) return; // 인스펙터에 _units 미할당 시 비활성
+
         // 이동 적용 (양쪽 클라이언트 공통) — 에어하키 퍽처럼 감속하며 도착
         for (int i = 0; i < _units.Length; i++)
             _units[i].position = Vector3.SmoothDamp(_units[i].position, _targets[i], ref _velocities[i], _smoothTime);
@@ -65,6 +69,8 @@ public class UnitSyncTest : MonoBehaviourPun
 
     private void OnGUI()
     {
+        if (_units == null || _units.Length == 0) return;
+
         GUILayout.BeginArea(new Rect(10, 140, 320, 150));
         GUILayout.Label($"Is Master : {PhotonNetwork.IsMasterClient}");
         for (int i = 0; i < _units.Length; i++)
