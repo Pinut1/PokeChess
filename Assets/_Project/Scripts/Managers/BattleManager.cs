@@ -134,7 +134,7 @@ public class BattleManager : MonoBehaviour
             defense = unit.Defense,
             specialDefense = unit.SpecialDefense,
             attackSpeed = unit.AttackSpeed,
-            range = unit.Range,
+            range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
             attackType = unit.AttackType,
             attackCooldown = 0f
         };
