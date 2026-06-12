@@ -23,6 +23,9 @@ public class BoardManager : MonoBehaviour
     // 벤치 슬롯. 인덱스 = 슬롯 번호. null = 빈 슬롯.
     private PokemonUnit[] _bench;
 
+    // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
+    private Vector3 _centerOffset;
+
     private void Awake()
     {
         _bench = new PokemonUnit[_benchSize];
@@ -89,10 +92,16 @@ public class BoardManager : MonoBehaviour
         // 타일들의 평균 무게중심(Center)을 구한 뒤, 쟁반 전체를 그 반대 방향으로 밀어줍니다.
         if (totalTiles > 0)
         {
-            Vector3 centerOffset = sumPosition / totalTiles;
-            boardAnchor.transform.position = -centerOffset;
+            _centerOffset = sumPosition / totalTiles;
+            boardAnchor.transform.position = -_centerOffset;
         }
     }
+
+    /// <summary>
+    /// 임의의 헥스 좌표(보드 범위 밖 포함)를 보드 정렬 기준 월드 좌표로 변환합니다.
+    /// BattleManager가 적 팀 미러 좌표를 시각화할 때 사용.
+    /// </summary>
+    public Vector3 CoordsToWorldPosition(HexCoords coords) => coords.ToWorldPosition(_hexSize) - _centerOffset;
 
     // ──────────────────────────────────────────
     // 조회 API (pull)

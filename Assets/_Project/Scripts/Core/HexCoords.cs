@@ -59,6 +59,22 @@ public struct HexCoords : IEquatable<HexCoords>
         return new Vector3(x, 0f, z);
     }
 
+    // 큐브 좌표계의 6방향 단위 벡터
+    private static readonly HexCoords[] DIRECTIONS =
+    {
+        new HexCoords(1, 0, -1), new HexCoords(1, -1, 0), new HexCoords(0, -1, 1),
+        new HexCoords(-1, 0, 1), new HexCoords(-1, 1, 0), new HexCoords(0, 1, -1)
+    };
+
+    /// <summary>인접한 6개 좌표를 반환합니다 (보드 범위 체크는 호출측 책임).</summary>
+    public HexCoords[] GetNeighbors()
+    {
+        var neighbors = new HexCoords[6];
+        for (int i = 0; i < 6; i++)
+            neighbors[i] = new HexCoords(q + DIRECTIONS[i].q, r + DIRECTIONS[i].r, s + DIRECTIONS[i].s);
+        return neighbors;
+    }
+
     #region Equals & GetHashCode (Dictionary Key 사용을 위한 필수 구현)
 
     public bool Equals(HexCoords other)
