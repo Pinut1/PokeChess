@@ -114,7 +114,7 @@ public class BattleManager : MonoBehaviour
             if (unit == null || unit.data == null) continue;
 
             HexCoords allyCoords = kv.Key;
-            HexCoords enemyCoords = new HexCoords(-allyCoords.q, -allyCoords.r);
+            HexCoords enemyCoords = board.GetMirroredCoords(allyCoords);
 
             _units.Add(CreateBattleUnit(unit, BattleTeam.Ally, allyCoords));
             _units.Add(CreateBattleUnit(unit, BattleTeam.Enemy, enemyCoords));
@@ -134,7 +134,7 @@ public class BattleManager : MonoBehaviour
     {
         foreach (var coords in board.GetBoardSnapshot().Keys)
         {
-            HexCoords mirrored = new HexCoords(-coords.q, -coords.r);
+            HexCoords mirrored = board.GetMirroredCoords(coords);
 
             var tile = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             tile.name = $"MirrorBoardTile_{mirrored}";

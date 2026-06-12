@@ -103,6 +103,18 @@ public class BoardManager : MonoBehaviour
     /// </summary>
     public Vector3 CoordsToWorldPosition(HexCoords coords) => coords.ToWorldPosition(_hexSize) - _centerOffset;
 
+    /// <summary>
+    /// 보드를 행(row) 기준으로 뒤집은 좌표를 반환합니다. 같은 (col, row) 좌표 집합을 재사용하므로
+    /// 항상 유효한 보드 타일 좌표이며, 평행이동만으로도 모양이 정확히 대칭인 "상대 보드"를 만들 수 있음.
+    /// </summary>
+    public HexCoords GetMirroredCoords(HexCoords coords)
+    {
+        int row = coords.r + Mathf.FloorToInt(coords.q / 2f);
+        int mirroredRow = (_rows - 1) - row;
+        int mirroredR = mirroredRow - Mathf.FloorToInt(coords.q / 2f);
+        return new HexCoords(coords.q, mirroredR);
+    }
+
     // ──────────────────────────────────────────
     // 조회 API (pull)
     // ──────────────────────────────────────────
