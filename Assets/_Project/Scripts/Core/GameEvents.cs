@@ -50,6 +50,9 @@ public static class GameEvents
     /// <summary>유닛 판매됨</summary>
     public static event Action<PokemonUnit> OnUnitSold;
 
+    /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
+    public static event Action OnSynergyUpdated;
+
     // ──────────────────────────────────────────
     // 샵
     // ──────────────────────────────────────────
@@ -96,6 +99,7 @@ public static class GameEvents
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
+    public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
