@@ -43,6 +43,7 @@ public class BattleManager : MonoBehaviour
     private const int MAX_TICKS = 300; // 30초 타임아웃
 
     private readonly List<BattleUnit> _units = new();
+    private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
 
     private void OnEnable()  => GameEvents.OnBattleStart += HandleBattleStart;
@@ -118,6 +119,28 @@ public class BattleManager : MonoBehaviour
 
         foreach (var bu in _units)
             SpawnVisual(bu);
+
+        SpawnMirrorBoard(board);
+    }
+
+    /// <summary>
+    /// 보드 전체 칸을 점대칭 미러 좌표에 깔아 "상대 보드"를 임시로 시각화.
+    /// 실제 타일 프리팹이 아닌 디버그용 평면 — 전투 종료 시 제거.
+    /// </summary>
+    private void SpawnMirrorBoard(BoardManager board)
+    {
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+        {
+            HexCoords mirrored = new HexCoords(-coords.q, -coords.r);
+
+            var tile = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            tile.name = $"MirrorBoardTile_{mirrored}";
+            tile.transform.localScale = new Vector3(0.95f, 0.05f, 0.95f);
+            tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 상대 보드 표시(연빨강)
+            tile.transform.position = board.CoordsToWorldPosition(mirrored);
+
+            _mirrorTiles.Add(tile);
+        }
     }
 
     private BattleUnit CreateBattleUnit(PokemonUnit unit, BattleTeam team, HexCoords coords)
@@ -304,5 +327,10 @@ public class BattleManager : MonoBehaviour
         }
 
         _units.Clear();
+
+        foreach (var tile in _mirrorTiles)
+            Destroy(tile);
+
+        _mirrorTiles.Clear();
     }
 }
