@@ -23,6 +23,24 @@ public class BattleDebugTest : MonoBehaviour
     {
         if (GUI.Button(new Rect(10, 300, 200, 40), "전투 시작 (디버그)"))
             GameEvents.BattleStart();
+
+        var gm = GameManager.Instance;
+        if (gm == null) return;
+
+        // 체력 표시 + 강제 승/패(게임오버 경로 테스트용 — 실제 전투 없이 BattleEnd 발화)
+        if (gm.PlayerHealth != null)
+            GUI.Label(new Rect(10, 345, 200, 24), $"체력: {gm.PlayerHealth.Health}/{gm.PlayerHealth.MaxHealth}");
+
+        if (GUI.Button(new Rect(10, 372, 200, 30), "강제 승리 (BattleEnd true)"))
+            GameEvents.BattleEnd(true);
+        if (GUI.Button(new Rect(10, 406, 200, 30), "강제 패배 (BattleEnd false)"))
+            GameEvents.BattleEnd(false);
+
+        if (gm.Phase != null && gm.Phase.CurrentPhase == GamePhase.GameOver)
+        {
+            var style = new GUIStyle(GUI.skin.label) { fontSize = 28, normal = { textColor = Color.red } };
+            GUI.Label(new Rect(10, 445, 400, 40), "=== GAME OVER ===", style);
+        }
     }
 
     private static void LogBattleStart() => Debug.Log("[BattleTest] 전투 시작 — 보드 미러링 후 시뮬레이션 진행");

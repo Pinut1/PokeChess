@@ -64,6 +64,9 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleBattleEnd(bool isWin)
     {
+        // 패배로 체력 0 → PlayerHealthManager가 SessionEnded로 이미 GameOver 전환했을 수 있음.
+        // 구독자 호출 순서와 무관하게 GameOver를 Result가 덮어쓰지 않도록 가드.
+        if (CurrentPhase == GamePhase.GameOver) return;
         EnterPhase(GamePhase.Result);
     }
 

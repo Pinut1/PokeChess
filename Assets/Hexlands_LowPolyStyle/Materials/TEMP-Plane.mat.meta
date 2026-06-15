@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: a3cd8d528a9feed4987eb300b6503c4a
+timeCreated: 1536669802
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Materials/TEMP-Plane.mat
+  uploadId: 279467

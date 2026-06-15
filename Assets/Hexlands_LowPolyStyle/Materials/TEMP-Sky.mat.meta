@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 6ee1733925face94daaec2a1855a4c76
+timeCreated: 1536669741
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Materials/TEMP-Sky.mat
+  uploadId: 279467

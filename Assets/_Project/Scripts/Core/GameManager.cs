@@ -16,6 +16,7 @@ public class GameManager : Singleton<GameManager>
     [SerializeField] private ItemManager       _itemManager;
     [SerializeField] private AugmentManager    _augmentManager;
     [SerializeField] private UIManager         _uiManager;
+    [SerializeField] private PlayerHealthManager _playerHealthManager;
 
     // 외부에서 읽기 전용 접근
     public NetworkManager    Network   => _networkManager;
@@ -27,6 +28,7 @@ public class GameManager : Singleton<GameManager>
     public ItemManager       Item      => _itemManager;
     public AugmentManager    Augment   => _augmentManager;
     public UIManager         UI        => _uiManager;
+    public PlayerHealthManager PlayerHealth => _playerHealthManager;
 
     protected override void Awake()
     {
@@ -49,5 +51,6 @@ public class GameManager : Singleton<GameManager>
         if (_itemManager       == null) Debug.LogError("[GameManager] ItemManager 참조 누락");
         if (_augmentManager    == null) Debug.LogError("[GameManager] AugmentManager 참조 누락");
         if (_uiManager         == null) Debug.LogError("[GameManager] UIManager 참조 누락");
+        if (_playerHealthManager == null) Debug.LogError("[GameManager] PlayerHealthManager 참조 누락");
     }
 }

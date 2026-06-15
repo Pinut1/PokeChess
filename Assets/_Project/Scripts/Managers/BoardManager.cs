@@ -16,12 +16,20 @@ public class BoardManager : MonoBehaviour
 
     [Header("Bench Settings")]
     [SerializeField] private int _benchSize = 9; // TFT 기준 벤치 슬롯 수
+    [SerializeField] private float _benchZOffset = -4f; // 보드 중심 기준 벤치 줄의 z 위치(월드)
 
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
 
     // 벤치 슬롯. 인덱스 = 슬롯 번호. null = 빈 슬롯.
     private PokemonUnit[] _bench;
+
+    // 벤치 시각 타일 + 슬롯별 월드 좌표(인덱스 = 슬롯).
+    private BenchTile[] _benchTiles;
+    private Vector3[] _benchSlotPositions;
+
+    // 진화(합체) 처리 중 재진입 방지 플래그.
+    private bool _isEvolving;
 
     // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
     private Vector3 _centerOffset;
@@ -34,6 +42,7 @@ public class BoardManager : MonoBehaviour
     private void Start()
     {
         GenerateBoard();
+        GenerateBench();
     }
 
     /// <summary>
@@ -98,10 +107,50 @@ public class BoardManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 벤치 슬롯들을 보드 아래쪽(_benchZOffset)에 한 줄로 생성합니다.
+    /// 각 타일은 BenchTile(IDropTarget)이며, 드롭 시 TryDropOnBench로 위임합니다.
+    /// </summary>
+    private void GenerateBench()
+    {
+        _benchTiles = new BenchTile[_benchSize];
+        _benchSlotPositions = new Vector3[_benchSize];
+
+        GameObject benchAnchor = new GameObject("BenchAnchor");
+        benchAnchor.transform.SetParent(this.transform);
+
+        float spacing = _hexSize * 1.1f;
+        float startX = -(_benchSize - 1) * spacing * 0.5f;
+
+        for (int i = 0; i < _benchSize; i++)
+        {
+            Vector3 pos = new Vector3(startX + i * spacing, 0f, _benchZOffset);
+            _benchSlotPositions[i] = pos;
+
+            GameObject tileGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            tileGo.transform.SetParent(benchAnchor.transform);
+            tileGo.transform.position = pos;
+            tileGo.transform.localScale = new Vector3(_hexSize * 0.9f, 0.05f, _hexSize * 0.9f);
+
+            BenchTile tile = tileGo.AddComponent<BenchTile>();
+            int slot = i; // 클로저 캡처 주의 — 루프 변수 복사
+            tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), $"BenchTile_{slot}");
+            _benchTiles[i] = tile;
+        }
+    }
+
+    /// <summary>
     /// 임의의 헥스 좌표(보드 범위 밖 포함)를 보드 정렬 기준 월드 좌표로 변환합니다.
     /// BattleManager가 적 팀 미러 좌표를 시각화할 때 사용.
     /// </summary>
     public Vector3 CoordsToWorldPosition(HexCoords coords) => coords.ToWorldPosition(_hexSize) - _centerOffset;
+
+    /// <summary>벤치 슬롯의 월드 좌표. BoardView가 유닛 위치 재배치에 사용.</summary>
+    public Vector3 BenchSlotWorldPosition(int slot)
+    {
+        if (_benchSlotPositions == null || slot < 0 || slot >= _benchSlotPositions.Length)
+            return Vector3.zero;
+        return _benchSlotPositions[slot];
+    }
 
     /// <summary>
     /// 보드를 행(row) 기준으로 뒤집은 좌표를 반환합니다. 같은 (col, row) 좌표 집합을 재사용하므로
@@ -148,6 +197,9 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>보드 위 빈 좌표→유닛 매핑(읽기 전용 스냅샷). 전투 스냅샷 등에서 위치가 필요할 때 사용.</summary>
     public IReadOnlyDictionary<HexCoords, PokemonUnit> GetBoardSnapshot() => _battleField;
+
+    /// <summary>벤치 슬롯 배열(읽기 전용, 인덱스=슬롯). null=빈 슬롯. BoardView 위치 재배치에 사용.</summary>
+    public IReadOnlyList<PokemonUnit> GetBenchSnapshot() => _bench;
 
     // ──────────────────────────────────────────
     // 보드 배치
@@ -198,6 +250,7 @@ public class BoardManager : MonoBehaviour
         }
 
         GameEvents.UnitPlaced(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
         return true;
     }
 
@@ -220,6 +273,40 @@ public class BoardManager : MonoBehaviour
         unit.isOnBoard = false;
 
         GameEvents.UnitBenched(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+        return true;
+    }
+
+    /// <summary>
+    /// 벤치 슬롯에 드롭됐을 때(드래그 콜백). 빈 슬롯이면 배치, 점유 슬롯이면 들어오는 유닛의
+    /// 원위치(보드 좌표/벤치 슬롯)와 교체(스왑)한다. 성공 시 true.
+    /// </summary>
+    public bool TryDropOnBench(PokemonUnit unit, int slot)
+    {
+        if (unit == null) return false;
+        if (slot < 0 || slot >= _benchSize) return false;
+
+        PokemonUnit occupant = _bench[slot];
+        if (occupant == unit) return true;            // 같은 자리 멱등
+        if (occupant == null) return TryPlaceInBench(unit, slot); // 빈 슬롯 — 일반 배치(+진화 검사)
+
+        // 점유됨 — 들어오는 유닛의 원위치로 occupant를 보내고 교체
+        if (TryFindBoardCoords(unit, out HexCoords fromCoords))
+        {
+            _battleField[fromCoords] = occupant;
+            occupant.isOnBoard = true;
+        }
+        else
+        {
+            int fromSlot = FindBenchSlot(unit);
+            if (fromSlot >= 0) _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
+        }
+
+        _bench[slot] = unit;
+        unit.isOnBoard = false;
+
+        GameEvents.UnitBenched(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
         return true;
     }
 
@@ -246,6 +333,26 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>벤치에 빈 슬롯이 있는지.</summary>
     public bool HasBenchSpace() => FirstEmptyBenchSlot() >= 0;
+
+    /// <summary>
+    /// 유닛을 보드/벤치 어디에 있든 제거하고 판매 처리. 골드 환급은 ShopManager가 OnUnitSold를 받아 처리한다.
+    /// UnitSold 발행 시점엔 unit이 아직 유효(Destroy는 프레임 끝에 적용)하므로 구독자가 data를 읽을 수 있음.
+    /// </summary>
+    public bool SellUnit(PokemonUnit unit)
+    {
+        if (unit == null) return false;
+
+        bool onBoard = TryFindBoardCoords(unit, out HexCoords coords);
+        int slot = onBoard ? -1 : FindBenchSlot(unit);
+        if (!onBoard && slot < 0) return false; // 보드/벤치 어디에도 없음
+
+        if (onBoard) _battleField[coords] = null;
+        else         _bench[slot] = null;
+
+        GameEvents.UnitSold(unit); // ShopManager(환급) · SynergyManager(재계산) · BoardView(resync)
+        Destroy(unit.gameObject);
+        return true;
+    }
 
     // ──────────────────────────────────────────
     // 내부 헬퍼
@@ -295,5 +402,74 @@ public class BoardManager : MonoBehaviour
             _battleField[coords] = null;
         else
             RemoveFromBenchByRef(unit);
+    }
+
+    // ──────────────────────────────────────────
+    // 합체 (일반 진화 = 동일 종 3개 → 별업, GDD 4.2)
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 보드+벤치 통틀어 같은 종(data.id)·같은 성(starLevel) 유닛이 3개 이상이면 1개로 합쳐 별업.
+    /// 1성→2성→3성, 3성이 상한. 별업 후 한 단계 더 가능하면 연쇄 진화.
+    /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
+    /// </summary>
+    private void CheckEvolution(int speciesId, int starLevel)
+    {
+        if (_isEvolving) return;
+        if (starLevel >= 3) return;
+
+        var boardMatches = new List<HexCoords>();
+        var benchMatches = new List<int>();
+
+        foreach (var kv in _battleField)
+            if (kv.Value != null && kv.Value.data != null &&
+                kv.Value.data.id == speciesId && kv.Value.starLevel == starLevel)
+                boardMatches.Add(kv.Key);
+
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] != null && _bench[i].data != null &&
+                _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
+                benchMatches.Add(i);
+
+        if (boardMatches.Count + benchMatches.Count < 3) return;
+
+        _isEvolving = true;
+
+        // 소비할 3개 모으기(보드 우선). consumed[0]이 생존자 = 첫 위치.
+        var consumed = new List<PokemonUnit>();
+        foreach (var c in boardMatches) { if (consumed.Count < 3) consumed.Add(_battleField[c]); }
+        foreach (var s in benchMatches) { if (consumed.Count < 3) consumed.Add(_bench[s]); }
+
+        bool survivorOnBoard = boardMatches.Count > 0;
+        HexCoords survivorCoords = survivorOnBoard ? boardMatches[0] : default;
+        int survivorSlot = survivorOnBoard ? -1 : benchMatches[0];
+        PokemonUnit survivor = consumed[0];
+
+        // 소비된 3개의 위치 비우기
+        foreach (var c in boardMatches)
+            if (consumed.Contains(_battleField[c])) _battleField[c] = null;
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] != null && consumed.Contains(_bench[i])) _bench[i] = null;
+
+        // 생존자 외 2개 파괴
+        foreach (var u in consumed)
+            if (u != survivor && u != null) Destroy(u.gameObject);
+
+        // 별업 + 재배치
+        survivor.starLevel = Mathf.Clamp(starLevel + 1, 1, 3);
+        survivor.ResetForBattle();
+        if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
+        else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
+
+        _isEvolving = false;
+
+        Debug.Log($"[Evolve] 종 {speciesId} {starLevel}성 3개 합체 → {survivor.starLevel}성");
+
+        // 이벤트 발화(시너지 재계산/뷰 갱신)
+        if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
+        else                 GameEvents.UnitBenched(survivor);
+
+        // 연쇄(예: 2성 3개 → 3성)
+        CheckEvolution(speciesId, survivor.starLevel);
     }
 }

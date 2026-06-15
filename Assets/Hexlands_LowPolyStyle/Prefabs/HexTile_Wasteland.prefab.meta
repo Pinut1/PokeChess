@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2fb98c264fc22154ca2c06b5921a1717
+timeCreated: 1536669483
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_Wasteland.prefab
+  uploadId: 279467

@@ -30,6 +30,9 @@ public static class GameEvents
     /// <summary>플레이어 레벨 변경. 인자 = 변경 후 레벨</summary>
     public static event Action<int> OnLevelChanged;
 
+    /// <summary>플레이어 체력 변경. 인자 = 변경 후 체력</summary>
+    public static event Action<int> OnHealthChanged;
+
     // ──────────────────────────────────────────
     // 증강
     // ──────────────────────────────────────────
@@ -96,6 +99,7 @@ public static class GameEvents
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
+    public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
