@@ -78,3 +78,9 @@ Thumbs.db
 
 # Unity crash recovery snapshots
 /[Aa]ssets/_Recovery/
+
+# 무시된 콘텐츠의 잔여 .meta 재무시 (위 !*.meta 부정 규칙을 다시 덮어씀) + 로컬 잡파일
+/[Aa]ssets/_Recovery.meta
+/[Aa]ssets/_Project/[Tt]emp.meta
+/[Aa]ssets/UserChoices.choices.meta
+/bridge.md
