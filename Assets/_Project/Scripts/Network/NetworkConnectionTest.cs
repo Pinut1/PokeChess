@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Photon.Pun;
 using Photon.Realtime;
 
@@ -41,6 +42,8 @@ public class NetworkConnectionTest : MonoBehaviourPunCallbacks
         GUILayout.Label($"In Room   : {_network.IsInRoom}");
         GUILayout.Label($"Players   : {_network.PlayerCount}");
         GUILayout.Label($"Is Master : {_network.IsMasterClient}");
+        GUILayout.Label($"AutoSync  : {PhotonNetwork.AutomaticallySyncScene}");
+        GUILayout.Label($"Scene     : {SceneManager.GetActiveScene().name}");
 
         GUILayout.Space(10);
 

@@ -597,11 +597,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1481026848}
+  - component: {fileID: 1481026852}
+  - component: {fileID: 1481026849}
+  - component: {fileID: 1481026851}
   - component: {fileID: 1481026847}
   - component: {fileID: 1481026850}
-  - component: {fileID: 1481026849}
-  - component: {fileID: 1481026852}
-  - component: {fileID: 1481026851}
   m_Layer: 0
   m_Name: Network_Test
   m_TagString: Untagged
@@ -648,6 +648,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 393c1ffbbbb38db4b924fef0e84431b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
+  _soloMode: 0
 --- !u!114 &1481026850
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -705,6 +706,7 @@ MonoBehaviour:
   _itemManager: {fileID: 0}
   _augmentManager: {fileID: 0}
   _uiManager: {fileID: 0}
+  _playerHealthManager: {fileID: 0}
 --- !u!1 &1984529690
 GameObject:
   m_ObjectHideFlags: 0

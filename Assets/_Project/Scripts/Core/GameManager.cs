@@ -30,6 +30,11 @@ public class GameManager : Singleton<GameManager>
     public UIManager         UI        => _uiManager;
     public PlayerHealthManager PlayerHealth => _playerHealthManager;
 
+    // GameManager는 매니저들을 같은 GameObject에 컴포넌트로 들고 있다. DontDestroyOnLoad로 유지하면
+    // 씬 전환 시 중복 인스턴스가 통째로 Destroy되며 게임플레이 매니저까지 사라지므로 씬 로컬로 둔다.
+    // (Photon 연결 자체는 PUN 내부 PhotonHandler가 씬을 넘어 유지하므로 영속 불필요)
+    protected override bool KeepAcrossScenes => false;
+
     protected override void Awake()
     {
         base.Awake();
@@ -42,15 +47,16 @@ public class GameManager : Singleton<GameManager>
 
     private void ValidateReferences()
     {
+        // 네트워크 계층은 모든 씬(로비/게임)에 필수.
         if (_networkManager    == null) Debug.LogError("[GameManager] NetworkManager 참조 누락");
         if (_roundPhaseManager == null) Debug.LogError("[GameManager] RoundPhaseManager 참조 누락");
-        if (_boardManager      == null) Debug.LogError("[GameManager] BoardManager 참조 누락");
-        if (_battleManager     == null) Debug.LogError("[GameManager] BattleManager 참조 누락");
-        if (_shopManager       == null) Debug.LogError("[GameManager] ShopManager 참조 누락");
-        if (_synergyManager    == null) Debug.LogError("[GameManager] SynergyManager 참조 누락");
-        if (_itemManager       == null) Debug.LogError("[GameManager] ItemManager 참조 누락");
-        if (_augmentManager    == null) Debug.LogError("[GameManager] AugmentManager 참조 누락");
-        if (_uiManager         == null) Debug.LogError("[GameManager] UIManager 참조 누락");
-        if (_playerHealthManager == null) Debug.LogError("[GameManager] PlayerHealthManager 참조 누락");
+
+        // 게임플레이 매니저는 GameScene에서만 존재. 로비 씬에선 비어 있는 게 정상이라 경고로만.
+        if (_boardManager      == null) Debug.LogWarning("[GameManager] BoardManager 미연결 (게임 씬이 아니면 정상)");
+        if (_battleManager     == null) Debug.LogWarning("[GameManager] BattleManager 미연결 (게임 씬이 아니면 정상)");
+        if (_shopManager       == null) Debug.LogWarning("[GameManager] ShopManager 미연결 (게임 씬이 아니면 정상)");
+        if (_synergyManager    == null) Debug.LogWarning("[GameManager] SynergyManager 미연결 (게임 씬이 아니면 정상)");
+        if (_playerHealthManager == null) Debug.LogWarning("[GameManager] PlayerHealthManager 미연결 (게임 씬이 아니면 정상)");
+        // ItemManager/AugmentManager/UIManager는 아직 스텁 — 검증 생략.
     }
 }

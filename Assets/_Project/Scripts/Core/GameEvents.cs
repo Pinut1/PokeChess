@@ -30,8 +30,11 @@ public static class GameEvents
     /// <summary>플레이어 레벨 변경. 인자 = 변경 후 레벨</summary>
     public static event Action<int> OnLevelChanged;
 
-    /// <summary>플레이어 체력 변경. 인자 = 변경 후 체력</summary>
+    /// <summary>플레이어 체력 변경. 인자 = 변경 후 체력 (팀 공통 HP — GDD 기준)</summary>
     public static event Action<int> OnHealthChanged;
+
+    /// <summary>파트너(상대 클라이언트) 골드 변경. 인자 = 파트너의 현재 골드. UI 표시용.</summary>
+    public static event Action<int> OnPartnerGoldChanged;
 
     // ──────────────────────────────────────────
     // 증강
@@ -43,6 +46,12 @@ public static class GameEvents
     // ──────────────────────────────────────────
     // 유닛
     // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 상대(파트너) 보드 배치가 갱신됨. 인자 = 파트너 보드의 읽기 전용 스냅샷.
+    /// NetworkManager가 RPC 수신 후 발행 → OpponentBoardView가 미러 렌더.
+    /// </summary>
+    public static event Action<BoardSnapshot> OnOpponentBoardChanged;
 
     /// <summary>유닛 보드에 배치됨</summary>
     public static event Action<PokemonUnit> OnUnitPlaced;
@@ -100,6 +109,8 @@ public static class GameEvents
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
+    public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);
+    public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);

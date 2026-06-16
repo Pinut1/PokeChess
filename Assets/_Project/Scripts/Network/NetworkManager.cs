@@ -26,6 +26,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>"준비 완료" 여부를 Player CustomProperties에 저장할 때 쓰는 키</summary>
     private const string READY_PROP_KEY = "Ready";
 
+    /// <summary>플레이어 골드를 Player CustomProperties에 저장할 때 쓰는 키(파트너 표시용).</summary>
+    private const string GOLD_PROP_KEY = "Gold";
+
+    /// <summary>팀 공통 HP를 Room CustomProperties에 저장할 때 쓰는 키(GDD: 팀 공통 체력).</summary>
+    private const string TEAM_HP_PROP_KEY = "TeamHP";
+
+    /// <summary>게임 씬 로드 완료 여부를 Player CustomProperties에 저장할 때 쓰는 키(라운드 시작 핸드셰이크).</summary>
+    private const string SCENE_READY_PROP_KEY = "SceneReady";
+
+    /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
+    private bool _gameStarted;
+
     /// <summary>연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용.</summary>
     private const float RECONNECT_GRACE_PERIOD = 60f;
 
@@ -51,6 +63,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // 연결
     // ─────────────────────────────────────────
 
+    private void Awake()
+    {
+        // 자동 씬 동기화는 "연결 전에" 켜져 있어야 팔로워(비마스터)가 마스터의 LoadLevel을 따라온다.
+        // 같은 GameObject의 다른 컴포넌트(NetworkConnectionTest)가 Start에서 Connect()를 부를 수 있어
+        // Start 순서 경합을 피하려고 모든 Start보다 먼저인 Awake에서 켠다.
+        if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
+    }
+
     private void Start()
     {
         if (_soloMode)
@@ -60,7 +80,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        PhotonNetwork.AutomaticallySyncScene = true;
+        // 씬 로컬이라 GameManager는 씬마다 새로 생기지만, 이미 연결돼 있으면(로비→게임 전환 후)
+        // 닉네임/인증값을 다시 설정하지 않는다(재접속 식별자 보존). 씬 동기화는 Awake에서 이미 켬.
+        if (PhotonNetwork.IsConnected) return;
+
         PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
 
         // ReconnectAndRejoin이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
@@ -167,8 +190,118 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
+    // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
+    // ─────────────────────────────────────────
+
+    /// <summary>현재 팀 공통 HP. Room CustomProperties에서 읽음. 미설정이면 -1.</summary>
+    public int TeamHealth
+    {
+        get
+        {
+            if (_soloMode || !PhotonNetwork.InRoom) return _soloTeamHp;
+            var props = PhotonNetwork.CurrentRoom?.CustomProperties;
+            if (props != null && props.TryGetValue(TEAM_HP_PROP_KEY, out object hp))
+                return (int)hp;
+            return -1;
+        }
+    }
+
+    private int _soloTeamHp = -1; // 솔로 모드용 로컬 팀 HP 저장
+
+    /// <summary>
+    /// 내 보드 배치 스냅샷을 상대 클라이언트에게 송출(미러 렌더용). 상대에게만 전송.
+    /// 보드/벤치가 바뀔 때 BoardSyncBroadcaster가 호출한다.
+    /// </summary>
+    public void BroadcastBoardSnapshot(int[] data)
+    {
+        if (_soloMode) return; // 파트너 없음 — 송출 불필요
+        if (!PhotonNetwork.InRoom) return;
+        photonView.RPC(nameof(RPC_OnBoardSnapshot), RpcTarget.Others, data);
+    }
+
+    /// <summary>
+    /// 게임 씬 로드 완료를 알림(라운드 시작 핸드셰이크). GameSceneBootstrap이 GameScene 진입 시 호출.
+    /// 두 클라가 모두 준비되면 MasterClient가 라운드 1을 시작한다.
+    /// (로비→게임 전환 중 라운드 시작 RPC가 유실되는 레이스 방지)
+    /// </summary>
+    public void NotifySceneReady()
+    {
+        if (_soloMode) { BroadcastRoundStart(1); return; }
+        if (!PhotonNetwork.InRoom) return;
+        var props = new Hashtable { { SCENE_READY_PROP_KEY, true } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>내 골드를 Player CustomProperties에 기록 → 파트너 클라가 표시.</summary>
+    public void SyncLocalGold(int gold)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return;
+        var props = new Hashtable { { GOLD_PROP_KEY, gold } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>팀 공통 HP 초기화(MasterClient만, 아직 미설정일 때). PlayerHealthManager가 게임 시작 시 호출.</summary>
+    public void InitTeamHealth(int hp)
+    {
+        if (_soloMode) { _soloTeamHp = hp; GameEvents.HealthChanged(hp); return; }
+        if (!IsMasterClient || !PhotonNetwork.InRoom) return;
+        if (TeamHealth >= 0) return; // 이미 설정됨(재접속 등)
+        SetTeamHealthProp(hp);
+    }
+
+    /// <summary>
+    /// 전투 패배 데미지를 팀 공통 HP에 반영 요청. 단일 기록자(MasterClient) 권위로 갱신.
+    /// 비마스터는 RPC로 마스터에게 위임 → 두 클라가 동시에 써서 생기는 경합 방지.
+    /// </summary>
+    public void ReportBattleLoss(int damage)
+    {
+        if (_soloMode) { ApplyTeamDamageLocal(damage); return; }
+        if (!PhotonNetwork.InRoom) return;
+
+        if (IsMasterClient) ApplyTeamDamageLocal(damage);
+        else photonView.RPC(nameof(RPC_ReportBattleLoss), RpcTarget.MasterClient, damage);
+    }
+
+    /// <summary>MasterClient에서만 실행: 현재 팀 HP를 읽어 데미지만큼 깎아 Room 속성에 기록.</summary>
+    private void ApplyTeamDamageLocal(int damage)
+    {
+        if (_soloMode)
+        {
+            _soloTeamHp = Mathf.Max(0, _soloTeamHp - damage);
+            GameEvents.HealthChanged(_soloTeamHp);
+            if (_soloTeamHp <= 0) GameEvents.SessionEnded();
+            return;
+        }
+
+        int current = TeamHealth;
+        if (current < 0) return; // 아직 초기화 안 됨
+        SetTeamHealthProp(Mathf.Max(0, current - damage));
+    }
+
+    private void SetTeamHealthProp(int hp)
+    {
+        var props = new Hashtable { { TEAM_HP_PROP_KEY, hp } };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    // ─────────────────────────────────────────
     // RPC 수신
     // ─────────────────────────────────────────
+
+    /// <summary>상대 보드 스냅샷 수신 → 미러 렌더용 이벤트 발행.</summary>
+    [PunRPC]
+    private void RPC_OnBoardSnapshot(int[] data)
+    {
+        GameEvents.OpponentBoardChanged(BoardSnapshot.Decode(data));
+    }
+
+    /// <summary>비마스터의 패배 데미지 요청을 마스터가 수신 → 팀 HP에 반영.</summary>
+    [PunRPC]
+    private void RPC_ReportBattleLoss(int damage)
+    {
+        if (!IsMasterClient) return;
+        ApplyTeamDamageLocal(damage);
+    }
 
     [PunRPC]
     private void RPC_OnRoundStart(int round)
@@ -301,7 +434,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.LoadLevel("GameSceneTest");
-        BroadcastRoundStart(1);
+        // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
+        // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
     }
 
     /// <summary>
@@ -312,16 +446,52 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
-        if (!IsMasterClient) return;
-        if (!changedProps.ContainsKey(READY_PROP_KEY)) return;
-
-        foreach (var player in PhotonNetwork.PlayerList)
+        // 파트너 골드 표시: 다른 플레이어의 Gold가 바뀌면 UI 갱신용 이벤트 발행(모든 클라).
+        if (targetPlayer != PhotonNetwork.LocalPlayer &&
+            changedProps.TryGetValue(GOLD_PROP_KEY, out object gold))
         {
-            bool isReady = player.CustomProperties.TryGetValue(READY_PROP_KEY, out object ready) && (bool)ready;
-            if (!isReady) return;
+            GameEvents.PartnerGoldChanged((int)gold);
         }
 
-        photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
+        // 이하 집계는 MasterClient만.
+        if (!IsMasterClient) return;
+
+        // 게임 씬 로드 핸드셰이크: 두 클라가 모두 SceneReady면 라운드 1 시작(1회만).
+        if (!_gameStarted && changedProps.ContainsKey(SCENE_READY_PROP_KEY) && AllPlayersHaveFlag(SCENE_READY_PROP_KEY))
+        {
+            _gameStarted = true;
+            BroadcastRoundStart(1);
+            return;
+        }
+
+        // 준비 완료 집계.
+        if (changedProps.ContainsKey(READY_PROP_KEY) && AllPlayersHaveFlag(READY_PROP_KEY))
+            photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
+    }
+
+    /// <summary>모든 플레이어의 해당 bool CustomProperty가 true인지.</summary>
+    private bool AllPlayersHaveFlag(string key)
+    {
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            bool on = player.CustomProperties.TryGetValue(key, out object v) && (bool)v;
+            if (!on) return false;
+        }
+        return true;
+    }
+
+    /// <summary>팀 공통 HP(Room 속성) 변경 수신 → 모든 클라가 UI 갱신, 0 이하면 세션 종료.</summary>
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    {
+        if (!propertiesThatChanged.TryGetValue(TEAM_HP_PROP_KEY, out object hp)) return;
+
+        int health = (int)hp;
+        GameEvents.HealthChanged(health);
+        if (health <= 0)
+        {
+            Debug.LogWarning("[Network] 팀 공통 HP 0 — 세션 종료(게임오버)");
+            GameEvents.SessionEnded();
+        }
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)
@@ -380,6 +550,9 @@ public class NetworkManager : MonoBehaviour
     public bool IsMasterClient => true;   // 오프라인에서는 항상 호스트 취급
     public int  PlayerCount    => 1;
 
+    private int _teamHp = -1;
+    public int  TeamHealth     => _teamHp;
+
     private void Start()
     {
         Debug.LogWarning("[Network] PUN2 미설치 — 오프라인 모드로 실행 중");
@@ -397,6 +570,28 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
     public void BroadcastPlayerReady()         => GameEvents.AllPlayersReady();
+
+    // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
+    public void BroadcastBoardSnapshot(int[] _) { }
+    public void SyncLocalGold(int _)            { }
+
+    /// <summary>오프라인(1인)은 씬 로드 즉시 라운드 1 시작.</summary>
+    public void NotifySceneReady()              => BroadcastRoundStart(1);
+
+    public void InitTeamHealth(int hp)
+    {
+        if (_teamHp >= 0) return;
+        _teamHp = hp;
+        GameEvents.HealthChanged(_teamHp);
+    }
+
+    public void ReportBattleLoss(int damage)
+    {
+        if (_teamHp < 0) return;
+        _teamHp = Mathf.Max(0, _teamHp - damage);
+        GameEvents.HealthChanged(_teamHp);
+        if (_teamHp <= 0) GameEvents.SessionEnded();
+    }
 }
 
 #endif

@@ -44,6 +44,8 @@ MonoBehaviour:
   - RPC_OnAllPlayersReady
   - RPC_OnPlayerReady
   - RPC_SetTarget
+  - RPC_OnBoardSnapshot
+  - RPC_ReportBattleLoss
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
