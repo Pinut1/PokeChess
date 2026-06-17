@@ -30,15 +30,15 @@ public class PokemonUnit : MonoBehaviour
     // 인덱스 = starLevel - 1.
     private static readonly float[] STAR_MULTIPLIER = { 1f, 1.8f, 3.24f };
 
-    /// <summary>현재 별 등급의 스탯 배수.</summary>
-    public float StarMultiplier
+    /// <summary>지정 별 등급의 스탯 배수. (BattleManager가 적 유닛 스탯 계산에 재사용)</summary>
+    public static float StarMultiplierFor(int starLevel)
     {
-        get
-        {
-            int idx = Mathf.Clamp(starLevel - 1, 0, STAR_MULTIPLIER.Length - 1);
-            return STAR_MULTIPLIER[idx];
-        }
+        int idx = Mathf.Clamp(starLevel - 1, 0, STAR_MULTIPLIER.Length - 1);
+        return STAR_MULTIPLIER[idx];
     }
+
+    /// <summary>현재 별 등급의 스탯 배수.</summary>
+    public float StarMultiplier => StarMultiplierFor(starLevel);
 
     // ──────────────────────────────────────────
     // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값

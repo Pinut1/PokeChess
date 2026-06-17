@@ -30,12 +30,13 @@ public class BattleUnit
 }
 
 /// <summary>
-/// 자동 전투 진행 담당.
+/// 자동 전투 진행 담당 (협동 PVE).
 /// GameEvents.OnBattleStart 수신 시 BoardManager 스냅샷으로 아군 팀을 만들고,
-/// 보드 중심 기준 점대칭 미러 좌표에 동일한 구성의 적 팀을 생성해 거울 대결을 시뮬레이션한다.
+/// 현재 라운드의 StageData에 정의된 적 구성을 미러 좌표에 생성해 시뮬레이션한다.
 /// 결과는 GameEvents.BattleEnd(isWin)으로 통지.
 ///
-/// PvP 상대 보드 동기화는 미구현 — 적 팀은 자기 보드의 미러로 대체 (TODO: 네트워크 동기화 도입 시 교체).
+/// 적은 PokemonUnit이 아니라 경량 BattleUnit 스냅샷(source=null)으로만 존재한다.
+/// StageData/적 풀이 없으면 기존 "내 보드 미러"로 폴백(디버그/씬 호환).
 /// </summary>
 public class BattleManager : MonoBehaviour
 {
@@ -44,6 +45,11 @@ public class BattleManager : MonoBehaviour
 
     // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
     private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
+
+    [Header("스테이지 (비어있으면 내 보드 미러로 폴백)")]
+    [Tooltip("PVE 적 구성. 현재 라운드로 선택됨(order 또는 round 일치, 없으면 인덱스 클램프).")]
+    [SerializeField] private List<StageData> _stages = new();
+    // 적 영문명 → PokemonData 해석은 중앙 PokemonDatabase.Instance가 담당(수동 풀 불필요).
 
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
@@ -108,22 +114,97 @@ public class BattleManager : MonoBehaviour
         _units.Clear();
 
         var board = GameManager.Instance.Board;
+
+        // 아군: 내 보드 스냅샷 그대로.
         foreach (var kv in board.GetBoardSnapshot())
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
+            _units.Add(CreateAllyUnit(unit, kv.Key));
+        }
 
-            HexCoords allyCoords = kv.Key;
-            HexCoords enemyCoords = board.GetMirroredCoords(allyCoords);
+        // 적: 현재 라운드의 StageData → 미러 좌표에 생성.
+        int round = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentRound : 0;
+        StageData stage = SelectStage(round);
+        int enemyCount = stage != null ? SpawnEnemiesFromStage(stage, board) : 0;
 
-            _units.Add(CreateBattleUnit(unit, BattleTeam.Ally, allyCoords));
-            _units.Add(CreateBattleUnit(unit, BattleTeam.Enemy, enemyCoords));
+        // 폴백: 스테이지/적이 하나도 없으면 기존 "내 보드 미러"로 대결(씬/디버그 호환).
+        if (enemyCount == 0)
+        {
+            if (stage == null)
+                Debug.LogWarning($"[Battle] 라운드 {round}에 맞는 StageData 없음 — 내 보드 미러로 폴백");
+            else
+                Debug.LogWarning($"[Battle] '{stage.stageId}' 적을 하나도 생성 못함(DUMMY/풀 누락) — 미러 폴백");
+            SpawnMirrorEnemies(board);
+        }
+        else
+        {
+            Debug.Log($"[Battle] '{stage.stageId}' 적 {enemyCount}기 생성");
         }
 
         foreach (var bu in _units)
             SpawnVisual(bu);
 
         SpawnMirrorBoard(board);
+    }
+
+    /// <summary>현재 라운드에 해당하는 스테이지 선택. order==round → round==round → 인덱스 클램프 순.</summary>
+    private StageData SelectStage(int round)
+    {
+        if (_stages == null || _stages.Count == 0) return null;
+
+        foreach (var s in _stages)
+            if (s != null && s.order == round) return s;
+        foreach (var s in _stages)
+            if (s != null && s.round == round) return s;
+
+        int idx = Mathf.Clamp(round - 1, 0, _stages.Count - 1);
+        return _stages[idx];
+    }
+
+    /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
+    private int SpawnEnemiesFromStage(StageData stage, BoardManager board)
+    {
+        int count = 0;
+        foreach (var e in stage.enemies)
+        {
+            if (e == null) continue;
+
+            PokemonData data = ResolvePokemon(e.pokemonNameEn);
+            if (data == null) continue; // DUMMY/미해결 슬롯은 건너뜀
+
+            // 기획은 적 자기 진영 로컬좌표(0~3행)로 작성 → 미러해서 플레이어 앞에 배치.
+            HexCoords coords = board.GetMirroredCoords(new HexCoords(e.q, e.r));
+            _units.Add(CreateEnemyUnit(data, e, coords));
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>중앙 PokemonDatabase에서 영문명으로 PokemonData 해석. 빈/"DUMMY"/미발견이면 null.</summary>
+    private PokemonData ResolvePokemon(string nameEn)
+    {
+        if (string.IsNullOrEmpty(nameEn) || nameEn == "DUMMY") return null;
+
+        var db = PokemonDatabase.Instance;
+        if (db == null) return null; // Instance 접근 시 에러 로그가 이미 출력됨
+
+        var data = db.GetByNameEn(nameEn);
+        if (data == null)
+            Debug.LogWarning($"[Battle] 적 '{nameEn}'을 PokemonDatabase에서 못 찾음 — 건너뜀");
+        return data;
+    }
+
+    /// <summary>"내 보드 미러" 폴백 적 생성(기존 동작). StageData 도입 전/디버그용.</summary>
+    private void SpawnMirrorEnemies(BoardManager board)
+    {
+        foreach (var kv in board.GetBoardSnapshot())
+        {
+            PokemonUnit unit = kv.Value;
+            if (unit == null || unit.data == null) continue;
+            HexCoords enemyCoords = board.GetMirroredCoords(kv.Key);
+            _units.Add(CreateBattleUnit(unit, BattleTeam.Enemy, enemyCoords));
+        }
     }
 
     /// <summary>
@@ -144,6 +225,42 @@ public class BattleManager : MonoBehaviour
 
             _mirrorTiles.Add(tile);
         }
+    }
+
+    /// <summary>내 보드 위 PokemonUnit에서 아군 BattleUnit 생성(원본 참조 유지 → 전투 후 복원).</summary>
+    private BattleUnit CreateAllyUnit(PokemonUnit unit, HexCoords coords)
+        => CreateBattleUnit(unit, BattleTeam.Ally, coords);
+
+    /// <summary>
+    /// StageData의 적 한 칸을 PokemonData + 강화 배수로 적 BattleUnit으로 생성(source=null).
+    /// 별 배수는 아군과 동일(PokemonUnit.StarMultiplierFor), 그 위에 statMultiplier(전 스탯)·
+    /// hpMultiplier(HP만)·atkMultiplier(공격력만)를 곱한다. 방어/특방/공속은 별 배수 미적용(아군 규칙과 동일).
+    /// </summary>
+    private BattleUnit CreateEnemyUnit(PokemonData data, EnemyPlacement e, HexCoords coords)
+    {
+        float star = PokemonUnit.StarMultiplierFor(e.starLevel);
+        float sm = e.statMultiplier <= 0f ? 1f : e.statMultiplier;
+        float hm = e.hpMultiplier   <= 0f ? 1f : e.hpMultiplier;
+        float am = e.atkMultiplier   <= 0f ? 1f : e.atkMultiplier;
+
+        float maxHp = data.hp * star * sm * hm;
+
+        return new BattleUnit
+        {
+            source = null,
+            team = BattleTeam.Enemy,
+            coords = coords,
+            maxHp = maxHp,
+            currentHp = maxHp,
+            attack = data.attack * star * sm * am,
+            specialAttack = data.specialAttack * star * sm,
+            defense = data.defense * sm,
+            specialDefense = data.specialDefense * sm,
+            attackSpeed = data.attackSpeed,
+            range = Mathf.Max(1, data.range),
+            attackType = data.attackType,
+            attackCooldown = 0f
+        };
     }
 
     private BattleUnit CreateBattleUnit(PokemonUnit unit, BattleTeam team, HexCoords coords)

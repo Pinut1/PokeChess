@@ -18,7 +18,7 @@ public static class PokeChessImporter
     // JSON 데이터 클래스 (JsonUtility용 래퍼)
     // ──────────────────────────────────────────
 
-    [Serializable] private class PokemonDatabase    { public List<PokemonEntry>    pokemon;    }
+    [Serializable] private class PokemonJsonDb      { public List<PokemonEntry>    pokemon;    }
     [Serializable] private class ItemDatabase       { public List<ItemEntry>       items;      }
     [Serializable] private class SynergyDatabase    { public List<SynergyEntry>    synergies;  }
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry> consumables;}
@@ -123,9 +123,11 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/pokemon_data");
         if (json == null) { Debug.LogError("[PokeChess] pokemon_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<PokemonDatabase>(json.text);
+        var db = JsonUtility.FromJson<PokemonJsonDb>(json.text);
         string dir = $"{SO_PATH}/Pokemon";
         EnsureDir(dir);
+
+        var imported = new List<PokemonData>();
 
         foreach (var e in db.pokemon)
         {
@@ -161,10 +163,25 @@ public static class PokeChessImporter
 
             // modelPrefab / icon 은 덮어쓰지 않음 (Inspector 수동 연결 보호)
             EditorUtility.SetDirty(so);
+            imported.Add(so);
         }
 
+        UpdatePokemonDatabase(imported);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 포켓몬 {db.pokemon.Count}종 Import 완료");
+        Debug.Log($"[PokeChess] 포켓몬 {db.pokemon.Count}종 Import 완료 (PokemonDatabase 자동 갱신)");
+    }
+
+    /// <summary>중앙 PokemonDatabase(Resources/PokemonDatabase.asset)를 임포트된 전체 목록으로 갱신.</summary>
+    private static void UpdatePokemonDatabase(List<PokemonData> all)
+    {
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+
+        var db = LoadOrCreate<PokemonDatabase>($"{resDir}/PokemonDatabase.asset");
+        db.all = all;
+        db.InvalidateCache();
+        EditorUtility.SetDirty(db);
     }
 
     [MenuItem("PokeChess/Import Item JSON")]
