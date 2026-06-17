@@ -23,6 +23,8 @@ public static class PokeChessImporter
     [Serializable] private class SynergyDatabase    { public List<SynergyEntry>    synergies;  }
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry> consumables;}
     [Serializable] private class StoneDatabase      { public List<StoneEntry> stones; }
+    [Serializable] private class RewardDatabase     { public List<RewardTableJson> tables; }
+    [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson> mappings; }
 
     [Serializable]
     private class PokemonEntry
@@ -86,6 +88,29 @@ public static class PokeChessImporter
         public int id;
         public string name, nameEn, stoneType, description;
         public string targetPokemon, evolvedPokemon;   // 매핑 (행마다 하나씩)
+    }
+
+    [Serializable]
+    private class RewardTableJson
+    {
+        public int rewardTableId;
+        public string label;
+        public List<RewardEntryJson> rewards;
+    }
+
+    [Serializable]
+    private class RewardEntryJson
+    {
+        public string kind;        // gold / item / consumable / stone / unit / augment
+        public int    amount;
+        public string refNameEn;
+        public float  dropChance;  // 0~1, 0이면 확정(1)로 보정
+    }
+
+    [Serializable]
+    private class TradeEvoJson
+    {
+        public string targetPokemonEn, evolvedPokemonEn, note;
     }
 
     // ──────────────────────────────────────────
@@ -287,9 +312,84 @@ public static class PokeChessImporter
         Debug.Log($"[PokeChess] 시너지 {db.synergies.Count}종 Import 완료");
     }
 
+    [MenuItem("PokeChess/Import Reward JSON")]
+    public static void ImportRewards()
+    {
+        var json = Resources.Load<TextAsset>("Data/reward_data");
+        if (json == null) { Debug.LogError("[PokeChess] reward_data.json 없음"); return; }
+
+        var db = JsonUtility.FromJson<RewardDatabase>(json.text);
+        string dir = $"{SO_PATH}/Rewards";
+        EnsureDir(dir);
+
+        foreach (var t in db.tables)
+        {
+            string path = $"{dir}/Reward_{t.rewardTableId}.asset";
+            var so = LoadOrCreate<RewardData>(path);
+
+            so.rewardTableId = t.rewardTableId;
+            so.label         = t.label;
+            so.rewards       = new List<RewardEntry>();
+
+            if (t.rewards != null)
+                foreach (var r in t.rewards)
+                    so.rewards.Add(new RewardEntry
+                    {
+                        kind       = ParseRewardKind(r.kind),
+                        amount     = r.amount,
+                        refNameEn  = r.refNameEn,
+                        dropChance = r.dropChance <= 0f ? 1f : r.dropChance
+                    });
+
+            EditorUtility.SetDirty(so);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 보상 테이블 {db.tables.Count}개 Import 완료");
+    }
+
+    [MenuItem("PokeChess/Import TradeEvolution JSON")]
+    public static void ImportTradeEvolutions()
+    {
+        var json = Resources.Load<TextAsset>("Data/trade_evolution_data");
+        if (json == null) { Debug.LogError("[PokeChess] trade_evolution_data.json 없음"); return; }
+
+        var db = JsonUtility.FromJson<TradeEvoDatabase>(json.text);
+        string dir = $"{SO_PATH}/Evolution";
+        EnsureDir(dir);
+
+        string path = $"{dir}/TradeEvolution_Data.asset";   // 통신진화는 단일 SO에 모음
+        var so = LoadOrCreate<TradeEvolutionData>(path);
+
+        so.mappings = new List<TradeEvolutionMapping>();
+        if (db.mappings != null)
+            foreach (var m in db.mappings)
+                if (!string.IsNullOrEmpty(m.targetPokemonEn))
+                    so.mappings.Add(new TradeEvolutionMapping
+                    {
+                        targetPokemonEn  = m.targetPokemonEn,
+                        evolvedPokemonEn = m.evolvedPokemonEn,
+                        note             = m.note
+                    });
+
+        EditorUtility.SetDirty(so);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");
+    }
+
     // ──────────────────────────────────────────
     // 유틸
     // ──────────────────────────────────────────
+
+    private static RewardKind ParseRewardKind(string s) => s switch
+    {
+        "item"                      => RewardKind.Item,
+        "consumable"                => RewardKind.Consumable,
+        "stone" or "evolutionStone" => RewardKind.EvolutionStone,
+        "unit"                      => RewardKind.Unit,
+        "augment" or "augmentChoice"=> RewardKind.AugmentChoice,
+        _                           => RewardKind.Gold,
+    };
 
     private static void ApplyItemStat(ItemData so, string key, float value)
     {

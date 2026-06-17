@@ -1,0 +1,5 @@
+{
+  "mappings": [
+    { "targetPokemonEn": "DUMMY", "evolvedPokemonEn": "DUMMY", "note": "통신교환 시 즉시 진화하는 종 — 기획 확정 필요 (예: 강철톤류/핫삼류)" }
+  ]
+}

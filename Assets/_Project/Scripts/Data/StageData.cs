@@ -68,5 +68,5 @@ public class StageData : ScriptableObject
     public List<EnemyPlacement> enemies = new();
 
     [Header("보상")]
-    public int rewardTableId;       // Reward Table 참조 (임포터/태욱 파트)
+    public int rewardTableId;       // RewardData.rewardTableId 참조 (역기획서 수치 확정 필요)
 }
