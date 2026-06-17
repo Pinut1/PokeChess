@@ -1,5 +1,5 @@
 {
-  "_readme": "스테이지 진행표. pokemonNameEn=확정 시그니처 종, DUMMY=기획 미정 슬롯(교체 필요). starLevel/q/r은 임시값 — 기획이 별·배치 확정. preReward: None/AugmentChoice/ItemReward/CompanionItem",
+  "_readme": "스테이지 진행표. pokemonNameEn=확정 시그니처 종, DUMMY=기획 미정 슬롯(교체 필요). starLevel/q/r은 임시값 — 기획이 별·배치 확정. preReward: None/AugmentChoice/ItemReward/CompanionItem. statMultiplier/hpMultiplier/atkMultiplier=보스·시그니처 강화 배수(없거나 0이면 임포터가 1.0으로 처리할 것). 아래 배수는 예시 — 실제 밸런싱은 기획.",
   "stages": [
     {
       "stageId": "1-1", "chapter": 1, "round": 1, "order": 1,
@@ -56,7 +56,7 @@
       "stageType": "GymBattle", "preReward": "None", "trainerName": "꼭두",
       "rewardTableId": 0,
       "enemies": [
-        { "pokemonNameEn": "Miltank", "pokemonNameKr": "밀탱크", "starLevel": 2, "q": 1, "r": 0 },
+        { "pokemonNameEn": "Miltank", "pokemonNameKr": "밀탱크", "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 2.0, "hpMultiplier": 1.5 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 2, "r": 1 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
@@ -115,8 +115,8 @@
       "stageType": "ChampionBattle", "preReward": "None", "trainerName": "그린",
       "rewardTableId": 0,
       "enemies": [
-        { "pokemonNameEn": "Aerodactyl", "pokemonNameKr": "프테라",   "starLevel": 2, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Dragonite",  "pokemonNameKr": "망나뇽",   "starLevel": 3, "q": 2, "r": 0 },
+        { "pokemonNameEn": "Aerodactyl", "pokemonNameKr": "프테라",   "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 1.8 },
+        { "pokemonNameEn": "Dragonite",  "pokemonNameKr": "망나뇽",   "starLevel": 3, "q": 2, "r": 0, "statMultiplier": 2.5 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 0 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 0 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },

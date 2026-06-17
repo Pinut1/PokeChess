@@ -34,6 +34,14 @@ public class EnemyPlacement
     public int    q;               // 헥스 좌표 q (적 보드 기준, 임시값 — 기획 확정 필요)
     public int    r;               // 헥스 좌표 r
     public string heldItemEn;      // (옵션) 트레이너 보유 아이템 영문명
+
+    // ── 보스/시그니처 강화 ─────────────────────────
+    // 같은 PokemonData를 스테이지마다 다른 강도로 쓰기 위한 배수. ★ 스케일 위에 추가로 곱해짐.
+    // 1 = 기본(플레이어와 동일). 예: 꼭두 밀탱크 2.0, 그린 망나뇽 2.5.
+    public float statMultiplier = 1f;     // 전 스탯 일괄 배수
+    public float hpMultiplier   = 1f;     // (옵션) HP만 추가 배수 — 탱커형 보스용
+    public float atkMultiplier  = 1f;     // (옵션) 공격력만 추가 배수
+    // 최종 = base × StarMultiplier × statMultiplier × (스탯별 배수)
 }
 
 /// <summary>
