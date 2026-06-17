@@ -24,7 +24,7 @@ public static class PokeChessImporter
     [Serializable] private class SynergyDatabase    { public List<SynergyEntry>     synergies;  }
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry>  consumables; }
     [Serializable] private class StoneDatabase      { public List<StoneEntry>       stones; }
-    [Serializable] private class StageDatabase      { public List<StageEntry>       stages; }
+    [Serializable] private class StageJsonDb        { public List<StageEntry>       stages; }
     [Serializable] private class RewardDatabase     { public List<RewardTableJson>  tables; }
     [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson>     mappings; }
 
@@ -406,61 +406,56 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/stage_data");
         if (json == null) { Debug.LogError("[PokeChess] stage_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<StageDatabase>(json.text);
-        if (db == null || db.stages == null)
+        var jsonDb = JsonUtility.FromJson<StageJsonDb>(json.text);
+        if (jsonDb == null || jsonDb.stages == null)
         {
             Debug.LogError("[PokeChess] stage_data.json 파싱 실패");
             return;
         }
 
-        string dir = $"{SO_PATH}/Stages";
-        EnsureDir(dir);
-
-        foreach (var e in db.stages)
+        // 스테이지당 .asset을 만들지 않고, 단일 StageDatabase.asset의 List를 통째로 교체.
+        var stages = new List<StageData>();
+        foreach (var e in jsonDb.stages)
         {
-            string safeStageId = string.IsNullOrEmpty(e.stageId)
-                ? $"Stage_{e.order}"
-                : e.stageId.Replace("/", "_");
-
-            string path = $"{dir}/{safeStageId}_Stage.asset";
-            var so = LoadOrCreate<StageData>(path);
-
-            so.stageId = e.stageId;
-            so.chapter = e.chapter;
-            so.round = e.round;
-            so.order = e.order;
-            so.stageType = ParseStageType(e.stageType);
-            so.preReward = ParsePreStageReward(e.preReward);
-            so.trainerName = e.trainerName ?? "";
-            so.rewardTableId = e.rewardTableId;
-
-            so.enemies = new List<EnemyPlacement>();
+            var stage = new StageData
+            {
+                stageId       = e.stageId,
+                chapter       = e.chapter,
+                round         = e.round,
+                order         = e.order,
+                stageType     = ParseStageType(e.stageType),
+                preReward     = ParsePreStageReward(e.preReward),
+                trainerName   = e.trainerName ?? "",
+                rewardTableId = e.rewardTableId,
+                enemies       = new List<EnemyPlacement>()
+            };
 
             if (e.enemies != null)
-            {
                 foreach (var enemy in e.enemies)
-                {
-                    so.enemies.Add(new EnemyPlacement
+                    stage.enemies.Add(new EnemyPlacement
                     {
-                        pokemonNameEn = enemy.pokemonNameEn ?? "",
-                        pokemonNameKr = enemy.pokemonNameKr ?? "",
-                        starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
-                        q = enemy.q,
-                        r = enemy.r,
-                        heldItemEn = enemy.heldItemEn ?? "",
-
+                        pokemonNameEn  = enemy.pokemonNameEn ?? "",
+                        pokemonNameKr  = enemy.pokemonNameKr ?? "",
+                        starLevel      = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
+                        q              = enemy.q,
+                        r              = enemy.r,
+                        heldItemEn     = enemy.heldItemEn ?? "",
                         statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
-                        hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
-                        atkMultiplier = NormalizeMultiplier(enemy.atkMultiplier)
+                        hpMultiplier   = NormalizeMultiplier(enemy.hpMultiplier),
+                        atkMultiplier  = NormalizeMultiplier(enemy.atkMultiplier)
                     });
-                }
-            }
 
-            EditorUtility.SetDirty(so);
+            stages.Add(stage);
         }
 
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+        var so = LoadOrCreate<StageDatabase>($"{resDir}/StageDatabase.asset");
+        so.stages = stages;
+        EditorUtility.SetDirty(so);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 스테이지 {db.stages.Count}개 Import 완료");
+        Debug.Log($"[PokeChess] 스테이지 {stages.Count}개 Import 완료 (StageDatabase 단일 에셋 갱신)");
     }
 
     [MenuItem("PokeChess/Import TradeEvolution JSON")]

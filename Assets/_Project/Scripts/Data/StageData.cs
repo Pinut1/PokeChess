@@ -47,9 +47,12 @@ public class EnemyPlacement
 /// <summary>
 /// 한 스테이지(예: 1-3)의 적 구성 + 사전 이벤트 정의.
 /// 적 종은 확정, 별/좌표/잡몹은 기획이 채우는 칸. BattleManager가 전투 시 이걸 읽어 적 팀 생성.
+///
+/// SO가 아닌 일반 직렬화 클래스 — 중앙 <see cref="StageDatabase"/>(SO 1개)가 List로 인라인 보유한다.
+/// 스테이지마다 .asset을 쪼개지 않아 파일/머지 노이즈를 없앤다(적 참조가 영문명 문자열이라 SO 객체참조 불필요).
 /// </summary>
-[CreateAssetMenu(menuName = "PokeChess/Stage", fileName = "NewStage_Data")]
-public class StageData : ScriptableObject
+[Serializable]
+public class StageData
 {
     [Header("식별")]
     public string stageId;          // "1-1"

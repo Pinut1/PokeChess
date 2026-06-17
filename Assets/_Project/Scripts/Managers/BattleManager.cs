@@ -46,10 +46,9 @@ public class BattleManager : MonoBehaviour
     // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
     private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
 
-    [Header("스테이지 (비어있으면 내 보드 미러로 폴백)")]
-    [Tooltip("PVE 적 구성. 현재 라운드로 선택됨(order 또는 round 일치, 없으면 인덱스 클램프).")]
-    [SerializeField] private List<StageData> _stages = new();
-    // 적 영문명 → PokemonData 해석은 중앙 PokemonDatabase.Instance가 담당(수동 풀 불필요).
+    // 스테이지 구성은 중앙 StageDatabase.Instance가 제공(인스펙터 수동 풀 불필요).
+    // 적 영문명 → PokemonData 해석도 중앙 PokemonDatabase.Instance가 담당.
+    // 둘 중 하나라도 없으면 "내 보드 미러"로 폴백(씬/디버그 호환).
 
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
@@ -123,9 +122,9 @@ public class BattleManager : MonoBehaviour
             _units.Add(CreateAllyUnit(unit, kv.Key));
         }
 
-        // 적: 현재 라운드의 StageData → 미러 좌표에 생성.
+        // 적: 현재 라운드의 StageData → 미러 좌표에 생성. (중앙 StageDatabase에서 조회)
         int round = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentRound : 0;
-        StageData stage = SelectStage(round);
+        StageData stage = StageDatabase.Instance != null ? StageDatabase.Instance.GetForRound(round) : null;
         int enemyCount = stage != null ? SpawnEnemiesFromStage(stage, board) : 0;
 
         // 폴백: 스테이지/적이 하나도 없으면 기존 "내 보드 미러"로 대결(씬/디버그 호환).
@@ -146,20 +145,6 @@ public class BattleManager : MonoBehaviour
             SpawnVisual(bu);
 
         SpawnMirrorBoard(board);
-    }
-
-    /// <summary>현재 라운드에 해당하는 스테이지 선택. order==round → round==round → 인덱스 클램프 순.</summary>
-    private StageData SelectStage(int round)
-    {
-        if (_stages == null || _stages.Count == 0) return null;
-
-        foreach (var s in _stages)
-            if (s != null && s.order == round) return s;
-        foreach (var s in _stages)
-            if (s != null && s.round == round) return s;
-
-        int idx = Mathf.Clamp(round - 1, 0, _stages.Count - 1);
-        return _stages[idx];
     }
 
     /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
