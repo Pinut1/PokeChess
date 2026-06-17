@@ -18,13 +18,15 @@ public static class PokeChessImporter
     // JSON 데이터 클래스 (JsonUtility용 래퍼)
     // ──────────────────────────────────────────
 
-    [Serializable] private class PokemonJsonDb      { public List<PokemonEntry>    pokemon;    }
-    [Serializable] private class ItemDatabase       { public List<ItemEntry>       items;      }
-    [Serializable] private class SynergyDatabase    { public List<SynergyEntry>    synergies;  }
-    [Serializable] private class ConsumableDatabase { public List<ConsumableEntry> consumables;}
-    [Serializable] private class StoneDatabase      { public List<StoneEntry> stones; }
-    [Serializable] private class RewardDatabase     { public List<RewardTableJson> tables; }
-    [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson> mappings; }
+    // 내부 JSON 래퍼는 PokemonJsonDb로 명명 — 런타임 SO 클래스 PokemonDatabase와 이름 충돌 회피.
+    [Serializable] private class PokemonJsonDb      { public List<PokemonEntry>     pokemon;    }
+    [Serializable] private class ItemDatabase       { public List<ItemEntry>        items;      }
+    [Serializable] private class SynergyDatabase    { public List<SynergyEntry>     synergies;  }
+    [Serializable] private class ConsumableDatabase { public List<ConsumableEntry>  consumables; }
+    [Serializable] private class StoneDatabase      { public List<StoneEntry>       stones; }
+    [Serializable] private class StageDatabase      { public List<StageEntry>       stages; }
+    [Serializable] private class RewardDatabase     { public List<RewardTableJson>  tables; }
+    [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson>     mappings; }
 
     [Serializable]
     private class PokemonEntry
@@ -89,6 +91,39 @@ public static class PokeChessImporter
         public string name, nameEn, stoneType, description;
         public string targetPokemon, evolvedPokemon;   // 매핑 (행마다 하나씩)
     }
+
+    
+    [Serializable]
+    private class StageEntry
+    {
+        public string stageId;
+        public int chapter;
+        public int round;
+        public int order;
+
+        public string stageType;
+        public string preReward;
+        public string trainerName;
+
+        public int rewardTableId;
+        public List<EnemyPlacementJson> enemies;
+    }
+    
+    [Serializable]
+    private class EnemyPlacementJson
+    {
+        public string pokemonNameEn;
+        public string pokemonNameKr;
+        public int starLevel;
+        public int q;
+        public int r;
+        public string heldItemEn;
+
+        public float statMultiplier;
+        public float hpMultiplier;
+        public float atkMultiplier;
+    }
+
 
     [Serializable]
     private class RewardTableJson
@@ -364,6 +399,69 @@ public static class PokeChessImporter
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 보상 테이블 {db.tables.Count}개 Import 완료");
     }
+    
+    [MenuItem("PokeChess/Import Stage JSON")]
+    public static void ImportStages()
+    {
+        var json = Resources.Load<TextAsset>("Data/stage_data");
+        if (json == null) { Debug.LogError("[PokeChess] stage_data.json 없음"); return; }
+
+        var db = JsonUtility.FromJson<StageDatabase>(json.text);
+        if (db == null || db.stages == null)
+        {
+            Debug.LogError("[PokeChess] stage_data.json 파싱 실패");
+            return;
+        }
+
+        string dir = $"{SO_PATH}/Stages";
+        EnsureDir(dir);
+
+        foreach (var e in db.stages)
+        {
+            string safeStageId = string.IsNullOrEmpty(e.stageId)
+                ? $"Stage_{e.order}"
+                : e.stageId.Replace("/", "_");
+
+            string path = $"{dir}/{safeStageId}_Stage.asset";
+            var so = LoadOrCreate<StageData>(path);
+
+            so.stageId = e.stageId;
+            so.chapter = e.chapter;
+            so.round = e.round;
+            so.order = e.order;
+            so.stageType = ParseStageType(e.stageType);
+            so.preReward = ParsePreStageReward(e.preReward);
+            so.trainerName = e.trainerName ?? "";
+            so.rewardTableId = e.rewardTableId;
+
+            so.enemies = new List<EnemyPlacement>();
+
+            if (e.enemies != null)
+            {
+                foreach (var enemy in e.enemies)
+                {
+                    so.enemies.Add(new EnemyPlacement
+                    {
+                        pokemonNameEn = enemy.pokemonNameEn ?? "",
+                        pokemonNameKr = enemy.pokemonNameKr ?? "",
+                        starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
+                        q = enemy.q,
+                        r = enemy.r,
+                        heldItemEn = enemy.heldItemEn ?? "",
+
+                        statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
+                        hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
+                        atkMultiplier = NormalizeMultiplier(enemy.atkMultiplier)
+                    });
+                }
+            }
+
+            EditorUtility.SetDirty(so);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 스테이지 {db.stages.Count}개 Import 완료");
+    }
 
     [MenuItem("PokeChess/Import TradeEvolution JSON")]
     public static void ImportTradeEvolutions()
@@ -458,5 +556,30 @@ public static class PokeChessImporter
         "all"    => SkillTargetType.All,
         _        => SkillTargetType.Single
     };
+
+    private static StageType ParseStageType(string s)
+    {
+        if (Enum.TryParse(s, true, out StageType result))
+            return result;
+
+        Debug.LogWarning($"[PokeChess] 알 수 없는 StageType: {s}, WildCommon으로 처리");
+        return StageType.WildCommon;
+    }
+
+    private static PreStageReward ParsePreStageReward(string s)
+    {
+        if (Enum.TryParse(s, true, out PreStageReward result))
+            return result;
+
+        Debug.LogWarning($"[PokeChess] 알 수 없는 PreStageReward: {s}, None으로 처리");
+        return PreStageReward.None;
+    }
+
+    private static float NormalizeMultiplier(float value)
+    {
+        return value <= 0f ? 1f : value;
+    }
 }
+
+
 #endif
