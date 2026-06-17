@@ -24,6 +24,13 @@ public class RoundPhaseManager : MonoBehaviour
     public GamePhase CurrentPhase { get; private set; } = GamePhase.Lobby;
     public int       CurrentRound { get; private set; } = 0;
 
+    /// <summary>
+    /// 현재 라운드에 진행 중인 스테이지(중앙 StageDatabase에서 해석). 라운드 변경 시 갱신.
+    /// 전투의 적 구성·보상테이블·트레이너·preReward의 단일 출처 — BattleManager 등은 여기서 읽는다.
+    /// StageDatabase 미임포트/매칭 실패 시 null(BattleManager는 "내 보드 미러"로 폴백).
+    /// </summary>
+    public StageData CurrentStage { get; private set; }
+
     private Coroutine _phaseTimer;
 
     // ─────────────────────────────────────────
@@ -59,7 +66,32 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleRoundChanged(int round)
     {
         CurrentRound = round;
+        ResolveCurrentStage(round);
         EnterPhase(GamePhase.Shopping);
+    }
+
+    /// <summary>
+    /// 현재 라운드의 스테이지를 중앙 StageDatabase에서 확정해 CurrentStage에 보관하고 OnStageEntered 발행.
+    /// 이후 BattleManager는 CurrentStage로 적을 생성하고, 연출/보상/증강 담당은 이벤트로 훅을 건다.
+    /// </summary>
+    private void ResolveCurrentStage(int round)
+    {
+        CurrentStage = StageDatabase.Instance != null ? StageDatabase.Instance.GetForRound(round) : null;
+
+        if (CurrentStage == null)
+        {
+            Debug.LogWarning($"[Phase] 라운드 {round} 스테이지 없음 — StageDatabase 미임포트? (전투는 미러 폴백)");
+            return;
+        }
+
+        Debug.Log($"[Phase] 스테이지 진입: {CurrentStage.stageId} ({CurrentStage.stageType})");
+        GameEvents.StageEntered(CurrentStage);
+
+        // TODO(기획 확정 후, 담당자 분배): 전투 전 이벤트 분기. 여기엔 로직을 하드코딩하지 않고
+        // OnStageEntered 구독으로 각 파트가 처리한다(증강 풀/보상 수치/연출 모두 기획 미확정).
+        //  - preReward(증강 3택1 / 아이템 / 컴패니언): 샵·증강 담당이 처리. Ready 전 강제(블로킹) 여부 기획 확정 필요.
+        //  - trainerName 존재 시 트레이너 등장 연출 + 전용 BGM/배경(UI 담당).
+        //  - 전투 승리 보상(rewardTableId)은 OnBattleEnd(true) 시 CurrentStage.rewardTableId로 RewardData 조회해 지급(보상 담당).
     }
 
     private void HandleBattleEnd(bool isWin)

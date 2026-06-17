@@ -82,6 +82,15 @@ public static class GameEvents
     /// <summary>페이즈 전환. 인자 = 새 페이즈</summary>
     public static event Action<GamePhase> OnPhaseChanged;
 
+    /// <summary>
+    /// 현재 라운드의 스테이지가 확정됨(라운드 시작 시점). 인자 = 진입한 StageData.
+    /// RoundPhaseManager가 StageDatabase에서 해석 후 발행.
+    /// 구독 측 훅(기획 확정 후 담당자가 채움):
+    ///   - 전투 전 보상/증강(preReward), 트레이너 등장 연출, 스테이지 타입별 BGM/배경 등.
+    /// 전투의 적 구성은 BattleManager가 Phase.CurrentStage에서 직접 읽으므로 이 이벤트 구독 불필요.
+    /// </summary>
+    public static event Action<StageData> OnStageEntered;
+
     // ──────────────────────────────────────────
     // 연결 끊김 / 재접속
     // ──────────────────────────────────────────
@@ -118,6 +127,7 @@ public static class GameEvents
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
+    public static void StageEntered(StageData stage) => OnStageEntered?.Invoke(stage);
 
     public static void OpponentDisconnected(float graceSeconds) => OnOpponentDisconnected?.Invoke(graceSeconds);
     public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();

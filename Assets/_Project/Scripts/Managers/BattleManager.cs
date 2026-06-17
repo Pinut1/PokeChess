@@ -46,9 +46,9 @@ public class BattleManager : MonoBehaviour
     // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
     private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
 
-    // 스테이지 구성은 중앙 StageDatabase.Instance가 제공(인스펙터 수동 풀 불필요).
-    // 적 영문명 → PokemonData 해석도 중앙 PokemonDatabase.Instance가 담당.
-    // 둘 중 하나라도 없으면 "내 보드 미러"로 폴백(씬/디버그 호환).
+    // 현재 스테이지는 RoundPhaseManager(Phase.CurrentStage)가 라운드별로 확정해 제공.
+    // 적 영문명 → PokemonData 해석은 중앙 PokemonDatabase.Instance가 담당.
+    // 스테이지/DB 둘 중 하나라도 없으면 "내 보드 미러"로 폴백(씬/디버그 호환).
 
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
@@ -122,16 +122,15 @@ public class BattleManager : MonoBehaviour
             _units.Add(CreateAllyUnit(unit, kv.Key));
         }
 
-        // 적: 현재 라운드의 StageData → 미러 좌표에 생성. (중앙 StageDatabase에서 조회)
-        int round = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentRound : 0;
-        StageData stage = StageDatabase.Instance != null ? StageDatabase.Instance.GetForRound(round) : null;
+        // 적: 현재 스테이지(RoundPhaseManager가 라운드별로 확정) → 미러 좌표에 생성.
+        StageData stage = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentStage : null;
         int enemyCount = stage != null ? SpawnEnemiesFromStage(stage, board) : 0;
 
         // 폴백: 스테이지/적이 하나도 없으면 기존 "내 보드 미러"로 대결(씬/디버그 호환).
         if (enemyCount == 0)
         {
             if (stage == null)
-                Debug.LogWarning($"[Battle] 라운드 {round}에 맞는 StageData 없음 — 내 보드 미러로 폴백");
+                Debug.LogWarning("[Battle] CurrentStage 없음(StageDatabase 미임포트/매칭 실패) — 내 보드 미러로 폴백");
             else
                 Debug.LogWarning($"[Battle] '{stage.stageId}' 적을 하나도 생성 못함(DUMMY/풀 누락) — 미러 폴백");
             SpawnMirrorEnemies(board);
