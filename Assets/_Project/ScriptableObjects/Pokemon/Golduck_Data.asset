@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Golduck_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 55
+  pokemonName: "\uACE8\uB355"
+  pokemonNameEn: Golduck
+  cost: 3
+  hp: 750
+  attack: 55
+  defense: 50
+  specialAttack: 85
+  specialDefense: 55
+  attackSpeed: 0.65
+  range: 2
+  attackType: 1
+  synergies: []
+  skill:
+    skillName: "\uAE30\uBCF8\uAE30"
+    description: 
+    damage: 170
+    manaCost: 100
+    targetType: 0
+    areaRadius: 0
+    lineLength: 0
+  evolvesIntoEn: 
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}
