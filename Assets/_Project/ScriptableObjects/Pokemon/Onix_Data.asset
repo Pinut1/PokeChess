@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Onix_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 95
+  pokemonName: "\uB871\uC2A4\uD1A4"
+  pokemonNameEn: Onix
+  cost: 2
+  hp: 800
+  attack: 50
+  defense: 90
+  specialAttack: 20
+  specialDefense: 40
+  attackSpeed: 0.45
+  range: 1
+  attackType: 0
+  synergies: []
+  skill:
+    skillName: "\uAE30\uBCF8\uAE30"
+    description: 
+    damage: 100
+    manaCost: 100
+    targetType: 0
+    areaRadius: 0
+    lineLength: 0
+  evolvesIntoEn: 
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

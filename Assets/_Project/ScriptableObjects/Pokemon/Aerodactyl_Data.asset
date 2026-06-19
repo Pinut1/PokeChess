@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Aerodactyl_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 142
+  pokemonName: "\uD504\uD14C\uB77C"
+  pokemonNameEn: Aerodactyl
+  cost: 4
+  hp: 820
+  attack: 95
+  defense: 55
+  specialAttack: 45
+  specialDefense: 50
+  attackSpeed: 0.8
+  range: 1
+  attackType: 0
+  synergies: []
+  skill:
+    skillName: "\uAE30\uBCF8\uAE30"
+    description: 
+    damage: 190
+    manaCost: 100
+    targetType: 0
+    areaRadius: 0
+    lineLength: 0
+  evolvesIntoEn: 
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}
