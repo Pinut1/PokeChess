@@ -25,7 +25,7 @@ public static class PokeChessImporter
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry>  consumables; }
     [Serializable] private class StoneDatabase      { public List<StoneEntry>       stones; }
     [Serializable] private class StageJsonDb        { public List<StageEntry>       stages; }
-    [Serializable] private class RewardDatabase     { public List<RewardTableJson>  tables; }
+    [Serializable] private class RewardJsonDb       { public List<RewardTableJson>  tables; }
     [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson>     mappings; }
 
     [Serializable]
@@ -370,22 +370,27 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/reward_data");
         if (json == null) { Debug.LogError("[PokeChess] reward_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<RewardDatabase>(json.text);
-        string dir = $"{SO_PATH}/Rewards";
-        EnsureDir(dir);
-
-        foreach (var t in db.tables)
+        var jsonDb = JsonUtility.FromJson<RewardJsonDb>(json.text);
+        if (jsonDb == null || jsonDb.tables == null)
         {
-            string path = $"{dir}/Reward_{t.rewardTableId}.asset";
-            var so = LoadOrCreate<RewardData>(path);
+            Debug.LogError("[PokeChess] reward_data.json 파싱 실패");
+            return;
+        }
 
-            so.rewardTableId = t.rewardTableId;
-            so.label         = t.label;
-            so.rewards       = new List<RewardEntry>();
+        // 테이블당 .asset을 만들지 않고, 단일 RewardDatabase.asset의 List를 통째로 교체. (StageDatabase와 동일 패턴)
+        var tables = new List<RewardData>();
+        foreach (var t in jsonDb.tables)
+        {
+            var table = new RewardData
+            {
+                rewardTableId = t.rewardTableId,
+                label         = t.label,
+                rewards       = new List<RewardEntry>()
+            };
 
             if (t.rewards != null)
                 foreach (var r in t.rewards)
-                    so.rewards.Add(new RewardEntry
+                    table.rewards.Add(new RewardEntry
                     {
                         kind       = ParseRewardKind(r.kind),
                         amount     = r.amount,
@@ -393,11 +398,17 @@ public static class PokeChessImporter
                         dropChance = r.dropChance <= 0f ? 1f : r.dropChance
                     });
 
-            EditorUtility.SetDirty(so);
+            tables.Add(table);
         }
 
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+        var so = LoadOrCreate<RewardDatabase>($"{resDir}/RewardDatabase.asset");
+        so.tables = tables;
+        EditorUtility.SetDirty(so);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 보상 테이블 {db.tables.Count}개 Import 완료");
+        Debug.Log($"[PokeChess] 보상 테이블 {tables.Count}개 Import 완료 (RewardDatabase 단일 에셋 갱신)");
     }
     
     [MenuItem("PokeChess/Import Stage JSON")]

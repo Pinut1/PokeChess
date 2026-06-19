@@ -12,6 +12,7 @@ public class GameManager : Singleton<GameManager>
     [SerializeField] private BoardManager      _boardManager;
     [SerializeField] private BattleManager     _battleManager;
     [SerializeField] private ShopManager       _shopManager;
+    [SerializeField] private RewardManager     _rewardManager;
     [SerializeField] private SynergyManager    _synergyManager;
     [SerializeField] private ItemManager       _itemManager;
     [SerializeField] private AugmentManager    _augmentManager;
@@ -24,6 +25,7 @@ public class GameManager : Singleton<GameManager>
     public BoardManager      Board     => _boardManager;
     public BattleManager     Battle    => _battleManager;
     public ShopManager       Shop      => _shopManager;
+    public RewardManager     Reward    => _rewardManager;
     public SynergyManager    Synergy   => _synergyManager;
     public ItemManager       Item      => _itemManager;
     public AugmentManager    Augment   => _augmentManager;
@@ -55,6 +57,7 @@ public class GameManager : Singleton<GameManager>
         if (_boardManager      == null) Debug.LogWarning("[GameManager] BoardManager 미연결 (게임 씬이 아니면 정상)");
         if (_battleManager     == null) Debug.LogWarning("[GameManager] BattleManager 미연결 (게임 씬이 아니면 정상)");
         if (_shopManager       == null) Debug.LogWarning("[GameManager] ShopManager 미연결 (게임 씬이 아니면 정상)");
+        if (_rewardManager     == null) Debug.LogWarning("[GameManager] RewardManager 미연결 (게임 씬이 아니면 정상)");
         if (_synergyManager    == null) Debug.LogWarning("[GameManager] SynergyManager 미연결 (게임 씬이 아니면 정상)");
         if (_playerHealthManager == null) Debug.LogWarning("[GameManager] PlayerHealthManager 미연결 (게임 씬이 아니면 정상)");
         // ItemManager/AugmentManager/UIManager는 아직 스텁 — 검증 생략.

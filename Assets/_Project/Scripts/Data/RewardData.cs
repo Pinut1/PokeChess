@@ -28,12 +28,15 @@ public class RewardEntry
 }
 
 /// <summary>
-/// 스테이지 클리어 보상 테이블. StageData.rewardTableId가 이 rewardTableId를 참조한다.
+/// 스테이지 클리어 보상 테이블 한 개. StageData.rewardTableId가 이 rewardTableId를 참조한다.
 /// 적 구성과 분리해 여러 스테이지가 같은 보상 테이블을 재사용할 수 있게 한다.
+///
+/// SO가 아닌 일반 직렬화 클래스 — 중앙 <see cref="RewardDatabase"/>(SO 1개)가 List로 인라인 보유한다.
+/// (Reward_{id}.asset을 쪼개지 않아 파일/머지 노이즈 제거 + 런타임 단일 로드. <see cref="StageData"/>와 동일 패턴.)
 /// 실제 수치는 역기획서 확정 후 채움.
 /// </summary>
-[CreateAssetMenu(menuName = "PokeChess/Reward", fileName = "NewReward_Data")]
-public class RewardData : ScriptableObject
+[Serializable]
+public class RewardData
 {
     [Header("식별")]
     public int    rewardTableId;       // StageData.rewardTableId가 참조하는 키

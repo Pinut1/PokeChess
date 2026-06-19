@@ -91,7 +91,7 @@ public class RoundPhaseManager : MonoBehaviour
         // OnStageEntered 구독으로 각 파트가 처리한다(증강 풀/보상 수치/연출 모두 기획 미확정).
         //  - preReward(증강 3택1 / 아이템 / 컴패니언): 샵·증강 담당이 처리. Ready 전 강제(블로킹) 여부 기획 확정 필요.
         //  - trainerName 존재 시 트레이너 등장 연출 + 전용 BGM/배경(UI 담당).
-        //  - 전투 승리 보상(rewardTableId)은 OnBattleEnd(true) 시 CurrentStage.rewardTableId로 RewardData 조회해 지급(보상 담당).
+        // 전투 승리 보상은 RewardManager가 OnBattleEnd(true)에서 CurrentStage.rewardTableId로 지급(연결 완료, 골드만 — 수치는 역기획서 대기).
     }
 
     private void HandleBattleEnd(bool isWin)
