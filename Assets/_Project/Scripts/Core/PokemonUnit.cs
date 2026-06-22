@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -21,6 +22,23 @@ public class PokemonUnit : MonoBehaviour
 
     [Header("상태")]
     public bool isOnBoard;          // false = 벤치
+
+    // ──────────────────────────────────────────
+    // 아이템 / 진화의 돌 슬롯
+    // ──────────────────────────────────────────
+    // 슬롯 2칸 공유. 조합: 진돌+장착템 / 장착템+장착템 가능, 진돌+진돌 불가(유닛당 돌 1개).
+    // 진화의 돌은 "되돌릴 수 있는 진화" — data를 진화체로 스왑하고 baseData(preStoneData)를 기억.
+    // 스탯/스킬/시너지는 모두 data에서 읽으므로 data 스왑만으로 전부 전환됨.
+    public const int MaxItemSlots = 2;
+
+    [Header("장착물")]
+    public List<ItemData> items = new();        // 일반 장착템 (진돌 제외)
+    public EvolutionStoneData equippedStone;     // null = 없음, 유닛당 최대 1개
+    public PokemonData preStoneData;             // 돌 빼면 돌아갈 베이스 종 (돌 없으면 null)
+
+    public int  UsedSlots      => items.Count + (equippedStone != null ? 1 : 0);
+    public bool HasFreeSlot    => UsedSlots < MaxItemSlots;
+    public bool IsStoneEvolved => equippedStone != null;
 
     // ──────────────────────────────────────────
     // 별 강화 스케일링
@@ -66,5 +84,85 @@ public class PokemonUnit : MonoBehaviour
     {
         currentHp = MaxHp;
         currentMana = 0f;
+    }
+
+    // ──────────────────────────────────────────
+    // 장착템
+    // ──────────────────────────────────────────
+
+    /// <summary>일반 장착템 장착. 빈 슬롯 없으면 실패. (스탯 효과 적용은 전투 스냅샷/ItemManager 몫)</summary>
+    public bool TryEquipItem(ItemData item)
+    {
+        if (item == null || !HasFreeSlot) return false;
+        items.Add(item);
+        return true;
+    }
+
+    /// <summary>장착템 제거. 제거된 아이템 반환(없으면 null). 인벤 반환은 호출측(ItemManager) 몫.</summary>
+    public ItemData RemoveItem(ItemData item)
+        => items.Remove(item) ? item : null;
+
+    // ──────────────────────────────────────────
+    // 진화의 돌 (되돌릴 수 있는 진화)
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 진화의 돌 장착 시도. 성공하면 data가 진화체로 스왑됨(스탯·스킬·시너지 자동 전환).
+    /// 실패 조건: 슬롯 부족 / 이미 돌 보유 / 이 종의 진화 대상 아님 / 진화체가 DB에 없음.
+    /// </summary>
+    public bool TryEquipStone(EvolutionStoneData stone)
+    {
+        if (stone == null || data == null) return false;
+        if (equippedStone != null) return false;        // 유닛당 돌 1개
+        if (!HasFreeSlot) return false;                 // 슬롯 부족
+
+        string evolvedEn = stone.GetEvolvedPokemon(data.pokemonNameEn);
+        if (string.IsNullOrEmpty(evolvedEn)) return false;   // 잘못된 대상(예: 물의돌→불 포켓몬)
+
+        var evolved = PokemonDatabase.Instance != null
+            ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
+        if (evolved == null)
+        {
+            Debug.LogError($"[Stone] 진화체 '{evolvedEn}' 가 PokemonDatabase에 없음 — 돌 시트와 포켓몬 시트 영문명 불일치");
+            return false;
+        }
+
+        preStoneData  = data;
+        data          = evolved;
+        equippedStone = stone;
+        currentHp     = Mathf.Min(currentHp, MaxHp);    // 진화체 MaxHp로 상한(준비단계 전투시작 시 풀회복됨)
+
+        GameEvents.UnitChanged(this);                   // 시너지 재계산용(머지 트리거는 진화체라 무의미)
+        return true;
+    }
+
+    /// <summary>
+    /// 진화의 돌 제거(제거기). data를 베이스 종으로 원복하고 돌을 반환(인벤 복귀는 호출측 몫).
+    /// 돌이 없으면 null. 원복으로 같은 종 3마리가 되면 합체돼야 하므로 OnUnitChanged 발화.
+    /// </summary>
+    public EvolutionStoneData RemoveStone()
+    {
+        if (equippedStone == null) return null;
+
+        var removed   = equippedStone;
+        data          = preStoneData;
+        preStoneData  = null;
+        equippedStone = null;
+        currentHp     = Mathf.Min(currentHp, MaxHp);
+
+        GameEvents.UnitChanged(this);                   // ★ BoardManager가 구독→CheckEvolution 재실행
+        return removed;
+    }
+
+    /// <summary>
+    /// 판매 직전 정리. 돌이 있으면 원복(+돌 반환)하고 장착템을 모두 회수해 반환한다.
+    /// 호출 후 data는 베이스 종이므로 ShopManager가 data.cost로 정산하면 된다.
+    /// 반환물(돌·아이템)의 인벤 복귀는 호출측(ItemManager/ShopManager) 몫.
+    /// </summary>
+    public void PrepareForSell(out EvolutionStoneData returnedStone, out List<ItemData> returnedItems)
+    {
+        returnedStone = RemoveStone();                  // 돌 있으면 원복 + 반환
+        returnedItems = new List<ItemData>(items);
+        items.Clear();
     }
 }

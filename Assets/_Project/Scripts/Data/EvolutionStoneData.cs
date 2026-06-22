@@ -27,11 +27,13 @@ public class EvolutionStoneData : ScriptableObject
     [Header("에셋 참조")]
     public Sprite icon;
 
-    /// <summary>targetPokemon 영문명으로 진화 후 포켓몬 영문명 반환. 없으면 null.</summary>
+    /// <summary>targetPokemon 영문명으로 진화 후 포켓몬 영문명 반환. 없으면 null.
+    /// 대소문자 무관 매칭(PokemonDatabase.GetByNameEn과 동일) — 시트 간 영문명 표기 차이 안전망.</summary>
     public string GetEvolvedPokemon(string targetNameEn)
     {
         foreach (var m in mappings)
-            if (m.targetPokemon == targetNameEn) return m.evolvedPokemon;
+            if (string.Equals(m.targetPokemon, targetNameEn, System.StringComparison.OrdinalIgnoreCase))
+                return m.evolvedPokemon;
         return null;
     }
 }

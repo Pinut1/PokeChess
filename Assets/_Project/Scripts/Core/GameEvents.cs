@@ -62,6 +62,13 @@ public static class GameEvents
     /// <summary>유닛 판매됨</summary>
     public static event Action<PokemonUnit> OnUnitSold;
 
+    /// <summary>
+    /// 유닛의 종(data)·성(starLevel)이 배치/벤치 외의 경로로 바뀜 (예: 진화의 돌 장착/제거).
+    /// BoardManager가 구독 → CheckEvolution 재실행해야 함. 안 그러면 돌 제거로 원복된
+    /// 유닛이 같은 종 3마리를 채워도 합체가 트리거되지 않는다.
+    /// </summary>
+    public static event Action<PokemonUnit> OnUnitChanged;
+
     /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
     public static event Action OnSynergyUpdated;
 
@@ -123,6 +130,7 @@ public static class GameEvents
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
+    public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);

@@ -36,6 +36,13 @@ public class PokemonData : ScriptableObject
     /// <summary>3마리 모았을 때 변환될 포켓몬 영문명. 최종 진화형은 비워둠.</summary>
     public string evolvesIntoEn;
 
+    [Header("획득 경로")]
+    /// <summary>
+    /// 상점에서 직접 구매 가능한지 여부. 진화의 돌·통신교환으로만 얻는 진화체는 false —
+    /// PokemonDatabase에는 등록되지만 ShopManager 풀에서는 제외된다. (기본값 true)
+    /// </summary>
+    public bool shopBuyable = true;
+
     [Header("에셋 참조")]
     public GameObject modelPrefab;
     public Sprite icon;

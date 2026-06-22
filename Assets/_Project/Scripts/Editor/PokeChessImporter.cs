@@ -40,6 +40,7 @@ public static class PokeChessImporter
         public string attackType;
         public SkillEntry skill;
         public string evolvesInto;   // 진화 후 포켓몬 영문명 (최종형은 빈 문자열)
+        public string obtainBy;      // "" 또는 "shop"=상점구매가능 / "stone"·"trade"=진화로만 획득(풀 제외)
         public string modelPath, iconPath;
     }
 
@@ -195,6 +196,10 @@ public static class PokeChessImporter
             };
 
             so.evolvesIntoEn = e.evolvesInto ?? "";
+
+            // obtainBy 미지정("")/"shop" → 상점 구매 가능. "stone"·"trade" 등은 진화로만 획득 → 풀 제외.
+            so.shopBuyable = string.IsNullOrEmpty(e.obtainBy) ||
+                             e.obtainBy.Equals("shop", StringComparison.OrdinalIgnoreCase);
 
             // modelPrefab / icon 은 덮어쓰지 않음 (Inspector 수동 연결 보호)
             EditorUtility.SetDirty(so);
