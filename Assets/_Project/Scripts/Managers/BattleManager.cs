@@ -23,6 +23,16 @@ public class BattleUnit
     public int range;
     public AttackType attackType;
 
+    // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
+    public float currentMana;
+    public float maxMana;            // = skill.manaCost
+    public float skillPower;         // skill.damage × 별 배수(×적 statMul) — 시전 시 특수방어로 경감
+    public SkillTargetType skillTargetType;
+    public int   skillAreaRadius;    // Area: 대상 중심 반경(칸)
+    public int   skillLineLength;    // Line: 시전자 기준 사거리(칸)
+
+    public bool HasSkill => maxMana > 0f;
+
     public float attackCooldown;   // 0 이하가 되면 공격 가능
     public GameObject visual;
 
@@ -42,6 +52,11 @@ public class BattleManager : MonoBehaviour
 {
     private const float TICK_INTERVAL = 0.1f;
     private const int MAX_TICKS = 300; // 30초 타임아웃
+
+    // 마나(TFT식): 평타 1회당 고정 획득 + 피해 받을 때 피해량 비례 획득(피격당 상한).
+    private const float MANA_PER_ATTACK = 10f;
+    private const float MANA_PER_DAMAGE_TAKEN = 0.05f;  // 받은 피해의 5%
+    private const float MANA_GAIN_CAP_PER_HIT = 20f;    // 한 번 피격으로 얻는 마나 상한
 
     // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
     private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
@@ -229,7 +244,7 @@ public class BattleManager : MonoBehaviour
 
         float maxHp = data.hp * star * sm * hm;
 
-        return new BattleUnit
+        var bu = new BattleUnit
         {
             source = null,
             team = BattleTeam.Enemy,
@@ -245,11 +260,26 @@ public class BattleManager : MonoBehaviour
             attackType = data.attackType,
             attackCooldown = 0f
         };
+        ApplySkill(bu, data.skill, star * sm); // 스킬 위력도 별·강화 배수 반영
+        return bu;
+    }
+
+    /// <summary>스킬 데이터를 BattleUnit에 반영. manaCost가 없거나 skill이 없으면 평타만(maxMana=0).</summary>
+    private static void ApplySkill(BattleUnit bu, PokemonSkillData skill, float powerScale)
+    {
+        if (skill == null || skill.manaCost <= 0) return;
+
+        bu.maxMana          = skill.manaCost;
+        bu.currentMana      = 0f;
+        bu.skillPower       = skill.damage * powerScale;
+        bu.skillTargetType  = skill.targetType;
+        bu.skillAreaRadius  = Mathf.Max(1, skill.areaRadius);
+        bu.skillLineLength  = Mathf.Max(1, skill.lineLength);
     }
 
     private BattleUnit CreateBattleUnit(PokemonUnit unit, BattleTeam team, HexCoords coords)
     {
-        return new BattleUnit
+        var bu = new BattleUnit
         {
             source = team == BattleTeam.Ally ? unit : null,
             team = team,
@@ -265,6 +295,8 @@ public class BattleManager : MonoBehaviour
             attackType = unit.AttackType,
             attackCooldown = 0f
         };
+        if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.StarMultiplier); // 스킬 위력에 별 배수 반영
+        return bu;
     }
 
     /// <summary>아군은 원본 오브젝트를 숨기고 그 자리에, 적은 미러 좌표에 시각화용 캡슐을 띄움.</summary>
@@ -310,7 +342,12 @@ public class BattleManager : MonoBehaviour
                 bu.attackCooldown -= TICK_INTERVAL;
                 if (bu.attackCooldown <= 0f)
                 {
-                    Attack(bu, target);
+                    // 마나가 차 있으면 평타 대신 스킬 시전. 둘 다 같은 공속 쿨다운을 소모.
+                    if (bu.HasSkill && bu.currentMana >= bu.maxMana)
+                        CastSkill(bu, target);
+                    else
+                        BasicAttack(bu, target);
+
                     bu.attackCooldown += bu.attackSpeed > 0f ? 1f / bu.attackSpeed : 1f;
                 }
             }
@@ -331,14 +368,85 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    private static void Attack(BattleUnit attacker, BattleUnit target)
+    /// <summary>평타 1회: 물리/특수 피해 + 시전자 마나 획득.</summary>
+    private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         float raw = attacker.attackType == AttackType.Physical
             ? attacker.attack - target.defense
             : attacker.specialAttack - target.specialDefense;
 
-        float damage = Mathf.Max(1f, raw);
-        target.currentHp -= damage;
+        DealDamage(target, Mathf.Max(1f, raw));
+        GainMana(attacker, MANA_PER_ATTACK);
+    }
+
+    /// <summary>스킬 시전: 마나 소모(0으로) 후 targetType에 따라 대상들에게 특수 피해.</summary>
+    private void CastSkill(BattleUnit caster, BattleUnit primaryTarget)
+    {
+        caster.currentMana = 0f;
+
+        var targets = GetSkillTargets(caster, primaryTarget);
+        foreach (var t in targets)
+        {
+            if (t == null || !t.IsAlive) continue;
+            float dmg = Mathf.Max(1f, caster.skillPower - t.specialDefense); // 스킬은 특수방어로 경감
+            DealDamage(t, dmg);
+        }
+
+        Debug.Log($"[Battle] {caster.team} 스킬 시전 → 대상 {targets.Count}기 (위력 {caster.skillPower:0})");
+    }
+
+    /// <summary>targetType별 피격 대상 목록. 항상 살아있는 적만 반환.</summary>
+    private List<BattleUnit> GetSkillTargets(BattleUnit caster, BattleUnit primaryTarget)
+    {
+        var result = new List<BattleUnit>();
+        if (primaryTarget == null) return result;
+
+        switch (caster.skillTargetType)
+        {
+            case SkillTargetType.All:
+                foreach (var u in _units)
+                    if (u.team != caster.team && u.IsAlive) result.Add(u);
+                break;
+
+            case SkillTargetType.Area: // 대상 중심 반경 내 적 전부
+                foreach (var u in _units)
+                    if (u.team != caster.team && u.IsAlive &&
+                        u.coords.DistanceTo(primaryTarget.coords) <= caster.skillAreaRadius)
+                        result.Add(u);
+                break;
+
+            case SkillTargetType.Line: // 시전자 사거리 내 + 대상 방향(앞쪽)의 적
+            {
+                int toTarget = caster.coords.DistanceTo(primaryTarget.coords);
+                foreach (var u in _units)
+                    if (u.team != caster.team && u.IsAlive &&
+                        caster.coords.DistanceTo(u.coords) <= caster.skillLineLength &&
+                        u.coords.DistanceTo(primaryTarget.coords) <= toTarget)
+                        result.Add(u);
+                if (!result.Contains(primaryTarget)) result.Add(primaryTarget);
+                break;
+            }
+
+            default: // Single
+                result.Add(primaryTarget);
+                break;
+        }
+
+        return result;
+    }
+
+    /// <summary>피해 적용 + 피격자 마나 획득(피해 비례, 피격당 상한).</summary>
+    private void DealDamage(BattleUnit target, float amount)
+    {
+        target.currentHp -= amount;
+        GainMana(target, Mathf.Min(amount * MANA_PER_DAMAGE_TAKEN, MANA_GAIN_CAP_PER_HIT));
+    }
+
+    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한).</summary>
+    private static void GainMana(BattleUnit unit, float amount)
+    {
+        if (!unit.HasSkill) return;
+        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount);
     }
 
     private BattleUnit FindNearestEnemy(BattleUnit bu)
