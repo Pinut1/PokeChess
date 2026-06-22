@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: db872996fbfe6514f8d44df93b2d8380
+timeCreated: 1536669475
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_River.prefab
+  uploadId: 279467

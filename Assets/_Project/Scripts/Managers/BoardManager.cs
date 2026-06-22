@@ -1,120 +1,475 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 7×8 헥사 보드 생성 및 유닛 배치 관리. 김기욱 파트.
+/// 전장(Board) 헥스 타일을 생성하고, 타일/벤치 위에 놓인 유닛들의 배치를 통제하는 매니저.
+/// 보드 상태(_battleField)와 벤치 상태(_bench)의 단일 진실 공급원.
+/// 다른 매니저는 GameEvents 트리거 수신 후 GetUnitsOnBoard()/GetUnitsInBench()로 pull.
 /// </summary>
 public class BoardManager : MonoBehaviour
 {
-    [Header("프리팹")]
-    [SerializeField] private GameObject hexTilePrefab;
+    [Header("Board Settings")]
+    [SerializeField] private HexTile _tilePrefab;
+    [SerializeField] private float _hexSize = 1.0f; // 인스펙터에서 수정 가능
+    [SerializeField] private int _cols = 7; // 가로 (TFT 기준 7)
+    [SerializeField] private int _rows = 4; // 세로 (TFT 기준 4)
 
-    [Header("보드 크기")]
-    [SerializeField] private int boardCols = 7;   // X 방향 칸 수
-    [SerializeField] private int boardRows = 8;   // Z 방향 칸 수
+    [Header("Bench Settings")]
+    [SerializeField] private int _benchSize = 9; // TFT 기준 벤치 슬롯 수
+    [SerializeField] private float _benchZOffset = -4f; // 보드 중심 기준 벤치 줄의 z 위치(월드)
 
-    [Header("타일 크기")]
-    [SerializeField] private float hexSize = 1f;  // 중심→꼭짓점 거리(m)
+    // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
+    private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
 
-    private HexTile[,] _tiles;
+    // 벤치 슬롯. 인덱스 = 슬롯 번호. null = 빈 슬롯.
+    private PokemonUnit[] _bench;
+
+    // 벤치 시각 타일 + 슬롯별 월드 좌표(인덱스 = 슬롯).
+    private BenchTile[] _benchTiles;
+    private Vector3[] _benchSlotPositions;
+
+    // 진화(합체) 처리 중 재진입 방지 플래그.
+    private bool _isEvolving;
+
+    // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
+    private Vector3 _centerOffset;
 
     private void Awake()
     {
-        GenerateBoard();
+        _bench = new PokemonUnit[_benchSize];
     }
 
-    // ──────────────────────────────────────────────────────
-    // 보드 생성
-    // ──────────────────────────────────────────────────────
-
-    private void GenerateBoard()
+    private void Start()
     {
-        _tiles = new HexTile[boardCols, boardRows];
+        GenerateBoard();
+        GenerateBench();
+    }
 
-        // Pointy-top 헥사 칸 간격
-        float colStep = Mathf.Sqrt(3f) * hexSize;   // 열 간격
-        float rowStep = 1.5f * hexSize;              // 행 간격
-
-        // 보드 전체를 BoardManager 오브젝트 기준 중앙 정렬
-        float totalWidth = (boardCols - 1) * colStep;
-        float totalDepth = (boardRows - 1) * rowStep;
-        Vector3 origin   = transform.position
-            - new Vector3(totalWidth * 0.5f, 0f, totalDepth * 0.5f);
-
-        for (int r = 0; r < boardRows; r++)
+    /// <summary>
+    /// 씬에 육각형 맵을 찍어내고, 카메라 정중앙(0,0,0)에 예쁘게 정렬합니다.
+    /// </summary>
+    public void GenerateBoard()
+    {
+        if (_tilePrefab == null)
         {
-            // 홀수 행은 반 칸 오른쪽으로 밀어서 벌집 모양 구성
-            float xOffset = (r % 2 == 1) ? colStep * 0.5f : 0f;
+            Debug.LogError("[BoardManager] HexTile 프리팹이 연결되지 않았습니다!");
+            return;
+        }
 
-            for (int c = 0; c < boardCols; c++)
+        _battleField.Clear();
+
+        // 1. 쟁반(Anchor) 생성
+        GameObject boardAnchor = new GameObject("BoardAnchor");
+        boardAnchor.transform.SetParent(this.transform);
+
+        Vector3 sumPosition = Vector3.zero;
+        int totalTiles = 0;
+
+        // 2. 타일 생성 루프
+        for (int row = 0; row < _rows; row++)
+        {
+            // 하이어라키 정리를 위한 행(Row) 폴더 생성
+            GameObject rowFolder = new GameObject($"Row_{row}");
+            rowFolder.transform.SetParent(boardAnchor.transform);
+
+            for (int col = 0; col < _cols; col++)
             {
-                Vector3 pos = origin + new Vector3(c * colStep + xOffset, 0f, r * rowStep);
+                // 직사각형(col, row)을 헥사곤 큐브(q, r) 좌표로 변환 (Flat-top 기준)
+                int q = col;
+                int r = row - Mathf.FloorToInt(col / 2f);
+                HexCoords coords = new HexCoords(q, r);
 
-                GameObject go = Instantiate(hexTilePrefab, pos, Quaternion.identity, transform);
-                go.name = $"HexTile_{c}_{r}";
+                // 프리팹 생성 및 위치 지정
+                HexTile newTile = Instantiate(_tilePrefab, rowFolder.transform);
+                Vector3 worldPos = coords.ToWorldPosition(_hexSize);
+                newTile.transform.localPosition = worldPos;
 
-                HexTile tile = go.GetComponent<HexTile>();
-                tile.col = c;
-                tile.row = r;
-                _tiles[c, r] = tile;
+                // 타일에게 콜백 무전기 주입! (이름도 예쁘게 세팅)
+                // TryPlaceUnit은 bool을 반환하므로 Action으로 받기 위해 람다로 감싼다(반환값 무시).
+                newTile.Initialize(coords, (unit, c) => TryPlaceUnit(unit, c), $"Tile_{row}_{col}");
+
+                // 금고에 빈 타일 등록
+                _battleField.Add(coords, null);
+
+                // 평균 위치 계산을 위해 누적
+                sumPosition += worldPos;
+                totalTiles++;
             }
+        }
+
+        // 3. 중앙 정렬 (Centering)
+        // 타일들의 평균 무게중심(Center)을 구한 뒤, 쟁반 전체를 그 반대 방향으로 밀어줍니다.
+        if (totalTiles > 0)
+        {
+            _centerOffset = sumPosition / totalTiles;
+            boardAnchor.transform.position = -_centerOffset;
         }
     }
 
-    // ──────────────────────────────────────────────────────
-    // 유닛 배치 API
-    // ──────────────────────────────────────────────────────
-
-    /// <summary>유닛을 보드 타일에 올린다. 성공 여부 반환.</summary>
-    public bool PlaceUnit(PokemonUnit unit, int col, int row)
+    /// <summary>
+    /// 벤치 슬롯들을 보드 아래쪽(_benchZOffset)에 한 줄로 생성합니다.
+    /// 각 타일은 BenchTile(IDropTarget)이며, 드롭 시 TryDropOnBench로 위임합니다.
+    /// </summary>
+    private void GenerateBench()
     {
-        if (!IsValid(col, row)) return false;
+        _benchTiles = new BenchTile[_benchSize];
+        _benchSlotPositions = new Vector3[_benchSize];
 
-        HexTile tile = _tiles[col, row];
-        if (tile.IsOccupied) return false;
+        GameObject benchAnchor = new GameObject("BenchAnchor");
+        benchAnchor.transform.SetParent(this.transform);
 
-        RemoveFromBoard(unit);  // 기존 타일에서 먼저 제거
+        float spacing = _hexSize * 1.1f;
+        float startX = -(_benchSize - 1) * spacing * 0.5f;
 
-        tile.occupant = unit;
-        tile.RefreshColor();
-        unit.isOnBoard = true;
-        unit.transform.position = tile.transform.position;
+        for (int i = 0; i < _benchSize; i++)
+        {
+            Vector3 pos = new Vector3(startX + i * spacing, 0f, _benchZOffset);
+            _benchSlotPositions[i] = pos;
+
+            GameObject tileGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            tileGo.transform.SetParent(benchAnchor.transform);
+            tileGo.transform.position = pos;
+            tileGo.transform.localScale = new Vector3(_hexSize * 0.9f, 0.05f, _hexSize * 0.9f);
+
+            BenchTile tile = tileGo.AddComponent<BenchTile>();
+            int slot = i; // 클로저 캡처 주의 — 루프 변수 복사
+            tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), $"BenchTile_{slot}");
+            _benchTiles[i] = tile;
+        }
+    }
+
+    /// <summary>
+    /// 임의의 헥스 좌표(보드 범위 밖 포함)를 보드 정렬 기준 월드 좌표로 변환합니다.
+    /// BattleManager가 적 팀 미러 좌표를 시각화할 때 사용.
+    /// </summary>
+    public Vector3 CoordsToWorldPosition(HexCoords coords) => coords.ToWorldPosition(_hexSize) - _centerOffset;
+
+    /// <summary>벤치 슬롯의 월드 좌표. BoardView가 유닛 위치 재배치에 사용.</summary>
+    public Vector3 BenchSlotWorldPosition(int slot)
+    {
+        if (_benchSlotPositions == null || slot < 0 || slot >= _benchSlotPositions.Length)
+            return Vector3.zero;
+        return _benchSlotPositions[slot];
+    }
+
+    /// <summary>
+    /// 보드를 행(row) 기준으로 뒤집은 좌표를 반환합니다. 같은 (col, row) 좌표 집합을 재사용하므로
+    /// 항상 유효한 보드 타일 좌표이며, 평행이동만으로도 모양이 정확히 대칭인 "상대 보드"를 만들 수 있음.
+    /// </summary>
+    public HexCoords GetMirroredCoords(HexCoords coords)
+    {
+        int row = coords.r + Mathf.FloorToInt(coords.q / 2f);
+        int mirroredRow = (_rows - 1) - row;
+        int mirroredR = mirroredRow - Mathf.FloorToInt(coords.q / 2f);
+        return new HexCoords(coords.q, mirroredR);
+    }
+
+    // ──────────────────────────────────────────
+    // 조회 API (pull)
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 현재 보드 위에 배치된 유닛 목록을 반환합니다.
+    /// SynergyManager 등이 OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 시 이 API로 직접 조회(pull)합니다.
+    /// </summary>
+    public List<PokemonUnit> GetUnitsOnBoard()
+    {
+        List<PokemonUnit> units = new List<PokemonUnit>();
+        foreach (PokemonUnit unit in _battleField.Values)
+        {
+            if (unit != null)
+                units.Add(unit);
+        }
+        return units;
+    }
+
+    /// <summary>현재 벤치에 있는 유닛 목록을 반환합니다.</summary>
+    public List<PokemonUnit> GetUnitsInBench()
+    {
+        List<PokemonUnit> units = new List<PokemonUnit>();
+        foreach (PokemonUnit unit in _bench)
+        {
+            if (unit != null)
+                units.Add(unit);
+        }
+        return units;
+    }
+
+    /// <summary>보드 위 빈 좌표→유닛 매핑(읽기 전용 스냅샷). 전투 스냅샷 등에서 위치가 필요할 때 사용.</summary>
+    public IReadOnlyDictionary<HexCoords, PokemonUnit> GetBoardSnapshot() => _battleField;
+
+    /// <summary>벤치 슬롯 배열(읽기 전용, 인덱스=슬롯). null=빈 슬롯. BoardView 위치 재배치에 사용.</summary>
+    public IReadOnlyList<PokemonUnit> GetBenchSnapshot() => _bench;
+
+    // ──────────────────────────────────────────
+    // 보드 배치
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 타일에서 마우스 드롭이 일어났을 때 콜백으로 호출되거나, 외부(샵 등)에서 직접 호출.
+    /// 빈 타일이면 이동/배치, 점유된 타일이면 스왑. 성공 시 true.
+    /// </summary>
+    public bool TryPlaceUnit(PokemonUnit unit, HexCoords targetCoords)
+    {
+        if (unit == null) return false;
+        if (!_battleField.ContainsKey(targetCoords)) return false;
+
+        PokemonUnit occupant = _battleField[targetCoords];
+        if (occupant == unit) return true; // 자기 자리에 그대로 드롭 — 변화 없음
+
+        // 들어오는 유닛이 원래 보드 위에 있었다면 그 좌표를 기억(스왑/비우기용)
+        bool fromBoard = TryFindBoardCoords(unit, out HexCoords fromCoords);
+
+        if (occupant == null)
+        {
+            // 빈 타일: 단순 이동/신규 배치
+            if (fromBoard) _battleField[fromCoords] = null;
+            else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
+
+            _battleField[targetCoords] = unit;
+            unit.isOnBoard = true;
+        }
+        else if (fromBoard)
+        {
+            // 보드 ↔ 보드 스왑 (둘 다 보드에 남음)
+            _battleField[fromCoords] = occupant;
+            _battleField[targetCoords] = unit;
+        }
+        else
+        {
+            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체
+            int benchSlot = FindBenchSlot(unit);
+            _battleField[targetCoords] = unit;
+            unit.isOnBoard = true;
+
+            if (benchSlot >= 0)
+            {
+                _bench[benchSlot] = occupant;
+                occupant.isOnBoard = false;
+            }
+        }
 
         GameEvents.UnitPlaced(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
         return true;
     }
 
-    /// <summary>유닛을 보드에서 들어내어 벤치로 보낸다.</summary>
-    public void BenchUnit(PokemonUnit unit)
+    // ──────────────────────────────────────────
+    // 벤치 배치
+    // ──────────────────────────────────────────
+
+    /// <summary>지정한 슬롯에 유닛을 놓습니다. 슬롯이 비어있어야 성공(같은 유닛은 멱등).</summary>
+    public bool TryPlaceInBench(PokemonUnit unit, int slot)
     {
-        RemoveFromBoard(unit);
+        if (unit == null) return false;
+        if (slot < 0 || slot >= _benchSize) return false;
+
+        PokemonUnit occupant = _bench[slot];
+        if (occupant == unit) return true;        // 같은 자리 멱등
+        if (occupant != null) return false;       // 점유됨 — 스왑은 호출측 책임
+
+        RemoveUnitFromCurrentLocation(unit);
+        _bench[slot] = unit;
         unit.isOnBoard = false;
+
         GameEvents.UnitBenched(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+        return true;
     }
 
-    /// <summary>좌표로 타일 반환. 범위 밖이면 null.</summary>
-    public HexTile GetTile(int col, int row)
-        => IsValid(col, row) ? _tiles[col, row] : null;
-
-    /// <summary>유닛이 현재 있는 타일 반환. 없으면 null.</summary>
-    public HexTile GetTileOf(PokemonUnit unit)
+    /// <summary>
+    /// 벤치 슬롯에 드롭됐을 때(드래그 콜백). 빈 슬롯이면 배치, 점유 슬롯이면 들어오는 유닛의
+    /// 원위치(보드 좌표/벤치 슬롯)와 교체(스왑)한다. 성공 시 true.
+    /// </summary>
+    public bool TryDropOnBench(PokemonUnit unit, int slot)
     {
-        foreach (HexTile tile in _tiles)
-            if (tile.occupant == unit) return tile;
-        return null;
+        if (unit == null) return false;
+        if (slot < 0 || slot >= _benchSize) return false;
+
+        PokemonUnit occupant = _bench[slot];
+        if (occupant == unit) return true;            // 같은 자리 멱등
+        if (occupant == null) return TryPlaceInBench(unit, slot); // 빈 슬롯 — 일반 배치(+진화 검사)
+
+        // 점유됨 — 들어오는 유닛의 원위치로 occupant를 보내고 교체
+        if (TryFindBoardCoords(unit, out HexCoords fromCoords))
+        {
+            _battleField[fromCoords] = occupant;
+            occupant.isOnBoard = true;
+        }
+        else
+        {
+            int fromSlot = FindBenchSlot(unit);
+            if (fromSlot >= 0) _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
+        }
+
+        _bench[slot] = unit;
+        unit.isOnBoard = false;
+
+        GameEvents.UnitBenched(unit);
+        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+        return true;
     }
 
-    // ──────────────────────────────────────────────────────
+    /// <summary>빈 슬롯 아무 곳에나 유닛을 놓습니다(샵 구매 등). 벤치가 가득 차면 실패.</summary>
+    public bool TryPlaceInBench(PokemonUnit unit)
+    {
+        int slot = FirstEmptyBenchSlot();
+        if (slot < 0)
+        {
+            Debug.Log("[BoardManager] 벤치가 가득 찼습니다.");
+            return false;
+        }
+        return TryPlaceInBench(unit, slot);
+    }
+
+    /// <summary>지정 슬롯을 비웁니다(판매/제거 시). 반환된 유닛 파괴 등은 호출측 책임.</summary>
+    public PokemonUnit RemoveFromBench(int slot)
+    {
+        if (slot < 0 || slot >= _benchSize) return null;
+        PokemonUnit removed = _bench[slot];
+        _bench[slot] = null;
+        return removed;
+    }
+
+    /// <summary>벤치에 빈 슬롯이 있는지.</summary>
+    public bool HasBenchSpace() => FirstEmptyBenchSlot() >= 0;
+
+    /// <summary>
+    /// 유닛을 보드/벤치 어디에 있든 제거하고 판매 처리. 골드 환급은 ShopManager가 OnUnitSold를 받아 처리한다.
+    /// UnitSold 발행 시점엔 unit이 아직 유효(Destroy는 프레임 끝에 적용)하므로 구독자가 data를 읽을 수 있음.
+    /// </summary>
+    public bool SellUnit(PokemonUnit unit)
+    {
+        if (unit == null) return false;
+
+        bool onBoard = TryFindBoardCoords(unit, out HexCoords coords);
+        int slot = onBoard ? -1 : FindBenchSlot(unit);
+        if (!onBoard && slot < 0) return false; // 보드/벤치 어디에도 없음
+
+        if (onBoard) _battleField[coords] = null;
+        else         _bench[slot] = null;
+
+        GameEvents.UnitSold(unit); // ShopManager(환급) · SynergyManager(재계산) · BoardView(resync)
+        Destroy(unit.gameObject);
+        return true;
+    }
+
+    // ──────────────────────────────────────────
     // 내부 헬퍼
-    // ──────────────────────────────────────────────────────
+    // ──────────────────────────────────────────
 
-    private void RemoveFromBoard(PokemonUnit unit)
+    /// <summary>보드에서 유닛의 현재 좌표를 역으로 찾음.</summary>
+    private bool TryFindBoardCoords(PokemonUnit unit, out HexCoords coords)
     {
-        HexTile prev = GetTileOf(unit);
-        if (prev == null) return;
-        prev.occupant = null;
-        prev.RefreshColor();
+        foreach (var kv in _battleField)
+        {
+            if (kv.Value == unit)
+            {
+                coords = kv.Key;
+                return true;
+            }
+        }
+        coords = default;
+        return false;
     }
 
-    private bool IsValid(int col, int row)
-        => col >= 0 && col < boardCols && row >= 0 && row < boardRows;
+    /// <summary>벤치에서 유닛의 슬롯 인덱스를 찾음. 없으면 -1.</summary>
+    private int FindBenchSlot(PokemonUnit unit)
+    {
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] == unit) return i;
+        return -1;
+    }
+
+    private int FirstEmptyBenchSlot()
+    {
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] == null) return i;
+        return -1;
+    }
+
+    /// <summary>벤치에서 해당 유닛 참조를 찾아 비움(있을 때만).</summary>
+    private void RemoveFromBenchByRef(PokemonUnit unit)
+    {
+        int slot = FindBenchSlot(unit);
+        if (slot >= 0) _bench[slot] = null;
+    }
+
+    /// <summary>유닛이 현재 어디(보드/벤치)에 있든 그 자리를 비움.</summary>
+    private void RemoveUnitFromCurrentLocation(PokemonUnit unit)
+    {
+        if (TryFindBoardCoords(unit, out HexCoords coords))
+            _battleField[coords] = null;
+        else
+            RemoveFromBenchByRef(unit);
+    }
+
+    // ──────────────────────────────────────────
+    // 합체 (일반 진화 = 동일 종 3개 → 별업, GDD 4.2)
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 보드+벤치 통틀어 같은 종(data.id)·같은 성(starLevel) 유닛이 3개 이상이면 1개로 합쳐 별업.
+    /// 1성→2성→3성, 3성이 상한. 별업 후 한 단계 더 가능하면 연쇄 진화.
+    /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
+    /// </summary>
+    private void CheckEvolution(int speciesId, int starLevel)
+    {
+        if (_isEvolving) return;
+        if (starLevel >= 3) return;
+
+        var boardMatches = new List<HexCoords>();
+        var benchMatches = new List<int>();
+
+        foreach (var kv in _battleField)
+            if (kv.Value != null && kv.Value.data != null &&
+                kv.Value.data.id == speciesId && kv.Value.starLevel == starLevel)
+                boardMatches.Add(kv.Key);
+
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] != null && _bench[i].data != null &&
+                _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
+                benchMatches.Add(i);
+
+        if (boardMatches.Count + benchMatches.Count < 3) return;
+
+        _isEvolving = true;
+
+        // 소비할 3개 모으기(보드 우선). consumed[0]이 생존자 = 첫 위치.
+        var consumed = new List<PokemonUnit>();
+        foreach (var c in boardMatches) { if (consumed.Count < 3) consumed.Add(_battleField[c]); }
+        foreach (var s in benchMatches) { if (consumed.Count < 3) consumed.Add(_bench[s]); }
+
+        bool survivorOnBoard = boardMatches.Count > 0;
+        HexCoords survivorCoords = survivorOnBoard ? boardMatches[0] : default;
+        int survivorSlot = survivorOnBoard ? -1 : benchMatches[0];
+        PokemonUnit survivor = consumed[0];
+
+        // 소비된 3개의 위치 비우기
+        foreach (var c in boardMatches)
+            if (consumed.Contains(_battleField[c])) _battleField[c] = null;
+        for (int i = 0; i < _bench.Length; i++)
+            if (_bench[i] != null && consumed.Contains(_bench[i])) _bench[i] = null;
+
+        // 생존자 외 2개 파괴
+        foreach (var u in consumed)
+            if (u != survivor && u != null) Destroy(u.gameObject);
+
+        // 별업 + 재배치
+        survivor.starLevel = Mathf.Clamp(starLevel + 1, 1, 3);
+        survivor.ResetForBattle();
+        if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
+        else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
+
+        _isEvolving = false;
+
+        Debug.Log($"[Evolve] 종 {speciesId} {starLevel}성 3개 합체 → {survivor.starLevel}성");
+
+        // 이벤트 발화(시너지 재계산/뷰 갱신)
+        if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
+        else                 GameEvents.UnitBenched(survivor);
+
+        // 연쇄(예: 2성 3개 → 3성)
+        CheckEvolution(speciesId, survivor.starLevel);
+    }
 }

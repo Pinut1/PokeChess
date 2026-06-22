@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: dcf682d7e73d63e4db2f3cea8bdac239
+timeCreated: 1536669478
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_Pasture.prefab
+  uploadId: 279467

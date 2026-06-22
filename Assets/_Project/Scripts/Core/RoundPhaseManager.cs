@@ -6,7 +6,8 @@ public enum GamePhase
     Lobby,     // 매칭 대기
     Shopping,  // 쇼핑 페이즈
     Battle,    // 전투 페이즈
-    Result     // 결과 처리
+    Result,    // 결과 처리
+    GameOver   // 세션 종료 (연결 끊김 등으로 인한 패배 처리)
 }
 
 /// <summary>
@@ -31,14 +32,24 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnRoundChanged += HandleRoundChanged;
-        GameEvents.OnBattleEnd    += HandleBattleEnd;
+        GameEvents.OnRoundChanged   += HandleRoundChanged;
+        GameEvents.OnBattleEnd      += HandleBattleEnd;
+        GameEvents.OnAllPlayersReady += HandleAllPlayersReady;
+        GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
+        GameEvents.OnOpponentReconnected  += HandleOpponentReconnected;
+        GameEvents.OnGracePeriodExpired   += HandleGracePeriodExpired;
+        GameEvents.OnSessionEnded         += HandleSessionEnded;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnRoundChanged -= HandleRoundChanged;
-        GameEvents.OnBattleEnd    -= HandleBattleEnd;
+        GameEvents.OnRoundChanged   -= HandleRoundChanged;
+        GameEvents.OnBattleEnd      -= HandleBattleEnd;
+        GameEvents.OnAllPlayersReady -= HandleAllPlayersReady;
+        GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
+        GameEvents.OnOpponentReconnected  -= HandleOpponentReconnected;
+        GameEvents.OnGracePeriodExpired   -= HandleGracePeriodExpired;
+        GameEvents.OnSessionEnded         -= HandleSessionEnded;
     }
 
     // ─────────────────────────────────────────
@@ -53,7 +64,70 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleBattleEnd(bool isWin)
     {
+        // 패배로 체력 0 → PlayerHealthManager가 SessionEnded로 이미 GameOver 전환했을 수 있음.
+        // 구독자 호출 순서와 무관하게 GameOver를 Result가 덮어쓰지 않도록 가드.
+        if (CurrentPhase == GamePhase.GameOver) return;
         EnterPhase(GamePhase.Result);
+    }
+
+    private void HandleAllPlayersReady()
+    {
+        if (CurrentPhase != GamePhase.Shopping) return;
+        EnterPhase(GamePhase.Battle);
+    }
+
+    /// <summary>상대 연결 끊김 — 유예시간 동안 페이즈 타이머 일시정지</summary>
+    private void HandleOpponentDisconnected(float graceSeconds)
+    {
+        Debug.LogWarning($"[Phase] 상대 연결 끊김 — {graceSeconds}초 유예, 페이즈 일시정지");
+
+        if (_phaseTimer != null)
+        {
+            StopCoroutine(_phaseTimer);
+            _phaseTimer = null;
+        }
+    }
+
+    /// <summary>상대 재접속 성공 — 페이즈 타이머 재개(처음부터 재시작)</summary>
+    private void HandleOpponentReconnected()
+    {
+        Debug.Log("[Phase] 상대 재접속 — 페이즈 재개");
+
+        switch (CurrentPhase)
+        {
+            case GamePhase.Shopping:
+                _phaseTimer = StartCoroutine(ShoppingTimer());
+                break;
+            case GamePhase.Result:
+                _phaseTimer = StartCoroutine(ResultTimer());
+                break;
+        }
+    }
+
+    /// <summary>재접속 유예시간 종료. 둘 다 끊겼으면 세션 종료, 한 명만 남았으면 항복/나가기 선택 필요</summary>
+    private void HandleGracePeriodExpired(bool bothDisconnected)
+    {
+        if (bothDisconnected)
+        {
+            HandleSessionEnded();
+            return;
+        }
+
+        Debug.LogWarning("[Phase] 유예시간 종료 — 남은 플레이어 항복/나가기 선택 필요 (UI 미구현)");
+        // TODO(UIManager): 항복/나가기 선택 UI 연결
+    }
+
+    /// <summary>세션 종료(패배 처리). 전적 기록 시스템 미구현 — 로그만 출력</summary>
+    private void HandleSessionEnded()
+    {
+        if (_phaseTimer != null)
+        {
+            StopCoroutine(_phaseTimer);
+            _phaseTimer = null;
+        }
+
+        EnterPhase(GamePhase.GameOver);
+        Debug.LogWarning("[Phase] 세션 종료 — 패배 처리 (전적 기록 미구현, 로그만 출력)");
     }
 
     // ─────────────────────────────────────────
@@ -110,11 +184,27 @@ public class RoundPhaseManager : MonoBehaviour
 
     /// <summary>
     /// 쇼핑 페이즈에서 준비 완료 버튼 누를 때 호출.
-    /// TODO: 2인 모두 준비 시 즉시 전투 돌입 — 기획 확정 후 구현.
+    /// 2인 모두 준비되면 GameEvents.OnAllPlayersReady를 통해 전투 페이즈로 전환됨.
     /// </summary>
     public void PlayerReady()
     {
         if (CurrentPhase != GamePhase.Shopping) return;
-        EnterPhase(GamePhase.Battle);
+        GameManager.Instance.Network.BroadcastPlayerReady();
+    }
+
+    // ─────────────────────────────────────────
+    // 임시 디버그 UI
+    // ─────────────────────────────────────────
+
+    private void OnGUI()
+    {
+        var style = new GUIStyle(GUI.skin.button) { fontSize = 36 };
+
+        if (CurrentPhase == GamePhase.Shopping)
+        {
+            var readyRect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
+            if (GUI.Button(readyRect, "Ready", style))
+                PlayerReady();
+        }
     }
 }

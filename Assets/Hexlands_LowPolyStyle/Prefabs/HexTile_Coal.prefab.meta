@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: f7ff2900d66e7bc4fa8b3214486aa170
+timeCreated: 1536669459
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_Coal.prefab
+  uploadId: 279467

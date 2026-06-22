@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
+  m_Name: Electric_Synergy
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyData
+  id: 1
+  synergyName: "\uC804\uAE30"
+  synergyNameEn: Electric
+  tiers:
+  - count: 2
+    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
+      +15%"
+  - count: 4
+    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
+      +35%"
+  - count: 6
+    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
+      +60%, \uAE30\uBCF8 \uACF5\uACA9 \uC2DC 10% \uD655\uB960\uB85C \uB9C8\uBE44"
+  icon: {fileID: 0}

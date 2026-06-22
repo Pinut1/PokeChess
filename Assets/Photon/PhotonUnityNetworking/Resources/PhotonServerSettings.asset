@@ -19,7 +19,7 @@ MonoBehaviour:
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: 
+    FixedRegion: kr
     Server: 
     Port: 0
     ProxyServer: 
@@ -41,6 +41,11 @@ MonoBehaviour:
   - RespawnSpaceship
   - RPC_OnBattleStart
   - RPC_OnRoundStart
+  - RPC_OnAllPlayersReady
+  - RPC_OnPlayerReady
+  - RPC_SetTarget
+  - RPC_OnBoardSnapshot
+  - RPC_ReportBattleLoss
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

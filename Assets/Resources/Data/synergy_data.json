@@ -1,0 +1,33 @@
+{
+  "synergies": [
+    {
+      "id": 1,
+      "name": "전기",
+      "nameEn": "Electric",
+      "tiers": [
+        { "count": 2, "effect": "전기 유닛의 공격 속도 +15%" },
+        { "count": 4, "effect": "전기 유닛의 공격 속도 +35%" },
+        { "count": 6, "effect": "전기 유닛의 공격 속도 +60%, 기본 공격 시 10% 확률로 마비" }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "비행",
+      "nameEn": "Flying",
+      "tiers": [
+        { "count": 2, "effect": "비행 유닛 회피율 +15%" },
+        { "count": 4, "effect": "비행 유닛 회피율 +30%" }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "불꽃",
+      "nameEn": "Fire",
+      "tiers": [
+        { "count": 2, "effect": "불꽃 유닛의 공격력 +10%" },
+        { "count": 4, "effect": "불꽃 유닛의 공격력 +25%" },
+        { "count": 6, "effect": "불꽃 유닛의 공격력 +45%, 기본 공격에 화상 부여" }
+      ]
+    }
+  ]
+}

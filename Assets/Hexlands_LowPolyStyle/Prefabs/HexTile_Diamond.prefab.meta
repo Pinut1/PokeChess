@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 3b1bf2bdbb915ea458933b1fe51224fc
+timeCreated: 1536669469
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_Diamond.prefab
+  uploadId: 279467

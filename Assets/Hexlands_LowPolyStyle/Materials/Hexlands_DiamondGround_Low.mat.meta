@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 95691847fc5146b49adf60cdc5df94f9
+timeCreated: 1536609386
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Materials/Hexlands_DiamondGround_Low.mat
+  uploadId: 279467

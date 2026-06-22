@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: dc899da57486f4c4fa53c3bb800568d6
+timeCreated: 1536669473
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 133586
+  packageName: HexLands - Low Poly Style
+  packageVersion: 1.0
+  assetPath: Assets/Hexlands_LowPolyStyle/Prefabs/HexTile_Lake.prefab
+  uploadId: 279467
