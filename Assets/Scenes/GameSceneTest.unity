@@ -315,6 +315,7 @@ GameObject:
   - component: {fileID: 1558058657}
   - component: {fileID: 1558058666}
   - component: {fileID: 1558058644}
+  - component: {fileID: 1558058667}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -422,6 +423,7 @@ MonoBehaviour:
   _boardManager: {fileID: 1558058663}
   _battleManager: {fileID: 1558058661}
   _shopManager: {fileID: 1558058658}
+  _rewardManager: {fileID: 1558058667}
   _synergyManager: {fileID: 1558058651}
   _itemManager: {fileID: 0}
   _augmentManager: {fileID: 0}
@@ -566,7 +568,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8916053d61b8c741850ee5ab43be40e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OpponentBoardView
-  _boardOffset: {x: 100, y: 0, z: 0}
+  _boardOffset: {x: 500, y: 0, z: 0}
   _unitHeight: 0.5
   _starColors:
   - {r: 0.6, g: 0.8, b: 1, a: 1}
@@ -670,6 +672,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54062ad92c4a24e44901b875cbb4e3c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameSceneBootstrap
+--- !u!114 &1558058667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63153d96d674a504caa2acc985a6b853, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RewardManager
 --- !u!1 &2053065678
 GameObject:
   m_ObjectHideFlags: 0

@@ -50,7 +50,9 @@ public class PokemonDatabase : ScriptableObject
     {
         if (_byName != null) return;
 
-        _byName = new Dictionary<string, PokemonData>();
+        // 대소문자 무시 매칭(안전망): 기획 시트 pokemonId가 UPPER_SNAKE/소문자로 와도
+        // DB의 PascalCale(nameEn)과 매칭되도록. 안 그러면 적이 조용히 누락됨.
+        _byName = new Dictionary<string, PokemonData>(System.StringComparer.OrdinalIgnoreCase);
         _byId   = new Dictionary<int, PokemonData>();
         foreach (var p in all)
         {

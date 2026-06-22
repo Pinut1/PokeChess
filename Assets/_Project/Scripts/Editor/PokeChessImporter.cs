@@ -504,6 +504,7 @@ public static class PokeChessImporter
 
     private static RewardKind ParseRewardKind(string s) => s switch
     {
+        "reroll"                    => RewardKind.Reroll,
         "item"                      => RewardKind.Item,
         "consumable"                => RewardKind.Consumable,
         "stone" or "evolutionStone" => RewardKind.EvolutionStone,
