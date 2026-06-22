@@ -23,6 +23,10 @@ public class BattleUnit
     public int range;
     public AttackType attackType;
 
+    // ── 크리티컬 (아이템으로 부여, 기본 무영향) ──
+    public float critChance     = 0f;     // 0~1. criPct 아이템으로 증가
+    public float critMultiplier = 1.5f;   // 크리 시 배수(TFT 표준). criDmgPct 아이템으로 증가
+
     // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
     public float currentMana;
     public float maxMana;            // = skill.manaCost
@@ -296,6 +300,8 @@ public class BattleManager : MonoBehaviour
             attackCooldown = 0f
         };
         if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.StarMultiplier); // 스킬 위력에 별 배수 반영
+        // TODO(태욱/ItemManager): unit.items 스탯을 bu에 반영 (criPct→critChance, criDmgPct→critMultiplier 등).
+        // 적용되기 전까지 크리 필드는 기본값(0/1.5)이라 크리배수=1로 무영향.
         return bu;
     }
 
@@ -368,14 +374,31 @@ public class BattleManager : MonoBehaviour
         }
     }
 
+    // ─────────────────────────────────────────
+    // 데미지 공식 (TFT식 비율 경감)
+    // ─────────────────────────────────────────
+    // 데미지 = 기본위력 × 경감(방어) × 크리배수.
+    // 경감은 100/(100+def) → 방어 1당 유효체력 +1%, 항상 양수(max(1) 불필요),
+    // 별 배수와 곱셈으로 공존. 관통/타입상성은 추후 이 두 헬퍼에 곱셈 레이어로 확장.
+
+    /// <summary>방어 비율 경감 계수. def 1당 유효체력 +1%. (관통은 여기서 def를 깎는 식으로 확장)</summary>
+    private static float Mitigation(float def) => 100f / (100f + Mathf.Max(0f, def));
+
+    /// <summary>크리 기대값 배수(난수 없는 결정론 — 2인 동기화 안전). 크리 없으면 1.</summary>
+    private static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
+
     /// <summary>평타 1회: 물리/특수 피해 + 시전자 마나 획득.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
-        float raw = attacker.attackType == AttackType.Physical
-            ? attacker.attack - target.defense
-            : attacker.specialAttack - target.specialDefense;
+        float power = attacker.attackType == AttackType.Physical
+            ? attacker.attack
+            : attacker.specialAttack;
+        float def = attacker.attackType == AttackType.Physical
+            ? target.defense
+            : target.specialDefense;
 
-        DealDamage(target, Mathf.Max(1f, raw));
+        float dmg = power * Mitigation(def) * CritFactor(attacker);
+        DealDamage(target, dmg);
         GainMana(attacker, MANA_PER_ATTACK);
     }
 
@@ -388,7 +411,7 @@ public class BattleManager : MonoBehaviour
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
-            float dmg = Mathf.Max(1f, caster.skillPower - t.specialDefense); // 스킬은 특수방어로 경감
+            float dmg = caster.skillPower * Mitigation(t.specialDefense) * CritFactor(caster); // 스킬은 특수방어로 경감
             DealDamage(t, dmg);
         }
 
