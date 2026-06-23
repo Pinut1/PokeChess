@@ -410,7 +410,8 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>
     /// 보드+벤치 통틀어 같은 종(data.id)·같은 성(starLevel) 유닛이 3개 이상이면 1개로 합쳐 별업.
-    /// 1성→2성→3성, 3성이 상한. 별업 후 한 단계 더 가능하면 연쇄 진화.
+    /// 별업 시 종이 진화체(evolvesIntoEn)로 바뀐다 — 꼬마돌1성×3 → 데구리2성, 데구리2성×3 → 딱구리3성.
+    /// 1성→2성→3성, 3성이 상한. 진화 대상이 없으면(최종형/데이터 미비) 종은 유지하고 별만 올림.
     /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
     /// </summary>
     private void CheckEvolution(int speciesId, int starLevel)
@@ -455,21 +456,32 @@ public class BoardManager : MonoBehaviour
         foreach (var u in consumed)
             if (u != survivor && u != null) Destroy(u.gameObject);
 
-        // 별업 + 재배치
+        // 별업 + 종 진화(evolvesIntoEn으로 스왑) + 재배치
         survivor.starLevel = Mathf.Clamp(starLevel + 1, 1, 3);
-        survivor.ResetForBattle();
+
+        // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
+        // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
+        string evolvedEn = survivor.data.evolvesIntoEn;
+        if (!string.IsNullOrEmpty(evolvedEn))
+        {
+            var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
+            if (evolved != null) survivor.data = evolved;
+            else Debug.LogWarning($"[Evolve] 진화체 '{evolvedEn}' 가 PokemonDatabase에 없음 — 종 유지(별만 상승). 데이터 보강 필요");
+        }
+
+        survivor.ResetForBattle();   // 진화체 MaxHp 기준 풀회복 (data 스왑 후 호출)
         if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
         else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
 
         _isEvolving = false;
 
-        Debug.Log($"[Evolve] 종 {speciesId} {starLevel}성 3개 합체 → {survivor.starLevel}성");
+        Debug.Log($"[Evolve] {starLevel}성 3개 합체 → {survivor.data.pokemonName} {survivor.starLevel}성");
 
-        // 이벤트 발화(시너지 재계산/뷰 갱신)
+        // 이벤트 발화(시너지 재계산/뷰 갱신 — 진화로 종이 바뀌었으니 모델 갱신도 뷰가 처리)
         if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
         else                 GameEvents.UnitBenched(survivor);
 
-        // 연쇄(예: 2성 3개 → 3성)
-        CheckEvolution(speciesId, survivor.starLevel);
+        // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
+        CheckEvolution(survivor.data.id, survivor.starLevel);
     }
 }

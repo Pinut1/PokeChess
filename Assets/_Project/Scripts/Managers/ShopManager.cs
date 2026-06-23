@@ -8,7 +8,12 @@ using UnityEngine;
 /// </summary>
 public class ShopManager : MonoBehaviour
 {
-    [Header("샵 풀 (PokemonData 에셋 할당; 비어있으면 ShopDebugTest가 런타임 시드)")]
+    [Header("샵 풀")]
+    [Tooltip("켜짐(권장): 중앙 PokemonDatabase의 shopBuyable 종으로 풀을 자동 구성. 데이터 구동이라 인스펙터 수동 할당 불필요.\n" +
+             "꺼짐: 아래 _pool 인스펙터 배열만 사용(특정 종만 나오게 하는 디버그/제한 테스트용).")]
+    [SerializeField] private bool _useDatabasePool = true;
+
+    [Tooltip("_useDatabasePool이 꺼졌을 때만 사용하는 수동 풀. 켜져 있으면 무시되고 DB로 덮어씀.")]
     [SerializeField] private List<PokemonData> _pool = new();
 
     [Header("샵 설정")]
@@ -47,8 +52,31 @@ public class ShopManager : MonoBehaviour
 
     private void Start()
     {
+        // DB 모드면 인스펙터 배열 무시하고 중앙 PokemonDatabase로 풀을 덮어씀(데이터 구동).
+        // 수동 모드(_useDatabasePool=false)인데 풀도 비었으면 ShopDebugTest가 런타임 테스트 풀 시드.
+        if (_useDatabasePool)
+            SeedPoolFromDatabase();
+
         GameEvents.GoldChanged(Gold);
         Roll(); // 초기 샵 공개
+    }
+
+    /// <summary>
+    /// 샵 풀을 중앙 PokemonDatabase의 shopBuyable 종으로 채운다(인스펙터 배열 덮어씀).
+    /// 진화체/통신·돌 전용 종은 shopBuyable=false라 풀에서 제외됨.
+    /// DB가 없거나 비면 기존 _pool 유지(빈 풀이면 ShopDebugTest 폴백).
+    /// </summary>
+    private void SeedPoolFromDatabase()
+    {
+        var db = PokemonDatabase.Instance;
+        if (db == null || db.all == null || db.all.Count == 0)
+        {
+            Debug.LogWarning("[Shop] PokemonDatabase 비어있음 — 풀 시드 실패(Import Pokemon JSON 확인)");
+            return;
+        }
+
+        _pool = db.all.FindAll(p => p != null && p.shopBuyable);
+        Debug.Log($"[Shop] PokemonDatabase에서 풀 {_pool.Count}종 시드 (shopBuyable)");
     }
 
     private void HandleRoundChanged(int round)
