@@ -179,6 +179,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
     }
 
+    /// <summary>MasterClient가 챕터 완주(최종 라운드 클리어)를 전체에 알림. 다음 라운드 대신 호출.</summary>
+    public void BroadcastGameCleared()
+    {
+        if (_soloMode) { GameEvents.GameCleared(); return; }
+
+        if (!IsMasterClient) return;
+        photonView.RPC(nameof(RPC_OnGameCleared), RpcTarget.All);
+    }
+
     /// <summary>쇼핑 페이즈에서 "준비 완료" 버튼 누를 때 호출. 자신의 준비 상태를 CustomProperties에 기록.</summary>
     public void BroadcastPlayerReady()
     {
@@ -327,6 +336,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("[Network] 전투 시작 수신");
         GameEvents.BattleStart();
+    }
+
+    [PunRPC]
+    private void RPC_OnGameCleared()
+    {
+        Debug.Log("[Network] 챕터 완주 수신");
+        GameEvents.GameCleared();
     }
 
     // ─────────────────────────────────────────
@@ -567,6 +583,7 @@ public class NetworkManager : MonoBehaviour
     public void LeaveRoom()         { }
     public void BroadcastRoundStart(int round) => GameEvents.RoundChanged(round);
     public void BroadcastBattleStart()         => GameEvents.BattleStart();
+    public void BroadcastGameCleared()         => GameEvents.GameCleared();
 
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
     public void BroadcastPlayerReady()         => GameEvents.AllPlayersReady();

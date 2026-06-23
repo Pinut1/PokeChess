@@ -68,11 +68,57 @@ public class RewardManager : MonoBehaviour
                 Debug.LogWarning($"[Reward] TODO EvolutionStone '{entry.refNameEn}' ×{entry.amount} — 진화의 돌 시스템 미구현(태욱)");
                 break;
             case RewardKind.Unit:
-                Debug.LogWarning($"[Reward] TODO Unit '{entry.refNameEn}' ×{entry.amount} — 컴패니언/유닛 지급 미구현");
+                GrantUnit(entry.refNameEn, entry.amount);
                 break;
             case RewardKind.AugmentChoice:
                 Debug.LogWarning("[Reward] TODO AugmentChoice — AugmentManager 미구현(태욱), preReward 흐름과 통합 예정");
                 break;
         }
+    }
+
+    /// <summary>
+    /// 유닛 보상 지급. refNameEn으로 PokemonDatabase 조회 → amount만큼 벤치에 추가.
+    /// 구매(ShopManager.Buy)와 동일 경로(UnitFactory.Create + Board.TryPlaceInBench).
+    /// 벤치가 가득 차면 더 못 받고 로그만 남긴다(보상 유실 — TFT도 벤치 풀이면 받지 못함).
+    /// </summary>
+    private void GrantUnit(string nameEn, int amount)
+    {
+        if (string.IsNullOrEmpty(nameEn) || nameEn == "DUMMY")
+        {
+            Debug.LogWarning($"[Reward] Unit refNameEn 비어있음/DUMMY — 스킵");
+            return;
+        }
+
+        var db = PokemonDatabase.Instance;
+        PokemonData data = db != null ? db.GetByNameEn(nameEn) : null;
+        if (data == null)
+        {
+            Debug.LogWarning($"[Reward] Unit '{nameEn}' PokemonDatabase에 없음 — 스킵");
+            return;
+        }
+
+        var board = GameManager.Instance.Board;
+        int granted = 0;
+        for (int i = 0; i < Mathf.Max(1, amount); i++)
+        {
+            if (!board.HasBenchSpace())
+            {
+                Debug.LogWarning($"[Reward] 벤치 가득 — Unit '{nameEn}' {amount - granted}개 유실");
+                break;
+            }
+
+            PokemonUnit unit = UnitFactory.Create(data);
+            if (unit == null) break;
+
+            if (!board.TryPlaceInBench(unit))
+            {
+                Destroy(unit.gameObject); // 방어적 정리(HasBenchSpace 통과 후 실패는 이론상 도달 안 함)
+                break;
+            }
+            granted++;
+        }
+
+        if (granted > 0)
+            Debug.Log($"[Reward] Unit '{nameEn}' ×{granted} 벤치 지급");
     }
 }

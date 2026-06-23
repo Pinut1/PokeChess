@@ -114,6 +114,13 @@ public static class GameEvents
     /// <summary>세션 종료(패배 처리). 전적 기록은 미구현 — 로그로만 처리</summary>
     public static event Action OnSessionEnded;
 
+    /// <summary>
+    /// 마지막 라운드(챕터 최종 스테이지) 클리어 — 게임 완주(승리).
+    /// MasterClient가 최종 라운드 결과 후 BroadcastGameCleared로 전체에 발행 →
+    /// RoundPhaseManager가 GamePhase.Victory로 전환. (다음 라운드를 브로드캐스트하지 않음.)
+    /// </summary>
+    public static event Action OnGameCleared;
+
     // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
     // ──────────────────────────────────────────
@@ -141,4 +148,5 @@ public static class GameEvents
     public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();
     public static void GracePeriodExpired(bool bothDisconnected) => OnGracePeriodExpired?.Invoke(bothDisconnected);
     public static void SessionEnded()               => OnSessionEnded?.Invoke();
+    public static void GameCleared()                => OnGameCleared?.Invoke();
 }

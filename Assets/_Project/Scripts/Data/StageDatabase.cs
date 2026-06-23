@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -15,6 +16,15 @@ public class StageDatabase : ScriptableObject
 {
     [Tooltip("임포터(Import Stage JSON)가 자동으로 채움. 수동 편집 비권장.")]
     public List<StageData> stages = new();
+
+    /// <summary>
+    /// 챕터 최종 라운드 번호. 완주(Victory) 판정용 — RoundPhaseManager가 CurrentRound와 비교.
+    /// GetForRound는 stages가 비지 않으면 항상 클램프해 절대 null을 안 주므로, 이 값으로 끝을 안다.
+    /// 스테이지가 없으면 0.
+    /// </summary>
+    public int LastRound => (stages == null || stages.Count == 0)
+        ? 0
+        : stages.Max(s => Mathf.Max(s.order, s.round));
 
     // 런타임 단일 접근. Resources 루트에 단 하나의 DB 에셋만 두면 됨.
     private static StageDatabase _instance;

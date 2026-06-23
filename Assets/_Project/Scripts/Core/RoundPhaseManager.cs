@@ -7,6 +7,7 @@ public enum GamePhase
     Shopping,  // 쇼핑 페이즈
     Battle,    // 전투 페이즈
     Result,    // 결과 처리
+    Victory,   // 챕터 완주 (최종 라운드 클리어)
     GameOver   // 세션 종료 (연결 끊김 등으로 인한 패배 처리)
 }
 
@@ -20,6 +21,11 @@ public class RoundPhaseManager : MonoBehaviour
     [Header("페이즈 시간 (초)")]
     [SerializeField] private float _shoppingDuration = 30f;
     [SerializeField] private float _resultDuration   = 3f;
+
+    [Header("진행 규칙")]
+    [Tooltip("켜짐: 쇼핑 제한시간이 지나면 자동으로 전투 시작(테스트/AFK 방지). " +
+             "꺼짐: 두 플레이어가 모두 Ready를 눌러야만 전투 시작(정식 동작).")]
+    [SerializeField] private bool _autoStartBattleOnTimeout = true;
 
     public GamePhase CurrentPhase { get; private set; } = GamePhase.Lobby;
     public int       CurrentRound { get; private set; } = 0;
@@ -46,6 +52,7 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnOpponentReconnected  += HandleOpponentReconnected;
         GameEvents.OnGracePeriodExpired   += HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
+        GameEvents.OnGameCleared          += HandleGameCleared;
     }
 
     private void OnDisable()
@@ -57,6 +64,7 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnOpponentReconnected  -= HandleOpponentReconnected;
         GameEvents.OnGracePeriodExpired   -= HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
+        GameEvents.OnGameCleared          -= HandleGameCleared;
     }
 
     // ─────────────────────────────────────────
@@ -97,9 +105,18 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleBattleEnd(bool isWin)
     {
         // 패배로 체력 0 → PlayerHealthManager가 SessionEnded로 이미 GameOver 전환했을 수 있음.
-        // 구독자 호출 순서와 무관하게 GameOver를 Result가 덮어쓰지 않도록 가드.
-        if (CurrentPhase == GamePhase.GameOver) return;
+        // 완주 직후 마지막 전투 결과가 Victory를 덮어쓰는 것도 방지.
+        // 구독자 호출 순서와 무관하게 종료 상태를 Result가 덮어쓰지 않도록 가드.
+        if (CurrentPhase == GamePhase.GameOver || CurrentPhase == GamePhase.Victory) return;
         EnterPhase(GamePhase.Result);
+    }
+
+    /// <summary>챕터 완주(최종 라운드 클리어). 양 클라이언트에서 BroadcastGameCleared로 발행됨.</summary>
+    private void HandleGameCleared()
+    {
+        if (CurrentPhase == GamePhase.GameOver) return;
+        Debug.Log("[Phase] 챕터 완주 — Victory");
+        EnterPhase(GamePhase.Victory);
     }
 
     private void HandleAllPlayersReady()
@@ -197,6 +214,11 @@ public class RoundPhaseManager : MonoBehaviour
 
     private IEnumerator ShoppingTimer()
     {
+        // 자동 시작이 꺼져 있으면 제한시간으로 전투를 강제하지 않는다.
+        // 이 경우 두 플레이어가 모두 Ready → OnAllPlayersReady 로만 전투가 시작된다.
+        if (!_autoStartBattleOnTimeout)
+            yield break;
+
         yield return new WaitForSeconds(_shoppingDuration);
         EnterPhase(GamePhase.Battle);
     }
@@ -206,7 +228,15 @@ public class RoundPhaseManager : MonoBehaviour
         yield return new WaitForSeconds(_resultDuration);
 
         var network = GameManager.Instance.Network;
-        if (network.IsMasterClient)
+        if (!network.IsMasterClient) yield break;
+
+        // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.
+        // (StageDatabase.GetForRound는 stages가 비지 않으면 항상 클램프해 null을 안 주므로
+        //  LastRound로 끝을 판정해야 한다 — 안 그러면 11 이후 1-11이 무한 반복됨.)
+        int last = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
+        if (last > 0 && CurrentRound >= last)
+            network.BroadcastGameCleared();
+        else
             network.BroadcastRoundStart(CurrentRound + 1);
     }
 
@@ -237,6 +267,16 @@ public class RoundPhaseManager : MonoBehaviour
             var readyRect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
             if (GUI.Button(readyRect, "Ready", style))
                 PlayerReady();
+        }
+        else if (CurrentPhase == GamePhase.Victory)
+        {
+            var labelStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 64,
+                alignment = TextAnchor.MiddleCenter
+            };
+            var rect = new Rect(0f, Screen.height / 2f - 60f, Screen.width, 120f);
+            GUI.Label(rect, "STAGE CLEAR!", labelStyle);
         }
     }
 }
