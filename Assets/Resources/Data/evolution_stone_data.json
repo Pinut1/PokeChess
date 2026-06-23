@@ -1,0 +1,18 @@
+[
+  { "id": 1, "name": "불꽃의돌", "nameEn": "FireStone",    "stoneType": "fire",    "description": "불꽃 타입 진화", "targetPokemon": "Vulpix",     "evolvedPokemon": "Ninetales" },
+  { "id": 1, "name": "불꽃의돌", "nameEn": "FireStone",    "stoneType": "fire",    "description": "불꽃 타입 진화", "targetPokemon": "Eevee",      "evolvedPokemon": "Flareon" },
+
+  { "id": 2, "name": "물의돌",   "nameEn": "WaterStone",   "stoneType": "water",   "description": "물 타입 진화",   "targetPokemon": "Poliwhirl",  "evolvedPokemon": "Poliwrath" },
+  { "id": 2, "name": "물의돌",   "nameEn": "WaterStone",   "stoneType": "water",   "description": "물 타입 진화",   "targetPokemon": "Eevee",      "evolvedPokemon": "Vaporeon" },
+
+  { "id": 3, "name": "천둥의돌", "nameEn": "ThunderStone", "stoneType": "thunder", "description": "전기 타입 진화", "targetPokemon": "Eevee",      "evolvedPokemon": "Jolteon" },
+  { "id": 3, "name": "천둥의돌", "nameEn": "ThunderStone", "stoneType": "thunder", "description": "전기 타입 진화", "targetPokemon": "Magneton",   "evolvedPokemon": "Magnezone" },
+
+  { "id": 4, "name": "리프의돌", "nameEn": "LeafStone",    "stoneType": "leaf",    "description": "풀 타입 진화",   "targetPokemon": "Gloom",      "evolvedPokemon": "Vileplume" },
+  { "id": 4, "name": "리프의돌", "nameEn": "LeafStone",    "stoneType": "leaf",    "description": "풀 타입 진화",   "targetPokemon": "Eevee",      "evolvedPokemon": "Leafeon" },
+
+  { "id": 5, "name": "달의돌",   "nameEn": "MoonStone",    "stoneType": "moon",    "description": "페어리 진화",    "targetPokemon": "Clefairy",   "evolvedPokemon": "Clefable" },
+  { "id": 5, "name": "달의돌",   "nameEn": "MoonStone",    "stoneType": "moon",    "description": "페어리 진화",    "targetPokemon": "Jigglypuff", "evolvedPokemon": "Wigglytuff" },
+
+  { "id": 6, "name": "태양의돌", "nameEn": "SunStone",     "stoneType": "sun",     "description": "풀 타입 진화",   "targetPokemon": "Gloom",      "evolvedPokemon": "Bellossom" }
+]
