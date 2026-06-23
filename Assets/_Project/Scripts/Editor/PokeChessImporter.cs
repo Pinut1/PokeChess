@@ -502,10 +502,10 @@ public static class PokeChessImporter
         if (json == null) { Debug.LogError("[PokeChess] trade_evolution_data.json 없음"); return; }
 
         var db = JsonUtility.FromJson<TradeEvoDatabase>(json.text);
-        string dir = $"{SO_PATH}/Evolution";
-        EnsureDir(dir);
+        const string resDir = "Assets/Resources";           // 런타임 TradeEvolutionData.Instance가 Resources에서 로드
+        EnsureDir(resDir);
 
-        string path = $"{dir}/TradeEvolution_Data.asset";   // 통신진화는 단일 SO에 모음
+        string path = $"{resDir}/TradeEvolution_Data.asset"; // 통신진화는 단일 SO에 모음
         var so = LoadOrCreate<TradeEvolutionData>(path);
 
         so.mappings = new List<TradeEvolutionMapping>();

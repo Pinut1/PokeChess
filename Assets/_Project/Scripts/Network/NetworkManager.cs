@@ -227,6 +227,88 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
+    // 통신교환 (전송 트랜잭션 — 모델A: 1마리 핸드오버 → 받는 쪽 진화/벤치)
+    // ─────────────────────────────────────────
+
+    /// <summary>전송 ack 대기 중인 보낸 유닛. 성공 ack 시 내 벤치에서 제거(취소 불가).</summary>
+    private PokemonUnit _pendingTradeUnit;
+
+    /// <summary>
+    /// 내 벤치 유닛 1마리를 파트너에게 전송. 받는 쪽(A)이 자기 권위로 (매핑되면)진화체를 벤치에 생성.
+    /// 상대 벤치가 가득이면 거부(유닛 그대로). 전송은 베이스 종+성급만 넘기고 인스턴스화는 A가 함.
+    /// </summary>
+    public void SendTradeUnit(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null) return;
+        if (_soloMode || !PhotonNetwork.InRoom) { Debug.LogWarning("[Trade] 파트너 없음 — 전송 불가"); return; }
+        if (_pendingTradeUnit != null) { Debug.LogWarning("[Trade] 이전 전송 처리 중"); return; }
+
+        _pendingTradeUnit = unit;
+        Debug.Log($"[Trade] 전송 요청: {unit.data.pokemonNameEn} ★{unit.starLevel} → 파트너");
+        photonView.RPC(nameof(RPC_TradeReceive), RpcTarget.Others, unit.data.pokemonNameEn, unit.starLevel);
+    }
+
+    [PunRPC]
+    private void RPC_TradeReceive(string baseNameEn, int starLevel)
+    {
+        var board = GameManager.Instance.Board;
+        if (board == null || !board.HasBenchSpace())
+        {
+            Debug.LogWarning("[Trade] 내 벤치 가득 — 전송 거부");
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        // 통신진화 매핑 있으면 진화체로, 없으면 그대로 핸드오버(데이터 미입력 폴백).
+        var te = TradeEvolutionData.Instance;
+        string evolved = te != null ? te.GetEvolved(baseNameEn) : null;
+        string targetName = string.IsNullOrEmpty(evolved) ? baseNameEn : evolved;
+
+        var data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(targetName) : null;
+        if (data == null)
+        {
+            Debug.LogWarning($"[Trade] '{targetName}' PokemonDatabase에 없음 — 거부");
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        var unit = UnitFactory.Create(data, Mathf.Clamp(starLevel, 1, 3));
+        if (unit == null || !board.TryPlaceInBench(unit))
+        {
+            if (unit != null) Destroy(unit.gameObject);
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
+        GameEvents.TradeUnitReceived(unit);
+        photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);
+    }
+
+    [PunRPC]
+    private void RPC_TradeAck(bool success)
+    {
+        if (_pendingTradeUnit == null) return;
+        var unit = _pendingTradeUnit;
+        _pendingTradeUnit = null;
+
+        if (!success)
+        {
+            Debug.LogWarning("[Trade] 전송 실패(상대 벤치 가득) — 유닛 유지");
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        // 성공 — 보낸 유닛을 내 벤치에서 제거(환급 없음, 취소 불가). Destroy로 시각도 정리.
+        var board = GameManager.Instance.Board;
+        var bench = board.GetBenchSnapshot();
+        for (int i = 0; i < bench.Count; i++)
+            if (bench[i] == unit) { board.RemoveFromBench(i); break; }
+        Destroy(unit.gameObject);
+        Debug.Log("[Trade] 전송 완료 — 보낸 유닛 제거");
+    }
+
+    // ─────────────────────────────────────────
     // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
     // ─────────────────────────────────────────
 
@@ -703,6 +785,9 @@ public class NetworkManager : MonoBehaviour
         if (!isWin) ReportBattleLoss(1);   // 라이프 -1
         GameEvents.TeamRoundResolved(isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose);
     }
+
+    /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
+    public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
 }
 
 #endif
