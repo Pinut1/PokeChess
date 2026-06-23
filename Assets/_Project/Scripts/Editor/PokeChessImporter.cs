@@ -585,6 +585,7 @@ public static class PokeChessImporter
             });
         }
     }
+
     private static RewardKind ParseRewardKind(string s) => s switch
     {
         "reroll"                    => RewardKind.Reroll,
