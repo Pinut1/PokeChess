@@ -26,6 +26,7 @@ public static class PokeChessImporter
     [Serializable] private class StoneDatabase      { public List<StoneEntry>       stones; }
     [Serializable] private class StageJsonDb        { public List<StageEntry>       stages; }
     [Serializable] private class RewardJsonDb       { public List<RewardTableJson>  tables; }
+    [Serializable] private class TrainerEntryJsonDb { public List<TrainerEntryJson> trainers; }
     [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson>     mappings; }
 
     [Serializable]
@@ -110,7 +111,15 @@ public static class PokeChessImporter
         public string rewardTableId;    // "RW001" 등 문자열 키
         public List<EnemyPlacementJson> enemies;
     }
-    
+
+    [Serializable]
+    private class TrainerEntryJson
+    {
+        public string trainerId;
+        public string trainerName;
+        public List<EnemyPlacementJson> enemies;
+    }
+
     [Serializable]
     private class EnemyPlacementJson
     {
@@ -416,7 +425,7 @@ public static class PokeChessImporter
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 보상 테이블 {tables.Count}개 Import 완료 (RewardDatabase 단일 에셋 갱신)");
     }
-    
+
     [MenuItem("PokeChess/Import Stage JSON")]
     public static void ImportStages()
     {
@@ -430,50 +439,63 @@ public static class PokeChessImporter
             return;
         }
 
+        // trainer_entry_data.json 로드
+        var trainerMap = LoadTrainerEntryMap();
+
         // 스테이지당 .asset을 만들지 않고, 단일 StageDatabase.asset의 List를 통째로 교체.
         var stages = new List<StageData>();
+
         foreach (var e in jsonDb.stages)
         {
             var stage = new StageData
             {
-                stageId       = e.stageId,
-                chapter       = e.chapter,
-                round         = e.round,
-                order         = e.order,
-                stageType     = ParseStageType(e.stageType),
-                preReward     = ParsePreStageReward(e.preReward),
-                trainerName   = e.trainerName ?? "",
-                trainerId     = e.trainerId ?? "",
+                stageId = e.stageId,
+                chapter = e.chapter,
+                round = e.round,
+                order = e.order,
+                stageType = ParseStageType(e.stageType),
+                preReward = ParsePreStageReward(e.preReward),
+                trainerName = e.trainerName ?? "",
+                trainerId = e.trainerId ?? "",
                 rewardTableId = e.rewardTableId ?? "",
-                enemies       = new List<EnemyPlacement>()
+                enemies = new List<EnemyPlacement>()
             };
 
-            if (e.enemies != null)
-                foreach (var enemy in e.enemies)
-                    stage.enemies.Add(new EnemyPlacement
-                    {
-                        pokemonNameEn  = enemy.pokemonNameEn ?? "",
-                        pokemonNameKr  = enemy.pokemonNameKr ?? "",
-                        starLevel      = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
-                        q              = enemy.q,
-                        r              = enemy.r,
-                        heldItemEn     = enemy.heldItemEn ?? "",
-                        statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
-                        hpMultiplier   = NormalizeMultiplier(enemy.hpMultiplier),
-                        atkMultiplier  = NormalizeMultiplier(enemy.atkMultiplier)
-                    });
+            List<EnemyPlacementJson> sourceEnemies = null;
+
+            // 1순위: trainerId가 있고 trainer_entry_data.json에서 찾을 수 있으면 그 적 구성을 사용
+            if (!string.IsNullOrEmpty(e.trainerId) &&
+                trainerMap.TryGetValue(e.trainerId, out var trainerEntry) &&
+                trainerEntry.enemies != null)
+            {
+                sourceEnemies = trainerEntry.enemies;
+
+                if (!string.IsNullOrEmpty(trainerEntry.trainerName))
+                    stage.trainerName = trainerEntry.trainerName;
+            }
+            else
+            {
+                // 2순위: 전환기 폴백 — 기존 stage_data.json 인라인 enemies 사용
+                sourceEnemies = e.enemies;
+
+                if (!string.IsNullOrEmpty(e.trainerId))
+                    Debug.LogWarning($"[PokeChess] trainerId '{e.trainerId}'를 trainer_entry_data에서 찾지 못해 stage_data 인라인 enemies를 사용합니다.");
+            }
+
+            AddEnemies(stage, sourceEnemies);
 
             stages.Add(stage);
         }
 
         const string resDir = "Assets/Resources";
         EnsureDir(resDir);
+
         var so = LoadOrCreate<StageDatabase>($"{resDir}/StageDatabase.asset");
         so.stages = stages;
         EditorUtility.SetDirty(so);
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 스테이지 {stages.Count}개 Import 완료 (StageDatabase 단일 에셋 갱신)");
+        Debug.Log($"[PokeChess] 스테이지 {stages.Count}개 Import 완료 (trainer_entry join 적용)");
     }
 
     [MenuItem("PokeChess/Import TradeEvolution JSON")]
@@ -509,6 +531,60 @@ public static class PokeChessImporter
     // 유틸
     // ──────────────────────────────────────────
 
+    private static Dictionary<string, TrainerEntryJson> LoadTrainerEntryMap()
+    {
+        var map = new Dictionary<string, TrainerEntryJson>(StringComparer.OrdinalIgnoreCase);
+
+        var trainerJson = Resources.Load<TextAsset>("Data/trainer_entry_data");
+        if (trainerJson == null)
+        {
+            Debug.LogWarning("[PokeChess] trainer_entry_data.json 없음 — stage_data 인라인 enemies를 사용합니다.");
+            return map;
+        }
+
+        var trainerDb = JsonUtility.FromJson<TrainerEntryJsonDb>(trainerJson.text);
+        if (trainerDb == null || trainerDb.trainers == null)
+        {
+            Debug.LogWarning("[PokeChess] trainer_entry_data.json 파싱 실패 — stage_data 인라인 enemies를 사용합니다.");
+            return map;
+        }
+
+        foreach (var trainer in trainerDb.trainers)
+        {
+            if (trainer == null || string.IsNullOrEmpty(trainer.trainerId))
+                continue;
+
+            map[trainer.trainerId] = trainer;
+        }
+
+        Debug.Log($"[PokeChess] trainer_entry_data {map.Count}개 로드 완료");
+        return map;
+    }
+
+    private static void AddEnemies(StageData stage, List<EnemyPlacementJson> sourceEnemies)
+    {
+        if (stage == null || sourceEnemies == null)
+            return;
+
+        foreach (var enemy in sourceEnemies)
+        {
+            if (enemy == null)
+                continue;
+
+            stage.enemies.Add(new EnemyPlacement
+            {
+                pokemonNameEn = enemy.pokemonNameEn ?? "",
+                pokemonNameKr = enemy.pokemonNameKr ?? "",
+                starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
+                q = enemy.q,
+                r = enemy.r,
+                heldItemEn = enemy.heldItemEn ?? "",
+                statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
+                hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
+                atkMultiplier = NormalizeMultiplier(enemy.atkMultiplier)
+            });
+        }
+    }
     private static RewardKind ParseRewardKind(string s) => s switch
     {
         "reroll"                    => RewardKind.Reroll,
