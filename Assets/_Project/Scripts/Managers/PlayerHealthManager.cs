@@ -11,16 +11,16 @@ using UnityEngine;
 /// </summary>
 public class PlayerHealthManager : MonoBehaviour
 {
-    [Header("체력 설정 (밸런스 — 인스펙터 조정 가능, 현재 값은 임시 기본값)")]
-    [SerializeField] private int _maxHealth = 100;
-    // TODO: TFT처럼 "생존한 적 유닛 수/성급 합"만큼 가변 데미지로 확장 가능. v1은 고정값.
-    [SerializeField] private int _damagePerLoss = 10;
+    [Header("라이프 설정 (공용 라이프 — 기획: 3개)")]
+    // GDD 규칙: 공용 라이프 3개. 한 라운드에 두 플레이어가 모두 패배해야 1 감소(스플릿은 라이프 유지).
+    // 실제 라이프 차감은 NetworkManager가 팀 결과(BothLose) 판정 시 권위로 처리한다.
+    [SerializeField] private int _maxLives = 3;
 
-    /// <summary>현재 팀 공통 HP. NetworkManager(Room 속성)에서 읽음.</summary>
+    /// <summary>현재 공용 라이프. NetworkManager(Room 속성)에서 읽음.</summary>
     public int Health => GameManager.Instance != null && GameManager.Instance.Network != null
         ? GameManager.Instance.Network.TeamHealth
         : -1;
-    public int MaxHealth => _maxHealth;
+    public int MaxHealth => _maxLives;
     public bool IsDead => Health == 0; // -1(미초기화)는 사망 아님
 
     private void OnEnable()  => GameEvents.OnBattleEnd += HandleBattleEnd;
@@ -31,8 +31,8 @@ public class PlayerHealthManager : MonoBehaviour
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
         if (net == null) return;
 
-        // MasterClient가 팀 HP를 최초 1회 초기화. 비마스터는 동기화된 값을 받기만 함.
-        net.InitTeamHealth(_maxHealth);
+        // MasterClient가 공용 라이프를 최초 1회 초기화. 비마스터는 동기화된 값을 받기만 함.
+        net.InitTeamHealth(_maxLives);
 
         // 이미 초기화돼 있으면(후입장/재접속) 현재 값으로 UI 동기화.
         if (net.TeamHealth >= 0) GameEvents.HealthChanged(net.TeamHealth);
@@ -40,12 +40,11 @@ public class PlayerHealthManager : MonoBehaviour
 
     private void HandleBattleEnd(bool isWin)
     {
-        if (isWin) return;
-
-        // 내 전투 패배 → 팀 공통 HP에 데미지 반영 요청(마스터 권위로 처리됨).
-        // HP 감소/게임오버 통지는 NetworkManager의 Room 속성 변경 콜백에서 발행된다.
+        // 내 보드 승패를 팀에 보고(승/패 둘 다). 두 플레이어가 모두 보고하면 MasterClient가
+        // 팀 결과(BothWin/Split/BothLose)를 판정하고, 둘 다 패배일 때만 라이프 -1을 권위로 처리한다.
+        // 라이프 감소/게임오버 통지는 NetworkManager의 Room 속성 변경 콜백에서 발행된다.
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
-        net?.ReportBattleLoss(_damagePerLoss);
-        Debug.Log($"[Health] 패배 — 팀 HP -{_damagePerLoss} 요청");
+        net?.ReportBattleResult(isWin);
+        Debug.Log($"[Health] 전투 결과 보고: {(isWin ? "승" : "패")}");
     }
 }

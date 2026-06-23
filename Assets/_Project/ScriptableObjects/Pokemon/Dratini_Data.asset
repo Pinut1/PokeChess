@@ -15,24 +15,27 @@ MonoBehaviour:
   id: 147
   pokemonName: "\uBBF8\uB1FD"
   pokemonNameEn: Dratini
-  cost: 3
-  hp: 680
-  attack: 65
-  defense: 45
-  specialAttack: 60
-  specialDefense: 45
+  cost: 4
+  hp: 850
+  attack: 40
+  defense: 30
   attackSpeed: 0.6
   range: 1
-  attackType: 0
-  synergies: []
+  spellPower: 250
+  manaCost: 45
+  synergies:
+  - Dragon
+  role: Magician
+  skillId: DRAGON_MAGICIAN
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 130
-    manaCost: 100
-    targetType: 0
-    areaRadius: 0
-    lineLength: 0
+    skillId: DRAGON_MAGICIAN
+    skillName: "\uC6A9\uC131\uAD70"
+    description: "\uAD11\uC5ED \uB4DC\uB798\uACE4 \uACE0\uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 4
+    areaRadius: 1
+    lineLength: 4
+    vfxId: VFX_Dragon_Magician
   evolvesIntoEn: Dragonair
   shopBuyable: 1
   modelPrefab: {fileID: 0}

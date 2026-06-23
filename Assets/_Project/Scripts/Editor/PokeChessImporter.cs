@@ -35,24 +35,26 @@ public static class PokeChessImporter
         public int id;
         public string name, nameEn;
         public int cost;
-        public float hp, attack, defense, specialAttack, specialDefense, attackSpeed;
         public int range;
-        public List<string> synergies;
-        public string attackType;
-        public SkillEntry skill;
-        public string evolvesInto;   // 진화 후 포켓몬 영문명 (최종형은 빈 문자열)
-        public string obtainBy;      // "" 또는 "shop"=상점구매가능 / "stone"·"trade"=진화로만 획득(풀 제외)
-        public string modelPath, iconPath;
+        public float hp, attack, defense, atkSpeed;
+        public float spellPower;
+        public int manaCost;
+        public string skillId;          // Skill Table 참조 (없으면 평타만)
+        public List<string> synergies;  // synergy1, synergy2 합친 배열
+        public string role;
+        public string obtainBy;         // shop=상점풀 / evolution·stone·trade·synergy·wild=풀 제외
+        public string evolvesInto;      // 별업 진화체 영문명 (최종형/별루트는 빈 문자열)
     }
 
+    [Serializable] private class SkillTableJsonDb { public List<SkillTableEntry> skills; }
+
     [Serializable]
-    private class SkillEntry
+    private class SkillTableEntry
     {
-        public string name, description;
-        public float damage;
-        public int manaCost;
-        public string targetType;
+        public string skillId, skillName, skillType, role;
+        public string effectType, targetType;
         public int areaRadius, lineLength;
+        public string vfxId, description;
     }
 
     [Serializable]
@@ -173,6 +175,7 @@ public static class PokeChessImporter
         string dir = $"{SO_PATH}/Pokemon";
         EnsureDir(dir);
 
+        var skillMap = LoadSkillTableMap(); // skillId → Skill Table 행
         var imported = new List<PokemonData>();
 
         foreach (var e in db.pokemon)
@@ -180,34 +183,27 @@ public static class PokeChessImporter
             string path = $"{dir}/{e.nameEn}_Data.asset";
             var so = LoadOrCreate<PokemonData>(path);
 
-            so.id             = e.id;
-            so.pokemonName    = e.name;
-            so.pokemonNameEn  = e.nameEn;
-            so.cost           = e.cost;
-            so.hp             = e.hp;
-            so.attack         = e.attack;
-            so.defense        = e.defense;
-            so.specialAttack  = e.specialAttack;
-            so.specialDefense = e.specialDefense;
-            so.attackSpeed    = e.attackSpeed;
-            so.range          = e.range;
-            so.synergies      = e.synergies ?? new List<string>();
-            so.attackType     = e.attackType == "physical" ? AttackType.Physical : AttackType.Special;
+            so.id            = e.id;
+            so.pokemonName   = e.name;
+            so.pokemonNameEn = e.nameEn;
+            so.cost          = e.cost;
+            so.hp            = e.hp;
+            so.attack        = e.attack;
+            so.defense       = e.defense;
+            so.attackSpeed   = e.atkSpeed;
+            so.range         = e.range;
+            so.spellPower    = e.spellPower;
+            so.manaCost      = e.manaCost;
+            so.synergies     = e.synergies ?? new List<string>();
+            so.role          = e.role ?? "";
+            so.skillId       = e.skillId ?? "";
 
-            so.skill = new PokemonSkillData
-            {
-                skillName   = e.skill.name,
-                description = e.skill.description,
-                damage      = e.skill.damage,
-                manaCost    = e.skill.manaCost,
-                targetType  = ParseTargetType(e.skill.targetType),
-                areaRadius  = e.skill.areaRadius,
-                lineLength  = e.skill.lineLength
-            };
+            // skillId로 Skill Table join → skill에 베이킹. 없으면 평타만(빈 스킬).
+            so.skill = BuildSkill(e.skillId, skillMap);
 
             so.evolvesIntoEn = e.evolvesInto ?? "";
 
-            // obtainBy 미지정("")/"shop" → 상점 구매 가능. "stone"·"trade" 등은 진화로만 획득 → 풀 제외.
+            // obtainBy 미지정("")/"shop" → 상점 풀 포함. evolution/stone/trade/synergy/wild → 풀 제외.
             so.shopBuyable = string.IsNullOrEmpty(e.obtainBy) ||
                              e.obtainBy.Equals("shop", StringComparison.OrdinalIgnoreCase);
 
@@ -219,7 +215,8 @@ public static class PokeChessImporter
         UpdatePokemonDatabase(imported);
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 포켓몬 {db.pokemon.Count}종 Import 완료 (PokemonDatabase 자동 갱신)");
+        int withSkill = imported.FindAll(p => p.skill != null && p.skill.HasSkill).Count;
+        Debug.Log($"[PokeChess] 포켓몬 {db.pokemon.Count}종 Import 완료 (스킬 join {withSkill}종, PokemonDatabase 갱신)");
     }
 
     /// <summary>중앙 PokemonDatabase(Resources/PokemonDatabase.asset)를 임포트된 전체 목록으로 갱신.</summary>
@@ -505,10 +502,10 @@ public static class PokeChessImporter
         if (json == null) { Debug.LogError("[PokeChess] trade_evolution_data.json 없음"); return; }
 
         var db = JsonUtility.FromJson<TradeEvoDatabase>(json.text);
-        string dir = $"{SO_PATH}/Evolution";
-        EnsureDir(dir);
+        const string resDir = "Assets/Resources";           // 런타임 TradeEvolutionData.Instance가 Resources에서 로드
+        EnsureDir(resDir);
 
-        string path = $"{dir}/TradeEvolution_Data.asset";   // 통신진화는 단일 SO에 모음
+        string path = $"{resDir}/TradeEvolution_Data.asset"; // 통신진화는 단일 SO에 모음
         var so = LoadOrCreate<TradeEvolutionData>(path);
 
         so.mappings = new List<TradeEvolutionMapping>();
@@ -640,13 +637,58 @@ public static class PokeChessImporter
             Directory.CreateDirectory(path);
     }
 
-    private static SkillTargetType ParseTargetType(string s) => s switch
+    /// <summary>skill_table.json 로드 → skillId(IgnoreCase) → 행 맵. 없으면 빈 맵(평타만).</summary>
+    private static Dictionary<string, SkillTableEntry> LoadSkillTableMap()
     {
-        "area"   => SkillTargetType.Area,
-        "line"   => SkillTargetType.Line,
-        "all"    => SkillTargetType.All,
-        _        => SkillTargetType.Single
-    };
+        var map = new Dictionary<string, SkillTableEntry>(StringComparer.OrdinalIgnoreCase);
+        var json = Resources.Load<TextAsset>("Data/skill_table");
+        if (json == null) { Debug.LogWarning("[PokeChess] skill_table.json 없음 — 스킬 없이 임포트(평타만)"); return map; }
+
+        var db = JsonUtility.FromJson<SkillTableJsonDb>(json.text);
+        if (db?.skills == null) { Debug.LogWarning("[PokeChess] skill_table.json 파싱 실패"); return map; }
+
+        foreach (var s in db.skills)
+            if (s != null && !string.IsNullOrEmpty(s.skillId))
+                map[s.skillId] = s;
+        Debug.Log($"[PokeChess] skill_table {map.Count}개 로드");
+        return map;
+    }
+
+    /// <summary>skillId로 Skill Table 행을 찾아 PokemonSkillData 생성. 없으면 빈 스킬(HasSkill=false).</summary>
+    private static PokemonSkillData BuildSkill(string skillId, Dictionary<string, SkillTableEntry> map)
+    {
+        if (string.IsNullOrEmpty(skillId) || !map.TryGetValue(skillId, out var s))
+            return new PokemonSkillData(); // skillId 빈/미발견 → 평타만
+
+        return new PokemonSkillData
+        {
+            skillId     = s.skillId,
+            skillName   = s.skillName,
+            description = s.description,
+            effectType  = ParseEffectType(s.effectType),
+            targetType  = ParseTargetType(s.targetType),
+            areaRadius  = s.areaRadius,
+            lineLength  = s.lineLength,
+            vfxId       = s.vfxId
+        };
+    }
+
+    private static SkillEffectType ParseEffectType(string s)
+        => Enum.TryParse(SnakeToPascal(s), true, out SkillEffectType r) ? r : SkillEffectType.Spell;
+
+    private static SkillTargetType ParseTargetType(string s)
+        => Enum.TryParse(SnakeToPascal(s), true, out SkillTargetType r) ? r : SkillTargetType.EnemySingle;
+
+    /// <summary>"ENEMY_AREA"/"HP_REGEN" → "EnemyArea"/"HpRegen" (Enum.TryParse용).</summary>
+    private static string SnakeToPascal(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var parts = s.Split('_');
+        for (int i = 0; i < parts.Length; i++)
+            parts[i] = parts[i].Length == 0 ? "" :
+                char.ToUpperInvariant(parts[i][0]) + parts[i].Substring(1).ToLowerInvariant();
+        return string.Concat(parts);
+    }
 
     private static StageType ParseStageType(string s)
     {

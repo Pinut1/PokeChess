@@ -15,24 +15,27 @@ MonoBehaviour:
   id: 95
   pokemonName: "\uB871\uC2A4\uD1A4"
   pokemonNameEn: Onix
-  cost: 2
-  hp: 800
-  attack: 50
-  defense: 90
-  specialAttack: 20
-  specialDefense: 40
-  attackSpeed: 0.45
+  cost: 4
+  hp: 1300
+  attack: 55
+  defense: 60
+  attackSpeed: 0.65
   range: 1
-  attackType: 0
-  synergies: []
+  spellPower: 150
+  manaCost: 55
+  synergies:
+  - Ground
+  role: Tanker
+  skillId: GROUND_TANKER
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 100
-    manaCost: 100
+    skillId: GROUND_TANKER
+    skillName: "\uCCA0\uBCBD\uC218\uBE44"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    effectType: 3
     targetType: 0
     areaRadius: 0
-    lineLength: 0
+    lineLength: 1
+    vfxId: VFX_Ground_Tanker
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

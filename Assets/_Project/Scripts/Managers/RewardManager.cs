@@ -2,22 +2,35 @@ using UnityEngine;
 
 /// <summary>
 /// 스테이지 클리어 보상 지급 담당.
-/// 전투 승리(OnBattleEnd(true)) 시 현재 스테이지의 rewardTableId로 RewardDatabase를 조회해 보상을 지급한다.
+/// 팀 라운드 결과(OnTeamRoundResolved) 확정 시 현재 스테이지의 rewardTableId로 RewardDatabase를 조회해 지급한다.
+/// 보상 배수(기획): BothWin=100%, Split(한 명만 패)=50%, BothLose(둘 다 패)=0%.
+/// 각 클라이언트가 자기 플레이어 몫을 지급한다(스플릿이면 두 플레이어 모두 절반).
 ///
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage (FSM에 보상 로직을 하드코딩하지 않기 위해 분리).
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드만 실제 지급 연결됨. 아이템/소모품/진화의 돌/유닛/증강은 해당 시스템(태욱/미구현)이 붙을 때까지
+/// 골드/유닛만 실제 지급 연결됨. 아이템/소모품/진화의 돌/증강은 해당 시스템(태욱/미구현)이 붙을 때까지
 /// 훅 + 경고 로그로 남긴다(역기획서 수치도 미확정). grep "[Reward] TODO"로 추적.
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
-    private void OnEnable()  => GameEvents.OnBattleEnd += HandleBattleEnd;
-    private void OnDisable() => GameEvents.OnBattleEnd -= HandleBattleEnd;
+    private void OnEnable()  => GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
+    private void OnDisable() => GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
 
-    private void HandleBattleEnd(bool isWin)
+    private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
     {
-        if (!isWin) return; // 패배 시 보상 없음
+        // 보상 배수: 둘 다 승=100%, 스플릿=50%, 둘 다 패=0%(지급 없음).
+        float mult = outcome switch
+        {
+            TeamRoundOutcome.BothWin => 1f,
+            TeamRoundOutcome.Split   => 0.5f,
+            _                        => 0f
+        };
+        if (mult <= 0f)
+        {
+            Debug.Log("[Reward] 둘 다 패배 — 보상 없음");
+            return;
+        }
 
         StageData stage = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentStage : null;
         if (stage == null)
@@ -36,13 +49,13 @@ public class RewardManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Reward] '{stage.stageId}' 클리어 보상 지급: {table.label} ({table.rewards.Count}항목)");
+        Debug.Log($"[Reward] '{stage.stageId}' 보상 지급: {table.label} ({table.rewards.Count}항목, 배수 {mult:P0})");
         foreach (var entry in table.rewards)
-            GrantEntry(entry, stage);
+            GrantEntry(entry, stage, mult);
     }
 
-    /// <summary>보상 한 항목 지급. dropChance로 확률 판정 후 종류별 분기.</summary>
-    private void GrantEntry(RewardEntry entry, StageData stage)
+    /// <summary>보상 한 항목 지급. dropChance로 확률 판정 후 배수 적용 종류별 분기.</summary>
+    private void GrantEntry(RewardEntry entry, StageData stage, float mult)
     {
         if (entry == null) return;
 
@@ -50,25 +63,29 @@ public class RewardManager : MonoBehaviour
         if (entry.dropChance < 1f && Random.value > entry.dropChance)
             return;
 
+        // 스플릿이면 수량 절반(내림). 1개짜리 유닛 보상은 0이 될 수 있음(의도 — 절반).
+        int amount = Mathf.FloorToInt(entry.amount * mult);
+
         switch (entry.kind)
         {
             case RewardKind.Gold:
-                GameManager.Instance.Shop.AddGold(entry.amount); // 구매/판매와 동일 경로 → 골드 동기화도 그대로 탐
-                Debug.Log($"[Reward] +{entry.amount}G");
+                if (amount <= 0) break;
+                GameManager.Instance.Shop.AddGold(amount); // 구매/판매와 동일 경로 → 골드 동기화도 그대로 탐
+                Debug.Log($"[Reward] +{amount}G");
                 break;
 
             // ── 아래는 해당 시스템이 붙으면 연결. 지금은 누락 추적용 훅 + 로그. ───────────────
             case RewardKind.Item:
-                Debug.LogWarning($"[Reward] TODO Item '{entry.refNameEn}' ×{entry.amount} — ItemManager 미구현(태욱)");
+                Debug.LogWarning($"[Reward] TODO Item '{entry.refNameEn}' ×{amount} — ItemManager 미구현(태욱)");
                 break;
             case RewardKind.Consumable:
-                Debug.LogWarning($"[Reward] TODO Consumable '{entry.refNameEn}' ×{entry.amount} — 소모품 시스템 미구현");
+                Debug.LogWarning($"[Reward] TODO Consumable '{entry.refNameEn}' ×{amount} — 소모품 시스템 미구현");
                 break;
             case RewardKind.EvolutionStone:
-                Debug.LogWarning($"[Reward] TODO EvolutionStone '{entry.refNameEn}' ×{entry.amount} — 진화의 돌 시스템 미구현(태욱)");
+                Debug.LogWarning($"[Reward] TODO EvolutionStone '{entry.refNameEn}' ×{amount} — 진화의 돌 시스템 미구현(태욱)");
                 break;
             case RewardKind.Unit:
-                GrantUnit(entry.refNameEn, entry.amount);
+                if (amount > 0) GrantUnit(entry.refNameEn, amount);
                 break;
             case RewardKind.AugmentChoice:
                 Debug.LogWarning("[Reward] TODO AugmentChoice — AugmentManager 미구현(태욱), preReward 흐름과 통합 예정");

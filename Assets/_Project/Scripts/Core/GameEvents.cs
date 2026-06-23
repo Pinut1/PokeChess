@@ -2,6 +2,18 @@ using System;
 using UnityEngine;
 
 /// <summary>
+/// 한 라운드의 팀(2인) 단위 결과. 각자 보드 승패를 MasterClient가 집계해 판정.
+/// 라이프/보상 규칙: BothWin=풀 보상, Split=라이프 유지+보상 50%, BothLose=라이프 -1+보상 0.
+/// (RPC 전송용으로 int 캐스팅하므로 값 순서를 바꾸지 말 것.)
+/// </summary>
+public enum TeamRoundOutcome
+{
+    BothWin = 0,   // 둘 다 승리
+    Split   = 1,   // 한 명만 패배
+    BothLose = 2   // 둘 다 패배
+}
+
+/// <summary>
 /// 매니저 간 직접 참조 대신 이벤트로 통신.
 /// 새 이벤트는 반드시 여기에만 추가할 것.
 /// </summary>
@@ -14,8 +26,14 @@ public static class GameEvents
     /// <summary>전투 시작</summary>
     public static event Action OnBattleStart;
 
-    /// <summary>전투 종료. true = 승, false = 패</summary>
+    /// <summary>전투 종료(각자 보드 로컬 결과). true = 승, false = 패</summary>
     public static event Action<bool> OnBattleEnd;
+
+    /// <summary>
+    /// 팀(2인) 단위 라운드 결과 확정. MasterClient가 두 플레이어 승패를 집계해 발행.
+    /// 라이프 차감은 NetworkManager(권위)가 처리하고, 보상은 RewardManager가 배수로 지급한다.
+    /// </summary>
+    public static event Action<TeamRoundOutcome> OnTeamRoundResolved;
 
     /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
     public static event Action OnAllPlayersReady;
@@ -71,6 +89,12 @@ public static class GameEvents
 
     /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
     public static event Action OnSynergyUpdated;
+
+    /// <summary>통신교환으로 파트너에게서 유닛을 받아 벤치에 배치 완료(A측). 인자 = 받은 유닛(진화체일 수 있음).</summary>
+    public static event Action<PokemonUnit> OnTradeUnitReceived;
+
+    /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
+    public static event Action OnTradeRejected;
 
     // ──────────────────────────────────────────
     // 샵
@@ -128,6 +152,7 @@ public static class GameEvents
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
+    public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
@@ -139,6 +164,8 @@ public static class GameEvents
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
+    public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
+    public static void TradeRejected()               => OnTradeRejected?.Invoke();
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);

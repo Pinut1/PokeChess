@@ -19,13 +19,28 @@ public class TradeEvolutionMapping
 /// <summary>
 /// 통신교환(전송) 진화 매핑 모음. 진화의 돌(EvolutionStoneData)·일반 진화
 /// (PokemonData.evolvesIntoEn)와 분리된 세 번째 진화 루트.
-/// GDD: 전송 즉시 진화 / 취소 불가 / 양쪽 필드+대기석의 동일 포켓몬 모두 진화체로 변환.
+/// 모델A(2026-06-22 확정): B가 base 1마리를 핸드오버하면 **그 1마리만** 진화체로 변환되어 A 벤치 직행.
+/// 취소 불가. (구안 "양쪽 필드+대기석 동일 종 전부 변환"=모델B는 기각됨.)
+/// 런타임은 A 클라가 자기 권위로 GetEvolved(base) 조회 후 진화체를 인스턴스화한다.
 /// </summary>
 [CreateAssetMenu(menuName = "PokeChess/TradeEvolution", fileName = "TradeEvolution_Data")]
 public class TradeEvolutionData : ScriptableObject
 {
     [Header("통신진화 매핑")]
     public List<TradeEvolutionMapping> mappings = new();
+
+    // 런타임 단일 접근(중앙 DB 패턴). 임포터가 Resources/TradeEvolution_Data.asset에 기록.
+    private static TradeEvolutionData _instance;
+    public static TradeEvolutionData Instance
+    {
+        get
+        {
+            if (_instance == null)
+                _instance = Resources.Load<TradeEvolutionData>("TradeEvolution_Data");
+            // 매핑이 비어도(데이터 미입력) 정상 — 통신교환은 평범한 핸드오버로 폴백.
+            return _instance;
+        }
+    }
 
     // 잦은 조회를 위한 캐시 (targetEn → evolvedEn). 코드에서 딕셔너리로 제어.
     private Dictionary<string, string> _lookup;

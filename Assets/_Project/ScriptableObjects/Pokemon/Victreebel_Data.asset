@@ -15,25 +15,29 @@ MonoBehaviour:
   id: 71
   pokemonName: "\uC6B0\uCE20\uBCF4\uD2B8"
   pokemonNameEn: Victreebel
-  cost: 3
-  hp: 760
-  attack: 80
-  defense: 50
-  specialAttack: 70
-  specialDefense: 50
-  attackSpeed: 0.65
-  range: 1
-  attackType: 0
-  synergies: []
+  cost: 1
+  hp: 700
+  attack: 25
+  defense: 40
+  attackSpeed: 0.5
+  range: 2
+  spellPower: 90
+  manaCost: 75
+  synergies:
+  - Grass
+  - Poison
+  role: Tanker
+  skillId: GRASS_TANKER
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 160
-    manaCost: 100
+    skillId: GRASS_TANKER
+    skillName: "\uCCA0\uBCBD"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    effectType: 3
     targetType: 0
     areaRadius: 0
-    lineLength: 0
+    lineLength: 1
+    vfxId: VFX_Grass_Tanker
   evolvesIntoEn: 
-  shopBuyable: 1
+  shopBuyable: 0
   modelPrefab: {fileID: 0}
   icon: {fileID: 0}

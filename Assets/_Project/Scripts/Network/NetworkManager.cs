@@ -35,6 +35,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>게임 씬 로드 완료 여부를 Player CustomProperties에 저장할 때 쓰는 키(라운드 시작 핸드셰이크).</summary>
     private const string SCENE_READY_PROP_KEY = "SceneReady";
 
+    /// <summary>이번 라운드 전투 결과를 Player CustomProperties에 저장할 때 쓰는 키. -1=미보고, 0=패, 1=승.</summary>
+    private const string BATTLE_RESULT_PROP_KEY = "BattleResult";
+    private const int    RESULT_NOT_REPORTED = -1;
+
+    /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
+    private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
+
+    /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
+    private bool _roundResultResolved;
+
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
@@ -198,6 +208,106 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    /// <summary>
+    /// 자기 보드 전투 결과(승/패)를 팀에 보고. PlayerHealthManager가 OnBattleEnd에서 호출.
+    /// 두 플레이어가 모두 보고하면 MasterClient가 팀 결과를 판정한다(OnPlayerPropertiesUpdate).
+    /// 솔로 모드는 1인=팀이므로 즉시 판정.
+    /// </summary>
+    public void ReportBattleResult(bool isWin)
+    {
+        if (_soloMode)
+        {
+            // 1인 = 팀. 승=BothWin, 패=BothLose(Split 불가).
+            ResolveSoloRound(isWin);
+            return;
+        }
+
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    // ─────────────────────────────────────────
+    // 통신교환 (전송 트랜잭션 — 모델A: 1마리 핸드오버 → 받는 쪽 진화/벤치)
+    // ─────────────────────────────────────────
+
+    /// <summary>전송 ack 대기 중인 보낸 유닛. 성공 ack 시 내 벤치에서 제거(취소 불가).</summary>
+    private PokemonUnit _pendingTradeUnit;
+
+    /// <summary>
+    /// 내 벤치 유닛 1마리를 파트너에게 전송. 받는 쪽(A)이 자기 권위로 (매핑되면)진화체를 벤치에 생성.
+    /// 상대 벤치가 가득이면 거부(유닛 그대로). 전송은 베이스 종+성급만 넘기고 인스턴스화는 A가 함.
+    /// </summary>
+    public void SendTradeUnit(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null) return;
+        if (_soloMode || !PhotonNetwork.InRoom) { Debug.LogWarning("[Trade] 파트너 없음 — 전송 불가"); return; }
+        if (_pendingTradeUnit != null) { Debug.LogWarning("[Trade] 이전 전송 처리 중"); return; }
+
+        _pendingTradeUnit = unit;
+        Debug.Log($"[Trade] 전송 요청: {unit.data.pokemonNameEn} ★{unit.starLevel} → 파트너");
+        photonView.RPC(nameof(RPC_TradeReceive), RpcTarget.Others, unit.data.pokemonNameEn, unit.starLevel);
+    }
+
+    [PunRPC]
+    private void RPC_TradeReceive(string baseNameEn, int starLevel)
+    {
+        var board = GameManager.Instance.Board;
+        if (board == null || !board.HasBenchSpace())
+        {
+            Debug.LogWarning("[Trade] 내 벤치 가득 — 전송 거부");
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        // 통신진화 매핑 있으면 진화체로, 없으면 그대로 핸드오버(데이터 미입력 폴백).
+        var te = TradeEvolutionData.Instance;
+        string evolved = te != null ? te.GetEvolved(baseNameEn) : null;
+        string targetName = string.IsNullOrEmpty(evolved) ? baseNameEn : evolved;
+
+        var data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(targetName) : null;
+        if (data == null)
+        {
+            Debug.LogWarning($"[Trade] '{targetName}' PokemonDatabase에 없음 — 거부");
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        var unit = UnitFactory.Create(data, Mathf.Clamp(starLevel, 1, 3));
+        if (unit == null || !board.TryPlaceInBench(unit))
+        {
+            if (unit != null) Destroy(unit.gameObject);
+            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+            return;
+        }
+
+        Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
+        GameEvents.TradeUnitReceived(unit);
+        photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);
+    }
+
+    [PunRPC]
+    private void RPC_TradeAck(bool success)
+    {
+        if (_pendingTradeUnit == null) return;
+        var unit = _pendingTradeUnit;
+        _pendingTradeUnit = null;
+
+        if (!success)
+        {
+            Debug.LogWarning("[Trade] 전송 실패(상대 벤치 가득) — 유닛 유지");
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        // 성공 — 보낸 유닛을 내 벤치에서 제거(환급 없음, 취소 불가). Destroy로 시각도 정리.
+        var board = GameManager.Instance.Board;
+        var bench = board.GetBenchSnapshot();
+        for (int i = 0; i < bench.Count; i++)
+            if (bench[i] == unit) { board.RemoveFromBench(i); break; }
+        Destroy(unit.gameObject);
+        Debug.Log("[Trade] 전송 완료 — 보낸 유닛 제거");
+    }
+
     // ─────────────────────────────────────────
     // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
     // ─────────────────────────────────────────
@@ -317,9 +427,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] 라운드 {round} 시작 수신");
 
-        // 각 클라이언트가 자기 자신의 준비 상태를 리셋
-        var props = new Hashtable { { READY_PROP_KEY, false } };
+        // 각 클라이언트가 자기 준비 상태 + 이번 라운드 전투 결과를 리셋
+        var props = new Hashtable
+        {
+            { READY_PROP_KEY, false },
+            { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
 
         GameEvents.RoundChanged(round);
     }
@@ -343,6 +458,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("[Network] 챕터 완주 수신");
         GameEvents.GameCleared();
+    }
+
+    [PunRPC]
+    private void RPC_OnTeamRoundResolved(int outcome)
+    {
+        GameEvents.TeamRoundResolved((TeamRoundOutcome)outcome);
+    }
+
+    /// <summary>솔로 모드(1인=팀) 즉시 판정. 승=BothWin, 패=BothLose(라이프 -1).</summary>
+    private void ResolveSoloRound(bool isWin)
+    {
+        TeamRoundOutcome outcome = isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose;
+        if (!isWin) ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT);
+        GameEvents.TeamRoundResolved(outcome);
     }
 
     // ─────────────────────────────────────────
@@ -483,6 +612,46 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 준비 완료 집계.
         if (changedProps.ContainsKey(READY_PROP_KEY) && AllPlayersHaveFlag(READY_PROP_KEY))
             photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
+
+        // 전투 결과 집계: 두 플레이어가 모두 보고했으면 팀 결과 1회 판정.
+        if (changedProps.ContainsKey(BATTLE_RESULT_PROP_KEY) && !_roundResultResolved && AllPlayersReportedResult())
+            ResolveTeamRound();
+    }
+
+    /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
+    private bool AllPlayersReportedResult()
+    {
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (!player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) ||
+                (int)v == RESULT_NOT_REPORTED)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감(둘 다 패) + 전체 브로드캐스트.
+    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose.
+    /// </summary>
+    private void ResolveTeamRound()
+    {
+        _roundResultResolved = true;
+
+        int wins = 0;
+        foreach (var player in PhotonNetwork.PlayerList)
+            if (player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) && (int)v == 1)
+                wins++;
+
+        TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
+                                 : wins == 1 ? TeamRoundOutcome.Split
+                                 : TeamRoundOutcome.BothLose;
+
+        if (outcome == TeamRoundOutcome.BothLose)
+            ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
+
+        Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");
+        photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, (int)outcome);
     }
 
     /// <summary>모든 플레이어의 해당 bool CustomProperty가 true인지.</summary>
@@ -609,6 +778,16 @@ public class NetworkManager : MonoBehaviour
         GameEvents.HealthChanged(_teamHp);
         if (_teamHp <= 0) GameEvents.SessionEnded();
     }
+
+    /// <summary>오프라인(1인=팀): 승=BothWin, 패=BothLose(라이프 -1). 즉시 판정.</summary>
+    public void ReportBattleResult(bool isWin)
+    {
+        if (!isWin) ReportBattleLoss(1);   // 라이프 -1
+        GameEvents.TeamRoundResolved(isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose);
+    }
+
+    /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
+    public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
 }
 
 #endif

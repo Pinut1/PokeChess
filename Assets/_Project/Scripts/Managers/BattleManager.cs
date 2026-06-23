@@ -15,13 +15,11 @@ public class BattleUnit
 
     public float currentHp;
     public float maxHp;
-    public float attack;
-    public float specialAttack;
-    public float defense;
-    public float specialDefense;
+    public float attack;          // 평타 데미지
+    public float defense;         // 받는 데미지 경감
+    public float spellPower;      // 스킬 데미지(SPELL effectType) 기반값
     public float attackSpeed;
     public int range;
-    public AttackType attackType;
 
     // ── 크리티컬 (아이템으로 부여, 기본 무영향) ──
     public float critChance     = 0f;     // 0~1. criPct 아이템으로 증가
@@ -29,11 +27,11 @@ public class BattleUnit
 
     // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
     public float currentMana;
-    public float maxMana;            // = skill.manaCost
-    public float skillPower;         // skill.damage × 별 배수(×적 statMul) — 시전 시 특수방어로 경감
+    public float maxMana;            // = PokemonData.manaCost
+    public SkillEffectType skillEffectType;  // 효과 분기 (Phase1: Attack/Spell만 데미지)
     public SkillTargetType skillTargetType;
-    public int   skillAreaRadius;    // Area: 대상 중심 반경(칸)
-    public int   skillLineLength;    // Line: 시전자 기준 사거리(칸)
+    public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
+    public int   skillLineLength;    // EnemyLine: 시전자 기준 직선(칸)
 
     public bool HasSkill => maxMana > 0f;
 
@@ -256,26 +254,27 @@ public class BattleManager : MonoBehaviour
             maxHp = maxHp,
             currentHp = maxHp,
             attack = data.attack * star * sm * am,
-            specialAttack = data.specialAttack * star * sm,
             defense = data.defense * sm,
-            specialDefense = data.specialDefense * sm,
+            spellPower = data.spellPower * star * sm,
             attackSpeed = data.attackSpeed,
             range = Mathf.Max(1, data.range),
-            attackType = data.attackType,
             attackCooldown = 0f
         };
-        ApplySkill(bu, data.skill, star * sm); // 스킬 위력도 별·강화 배수 반영
+        ApplySkill(bu, data.skill, data.manaCost);
         return bu;
     }
 
-    /// <summary>스킬 데이터를 BattleUnit에 반영. manaCost가 없거나 skill이 없으면 평타만(maxMana=0).</summary>
-    private static void ApplySkill(BattleUnit bu, PokemonSkillData skill, float powerScale)
+    /// <summary>
+    /// 스킬 데이터를 BattleUnit에 반영. skillId가 없거나 manaCost<=0이면 평타만(maxMana=0).
+    /// 위력은 데이터에 없음 — 시전 시 effectType에 따라 attack/spellPower로 계산(ApplySkill에선 분기 정보만 복사).
+    /// </summary>
+    private static void ApplySkill(BattleUnit bu, PokemonSkillData skill, int manaCost)
     {
-        if (skill == null || skill.manaCost <= 0) return;
+        if (skill == null || !skill.HasSkill || manaCost <= 0) return;
 
-        bu.maxMana          = skill.manaCost;
+        bu.maxMana          = manaCost;
         bu.currentMana      = 0f;
-        bu.skillPower       = skill.damage * powerScale;
+        bu.skillEffectType  = skill.effectType;
         bu.skillTargetType  = skill.targetType;
         bu.skillAreaRadius  = Mathf.Max(1, skill.areaRadius);
         bu.skillLineLength  = Mathf.Max(1, skill.lineLength);
@@ -291,15 +290,14 @@ public class BattleManager : MonoBehaviour
             maxHp = unit.MaxHp,
             currentHp = unit.MaxHp,
             attack = unit.Attack,
-            specialAttack = unit.SpecialAttack,
             defense = unit.Defense,
-            specialDefense = unit.SpecialDefense,
+            spellPower = unit.SpellPower,
             attackSpeed = unit.AttackSpeed,
             range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
-            attackType = unit.AttackType,
             attackCooldown = 0f
         };
-        if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.StarMultiplier);
+        if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.ManaCost);
+
         // 장착 아이템 스탯을 전투 스냅샷에 반영한다. PokemonUnit 원본은 변경하지 않음.
         ItemManager.ApplyItemStats(unit, bu);
 
@@ -388,38 +386,45 @@ public class BattleManager : MonoBehaviour
     /// <summary>크리 기대값 배수(난수 없는 결정론 — 2인 동기화 안전). 크리 없으면 1.</summary>
     private static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
 
-    /// <summary>평타 1회: 물리/특수 피해 + 시전자 마나 획득.</summary>
+    /// <summary>평타 1회: attack 기반 피해(방어로 경감) + 시전자 마나 획득.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
-        float power = attacker.attackType == AttackType.Physical
-            ? attacker.attack
-            : attacker.specialAttack;
-        float def = attacker.attackType == AttackType.Physical
-            ? target.defense
-            : target.specialDefense;
-
-        float dmg = power * Mitigation(def) * CritFactor(attacker);
+        float dmg = attacker.attack * Mitigation(target.defense) * CritFactor(attacker);
         DealDamage(target, dmg);
         GainMana(attacker, MANA_PER_ATTACK);
     }
 
-    /// <summary>스킬 시전: 마나 소모(0으로) 후 targetType에 따라 대상들에게 특수 피해.</summary>
+    /// <summary>
+    /// 스킬 시전: 마나 소모(0으로) 후 effectType 분기.
+    /// Phase1: Attack(=attack 위력)/Spell(=spellPower 위력)만 데미지. 나머지(지원/CC)는 미구현 — 기획 수치 대기.
+    /// </summary>
     private void CastSkill(BattleUnit caster, BattleUnit primaryTarget)
     {
         caster.currentMana = 0f;
+
+        // 데미지 스킬만 처리. 지원/CC(HP_REGEN/SHIELD/AS_BUFF/MANA_REGEN/SLOW/STUN/TAUNT)는 Phase2.
+        bool isDamage = caster.skillEffectType == SkillEffectType.Attack ||
+                        caster.skillEffectType == SkillEffectType.Spell;
+        if (!isDamage)
+        {
+            // TODO(Phase2): effectType별 지원/CC 효과. 기획 지속시간·증가율 확정 후 구현.
+            Debug.Log($"[Battle] {caster.team} 스킬({caster.skillEffectType}) — Phase2 미구현(무효과)");
+            return;
+        }
+
+        float power = caster.skillEffectType == SkillEffectType.Attack ? caster.attack : caster.spellPower;
 
         var targets = GetSkillTargets(caster, primaryTarget);
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
-            float dmg = caster.skillPower * Mitigation(t.specialDefense) * CritFactor(caster); // 스킬은 특수방어로 경감
-            DealDamage(t, dmg);
+            DealDamage(t, power * Mitigation(t.defense) * CritFactor(caster));
         }
 
-        Debug.Log($"[Battle] {caster.team} 스킬 시전 → 대상 {targets.Count}기 (위력 {caster.skillPower:0})");
+        Debug.Log($"[Battle] {caster.team} 스킬 시전({caster.skillEffectType}) → 대상 {targets.Count}기 (위력 {power:0})");
     }
 
-    /// <summary>targetType별 피격 대상 목록. 항상 살아있는 적만 반환.</summary>
+    /// <summary>targetType별 피격 대상 목록(데미지 스킬용 = 적 대상). 항상 살아있는 적만 반환.</summary>
     private List<BattleUnit> GetSkillTargets(BattleUnit caster, BattleUnit primaryTarget)
     {
         var result = new List<BattleUnit>();
@@ -427,19 +432,14 @@ public class BattleManager : MonoBehaviour
 
         switch (caster.skillTargetType)
         {
-            case SkillTargetType.All:
-                foreach (var u in _units)
-                    if (u.team != caster.team && u.IsAlive) result.Add(u);
-                break;
-
-            case SkillTargetType.Area: // 대상 중심 반경 내 적 전부
+            case SkillTargetType.EnemyArea: // 대상 중심 반경 내 적 전부
                 foreach (var u in _units)
                     if (u.team != caster.team && u.IsAlive &&
                         u.coords.DistanceTo(primaryTarget.coords) <= caster.skillAreaRadius)
                         result.Add(u);
                 break;
 
-            case SkillTargetType.Line: // 시전자 사거리 내 + 대상 방향(앞쪽)의 적
+            case SkillTargetType.EnemyLine: // 시전자 사거리 내 + 대상 방향(앞쪽)의 적
             {
                 int toTarget = caster.coords.DistanceTo(primaryTarget.coords);
                 foreach (var u in _units)
@@ -451,8 +451,11 @@ public class BattleManager : MonoBehaviour
                 break;
             }
 
-            default: // Single
+            case SkillTargetType.EnemySingle:
                 result.Add(primaryTarget);
+                break;
+
+            default: // Ally* (지원 스킬) — 데미지 경로에선 대상 없음(Phase2에서 아군 타겟팅 구현)
                 break;
         }
 
