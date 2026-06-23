@@ -69,37 +69,35 @@ public class ItemDebugTest : MonoBehaviour
             }
 
             var testBattleUnit = new BattleUnit
-            {
-                source = unit,
-                team = BattleTeam.Ally,
-                maxHp = unit.MaxHp,
-                currentHp = unit.MaxHp,
-                attack = unit.Attack,
-                specialAttack = unit.SpecialAttack,
-                defense = unit.Defense,
-                specialDefense = unit.SpecialDefense,
-                attackSpeed = unit.AttackSpeed,
-                range = Mathf.Max(1, unit.Range),
-                attackType = unit.AttackType,
-                attackCooldown = 0f
-            };
+			{
+				source = unit,
+				team = BattleTeam.Ally,
+				maxHp = unit.MaxHp,
+				currentHp = unit.MaxHp,
+				attack = unit.Attack,
+				defense = unit.Defense,
+				spellPower = unit.SpellPower,
+				attackSpeed = unit.AttackSpeed,
+				range = Mathf.Max(1, unit.Range),
+				attackCooldown = 0f
+			};
 
             Debug.Log(
-                $"[ItemDebug] 적용 전: unit={unit.data?.pokemonName ?? "Unknown"}, " +
-                $"items={unit.items.Count}, HP={testBattleUnit.maxHp:0.##}, " +
-                $"ATK={testBattleUnit.attack:0.##}, DEF={testBattleUnit.defense:0.##}, " +
-                $"SPDEF={testBattleUnit.specialDefense:0.##}"
-            );
+				$"[ItemDebug] 적용 전: unit={unit.data?.pokemonName ?? "Unknown"}, " +
+				$"items={unit.items.Count}, HP={testBattleUnit.maxHp:0.##}, " +
+				$"ATK={testBattleUnit.attack:0.##}, DEF={testBattleUnit.defense:0.##}, " +
+				$"SPELL={testBattleUnit.spellPower:0.##}"
+			);
 
             ItemManager.ApplyItemStats(unit, testBattleUnit);
 
             Debug.Log(
-                $"[ItemDebug] 적용 후: unit={unit.data?.pokemonName ?? "Unknown"}, " +
-                $"items={unit.items.Count}, HP={testBattleUnit.maxHp:0.##}, " +
-                $"ATK={testBattleUnit.attack:0.##}, DEF={testBattleUnit.defense:0.##}, " +
-                $"SPDEF={testBattleUnit.specialDefense:0.##}, " +
-                $"CRIT={testBattleUnit.critChance:0.##}"
-            );
+				$"[ItemDebug] 적용 후: unit={unit.data?.pokemonName ?? "Unknown"}, " +
+				$"items={unit.items.Count}, HP={testBattleUnit.maxHp:0.##}, " +
+				$"ATK={testBattleUnit.attack:0.##}, DEF={testBattleUnit.defense:0.##}, " +
+				$"SPELL={testBattleUnit.spellPower:0.##}, " +
+				$"CRIT={testBattleUnit.critChance:0.##}"
+			);
         }
     }
 
