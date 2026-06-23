@@ -35,6 +35,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>게임 씬 로드 완료 여부를 Player CustomProperties에 저장할 때 쓰는 키(라운드 시작 핸드셰이크).</summary>
     private const string SCENE_READY_PROP_KEY = "SceneReady";
 
+    /// <summary>이번 라운드 전투 결과를 Player CustomProperties에 저장할 때 쓰는 키. -1=미보고, 0=패, 1=승.</summary>
+    private const string BATTLE_RESULT_PROP_KEY = "BattleResult";
+    private const int    RESULT_NOT_REPORTED = -1;
+
+    /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
+    private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
+
+    /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
+    private bool _roundResultResolved;
+
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
@@ -198,6 +208,24 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    /// <summary>
+    /// 자기 보드 전투 결과(승/패)를 팀에 보고. PlayerHealthManager가 OnBattleEnd에서 호출.
+    /// 두 플레이어가 모두 보고하면 MasterClient가 팀 결과를 판정한다(OnPlayerPropertiesUpdate).
+    /// 솔로 모드는 1인=팀이므로 즉시 판정.
+    /// </summary>
+    public void ReportBattleResult(bool isWin)
+    {
+        if (_soloMode)
+        {
+            // 1인 = 팀. 승=BothWin, 패=BothLose(Split 불가).
+            ResolveSoloRound(isWin);
+            return;
+        }
+
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
     // ─────────────────────────────────────────
     // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
     // ─────────────────────────────────────────
@@ -317,9 +345,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] 라운드 {round} 시작 수신");
 
-        // 각 클라이언트가 자기 자신의 준비 상태를 리셋
-        var props = new Hashtable { { READY_PROP_KEY, false } };
+        // 각 클라이언트가 자기 준비 상태 + 이번 라운드 전투 결과를 리셋
+        var props = new Hashtable
+        {
+            { READY_PROP_KEY, false },
+            { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
 
         GameEvents.RoundChanged(round);
     }
@@ -343,6 +376,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("[Network] 챕터 완주 수신");
         GameEvents.GameCleared();
+    }
+
+    [PunRPC]
+    private void RPC_OnTeamRoundResolved(int outcome)
+    {
+        GameEvents.TeamRoundResolved((TeamRoundOutcome)outcome);
+    }
+
+    /// <summary>솔로 모드(1인=팀) 즉시 판정. 승=BothWin, 패=BothLose(라이프 -1).</summary>
+    private void ResolveSoloRound(bool isWin)
+    {
+        TeamRoundOutcome outcome = isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose;
+        if (!isWin) ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT);
+        GameEvents.TeamRoundResolved(outcome);
     }
 
     // ─────────────────────────────────────────
@@ -483,6 +530,46 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 준비 완료 집계.
         if (changedProps.ContainsKey(READY_PROP_KEY) && AllPlayersHaveFlag(READY_PROP_KEY))
             photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
+
+        // 전투 결과 집계: 두 플레이어가 모두 보고했으면 팀 결과 1회 판정.
+        if (changedProps.ContainsKey(BATTLE_RESULT_PROP_KEY) && !_roundResultResolved && AllPlayersReportedResult())
+            ResolveTeamRound();
+    }
+
+    /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
+    private bool AllPlayersReportedResult()
+    {
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (!player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) ||
+                (int)v == RESULT_NOT_REPORTED)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감(둘 다 패) + 전체 브로드캐스트.
+    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose.
+    /// </summary>
+    private void ResolveTeamRound()
+    {
+        _roundResultResolved = true;
+
+        int wins = 0;
+        foreach (var player in PhotonNetwork.PlayerList)
+            if (player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) && (int)v == 1)
+                wins++;
+
+        TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
+                                 : wins == 1 ? TeamRoundOutcome.Split
+                                 : TeamRoundOutcome.BothLose;
+
+        if (outcome == TeamRoundOutcome.BothLose)
+            ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
+
+        Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");
+        photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, (int)outcome);
     }
 
     /// <summary>모든 플레이어의 해당 bool CustomProperty가 true인지.</summary>
@@ -608,6 +695,13 @@ public class NetworkManager : MonoBehaviour
         _teamHp = Mathf.Max(0, _teamHp - damage);
         GameEvents.HealthChanged(_teamHp);
         if (_teamHp <= 0) GameEvents.SessionEnded();
+    }
+
+    /// <summary>오프라인(1인=팀): 승=BothWin, 패=BothLose(라이프 -1). 즉시 판정.</summary>
+    public void ReportBattleResult(bool isWin)
+    {
+        if (!isWin) ReportBattleLoss(1);   // 라이프 -1
+        GameEvents.TeamRoundResolved(isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose);
     }
 }
 
