@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: RewardDatabase
   m_EditorClassIdentifier: Assembly-CSharp::RewardDatabase
   tables:
-  - rewardTableId: 1
-    label: "1-1 \uD074\uB9AC\uC5B4 \uBCF4\uC0C1 (\uC608\uC2DC \u2014 \uC5ED\uAE30\uD68D\uC11C
+  - rewardTableId: RW001
+    label: "\uC57C\uC0DD \uD074\uB9AC\uC5B4 \uBCF4\uC0C1 (\uC608\uC2DC \u2014 \uC5ED\uAE30\uD68D\uC11C
       \uD655\uC815 \uD544\uC694)"
     rewards:
     - kind: 0
@@ -25,7 +25,7 @@ MonoBehaviour:
       amount: 1
       refNameEn: 
       dropChance: 1
-  - rewardTableId: 2
+  - rewardTableId: RW002
     label: "\uAD00\uC7A5\uC804 \uD074\uB9AC\uC5B4 \uBCF4\uC0C1 (\uC608\uC2DC)"
     rewards:
     - kind: 0

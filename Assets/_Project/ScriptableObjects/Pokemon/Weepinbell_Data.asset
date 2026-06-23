@@ -34,5 +34,6 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 0
   evolvesIntoEn: Victreebel
+  shopBuyable: 1
   modelPrefab: {fileID: 0}
   icon: {fileID: 0}

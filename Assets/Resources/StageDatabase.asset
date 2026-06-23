@@ -20,6 +20,7 @@ MonoBehaviour:
     stageType: 0
     preReward: 0
     trainerName: 
+    trainerId: WILD_COMMON
     enemies:
     - pokemonNameEn: Magikarp
       pokemonNameKr: "\uC789\uC5B4\uD0B9"
@@ -30,7 +31,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 1
+    rewardTableId: RW001
   - stageId: 1-2
     chapter: 1
     round: 2
@@ -38,6 +39,7 @@ MonoBehaviour:
     stageType: 1
     preReward: 0
     trainerName: 
+    trainerId: WILD_RARE
     enemies:
     - pokemonNameEn: Magikarp
       pokemonNameKr: "\uC789\uC5B4\uD0B9"
@@ -57,7 +59,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 1
+    rewardTableId: RW001
   - stageId: 1-3
     chapter: 1
     round: 3
@@ -65,6 +67,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 0
     trainerName: "\uD638\uC77C"
+    trainerId: GYM_TSUKUSHI
     enemies:
     - pokemonNameEn: Caterpie
       pokemonNameKr: "\uCE90\uD130\uD53C"
@@ -102,7 +105,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-4
     chapter: 1
     round: 4
@@ -110,6 +113,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 0
     trainerName: "\uBBFC\uD654"
+    trainerId: GYM_ERIKA
     enemies:
     - pokemonNameEn: Weepinbell
       pokemonNameKr: "\uBAA8\uB2E4\uD53C"
@@ -147,7 +151,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-5
     chapter: 1
     round: 5
@@ -155,6 +159,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 1
     trainerName: "\uC6C5\uC774"
+    trainerId: GYM_HAYATO
     enemies:
     - pokemonNameEn: Geodude
       pokemonNameKr: "\uAF2C\uB9C8\uB3CC"
@@ -192,7 +197,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-6
     chapter: 1
     round: 6
@@ -200,6 +205,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 0
     trainerName: "\uAF2D\uB450"
+    trainerId: GYM_MATIS
     enemies:
     - pokemonNameEn: Miltank
       pokemonNameKr: "\uBC00\uD0F1\uD06C"
@@ -237,7 +243,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-7
     chapter: 1
     round: 7
@@ -245,6 +251,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 3
     trainerName: "\uC774\uC2AC\uC774"
+    trainerId: GYM_NATSUME
     enemies:
     - pokemonNameEn: Psyduck
       pokemonNameKr: "\uACE0\uB77C\uD30C\uB355"
@@ -282,14 +289,15 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-8
     chapter: 1
     round: 8
     order: 8
     stageType: 2
-    preReward: 1
+    preReward: 0
     trainerName: "\uC720\uBE48"
+    trainerId: GYM_KYOU
     enemies:
     - pokemonNameEn: Gastly
       pokemonNameKr: "\uACE0\uC624\uC2A4"
@@ -327,7 +335,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-9
     chapter: 1
     round: 9
@@ -335,6 +343,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 0
     trainerName: "\uBE44\uC8FC\uAE30"
+    trainerId: GYM_BIJUGI
     enemies:
     - pokemonNameEn: Meowth
       pokemonNameKr: "\uB098\uC639"
@@ -390,7 +399,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-10
     chapter: 1
     round: 10
@@ -398,6 +407,7 @@ MonoBehaviour:
     stageType: 2
     preReward: 1
     trainerName: "\uC774\uD5A5"
+    trainerId: GYM_IHYANG
     enemies:
     - pokemonNameEn: Dratini
       pokemonNameKr: "\uBBF8\uB1FD"
@@ -453,7 +463,7 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
   - stageId: 1-11
     chapter: 1
     round: 11
@@ -461,6 +471,7 @@ MonoBehaviour:
     stageType: 3
     preReward: 0
     trainerName: "\uADF8\uB9B0"
+    trainerId: CHAMP_GREEN
     enemies:
     - pokemonNameEn: Aerodactyl
       pokemonNameKr: "\uD504\uD14C\uB77C"
@@ -534,4 +545,4 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: 2
+    rewardTableId: RW002
