@@ -18,8 +18,8 @@ public class StoneDebugTest : MonoBehaviour
         if (gm == null || gm.Board == null) return;
 
         var bench = gm.Board.GetBenchSnapshot();
-        float y = 470f;
-        GUI.Label(new Rect(600, y, 360, 22), "진화의 돌(장착/해제):");
+        float baseX = 10f, y = 360f;   // 좌측(통신교환 버튼 아래)
+        GUI.Label(new Rect(baseX, y, 360, 22), "진화의 돌(장착/해제):");
         y += 24f;
 
         for (int i = 0; i < bench.Count; i++)
@@ -27,25 +27,25 @@ public class StoneDebugTest : MonoBehaviour
             var u = bench[i];
             if (u == null || u.data == null) continue;
 
-            GUI.Label(new Rect(600, y, 360, 22),
+            GUI.Label(new Rect(baseX, y, 360, 22),
                 $"슬롯{i}: {u.data.pokemonName}{(u.IsStoneEvolved ? " (돌진화중)" : "")}");
             y += 22f;
 
             if (u.IsStoneEvolved)
             {
-                if (GUI.Button(new Rect(620, y, 200, 24), "돌 해제(원복)"))
+                if (GUI.Button(new Rect(baseX + 10, y, 200, 24), "돌 해제(원복)"))
                     u.RemoveStone();
                 y += 26f;
             }
             else
             {
-                float x = 620f;
+                float x = baseX + 10;
                 foreach (var stone in _stones)
                 {
                     if (stone == null) continue;
-                    if (GUI.Button(new Rect(x, y, 110, 24), stone.stoneName))
+                    if (GUI.Button(new Rect(x, y, 90, 24), stone.stoneName))
                         u.TryEquipStone(stone); // 대상 아니면 내부에서 실패 로그
-                    x += 114f;
+                    x += 94f;
                 }
                 y += 26f;
             }

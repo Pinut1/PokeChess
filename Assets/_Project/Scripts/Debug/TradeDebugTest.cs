@@ -13,16 +13,16 @@ public class TradeDebugTest : MonoBehaviour
         if (gm == null || gm.Board == null || gm.Network == null) return;
 
         var bench = gm.Board.GetBenchSnapshot();
-        float y = 300f;
-        GUI.Label(new Rect(600, y, 360, 22), "통신교환(클릭 = 파트너에게 전송):");
+        float x = 10f, y = 175f;   // 좌측(HUD 상태패널 아래)
+        GUI.Label(new Rect(x, y, 300, 22), "통신교환(클릭 = 파트너 전송):");
         y += 24f;
         for (int i = 0; i < bench.Count; i++)
         {
             var u = bench[i];
             if (u == null || u.data == null) continue;
-            if (GUI.Button(new Rect(600, y, 340, 26), $"전송: 슬롯{i} {u.data.pokemonName} ★{u.starLevel}"))
+            if (GUI.Button(new Rect(x, y, 280, 24), $"전송: 슬롯{i} {u.data.pokemonName} ★{u.starLevel}"))
                 gm.Network.SendTradeUnit(u);
-            y += 28f;
+            y += 26f;
         }
     }
 }

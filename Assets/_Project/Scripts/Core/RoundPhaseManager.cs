@@ -254,29 +254,5 @@ public class RoundPhaseManager : MonoBehaviour
         GameManager.Instance.Network.BroadcastPlayerReady();
     }
 
-    // ─────────────────────────────────────────
-    // 임시 디버그 UI
-    // ─────────────────────────────────────────
-
-    private void OnGUI()
-    {
-        var style = new GUIStyle(GUI.skin.button) { fontSize = 36 };
-
-        if (CurrentPhase == GamePhase.Shopping)
-        {
-            var readyRect = new Rect(Screen.width / 2f - 150f, Screen.height - 150f, 300f, 100f);
-            if (GUI.Button(readyRect, "Ready", style))
-                PlayerReady();
-        }
-        else if (CurrentPhase == GamePhase.Victory)
-        {
-            var labelStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 64,
-                alignment = TextAnchor.MiddleCenter
-            };
-            var rect = new Rect(0f, Screen.height / 2f - 60f, Screen.width, 120f);
-            GUI.Label(rect, "STAGE CLEAR!", labelStyle);
-        }
-    }
+    // Ready 버튼 / Victory 표시는 PrototypeHud(통합 HUD)로 이관됨.
 }
