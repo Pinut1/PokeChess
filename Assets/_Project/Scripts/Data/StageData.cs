@@ -65,11 +65,14 @@ public class StageData
     public PreStageReward preReward = PreStageReward.None; // 전투 전 증강/아이템 이벤트
 
     [Header("트레이너 (Wild면 비움)")]
-    public string trainerName;      // "웅이", "그린" 등
+    public string trainerName;      // "웅이", "그린" 등 — 표시용 한글명
+    public string trainerId;        // "GYM_TSUKUSHI", "WILD_COMMON" 등 — Trainer Entry 시트 참조 키
 
-    [Header("적 구성")]
+    // 적 구성은 trainerId로 Trainer Entry(trainer_entry_data.json)를 참조해 결정한다.
+    // 임포터가 import 시점에 join(비정규화)하여 아래 enemies에 베이킹한다 → 런타임은 enemies만 읽음.
+    [Header("적 구성 (임포터가 trainerId로 join해 채움)")]
     public List<EnemyPlacement> enemies = new();
 
     [Header("보상")]
-    public int rewardTableId;       // RewardData.rewardTableId 참조 (역기획서 수치 확정 필요)
+    public string rewardTableId;    // RewardData.rewardTableId 참조 ("RW001" 등, 역기획서 수치 확정 필요)
 }

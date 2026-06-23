@@ -1,27 +1,21 @@
 {
-  "_readme": "스테이지 진행표(GDD Stage Table). trainerId=Trainer Entry(trainer_entry_data.json) 참조 키 — 적 구성의 단일 출처는 그쪽. 아래 enemies는 [전환기] 인라인 폴백으로, 태욱 join 임포터가 들어오면 제거 예정(그 전까지 현행 임포터가 그대로 동작하도록 유지). preReward: None/AugmentChoice/ItemReward/CompanionItem (GDD 증강 라운드=1-5/1-10/2-4). statMultiplier/hpMultiplier/atkMultiplier=강화 배수(0이면 임포터가 1.0).",
-  "stages": [
+  "_readme": "Trainer Entry 시트(정규화). trainerId -> 적 유닛 구성. GDD Stage Table이 stage별 trainerId로 이걸 참조한다. 임포터(Import Stage JSON, 태욱 join 구현 예정)가 stage_data.json의 trainerId로 이 파일을 조회해 StageData.enemies에 baking한다. 적 구성의 단일 출처 = 이 파일(여러 스테이지가 같은 trainer 재사용 가능). EnemyPlacement 필드는 기존 stage enemies와 동일(pokemonNameEn/starLevel/q/r/heldItemEn/statMultiplier/hpMultiplier/atkMultiplier). DUMMY=기획 미정 슬롯. starLevel/q/r/배수는 임시값 — 기획 확정 대상.",
+  "trainers": [
     {
-      "stageId": "1-1", "chapter": 1, "round": 1, "order": 1,
-      "stageType": "WildCommon", "preReward": "None", "trainerName": "", "trainerId": "WILD_COMMON",
-      "rewardTableId": "RW001",
+      "trainerId": "WILD_COMMON", "trainerName": "",
       "enemies": [
         { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 1, "r": 0 }
       ]
     },
     {
-      "stageId": "1-2", "chapter": 1, "round": 2, "order": 2,
-      "stageType": "WildRare", "preReward": "None", "trainerName": "", "trainerId": "WILD_RARE",
-      "rewardTableId": "RW001",
+      "trainerId": "WILD_RARE", "trainerName": "",
       "enemies": [
         { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 1, "r": 0 },
         { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 2, "r": 0 }
       ]
     },
     {
-      "stageId": "1-3", "chapter": 1, "round": 3, "order": 3,
-      "stageType": "GymBattle", "preReward": "None", "trainerName": "호일", "trainerId": "GYM_TSUKUSHI",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_TSUKUSHI", "trainerName": "호일",
       "enemies": [
         { "pokemonNameEn": "Caterpie", "pokemonNameKr": "캐터피", "starLevel": 1, "q": 0, "r": 0 },
         { "pokemonNameEn": "Metapod",  "pokemonNameKr": "단데기", "starLevel": 2, "q": 1, "r": 0 },
@@ -30,9 +24,7 @@
       ]
     },
     {
-      "stageId": "1-4", "chapter": 1, "round": 4, "order": 4,
-      "stageType": "GymBattle", "preReward": "None", "trainerName": "민화", "trainerId": "GYM_ERIKA",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_ERIKA", "trainerName": "민화",
       "enemies": [
         { "pokemonNameEn": "Weepinbell", "pokemonNameKr": "모다피",   "starLevel": 1, "q": 1, "r": 0 },
         { "pokemonNameEn": "Victreebel", "pokemonNameKr": "우츠보트", "starLevel": 2, "q": 2, "r": 0 },
@@ -41,9 +33,7 @@
       ]
     },
     {
-      "stageId": "1-5", "chapter": 1, "round": 5, "order": 5,
-      "stageType": "GymBattle", "preReward": "AugmentChoice", "trainerName": "웅이", "trainerId": "GYM_HAYATO",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_HAYATO", "trainerName": "웅이",
       "enemies": [
         { "pokemonNameEn": "Geodude", "pokemonNameKr": "꼬마돌", "starLevel": 1, "q": 1, "r": 0 },
         { "pokemonNameEn": "Onix",    "pokemonNameKr": "롱스톤", "starLevel": 2, "q": 2, "r": 0 },
@@ -52,9 +42,7 @@
       ]
     },
     {
-      "stageId": "1-6", "chapter": 1, "round": 6, "order": 6,
-      "stageType": "GymBattle", "preReward": "None", "trainerName": "꼭두", "trainerId": "GYM_MATIS",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_MATIS", "trainerName": "꼭두",
       "enemies": [
         { "pokemonNameEn": "Miltank", "pokemonNameKr": "밀탱크", "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 2.0, "hpMultiplier": 1.5 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
@@ -63,9 +51,7 @@
       ]
     },
     {
-      "stageId": "1-7", "chapter": 1, "round": 7, "order": 7,
-      "stageType": "GymBattle", "preReward": "CompanionItem", "trainerName": "이슬이", "trainerId": "GYM_NATSUME",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_NATSUME", "trainerName": "이슬이",
       "enemies": [
         { "pokemonNameEn": "Psyduck", "pokemonNameKr": "고라파덕", "starLevel": 1, "q": 1, "r": 0 },
         { "pokemonNameEn": "Golduck", "pokemonNameKr": "골덕",     "starLevel": 2, "q": 2, "r": 0 },
@@ -74,9 +60,7 @@
       ]
     },
     {
-      "stageId": "1-8", "chapter": 1, "round": 8, "order": 8,
-      "stageType": "GymBattle", "preReward": "None", "trainerName": "유빈", "trainerId": "GYM_KYOU",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_KYOU", "trainerName": "유빈",
       "enemies": [
         { "pokemonNameEn": "Gastly",  "pokemonNameKr": "고오스", "starLevel": 1, "q": 1, "r": 0 },
         { "pokemonNameEn": "Haunter", "pokemonNameKr": "팬텀",   "starLevel": 2, "q": 2, "r": 0 },
@@ -85,9 +69,7 @@
       ]
     },
     {
-      "stageId": "1-9", "chapter": 1, "round": 9, "order": 9,
-      "stageType": "GymBattle", "preReward": "None", "trainerName": "비주기", "trainerId": "GYM_BIJUGI",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_BIJUGI", "trainerName": "비주기",
       "enemies": [
         { "pokemonNameEn": "Meowth",   "pokemonNameKr": "나옹",     "starLevel": 1, "q": 0, "r": 0 },
         { "pokemonNameEn": "Persian",  "pokemonNameKr": "페르시온", "starLevel": 2, "q": 1, "r": 0 },
@@ -98,9 +80,7 @@
       ]
     },
     {
-      "stageId": "1-10", "chapter": 1, "round": 10, "order": 10,
-      "stageType": "GymBattle", "preReward": "AugmentChoice", "trainerName": "이향", "trainerId": "GYM_IHYANG",
-      "rewardTableId": "RW002",
+      "trainerId": "GYM_IHYANG", "trainerName": "이향",
       "enemies": [
         { "pokemonNameEn": "Dratini",   "pokemonNameKr": "미뇽",   "starLevel": 1, "q": 0, "r": 0 },
         { "pokemonNameEn": "Dragonair", "pokemonNameKr": "신뇽",   "starLevel": 2, "q": 1, "r": 0 },
@@ -111,12 +91,10 @@
       ]
     },
     {
-      "stageId": "1-11", "chapter": 1, "round": 11, "order": 11,
-      "stageType": "ChampionBattle", "preReward": "None", "trainerName": "그린", "trainerId": "CHAMP_GREEN",
-      "rewardTableId": "RW002",
+      "trainerId": "CHAMP_GREEN", "trainerName": "그린",
       "enemies": [
-        { "pokemonNameEn": "Aerodactyl", "pokemonNameKr": "프테라",   "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 1.8 },
-        { "pokemonNameEn": "Dragonite",  "pokemonNameKr": "망나뇽",   "starLevel": 3, "q": 2, "r": 0, "statMultiplier": 2.5 },
+        { "pokemonNameEn": "Aerodactyl", "pokemonNameKr": "프테라", "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 1.8 },
+        { "pokemonNameEn": "Dragonite",  "pokemonNameKr": "망나뇽", "starLevel": 3, "q": 2, "r": 0, "statMultiplier": 2.5 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 0 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 0 },
         { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },

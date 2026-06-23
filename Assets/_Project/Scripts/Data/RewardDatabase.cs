@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -28,12 +29,13 @@ public class RewardDatabase : ScriptableObject
         }
     }
 
-    /// <summary>rewardTableId로 보상 테이블 조회. 없으면 null.</summary>
-    public RewardData GetByTableId(int rewardTableId)
+    /// <summary>rewardTableId("RW001" 등)로 보상 테이블 조회. 대소문자 무시. 없으면 null.</summary>
+    public RewardData GetByTableId(string rewardTableId)
     {
-        if (tables == null) return null;
+        if (tables == null || string.IsNullOrEmpty(rewardTableId)) return null;
         foreach (var t in tables)
-            if (t != null && t.rewardTableId == rewardTableId) return t;
+            if (t != null && string.Equals(t.rewardTableId, rewardTableId, StringComparison.OrdinalIgnoreCase))
+                return t;
         return null;
     }
 }

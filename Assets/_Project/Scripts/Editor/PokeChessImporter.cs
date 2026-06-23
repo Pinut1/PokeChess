@@ -105,8 +105,9 @@ public static class PokeChessImporter
         public string stageType;
         public string preReward;
         public string trainerName;
+        public string trainerId;        // Trainer Entry 참조 키 (join 임포터에서 사용)
 
-        public int rewardTableId;
+        public string rewardTableId;    // "RW001" 등 문자열 키
         public List<EnemyPlacementJson> enemies;
     }
     
@@ -129,7 +130,7 @@ public static class PokeChessImporter
     [Serializable]
     private class RewardTableJson
     {
-        public int rewardTableId;
+        public string rewardTableId;    // "RW001" 등 문자열 키
         public string label;
         public List<RewardEntryJson> rewards;
     }
@@ -442,7 +443,8 @@ public static class PokeChessImporter
                 stageType     = ParseStageType(e.stageType),
                 preReward     = ParsePreStageReward(e.preReward),
                 trainerName   = e.trainerName ?? "",
-                rewardTableId = e.rewardTableId,
+                trainerId     = e.trainerId ?? "",
+                rewardTableId = e.rewardTableId ?? "",
                 enemies       = new List<EnemyPlacement>()
             };
 

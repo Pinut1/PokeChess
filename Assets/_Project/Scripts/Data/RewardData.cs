@@ -40,7 +40,7 @@ public class RewardEntry
 public class RewardData
 {
     [Header("식별")]
-    public int    rewardTableId;       // StageData.rewardTableId가 참조하는 키
+    public string rewardTableId;       // StageData.rewardTableId가 참조하는 키 (GDD 표기 "RW001")
     public string label;               // 가독용 (예: "1-3 클리어 보상")
 
     [Header("보상 목록")]
