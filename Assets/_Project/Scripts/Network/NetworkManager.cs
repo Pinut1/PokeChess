@@ -81,6 +81,23 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
     }
 
+    public override void OnEnable()
+    {
+        base.OnEnable();
+        GameEvents.OnGoldChanged += HandleGoldChanged;
+    }
+
+    public override void OnDisable()
+    {
+        GameEvents.OnGoldChanged -= HandleGoldChanged;
+        base.OnDisable();
+    }
+
+    private void HandleGoldChanged(int gold)
+    {
+        SyncLocalGold(gold);
+    }
+
     private void Start()
     {
         if (_soloMode)
