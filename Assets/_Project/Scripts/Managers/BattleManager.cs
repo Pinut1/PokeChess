@@ -384,12 +384,12 @@ public class BattleManager : MonoBehaviour
     /// <summary>크리 기대값 배수(난수 없는 결정론 — 2인 동기화 안전). 크리 없으면 1.</summary>
     private static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
 
-    /// <summary>평타 1회: attack 기반 피해(방어로 경감) + 시전자 마나 획득.</summary>
+    /// <summary>평타 1회: attack 기반 물리 피해(파이프라인) + 시전자 마나 획득.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
-        float dmg = attacker.attack * Mitigation(target.defense) * CritFactor(attacker);
-        DealDamage(target, dmg);
+        ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
         GainMana(attacker, MANA_PER_ATTACK);
+        // [기둥B] attacker 효과 OnBasicAttack(target) — 구인수(평타 시 힐) 등
     }
 
     /// <summary>
@@ -410,16 +410,19 @@ public class BattleManager : MonoBehaviour
             return;
         }
 
+        // ATTACK=attack(물리), SPELL=spellPower(마법). 경감은 어차피 defense 하나지만 타입은 효과 조건용.
         float power = caster.skillEffectType == SkillEffectType.Attack ? caster.attack : caster.spellPower;
+        DamageType type = caster.skillEffectType == SkillEffectType.Attack ? DamageType.Physical : DamageType.Magic;
 
         var targets = GetSkillTargets(caster, primaryTarget);
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
-            DealDamage(t, power * Mitigation(t.defense) * CritFactor(caster));
+            ResolveDamage(new DamageContext(caster, t, power, type, isBasicAttack: false));
         }
 
         Debug.Log($"[Battle] {caster.team} 스킬 시전({caster.skillEffectType}) → 대상 {targets.Count}기 (위력 {power:0})");
+        // [기둥B] caster 효과 OnSkillCast()
     }
 
     /// <summary>targetType별 피격 대상 목록(데미지 스킬용 = 적 대상). 항상 살아있는 적만 반환.</summary>
@@ -460,11 +463,31 @@ public class BattleManager : MonoBehaviour
         return result;
     }
 
-    /// <summary>피해 적용 + 피격자 마나 획득(피해 비례, 피격당 상한).</summary>
-    private void DealDamage(BattleUnit target, float amount)
+    /// <summary>
+    /// 데미지 파이프라인(단일 진입점). 모든 평타·스킬 피해가 여기를 통과한다.
+    /// 순서: 공격자 효과(OnDealDamage) → 크리 → 경감(True 제외) → 피격자 효과(OnTakeDamage) → 적용+마나 → OnKill.
+    /// 효과 훅(기둥B)이 ctx.amount/type/플래그를 수정해 "X일때 Y"를 구현한다.
+    /// </summary>
+    private void ResolveDamage(DamageContext ctx)
     {
-        target.currentHp -= amount;
-        GainMana(target, Mathf.Min(amount * MANA_PER_DAMAGE_TAKEN, MANA_GAIN_CAP_PER_HIT));
+        if (ctx.target == null || !ctx.target.IsAlive) return;
+
+        // [기둥B] 공격자 효과 OnDealDamage(ctx) — 거인학살자(+target.maxHp%)·관통 등이 ctx 가공
+
+        // 크리 (현재 결정론적 기대값 — 각자 보드 로컬 시뮬이라 추후 RNG 크리로 교체 가능)
+        ctx.amount *= CritFactor(ctx.source);
+
+        // 경감 (True 타입은 경감 무시 고정딜)
+        if (ctx.type != DamageType.True)
+            ctx.amount *= Mitigation(ctx.target.defense);
+
+        // [기둥B] 피격자 효과 OnTakeDamage(ctx) — 보호막 흡수·추가 경감
+
+        // 적용 + 피격자 마나 획득(피해 비례, 피격당 상한)
+        ctx.target.currentHp -= ctx.amount;
+        GainMana(ctx.target, Mathf.Min(ctx.amount * MANA_PER_DAMAGE_TAKEN, MANA_GAIN_CAP_PER_HIT));
+
+        // [기둥B] ctx.target 사망 시 ctx.source 효과 OnKill(victim)
     }
 
     /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한).</summary>
