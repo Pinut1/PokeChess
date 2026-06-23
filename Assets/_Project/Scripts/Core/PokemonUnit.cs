@@ -62,14 +62,14 @@ public class PokemonUnit : MonoBehaviour
     // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
     // ──────────────────────────────────────────
 
-    public float MaxHp           => data != null ? data.hp * StarMultiplier : 0f;
-    public float Attack          => data != null ? data.attack * StarMultiplier : 0f;
-    public float SpecialAttack   => data != null ? data.specialAttack * StarMultiplier : 0f;
-    public float Defense         => data != null ? data.defense : 0f;
-    public float SpecialDefense  => data != null ? data.specialDefense : 0f;
-    public float AttackSpeed     => data != null ? data.attackSpeed : 0f;
-    public int   Range           => data != null ? data.range : 0;
-    public AttackType AttackType => data != null ? data.attackType : AttackType.Physical;
+    public float MaxHp        => data != null ? data.hp * StarMultiplier : 0f;
+    public float Attack       => data != null ? data.attack * StarMultiplier : 0f;
+    public float SpellPower   => data != null ? data.spellPower * StarMultiplier : 0f;
+    public float Defense      => data != null ? data.defense : 0f;
+    public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
+    public int   Range        => data != null ? data.range : 0;
+    public int   ManaCost     => data != null ? data.manaCost : 0;
+    public string Role        => data != null ? data.role : "";
 
     private void Start()
     {

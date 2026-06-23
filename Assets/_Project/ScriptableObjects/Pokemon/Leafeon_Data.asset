@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Leafeon_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 470
+  pokemonName: "\uB9AC\uD53C\uC544"
+  pokemonNameEn: Leafeon
+  cost: 3
+  hp: 750
+  attack: 65
+  defense: 35
+  attackSpeed: 0.6
+  range: 1
+  spellPower: 60
+  manaCost: 70
+  synergies:
+  - Mutant
+  role: Archer
+  skillId: MUTANT_ARCHER
+  skill:
+    skillId: MUTANT_ARCHER
+    skillName: "\uC2A4\uC704\uCE58\uC544\uC6C3"
+    description: "\uB2E8\uC77C \uC801 \uB3CC\uC5F0\uBCC0\uC774 \uB370\uBBF8\uC9C0"
+    effectType: 0
+    targetType: 3
+    areaRadius: 0
+    lineLength: 4
+    vfxId: VFX_Mutant_Archer
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

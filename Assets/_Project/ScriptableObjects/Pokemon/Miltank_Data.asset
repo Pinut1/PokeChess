@@ -15,24 +15,27 @@ MonoBehaviour:
   id: 241
   pokemonName: "\uBC00\uD0F1\uD06C"
   pokemonNameEn: Miltank
-  cost: 4
-  hp: 950
-  attack: 70
-  defense: 70
-  specialAttack: 30
-  specialDefense: 65
-  attackSpeed: 0.55
+  cost: 3
+  hp: 1000
+  attack: 50
+  defense: 55
+  attackSpeed: 0.6
   range: 1
-  attackType: 0
-  synergies: []
+  spellPower: 180
+  manaCost: 65
+  synergies:
+  - Normal
+  role: Tanker
+  skillId: NORMAL_TANKER
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 140
-    manaCost: 100
+    skillId: NORMAL_TANKER
+    skillName: "\uB2E8\uB2E8\uD574\uC9C0\uAE30"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    effectType: 3
     targetType: 0
     areaRadius: 0
-    lineLength: 0
+    lineLength: 1
+    vfxId: VFX_Normal_Tanker
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

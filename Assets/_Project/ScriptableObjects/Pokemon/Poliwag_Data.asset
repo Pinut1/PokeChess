@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Poliwag_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 60
+  pokemonName: "\uBC1C\uCC59\uC774"
+  pokemonNameEn: Poliwag
+  cost: 2
+  hp: 750
+  attack: 50
+  defense: 50
+  attackSpeed: 0.45
+  range: 1
+  spellPower: 60
+  manaCost: 85
+  synergies:
+  - Water
+  role: Warrior
+  skillId: WATER_WARRIOR
+  skill:
+    skillId: WATER_WARRIOR
+    skillName: "\uC544\uCFE0\uC544\uD14C\uC77C"
+    description: "\uADFC\uC811 \uBB3C \uC18D\uC131 \uB370\uBBF8\uC9C0"
+    effectType: 0
+    targetType: 3
+    areaRadius: 0
+    lineLength: 1
+    vfxId: VFX_Water_Warrior
+  evolvesIntoEn: Poliwhirl
+  shopBuyable: 1
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

@@ -15,25 +15,28 @@ MonoBehaviour:
   id: 53
   pokemonName: "\uD398\uB974\uC2DC\uC628"
   pokemonNameEn: Persian
-  cost: 3
-  hp: 700
-  attack: 75
-  defense: 45
-  specialAttack: 40
-  specialDefense: 45
-  attackSpeed: 0.75
+  cost: 5
+  hp: 1200
+  attack: 80
+  defense: 55
+  attackSpeed: 0.7
   range: 1
-  attackType: 0
-  synergies: []
+  spellPower: 400
+  manaCost: 60
+  synergies:
+  - Normal
+  role: Assassin
+  skillId: NORMAL_ASSASSIN
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 150
-    manaCost: 100
-    targetType: 0
+    skillId: NORMAL_ASSASSIN
+    skillName: "\uCE7C\uB85C\uC798\uB77C"
+    description: "\uB2E8\uC77C \uC801 \uACE0\uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 3
     areaRadius: 0
-    lineLength: 0
+    lineLength: 1
+    vfxId: VFX_Normal_Assassin
   evolvesIntoEn: 
-  shopBuyable: 1
+  shopBuyable: 0
   modelPrefab: {fileID: 0}
   icon: {fileID: 0}

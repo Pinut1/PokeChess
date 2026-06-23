@@ -16,23 +16,26 @@ MonoBehaviour:
   pokemonName: "\uACE0\uC624\uC2A4"
   pokemonNameEn: Gastly
   cost: 2
-  hp: 520
-  attack: 40
-  defense: 30
-  specialAttack: 75
-  specialDefense: 40
-  attackSpeed: 0.6
-  range: 3
-  attackType: 1
-  synergies: []
+  hp: 550
+  attack: 20
+  defense: 20
+  attackSpeed: 0.5
+  range: 1
+  spellPower: 130
+  manaCost: 55
+  synergies:
+  - Poison
+  role: Magician
+  skillId: POISON_MAGICIAN
   skill:
-    skillName: "\uAE30\uBCF8\uAE30"
-    description: 
-    damage: 140
-    manaCost: 100
-    targetType: 0
-    areaRadius: 0
-    lineLength: 0
+    skillId: POISON_MAGICIAN
+    skillName: "\uB3C5\uAC00\uC2A4"
+    description: "\uAD11\uC5ED \uB3C5 \uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 4
+    areaRadius: 1
+    lineLength: 4
+    vfxId: VFX_Poison_Magician
   evolvesIntoEn: Haunter
   shopBuyable: 1
   modelPrefab: {fileID: 0}
