@@ -39,6 +39,13 @@ public class RoundPhaseManager : MonoBehaviour
 
     private Coroutine _phaseTimer;
 
+    /// <summary>이번 라운드 팀 결과(OnTeamRoundResolved)가 도착했는지. 라운드 시작 시 리셋.</summary>
+    private bool _teamRoundResolved;
+
+    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다(전투 최대 길이 MAX_TICKS*TICK_INTERVAL=30s와 동일).
+    /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).</summary>
+    private const float TEAM_RESULT_SAFETY_TIMEOUT = 30f;
+
     // ─────────────────────────────────────────
     // 이벤트 구독
     // ─────────────────────────────────────────
@@ -53,6 +60,7 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnGracePeriodExpired   += HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
         GameEvents.OnGameCleared          += HandleGameCleared;
+        GameEvents.OnTeamRoundResolved    += HandleTeamRoundResolved;
     }
 
     private void OnDisable()
@@ -65,7 +73,10 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnGracePeriodExpired   -= HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
         GameEvents.OnGameCleared          -= HandleGameCleared;
+        GameEvents.OnTeamRoundResolved    -= HandleTeamRoundResolved;
     }
+
+    private void HandleTeamRoundResolved(TeamRoundOutcome outcome) => _teamRoundResolved = true;
 
     // ─────────────────────────────────────────
     // 이벤트 핸들러
@@ -74,6 +85,7 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleRoundChanged(int round)
     {
         CurrentRound = round;
+        _teamRoundResolved = false;
         ResolveCurrentStage(round);
         EnterPhase(GamePhase.Shopping);
     }
@@ -115,7 +127,7 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleGameCleared()
     {
         if (CurrentPhase == GamePhase.GameOver) return;
-        Debug.Log("[Phase] 챕터 완주 — Victory");
+        Debug.Log($"[Phase] 챕터 완주 — Victory (도달 라운드 {CurrentRound})");
         EnterPhase(GamePhase.Victory);
     }
 
@@ -176,7 +188,8 @@ public class RoundPhaseManager : MonoBehaviour
         }
 
         EnterPhase(GamePhase.GameOver);
-        Debug.LogWarning("[Phase] 세션 종료 — 패배 처리 (전적 기록 미구현, 로그만 출력)");
+        string stageId = CurrentStage != null ? CurrentStage.stageId : "(없음)";
+        Debug.LogWarning($"[Phase] 세션 종료 — 패배 처리 (도달 라운드 {CurrentRound}, 스테이지 {stageId}) — 전적 기록 시스템 미구현, 로그만 출력");
     }
 
     // ─────────────────────────────────────────
@@ -229,6 +242,18 @@ public class RoundPhaseManager : MonoBehaviour
 
         var network = GameManager.Instance.Network;
         if (!network.IsMasterClient) yield break;
+
+        // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
+        // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다.
+        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 둔다.
+        float waited = 0f;
+        while (!_teamRoundResolved && waited < TEAM_RESULT_SAFETY_TIMEOUT)
+        {
+            yield return null;
+            waited += Time.deltaTime;
+        }
+        if (!_teamRoundResolved)
+            Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
 
         // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.
         // (StageDatabase.GetForRound는 stages가 비지 않으면 항상 클램프해 null을 안 주므로

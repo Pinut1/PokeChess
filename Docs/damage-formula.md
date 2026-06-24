@@ -21,7 +21,7 @@ DamageContext { source, target, amount, type, isBasicAttack }
    │
    ⑥ 사망 시     공격자 효과 OnKill(victim)   ← [기둥B]
 ```
-①④⑥은 현재 seam(주석)이며 기둥B(효과 훅) 도입 시 채워진다.
+①④⑥은 기둥B(`ICombatEffect`/`BattleUnit.effects`, 2026-06-24 구현완료)로 채워짐 — 아이템(`ItemStatEffect`/`ItemConditionalEffect`)이 OnDealDamage/OnTakeDamage/OnKill에서 ctx를 가공한다.
 
 ## 기본 위력 (단계 시작값)
 | 출처 | 위력 | 타입 |
@@ -70,6 +70,6 @@ CritFactor(a) = 1 + a.critChance * (a.critMultiplier - 1)
 ```
 
 ## 미확정 / 추후
-- RNG 크리 전환 여부(결정론 유지 vs 보이는 크리 연출).
-- 관통/방어 감소(① 단계 확장).
-- 효과 훅(①④⑥) = 기둥B(ICombatEffect) 구현 시 연결. 설계: `docs/combat-depth-design.md`.
+- RNG 크리 전환 여부(결정론 유지 vs 보이는 크리 연출) — 기획 결정 대기, 코드는 양쪽 다 작은 변경.
+- 관통/방어 감소(① 단계 확장) — `ItemData`에 관통 필드가 없어 데이터 정의 전엔 구현 표면이 없음.
+- 기둥C(role 타겟팅/Stun·Slow·Taunt, 2026-06-24 구현완료)도 같은 파이프라인을 공유 — 지속시간 등은 전부 placeholder, 설계: `docs/combat-depth-design.md`.
