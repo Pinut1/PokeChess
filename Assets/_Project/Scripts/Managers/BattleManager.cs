@@ -61,6 +61,73 @@ public class BattleUnit
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
 
     public bool IsAlive => currentHp > 0f;
+
+    // ─────────────────────────────────────────
+    // CC/지원 상태 변이 — 상태(필드)와 그 상태를 바꾸는 행동을 한 곳에 모음.
+    // BattleManager(타겟 선정)가 대상을 고른 뒤 이 메서드들로 위임한다.
+    // ─────────────────────────────────────────
+
+    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
+    public void TickCcState(float deltaTime)
+    {
+        if (stunRemaining > 0f)
+            stunRemaining = Mathf.Max(0f, stunRemaining - deltaTime);
+
+        if (slowRemaining > 0f)
+        {
+            slowRemaining = Mathf.Max(0f, slowRemaining - deltaTime);
+            if (slowRemaining <= 0f) slowMultiplier = 1f;
+        }
+
+        if (asBuffRemaining > 0f)
+        {
+            asBuffRemaining = Mathf.Max(0f, asBuffRemaining - deltaTime);
+            if (asBuffRemaining <= 0f) asBuffMultiplier = 1f;
+        }
+
+        if (tauntedBy != null && !tauntedBy.IsAlive)
+            tauntedBy = null;
+    }
+
+    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
+    private bool TryConsumeCcImmunity()
+    {
+        if (!HasCcImmuneItem || ccImmuneConsumed) return false;
+        ccImmuneConsumed = true;
+        return true;
+    }
+
+    public void ApplyStun(float duration)
+    {
+        if (TryConsumeCcImmunity()) return;
+        stunRemaining = Mathf.Max(stunRemaining, duration);
+    }
+
+    public void ApplySlow(float multiplier, float duration)
+    {
+        if (TryConsumeCcImmunity()) return;
+        slowMultiplier = Mathf.Min(slowMultiplier, multiplier);
+        slowRemaining = Mathf.Max(slowRemaining, duration);
+    }
+
+    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
+    public void ApplyTaunt(BattleUnit caster)
+    {
+        if (TryConsumeCcImmunity()) return;
+        tauntedBy = caster;
+    }
+
+    public void ApplyHeal(float amount)
+        => currentHp = Mathf.Min(maxHp, currentHp + Mathf.Max(0f, amount));
+
+    public void ApplyShield(float amount)
+        => shield += Mathf.Max(0f, amount);
+
+    public void ApplyAsBuff(float multiplier, float duration)
+    {
+        asBuffMultiplier = Mathf.Max(asBuffMultiplier, multiplier);
+        asBuffRemaining  = Mathf.Max(asBuffRemaining, duration);
+    }
 }
 
 /// <summary>
@@ -404,7 +471,7 @@ public class BattleManager : MonoBehaviour
         {
             if (!bu.IsAlive) continue;
 
-            TickCcState(bu);
+            bu.TickCcState(TICK_INTERVAL);
             if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
 
             BattleUnit target = (bu.tauntedBy != null && bu.tauntedBy.IsAlive) ? bu.tauntedBy : FindNearestEnemy(bu);
@@ -457,28 +524,6 @@ public class BattleManager : MonoBehaviour
             bu.burnTicksRemaining -= 1f;
             if (bu.burnTicksRemaining <= 0f) bu.burnDamagePerTick = 0f;
         }
-    }
-
-    /// <summary>스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
-    private void TickCcState(BattleUnit bu)
-    {
-        if (bu.stunRemaining > 0f)
-            bu.stunRemaining = Mathf.Max(0f, bu.stunRemaining - TICK_INTERVAL);
-
-        if (bu.slowRemaining > 0f)
-        {
-            bu.slowRemaining = Mathf.Max(0f, bu.slowRemaining - TICK_INTERVAL);
-            if (bu.slowRemaining <= 0f) bu.slowMultiplier = 1f;
-        }
-
-        if (bu.asBuffRemaining > 0f)
-        {
-            bu.asBuffRemaining = Mathf.Max(0f, bu.asBuffRemaining - TICK_INTERVAL);
-            if (bu.asBuffRemaining <= 0f) bu.asBuffMultiplier = 1f;
-        }
-
-        if (bu.tauntedBy != null && !bu.tauntedBy.IsAlive)
-            bu.tauntedBy = null;
     }
 
     /// <summary>self를 사거리 내에 둔 적 팀 유닛 수(defSpDefPerAttacker용 근사 — 타겟 캐싱이 없어 "공격 중"의 정확한 정의는 없음).</summary>
@@ -585,25 +630,25 @@ public class BattleManager : MonoBehaviour
             switch (caster.skillEffectType)
             {
                 case SkillEffectType.Stun:
-                    ApplyStun(t, STUN_DURATION);
+                    t.ApplyStun(STUN_DURATION);
                     break;
                 case SkillEffectType.Slow:
-                    ApplySlow(t, SLOW_MULTIPLIER, SLOW_DURATION);
+                    t.ApplySlow(SLOW_MULTIPLIER, SLOW_DURATION);
                     break;
                 case SkillEffectType.Taunt:
-                    ApplyTaunt(caster, t);
+                    t.ApplyTaunt(caster);
                     break;
                 case SkillEffectType.HpRegen:
-                    ApplyHeal(t, caster.spellPower);
+                    t.ApplyHeal(caster.spellPower);
                     break;
                 case SkillEffectType.Shield:
-                    ApplyShield(t, caster.spellPower);
+                    t.ApplyShield(caster.spellPower);
                     break;
                 case SkillEffectType.ManaRegen:
                     GainMana(t, MANA_REGEN_SKILL_AMOUNT);
                     break;
                 case SkillEffectType.AsBuff:
-                    ApplyAsBuff(t, AS_BUFF_MULTIPLIER, AS_BUFF_DURATION);
+                    t.ApplyAsBuff(AS_BUFF_MULTIPLIER, AS_BUFF_DURATION);
                     break;
             }
         }
@@ -664,46 +709,6 @@ public class BattleManager : MonoBehaviour
             if (ratio < weakestRatio) { weakestRatio = ratio; weakest = u; }
         }
         return weakest;
-    }
-
-    private static void ApplyHeal(BattleUnit target, float amount)
-        => target.currentHp = Mathf.Min(target.maxHp, target.currentHp + Mathf.Max(0f, amount));
-
-    private static void ApplyShield(BattleUnit target, float amount)
-        => target.shield += Mathf.Max(0f, amount);
-
-    private static void ApplyAsBuff(BattleUnit target, float multiplier, float duration)
-    {
-        target.asBuffMultiplier = Mathf.Max(target.asBuffMultiplier, multiplier);
-        target.asBuffRemaining  = Mathf.Max(target.asBuffRemaining, duration);
-    }
-
-    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
-    private static bool TryConsumeCcImmunity(BattleUnit target)
-    {
-        if (!target.HasCcImmuneItem || target.ccImmuneConsumed) return false;
-        target.ccImmuneConsumed = true;
-        return true;
-    }
-
-    private static void ApplyStun(BattleUnit target, float duration)
-    {
-        if (TryConsumeCcImmunity(target)) return;
-        target.stunRemaining = Mathf.Max(target.stunRemaining, duration);
-    }
-
-    private static void ApplySlow(BattleUnit target, float multiplier, float duration)
-    {
-        if (TryConsumeCcImmunity(target)) return;
-        target.slowMultiplier = Mathf.Min(target.slowMultiplier, multiplier);
-        target.slowRemaining = Mathf.Max(target.slowRemaining, duration);
-    }
-
-    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
-    private static void ApplyTaunt(BattleUnit caster, BattleUnit target)
-    {
-        if (TryConsumeCcImmunity(target)) return;
-        target.tauntedBy = caster;
     }
 
     /// <summary>targetType별 피격 대상 목록(데미지 스킬용 = 적 대상). 항상 살아있는 적만 반환.</summary>
