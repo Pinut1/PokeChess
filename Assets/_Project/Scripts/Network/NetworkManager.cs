@@ -280,6 +280,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        // 매핑이 적중해 베이스가 아닌 진화체를 받았을 때만 특수진화 배율(×1.5) 대상.
+        unit.isTradeEvolved = !string.IsNullOrEmpty(evolved);
+
         Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
         GameEvents.TradeUnitReceived(unit);
         photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);

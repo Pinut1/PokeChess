@@ -314,7 +314,6 @@ GameObject:
   - component: {fileID: 1558058644}
   - component: {fileID: 1558058667}
   - component: {fileID: 1558058668}
-  - component: {fileID: 1558058669}
   - component: {fileID: 1558058670}
   - component: {fileID: 1558058672}
   - component: {fileID: 1558058671}
@@ -650,25 +649,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c39320e141bbb344aa95a4d48aeca37b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TradeDebugTest
---- !u!114 &1558058669
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2d0e87397071e641afe8f9097d3ecc7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StoneDebugTest
-  _stones:
-  - {fileID: 11400000, guid: ff3ec391bb0a23f46b33ed0c15b7db76, type: 2}
-  - {fileID: 11400000, guid: f9e5646f6da022c4297c992f0059a8a1, type: 2}
-  - {fileID: 11400000, guid: d422b589fb80adc4fbc2e8094fdb8e33, type: 2}
-  - {fileID: 11400000, guid: e21de7fdbc1ddd549b8d1021f2a4dfa5, type: 2}
-  - {fileID: 11400000, guid: 445ecd19338c6304caad3aa9ad94b822, type: 2}
-  - {fileID: 11400000, guid: 3734b8db6dde46549867d061d68fc784, type: 2}
 --- !u!114 &1558058670
 MonoBehaviour:
   m_ObjectHideFlags: 0

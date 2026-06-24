@@ -40,6 +40,9 @@ public class PokemonUnit : MonoBehaviour
     public bool HasFreeSlot    => UsedSlots < MaxItemSlots;
     public bool IsStoneEvolved => equippedStone != null;
 
+    /// <summary>통신교환으로 진화체를 받았는지(NetworkManager.RPC_TradeReceive가 매핑 적중 시 설정). 베이스 핸드오버면 false.</summary>
+    public bool isTradeEvolved;
+
     // ──────────────────────────────────────────
     // 별 강화 스케일링
     // ──────────────────────────────────────────
@@ -58,13 +61,19 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>현재 별 등급의 스탯 배수.</summary>
     public float StarMultiplier => StarMultiplierFor(starLevel);
 
+    // PLACEHOLDER(기획확정 전): 진화의 돌·통신교환으로 얻은 "특수진화체"는 별배율에 ×1.5 추가.
+    // 돌은 장착 중에만(IsStoneEvolved, 해제 시 자동으로 빠짐), 통신교환은 영구(isTradeEvolved).
+    private const float SPECIAL_EVOLUTION_MULTIPLIER = 1.5f;
+    public bool IsSpecialEvolved => IsStoneEvolved || isTradeEvolved;
+    public float SpecialEvolutionMultiplier => IsSpecialEvolved ? SPECIAL_EVOLUTION_MULTIPLIER : 1f;
+
     // ──────────────────────────────────────────
     // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
     // ──────────────────────────────────────────
 
-    public float MaxHp        => data != null ? data.hp * StarMultiplier : 0f;
-    public float Attack       => data != null ? data.attack * StarMultiplier : 0f;
-    public float SpellPower   => data != null ? data.spellPower * StarMultiplier : 0f;
+    public float MaxHp        => data != null ? data.hp * StarMultiplier * SpecialEvolutionMultiplier : 0f;
+    public float Attack       => data != null ? data.attack * StarMultiplier * SpecialEvolutionMultiplier : 0f;
+    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * SpecialEvolutionMultiplier : 0f;
     public float Defense      => data != null ? data.defense : 0f;
     public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
     public int   Range        => data != null ? data.range : 0;

@@ -42,5 +42,5 @@ MonoBehaviour:
       dropChance: 1
     - kind: 3
       amount: 1
-      refNameEn: DUMMY
+      refNameEn: Sitrus Berry
       dropChance: 0.5

@@ -28,7 +28,7 @@ public class BattleUnit
     // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
     public float currentMana;
     public float maxMana;            // = PokemonData.manaCost
-    public SkillEffectType skillEffectType;  // 효과 분기 (Phase1: Attack/Spell만 데미지)
+    public SkillEffectType skillEffectType;  // 효과 분기 (Attack/Spell=데미지, Stun/Slow/Taunt=CC, HpRegen/Shield/ManaRegen/AsBuff=지원)
     public SkillTargetType skillTargetType;
     public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
     public int   skillLineLength;    // EnemyLine: 시전자 기준 직선(칸)
@@ -56,7 +56,78 @@ public class BattleUnit
     public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
     public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
 
+    // ── 지원 스킬 버프(AsBuff) — CC와 동일한 패턴(1=무효과, 시간 지나면 복원) ──
+    public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
+    public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
+
     public bool IsAlive => currentHp > 0f;
+
+    // ─────────────────────────────────────────
+    // CC/지원 상태 변이 — 상태(필드)와 그 상태를 바꾸는 행동을 한 곳에 모음.
+    // BattleManager(타겟 선정)가 대상을 고른 뒤 이 메서드들로 위임한다.
+    // ─────────────────────────────────────────
+
+    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
+    public void TickCcState(float deltaTime)
+    {
+        if (stunRemaining > 0f)
+            stunRemaining = Mathf.Max(0f, stunRemaining - deltaTime);
+
+        if (slowRemaining > 0f)
+        {
+            slowRemaining = Mathf.Max(0f, slowRemaining - deltaTime);
+            if (slowRemaining <= 0f) slowMultiplier = 1f;
+        }
+
+        if (asBuffRemaining > 0f)
+        {
+            asBuffRemaining = Mathf.Max(0f, asBuffRemaining - deltaTime);
+            if (asBuffRemaining <= 0f) asBuffMultiplier = 1f;
+        }
+
+        if (tauntedBy != null && !tauntedBy.IsAlive)
+            tauntedBy = null;
+    }
+
+    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
+    private bool TryConsumeCcImmunity()
+    {
+        if (!HasCcImmuneItem || ccImmuneConsumed) return false;
+        ccImmuneConsumed = true;
+        return true;
+    }
+
+    public void ApplyStun(float duration)
+    {
+        if (TryConsumeCcImmunity()) return;
+        stunRemaining = Mathf.Max(stunRemaining, duration);
+    }
+
+    public void ApplySlow(float multiplier, float duration)
+    {
+        if (TryConsumeCcImmunity()) return;
+        slowMultiplier = Mathf.Min(slowMultiplier, multiplier);
+        slowRemaining = Mathf.Max(slowRemaining, duration);
+    }
+
+    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
+    public void ApplyTaunt(BattleUnit caster)
+    {
+        if (TryConsumeCcImmunity()) return;
+        tauntedBy = caster;
+    }
+
+    public void ApplyHeal(float amount)
+        => currentHp = Mathf.Min(maxHp, currentHp + Mathf.Max(0f, amount));
+
+    public void ApplyShield(float amount)
+        => shield += Mathf.Max(0f, amount);
+
+    public void ApplyAsBuff(float multiplier, float duration)
+    {
+        asBuffMultiplier = Mathf.Max(asBuffMultiplier, multiplier);
+        asBuffRemaining  = Mathf.Max(asBuffRemaining, duration);
+    }
 }
 
 /// <summary>
@@ -82,6 +153,11 @@ public class BattleManager : MonoBehaviour
     private const float STUN_DURATION = 1.5f;
     private const float SLOW_DURATION = 3f;
     private const float SLOW_MULTIPLIER = 0.5f;
+
+    // 지원 스킬(HpRegen/Shield/ManaRegen/AsBuff) — PLACEHOLDER(기획확정 전): 위력/지속시간.
+    private const float MANA_REGEN_SKILL_AMOUNT = 30f;
+    private const float AS_BUFF_MULTIPLIER = 1.5f;
+    private const float AS_BUFF_DURATION = 3f;
 
     // role 기반 타겟 우선순위(기둥C) — PLACEHOLDER(기획확정 전): 낮을수록 먼저 타겟팅.
     private static readonly Dictionary<string, int> ROLE_TARGET_PRIORITY = new()
@@ -395,7 +471,7 @@ public class BattleManager : MonoBehaviour
         {
             if (!bu.IsAlive) continue;
 
-            TickCcState(bu);
+            bu.TickCcState(TICK_INTERVAL);
             if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
 
             BattleUnit target = (bu.tauntedBy != null && bu.tauntedBy.IsAlive) ? bu.tauntedBy : FindNearestEnemy(bu);
@@ -415,7 +491,7 @@ public class BattleManager : MonoBehaviour
                         BasicAttack(bu, target);
 
                     float baseCooldown = bu.attackSpeed > 0f ? 1f / bu.attackSpeed : 1f;
-                    bu.attackCooldown += baseCooldown / Mathf.Max(0.01f, bu.slowMultiplier);
+                    bu.attackCooldown += baseCooldown / Mathf.Max(0.01f, bu.slowMultiplier) / Mathf.Max(0.01f, bu.asBuffMultiplier);
                 }
             }
             else
@@ -448,22 +524,6 @@ public class BattleManager : MonoBehaviour
             bu.burnTicksRemaining -= 1f;
             if (bu.burnTicksRemaining <= 0f) bu.burnDamagePerTick = 0f;
         }
-    }
-
-    /// <summary>스턴/슬로우 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
-    private void TickCcState(BattleUnit bu)
-    {
-        if (bu.stunRemaining > 0f)
-            bu.stunRemaining = Mathf.Max(0f, bu.stunRemaining - TICK_INTERVAL);
-
-        if (bu.slowRemaining > 0f)
-        {
-            bu.slowRemaining = Mathf.Max(0f, bu.slowRemaining - TICK_INTERVAL);
-            if (bu.slowRemaining <= 0f) bu.slowMultiplier = 1f;
-        }
-
-        if (bu.tauntedBy != null && !bu.tauntedBy.IsAlive)
-            bu.tauntedBy = null;
     }
 
     /// <summary>self를 사거리 내에 둔 적 팀 유닛 수(defSpDefPerAttacker용 근사 — 타겟 캐싱이 없어 "공격 중"의 정확한 정의는 없음).</summary>
@@ -514,7 +574,8 @@ public class BattleManager : MonoBehaviour
 
     /// <summary>
     /// 스킬 시전: 마나 소모(0으로) 후 effectType 분기.
-    /// Phase1: Attack(=attack 위력)/Spell(=spellPower 위력)만 데미지. 나머지(지원/CC)는 미구현 — 기획 수치 대기.
+    /// Attack/Spell=데미지(attack/spellPower 위력), Stun/Slow/Taunt=CC(적 대상), HpRegen/Shield/ManaRegen/AsBuff=지원(아군 대상).
+    /// 전부 기획 수치 PLACEHOLDER(지속시간/위력 등) — 메커니즘은 선구현, 수치는 확정 후 교체.
     /// </summary>
     private void CastSkill(BattleUnit caster, BattleUnit primaryTarget)
     {
@@ -550,11 +611,18 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// CC(Slow/Stun/Taunt) 스킬 적용. 지원형(HpRegen/Shield/ManaRegen/AsBuff)은 여전히 Phase2 미구현(로그만).
+    /// CC(Slow/Stun/Taunt, 적 대상) + 지원(HpRegen/Shield/ManaRegen/AsBuff, 아군 대상) 스킬 적용.
+    /// 지원형은 primaryTarget(적)을 안 쓰고 GetAllyTargets로 자체 타겟팅한다.
     /// </summary>
     private void ApplyCcOrSupportSkill(BattleUnit caster, BattleUnit primaryTarget)
     {
-        var targets = GetSkillTargets(caster, primaryTarget);
+        bool isSupport = caster.skillEffectType == SkillEffectType.HpRegen   ||
+                          caster.skillEffectType == SkillEffectType.Shield   ||
+                          caster.skillEffectType == SkillEffectType.ManaRegen ||
+                          caster.skillEffectType == SkillEffectType.AsBuff;
+
+        var targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
+
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
@@ -562,48 +630,85 @@ public class BattleManager : MonoBehaviour
             switch (caster.skillEffectType)
             {
                 case SkillEffectType.Stun:
-                    ApplyStun(t, STUN_DURATION);
+                    t.ApplyStun(STUN_DURATION);
                     break;
                 case SkillEffectType.Slow:
-                    ApplySlow(t, SLOW_MULTIPLIER, SLOW_DURATION);
+                    t.ApplySlow(SLOW_MULTIPLIER, SLOW_DURATION);
                     break;
                 case SkillEffectType.Taunt:
-                    ApplyTaunt(caster, t);
+                    t.ApplyTaunt(caster);
                     break;
-                default:
-                    // TODO(Phase2): HpRegen/Shield/ManaRegen/AsBuff(아군 지원형). 기획 수치 확정 후 구현.
-                    Debug.Log($"[Battle] {caster.team} 스킬({caster.skillEffectType}) — Phase2 미구현(무효과)");
+                case SkillEffectType.HpRegen:
+                    t.ApplyHeal(caster.spellPower);
+                    break;
+                case SkillEffectType.Shield:
+                    t.ApplyShield(caster.spellPower);
+                    break;
+                case SkillEffectType.ManaRegen:
+                    GainMana(t, MANA_REGEN_SKILL_AMOUNT);
+                    break;
+                case SkillEffectType.AsBuff:
+                    t.ApplyAsBuff(AS_BUFF_MULTIPLIER, AS_BUFF_DURATION);
                     break;
             }
         }
     }
 
-    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
-    private static bool TryConsumeCcImmunity(BattleUnit target)
+    /// <summary>targetType별 아군 대상 목록(지원 스킬용). AllySelf=자신, AllyArea=반경 내 아군, AllySingle=최저 HP비율 아군.</summary>
+    private List<BattleUnit> GetAllyTargets(BattleUnit caster)
     {
-        if (!target.HasCcImmuneItem || target.ccImmuneConsumed) return false;
-        target.ccImmuneConsumed = true;
-        return true;
+        var result = new List<BattleUnit>();
+
+        switch (caster.skillTargetType)
+        {
+            case SkillTargetType.AllySelf:
+                result.Add(caster);
+                break;
+
+            case SkillTargetType.AllyArea:
+                foreach (var u in _units)
+                    if (u.team == caster.team && u.IsAlive &&
+                        caster.coords.DistanceTo(u.coords) <= caster.skillAreaRadius)
+                        result.Add(u);
+                break;
+
+            // AllySingle: 데이터 설계 의도(PokemonSkillData 주석) = HpRegen→최저HP, Shield→탱커.
+            case SkillTargetType.AllySingle when caster.skillEffectType == SkillEffectType.Shield:
+            {
+                BattleUnit tanker = null;
+                foreach (var u in _units)
+                    if (u.team == caster.team && u.IsAlive && u.role == PokemonRole.Tanker) { tanker = u; break; }
+                var fallback = tanker ?? LowestHpRatioAlly(caster.team);
+                if (fallback != null) result.Add(fallback); // 탱커 없으면 최저HP로 폴백
+                break;
+            }
+
+            case SkillTargetType.AllySingle:
+            {
+                var weakest = LowestHpRatioAlly(caster.team);
+                if (weakest != null) result.Add(weakest);
+                break;
+            }
+
+            default: // Enemy* 타입이 지원 스킬에 잘못 설정된 경우 — 대상 없음
+                break;
+        }
+
+        return result;
     }
 
-    private static void ApplyStun(BattleUnit target, float duration)
+    /// <summary>team 진영에서 살아있는 유닛 중 currentHp/maxHp 비율이 가장 낮은 유닛.</summary>
+    private BattleUnit LowestHpRatioAlly(BattleTeam team)
     {
-        if (TryConsumeCcImmunity(target)) return;
-        target.stunRemaining = Mathf.Max(target.stunRemaining, duration);
-    }
-
-    private static void ApplySlow(BattleUnit target, float multiplier, float duration)
-    {
-        if (TryConsumeCcImmunity(target)) return;
-        target.slowMultiplier = Mathf.Min(target.slowMultiplier, multiplier);
-        target.slowRemaining = Mathf.Max(target.slowRemaining, duration);
-    }
-
-    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
-    private static void ApplyTaunt(BattleUnit caster, BattleUnit target)
-    {
-        if (TryConsumeCcImmunity(target)) return;
-        target.tauntedBy = caster;
+        BattleUnit weakest = null;
+        float weakestRatio = float.MaxValue;
+        foreach (var u in _units)
+        {
+            if (u.team != team || !u.IsAlive) continue;
+            float ratio = u.maxHp > 0f ? u.currentHp / u.maxHp : 0f;
+            if (ratio < weakestRatio) { weakestRatio = ratio; weakest = u; }
+        }
+        return weakest;
     }
 
     /// <summary>targetType별 피격 대상 목록(데미지 스킬용 = 적 대상). 항상 살아있는 적만 반환.</summary>
