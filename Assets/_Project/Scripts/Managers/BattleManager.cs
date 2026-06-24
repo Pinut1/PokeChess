@@ -297,8 +297,10 @@ public class BattleManager : MonoBehaviour
             attackCooldown = 0f
         };
         if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.ManaCost);
-        // TODO(태욱/ItemManager): unit.items 스탯을 bu에 반영 (criPct→critChance, criDmgPct→critMultiplier 등).
-        // 적용되기 전까지 크리 필드는 기본값(0/1.5)이라 크리배수=1로 무영향.
+
+        // 장착 아이템 스탯을 전투 스냅샷에 반영한다. PokemonUnit 원본은 변경하지 않음.
+        ItemManager.ApplyItemStats(unit, bu);
+
         return bu;
     }
 
