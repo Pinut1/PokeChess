@@ -50,7 +50,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 2cc70c5591e6709468a6310f8bec602f, type: 3}
       propertyPath: m_Name
-      value: Meowth
+      value: meowth_pf
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 2cc70c5591e6709468a6310f8bec602f, type: 3}
       propertyPath: m_IsActive
