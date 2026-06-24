@@ -13,18 +13,19 @@ public class ItemStatEffect : ICombatEffect
     {
         if (_item == null) return;
 
-        float bonusHp = _item.hpBonus + self.maxHp * _item.maxHpPct;
+        // ItemData의 *Pct/*Percent류는 0~100 정수 퍼센트로 저장됨(예: maxHpPct=18 → +18%) — /100 필요.
+        float bonusHp = _item.hpBonus + self.maxHp * (_item.maxHpPct * 0.01f);
         self.maxHp += bonusHp;
         self.currentHp += bonusHp;
 
-        self.attack     += _item.attackBonus;
-        self.spellPower += self.spellPower * _item.spAtkPct;
-        self.attackSpeed += self.attackSpeed * _item.attackSpeedBonus;
+        self.attack      += _item.attackBonus;
+        self.spellPower  += self.spellPower * (_item.spAtkPct * 0.01f);
+        self.attackSpeed += self.attackSpeed * (_item.attackSpeedBonus * 0.01f);
 
-        // spDef 폐지(v9) — defenseBonus/spDefBonus 둘 다 단일 defense로 합산.
+        // spDef 폐지(v9) — defenseBonus/spDefBonus 둘 다 단일 defense로 합산. (둘 다 flat 보너스, % 아님)
         self.defense += _item.defenseBonus + _item.spDefBonus;
 
-        self.critChance     += _item.criPct;
-        self.critMultiplier  += _item.criDmgPct;
+        self.critChance     += _item.criPct * 0.01f;
+        self.critMultiplier  += _item.criDmgPct * 0.01f;
     }
 }

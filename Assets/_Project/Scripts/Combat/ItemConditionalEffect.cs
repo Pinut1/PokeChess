@@ -29,7 +29,7 @@ public class ItemConditionalEffect : ICombatEffect
 
         if (_item.hpRegenPercent > 0f)
         {
-            self.currentHp = Mathf.Min(self.maxHp, self.currentHp + self.maxHp * _item.hpRegenPercent * deltaTime);
+            self.currentHp = Mathf.Min(self.maxHp, self.currentHp + self.maxHp * (_item.hpRegenPercent * 0.01f) * deltaTime);
         }
 
         if (_item.defSpDefPerAttacker > 0f)
@@ -46,11 +46,11 @@ public class ItemConditionalEffect : ICombatEffect
 
         // ① 흡혈 — 보호막으로 막히기 전, 원본 피해량 기준.
         if (_item.healTakenDmgPct > 0f)
-            self.currentHp = Mathf.Min(self.maxHp, self.currentHp + ctx.amount * _item.healTakenDmgPct);
+            self.currentHp = Mathf.Min(self.maxHp, self.currentHp + ctx.amount * (_item.healTakenDmgPct * 0.01f));
 
         // ② 치명적 피해 시 보호막 생성(아직 보호막이 없을 때만).
         if (_item.shieldPctOnFatalHit > 0f && self.shield <= 0f && ctx.amount >= self.currentHp + self.shield)
-            self.shield = self.maxHp * _item.shieldPctOnFatalHit;
+            self.shield = self.maxHp * (_item.shieldPctOnFatalHit * 0.01f);
 
         // ③ 보호막 흡수.
         if (self.shield > 0f)
@@ -65,7 +65,7 @@ public class ItemConditionalEffect : ICombatEffect
                           : ctx.type == DamageType.Magic    ? _item.reflectSpPct
                           : 0f;
         if (reflectPct > 0f && ctx.source != null && ctx.source != self)
-            ctx.source.currentHp -= ctx.amount * reflectPct;
+            ctx.source.currentHp -= ctx.amount * (reflectPct * 0.01f);
 
         // ⑤ 물리 피격 시 주변 적에게 화상 전이.
         if (_item.burnNearOnPhysHit && ctx.type == DamageType.Physical)
@@ -76,6 +76,6 @@ public class ItemConditionalEffect : ICombatEffect
     {
         if (_item == null) return;
         if (_item.moveSpdPctOnKill > 0f)
-            self.moveSpeedMultiplier += _item.moveSpdPctOnKill; // PLACEHOLDER(기획확정 전): 영구 누적형
+            self.moveSpeedMultiplier += _item.moveSpdPctOnKill * 0.01f; // PLACEHOLDER(기획확정 전): 영구 누적형
     }
 }
