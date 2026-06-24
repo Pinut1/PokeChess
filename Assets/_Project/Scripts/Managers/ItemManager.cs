@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -5,32 +6,168 @@ using UnityEngine;
 /// </summary>
 public class ItemManager : MonoBehaviour
 {
-    // TODO(태욱): 인벤토리 보관 — 획득(reward/아이템샵) 시 추가, 장착 성공 시 제거.
-    // private readonly List<ItemData> _items = new();
-    // private readonly List<EvolutionStoneData> _stones = new();
+    private const int MAX_INVENTORY_SIZE = 20;
+
+    [Header("Item Inventory")]
+    [SerializeField] private List<ItemData> _items = new();
+    [SerializeField] private List<EvolutionStoneData> _stones = new();
+
+    public int InventoryCount => _items.Count + _stones.Count;
+    public int InventoryMax => MAX_INVENTORY_SIZE;
+
+    public IReadOnlyList<ItemData> Items => _items;
+    public IReadOnlyList<EvolutionStoneData> Stones => _stones;
+
+    public bool HasInventorySpace()
+    {
+        return InventoryCount < MAX_INVENTORY_SIZE;
+    }
 
     /// <summary>
-    /// 장착 단일 입구. 드래그&드롭 UI가 인벤토리 항목을 유닛에 드롭할 때 호출한다.
-    /// 돌/일반 아이템을 타입으로 분기해 PokemonUnit 저수준 장착 로직으로 라우팅한다.
-    /// 슬롯 규칙은 PokemonUnit이 처리한다.
+    /// 일반 아이템 획득 시 인벤토리에 추가한다.
+    /// Reward / ItemShop 구매 성공 시 호출한다.
+    /// </summary>
+    public bool AddItem(ItemData item)
+    {
+        if (item == null)
+        {
+            Debug.LogWarning("[ItemManager] 아이템 추가 실패: 아이템 데이터가 없습니다.");
+            return false;
+        }
+
+        if (!HasInventorySpace())
+        {
+            Debug.LogWarning($"[ItemManager] 아이템 추가 실패: 인벤토리가 가득 찼습니다. ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+            return false;
+        }
+
+        _items.Add(item);
+        Debug.Log($"[ItemManager] 아이템 인벤토리 추가: {item.itemName} ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+        return true;
+    }
+
+    /// <summary>
+    /// 진화의 돌 획득 시 인벤토리에 추가한다.
+    /// Reward / ItemShop 구매 성공 시 호출한다.
+    /// </summary>
+    public bool AddStone(EvolutionStoneData stone)
+    {
+        if (stone == null)
+        {
+            Debug.LogWarning("[ItemManager] 진화의 돌 추가 실패: 돌 데이터가 없습니다.");
+            return false;
+        }
+
+        if (!HasInventorySpace())
+        {
+            Debug.LogWarning($"[ItemManager] 진화의 돌 추가 실패: 인벤토리가 가득 찼습니다. ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+            return false;
+        }
+
+        _stones.Add(stone);
+        Debug.Log($"[ItemManager] 진화의 돌 인벤토리 추가: {stone.name} ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+        return true;
+    }
+
+    /// <summary>
+    /// 일반 아이템/진화의 돌을 타입에 따라 인벤토리에 추가한다.
+    /// </summary>
+    public bool AddToInventory(ScriptableObject equippable)
+    {
+        if (equippable == null)
+            return false;
+
+        switch (equippable)
+        {
+            case ItemData item:
+                return AddItem(item);
+
+            case EvolutionStoneData stone:
+                return AddStone(stone);
+
+            default:
+                Debug.LogWarning($"[ItemManager] 인벤토리 추가 불가 타입: {equippable.GetType().Name}");
+                return false;
+        }
+    }
+
+    private bool ContainsInInventory(ScriptableObject equippable)
+    {
+        switch (equippable)
+        {
+            case ItemData item:
+                return _items.Contains(item);
+
+            case EvolutionStoneData stone:
+                return _stones.Contains(stone);
+
+            default:
+                return false;
+        }
+    }
+
+    private bool RemoveFromInventory(ScriptableObject equippable)
+    {
+        switch (equippable)
+        {
+            case ItemData item:
+                return _items.Remove(item);
+
+            case EvolutionStoneData stone:
+                return _stones.Remove(stone);
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// 장착 단일 입구.
+    /// 드래그&드롭 UI가 인벤토리 항목을 유닛에 드롭할 때 호출한다.
+    ///
+    /// 처리 흐름:
+    /// 1. 인벤토리에 있는 아이템인지 확인
+    /// 2. 유닛에 장착 시도
+    /// 3. 장착 성공 시 인벤토리에서 제거
+    /// 4. 장착 실패 시 인벤토리에 그대로 유지
     /// </summary>
     public bool EquipToUnit(ScriptableObject equippable, PokemonUnit unit)
     {
         if (unit == null || equippable == null)
             return false;
 
+        if (!ContainsInInventory(equippable))
+        {
+            Debug.LogWarning($"[ItemManager] 장착 실패: 인벤토리에 없는 장착물입니다. ({equippable.name})");
+            return false;
+        }
+
+        bool success;
+
         switch (equippable)
         {
             case EvolutionStoneData stone:
-                return unit.TryEquipStone(stone);
+                success = unit.TryEquipStone(stone);
+                break;
 
             case ItemData item:
-                return TryEquipItem(unit, item);
+                success = TryEquipItem(unit, item);
+                break;
 
             default:
                 Debug.LogWarning($"[ItemManager] 장착 불가 타입: {equippable.GetType().Name}");
                 return false;
         }
+
+        if (!success)
+        {
+            Debug.LogWarning("[ItemManager] 장착 실패: 장착물은 인벤토리에 그대로 유지됩니다.");
+            return false;
+        }
+
+        RemoveFromInventory(equippable);
+        Debug.Log($"[ItemManager] 장착 성공: 인벤토리에서 제거 완료 ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+        return true;
     }
 
     /// <summary>
@@ -65,7 +202,6 @@ public class ItemManager : MonoBehaviour
 
     /// <summary>
     /// 일반 장착 아이템을 유닛에서 제거한다.
-    /// 제거된 아이템의 인벤토리 복귀는 호출측에서 처리한다.
     /// </summary>
     public static ItemData RemoveItem(PokemonUnit unit, ItemData item)
     {
@@ -85,33 +221,74 @@ public class ItemManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 장착 해제 단일 입구. 돌은 베이스 종으로 원복하고, 일반 아이템은 제거한다.
-    /// 반환물의 인벤토리 복귀는 호출측에서 처리한다.
+    /// 장착 해제 단일 입구.
+    /// 돌은 베이스 종으로 원복하고, 일반 아이템은 제거한다.
+    ///
+    /// 처리 흐름:
+    /// 1. 인벤토리 공간 확인
+    /// 2. 유닛에서 장착물 제거
+    /// 3. 제거 성공 시 인벤토리로 반환
     /// </summary>
     public ScriptableObject UnequipFromUnit(ScriptableObject equippable, PokemonUnit unit)
     {
         if (unit == null || equippable == null)
             return null;
 
+        if (!HasInventorySpace())
+        {
+            Debug.LogWarning($"[ItemManager] 해제 실패: 인벤토리가 가득 찼습니다. ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+            return null;
+        }
+
+        ScriptableObject removed = null;
+
         switch (equippable)
         {
             case EvolutionStoneData:
-                return unit.RemoveStone();
+                removed = unit.RemoveStone();
+                break;
 
             case ItemData item:
-                return RemoveItem(unit, item);
+                removed = RemoveItem(unit, item);
+                break;
 
             default:
                 Debug.LogWarning($"[ItemManager] 해제 불가 타입: {equippable.GetType().Name}");
                 return null;
         }
+
+        if (removed == null)
+            return null;
+
+        AddToInventory(removed);
+        Debug.Log($"[ItemManager] 해제 성공: 인벤토리로 반환 완료 ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+
+        return removed;
     }
 
     /// <summary>
     /// 기존 진화의 돌 제거 호출부 호환용.
+    /// 제거 성공 시 인벤토리로 반환한다.
     /// </summary>
     public ScriptableObject UnequipStone(PokemonUnit unit)
-        => unit != null ? unit.RemoveStone() : null;
+    {
+        if (unit == null)
+            return null;
+
+        if (!HasInventorySpace())
+        {
+            Debug.LogWarning($"[ItemManager] 진화의 돌 해제 실패: 인벤토리가 가득 찼습니다. ({InventoryCount}/{MAX_INVENTORY_SIZE})");
+            return null;
+        }
+
+        ScriptableObject removed = unit.RemoveStone();
+
+        if (removed == null)
+            return null;
+
+        AddToInventory(removed);
+        return removed;
+    }
 
     /// <summary>
     /// PokemonUnit에 장착된 일반 아이템들의 스탯을 전투용 BattleUnit 스냅샷에 반영한다.
