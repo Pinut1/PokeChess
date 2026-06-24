@@ -38,6 +38,24 @@ public class BattleUnit
     public float attackCooldown;   // 0 이하가 되면 공격 가능
     public GameObject visual;
 
+    // ── 효과 훅(기둥B) — 아이템/스킬/시너지가 전투 틱에 꽂히는 진입점 ──
+    public readonly List<ICombatEffect> effects = new();
+
+    // ── 조건부 아이템 효과 상태(기둥B 2단계) ──
+    public float shield;                  // 보호막 흡수량. 0 이하면 없음(shieldPctOnFatalHit).
+    public float burnDamagePerTick;       // 화상 중 매틱 고정(True) 피해. 0이면 화상 없음.
+    public float burnTicksRemaining;      // 화상 잔여 틱 수(시간이 아니라 틱 카운트).
+    public float moveSpeedMultiplier = 1f; // 이동 가속 배수(moveSpdPctOnKill로 누적 가산).
+
+    // ── CC 상태(기둥C) ──
+    public float stunRemaining;           // 0보다 크면 행동 불능.
+    public float slowMultiplier = 1f;     // 1=정상, 0.5=공속 50% 감소.
+    public float slowRemaining;           // 슬로우 잔여 시간. 0 도달 시 slowMultiplier 1로 복원.
+    public BattleUnit tauntedBy;          // null 아니면 이 유닛을 강제 타겟(도발자 생존 중에만 유효).
+    public bool HasCcImmuneItem;          // ccImmune 아이템 보유 여부.
+    public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
+    public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
+
     public bool IsAlive => currentHp > 0f;
 }
 
@@ -59,6 +77,23 @@ public class BattleManager : MonoBehaviour
     private const float MANA_PER_ATTACK = 10f;
     private const float MANA_PER_DAMAGE_TAKEN = 0.05f;  // 받은 피해의 5%
     private const float MANA_GAIN_CAP_PER_HIT = 20f;    // 한 번 피격으로 얻는 마나 상한
+
+    // CC(기둥C) — PLACEHOLDER(기획확정 전): 지속시간/감속률.
+    private const float STUN_DURATION = 1.5f;
+    private const float SLOW_DURATION = 3f;
+    private const float SLOW_MULTIPLIER = 0.5f;
+
+    // role 기반 타겟 우선순위(기둥C) — PLACEHOLDER(기획확정 전): 낮을수록 먼저 타겟팅.
+    private static readonly Dictionary<string, int> ROLE_TARGET_PRIORITY = new()
+    {
+        { PokemonRole.Supporter, 0 },
+        { PokemonRole.Magician,  1 },
+        { PokemonRole.Archer,    1 },
+        { PokemonRole.Assassin,  2 },
+        { PokemonRole.Warrior,   3 },
+        { PokemonRole.Tanker,    4 },
+    };
+    private const int DEFAULT_ROLE_PRIORITY = 2; // 미지정/알 수 없는 role 폴백
 
     // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
     private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
@@ -156,6 +191,11 @@ public class BattleManager : MonoBehaviour
         {
             Debug.Log($"[Battle] '{stage.stageId}' 적 {enemyCount}기 생성");
         }
+
+        // [기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).
+        foreach (var bu in _units)
+            foreach (var effect in bu.effects)
+                effect.OnCombatStart(bu);
 
         foreach (var bu in _units)
             SpawnVisual(bu);
@@ -258,7 +298,8 @@ public class BattleManager : MonoBehaviour
             spellPower = data.spellPower * star * sm,
             attackSpeed = data.attackSpeed,
             range = Mathf.Max(1, data.range),
-            attackCooldown = 0f
+            attackCooldown = 0f,
+            role = data.role ?? ""
         };
         ApplySkill(bu, data.skill, data.manaCost);
         return bu;
@@ -294,11 +335,18 @@ public class BattleManager : MonoBehaviour
             spellPower = unit.SpellPower,
             attackSpeed = unit.AttackSpeed,
             range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
-            attackCooldown = 0f
+            attackCooldown = 0f,
+            role = unit.Role
         };
         if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.ManaCost);
-        // TODO(태욱/ItemManager): unit.items 스탯을 bu에 반영 (criPct→critChance, criDmgPct→critMultiplier 등).
-        // 적용되기 전까지 크리 필드는 기본값(0/1.5)이라 크리배수=1로 무영향.
+
+        foreach (var item in unit.items)
+        {
+            bu.effects.Add(new ItemStatEffect(item));
+            bu.effects.Add(new ItemConditionalEffect(item, this));
+            if (item.ccImmune) bu.HasCcImmuneItem = true;
+        }
+
         return bu;
     }
 
@@ -335,7 +383,22 @@ public class BattleManager : MonoBehaviour
         {
             if (!bu.IsAlive) continue;
 
-            BattleUnit target = FindNearestEnemy(bu);
+            foreach (var effect in bu.effects)
+                effect.OnTick(bu, TICK_INTERVAL);
+
+            if (!bu.IsAlive) continue; // 화상/도트 등으로 이번 틱에 죽었으면 행동 스킵
+        }
+
+        TickBurn();
+
+        foreach (var bu in _units)
+        {
+            if (!bu.IsAlive) continue;
+
+            TickCcState(bu);
+            if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
+
+            BattleUnit target = (bu.tauntedBy != null && bu.tauntedBy.IsAlive) ? bu.tauntedBy : FindNearestEnemy(bu);
             if (target == null) continue;
 
             int distance = bu.coords.DistanceTo(target.coords);
@@ -351,12 +414,15 @@ public class BattleManager : MonoBehaviour
                     else
                         BasicAttack(bu, target);
 
-                    bu.attackCooldown += bu.attackSpeed > 0f ? 1f / bu.attackSpeed : 1f;
+                    float baseCooldown = bu.attackSpeed > 0f ? 1f / bu.attackSpeed : 1f;
+                    bu.attackCooldown += baseCooldown / Mathf.Max(0.01f, bu.slowMultiplier);
                 }
             }
             else
             {
-                MoveTowards(bu, target.coords);
+                int moveSteps = Mathf.Max(1, Mathf.RoundToInt(bu.moveSpeedMultiplier));
+                for (int i = 0; i < moveSteps && bu.coords.DistanceTo(target.coords) > bu.range; i++)
+                    MoveTowards(bu, target.coords);
             }
         }
 
@@ -368,6 +434,58 @@ public class BattleManager : MonoBehaviour
                 Destroy(bu.visual);
                 bu.visual = null;
             }
+        }
+    }
+
+    /// <summary>매틱 burnTicksRemaining>0인 모든 유닛에 고정(True) 피해. 아이템 보유와 무관하게 "화상이 옮은" 유닛 전체 대상.</summary>
+    private void TickBurn()
+    {
+        foreach (var bu in _units)
+        {
+            if (!bu.IsAlive || bu.burnTicksRemaining <= 0f) continue;
+
+            bu.currentHp -= bu.burnDamagePerTick;
+            bu.burnTicksRemaining -= 1f;
+            if (bu.burnTicksRemaining <= 0f) bu.burnDamagePerTick = 0f;
+        }
+    }
+
+    /// <summary>스턴/슬로우 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
+    private void TickCcState(BattleUnit bu)
+    {
+        if (bu.stunRemaining > 0f)
+            bu.stunRemaining = Mathf.Max(0f, bu.stunRemaining - TICK_INTERVAL);
+
+        if (bu.slowRemaining > 0f)
+        {
+            bu.slowRemaining = Mathf.Max(0f, bu.slowRemaining - TICK_INTERVAL);
+            if (bu.slowRemaining <= 0f) bu.slowMultiplier = 1f;
+        }
+
+        if (bu.tauntedBy != null && !bu.tauntedBy.IsAlive)
+            bu.tauntedBy = null;
+    }
+
+    /// <summary>self를 사거리 내에 둔 적 팀 유닛 수(defSpDefPerAttacker용 근사 — 타겟 캐싱이 없어 "공격 중"의 정확한 정의는 없음).</summary>
+    public int CountAttackersInRange(BattleUnit self)
+    {
+        int count = 0;
+        foreach (var other in _units)
+            if (other.team != self.team && other.IsAlive && self.coords.DistanceTo(other.coords) <= other.range)
+                count++;
+        return count;
+    }
+
+    /// <summary>center(피격자) 주변의 적 팀 유닛에 화상 설정(비중첩 — 틱 수만 갱신).</summary>
+    public void ApplyBurnAround(BattleUnit center, int radius, float dmgPerTick, int ticks)
+    {
+        foreach (var u in _units)
+        {
+            if (u.team == center.team || !u.IsAlive) continue;
+            if (center.coords.DistanceTo(u.coords) > radius) continue;
+
+            u.burnDamagePerTick = dmgPerTick;
+            u.burnTicksRemaining = ticks;
         }
     }
 
@@ -389,7 +507,9 @@ public class BattleManager : MonoBehaviour
     {
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
         GainMana(attacker, MANA_PER_ATTACK);
-        // [기둥B] attacker 효과 OnBasicAttack(target) — 구인수(평타 시 힐) 등
+
+        foreach (var effect in attacker.effects)
+            effect.OnBasicAttack(attacker, target);
     }
 
     /// <summary>
@@ -400,13 +520,15 @@ public class BattleManager : MonoBehaviour
     {
         caster.currentMana = 0f;
 
-        // 데미지 스킬만 처리. 지원/CC(HP_REGEN/SHIELD/AS_BUFF/MANA_REGEN/SLOW/STUN/TAUNT)는 Phase2.
+        // 데미지 스킬만 처리. 지원(HP_REGEN/SHIELD/AS_BUFF/MANA_REGEN)은 Phase2, CC(SLOW/STUN/TAUNT)는 기둥C에서 구현.
         bool isDamage = caster.skillEffectType == SkillEffectType.Attack ||
                         caster.skillEffectType == SkillEffectType.Spell;
         if (!isDamage)
         {
-            // TODO(Phase2): effectType별 지원/CC 효과. 기획 지속시간·증가율 확정 후 구현.
-            Debug.Log($"[Battle] {caster.team} 스킬({caster.skillEffectType}) — Phase2 미구현(무효과)");
+            ApplyCcOrSupportSkill(caster, primaryTarget);
+
+            foreach (var effect in caster.effects)
+                effect.OnSkillCast(caster);
             return;
         }
 
@@ -422,7 +544,66 @@ public class BattleManager : MonoBehaviour
         }
 
         Debug.Log($"[Battle] {caster.team} 스킬 시전({caster.skillEffectType}) → 대상 {targets.Count}기 (위력 {power:0})");
-        // [기둥B] caster 효과 OnSkillCast()
+
+        foreach (var effect in caster.effects)
+            effect.OnSkillCast(caster);
+    }
+
+    /// <summary>
+    /// CC(Slow/Stun/Taunt) 스킬 적용. 지원형(HpRegen/Shield/ManaRegen/AsBuff)은 여전히 Phase2 미구현(로그만).
+    /// </summary>
+    private void ApplyCcOrSupportSkill(BattleUnit caster, BattleUnit primaryTarget)
+    {
+        var targets = GetSkillTargets(caster, primaryTarget);
+        foreach (var t in targets)
+        {
+            if (t == null || !t.IsAlive) continue;
+
+            switch (caster.skillEffectType)
+            {
+                case SkillEffectType.Stun:
+                    ApplyStun(t, STUN_DURATION);
+                    break;
+                case SkillEffectType.Slow:
+                    ApplySlow(t, SLOW_MULTIPLIER, SLOW_DURATION);
+                    break;
+                case SkillEffectType.Taunt:
+                    ApplyTaunt(caster, t);
+                    break;
+                default:
+                    // TODO(Phase2): HpRegen/Shield/ManaRegen/AsBuff(아군 지원형). 기획 수치 확정 후 구현.
+                    Debug.Log($"[Battle] {caster.team} 스킬({caster.skillEffectType}) — Phase2 미구현(무효과)");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
+    private static bool TryConsumeCcImmunity(BattleUnit target)
+    {
+        if (!target.HasCcImmuneItem || target.ccImmuneConsumed) return false;
+        target.ccImmuneConsumed = true;
+        return true;
+    }
+
+    private static void ApplyStun(BattleUnit target, float duration)
+    {
+        if (TryConsumeCcImmunity(target)) return;
+        target.stunRemaining = Mathf.Max(target.stunRemaining, duration);
+    }
+
+    private static void ApplySlow(BattleUnit target, float multiplier, float duration)
+    {
+        if (TryConsumeCcImmunity(target)) return;
+        target.slowMultiplier = Mathf.Min(target.slowMultiplier, multiplier);
+        target.slowRemaining = Mathf.Max(target.slowRemaining, duration);
+    }
+
+    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
+    private static void ApplyTaunt(BattleUnit caster, BattleUnit target)
+    {
+        if (TryConsumeCcImmunity(target)) return;
+        target.tauntedBy = caster;
     }
 
     /// <summary>targetType별 피격 대상 목록(데미지 스킬용 = 적 대상). 항상 살아있는 적만 반환.</summary>
@@ -472,7 +653,8 @@ public class BattleManager : MonoBehaviour
     {
         if (ctx.target == null || !ctx.target.IsAlive) return;
 
-        // [기둥B] 공격자 효과 OnDealDamage(ctx) — 거인학살자(+target.maxHp%)·관통 등이 ctx 가공
+        foreach (var effect in ctx.source.effects)
+            effect.OnDealDamage(ctx.source, ctx);
 
         // 크리 (현재 결정론적 기대값 — 각자 보드 로컬 시뮬이라 추후 RNG 크리로 교체 가능)
         ctx.amount *= CritFactor(ctx.source);
@@ -481,13 +663,16 @@ public class BattleManager : MonoBehaviour
         if (ctx.type != DamageType.True)
             ctx.amount *= Mitigation(ctx.target.defense);
 
-        // [기둥B] 피격자 효과 OnTakeDamage(ctx) — 보호막 흡수·추가 경감
+        foreach (var effect in ctx.target.effects)
+            effect.OnTakeDamage(ctx.target, ctx);
 
         // 적용 + 피격자 마나 획득(피해 비례, 피격당 상한)
         ctx.target.currentHp -= ctx.amount;
         GainMana(ctx.target, Mathf.Min(ctx.amount * MANA_PER_DAMAGE_TAKEN, MANA_GAIN_CAP_PER_HIT));
 
-        // [기둥B] ctx.target 사망 시 ctx.source 효과 OnKill(victim)
+        if (!ctx.target.IsAlive)
+            foreach (var effect in ctx.source.effects)
+                effect.OnKill(ctx.source, ctx.target);
     }
 
     /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한).</summary>
@@ -497,24 +682,29 @@ public class BattleManager : MonoBehaviour
         unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount);
     }
 
+    /// <summary>role 우선순위(낮을수록 먼저 타겟) → 동순위 내 최단거리로 타겟 선정(기둥C).</summary>
     private BattleUnit FindNearestEnemy(BattleUnit bu)
     {
-        BattleUnit nearest = null;
-        int nearestDist = int.MaxValue;
+        BattleUnit best = null;
+        int bestPriority = int.MaxValue;
+        int bestDist = int.MaxValue;
 
         foreach (var other in _units)
         {
             if (other.team == bu.team || !other.IsAlive) continue;
 
+            int priority = ROLE_TARGET_PRIORITY.TryGetValue(other.role, out var p) ? p : DEFAULT_ROLE_PRIORITY;
             int dist = bu.coords.DistanceTo(other.coords);
-            if (dist < nearestDist)
+
+            if (priority < bestPriority || (priority == bestPriority && dist < bestDist))
             {
-                nearestDist = dist;
-                nearest = other;
+                bestPriority = priority;
+                bestDist = dist;
+                best = other;
             }
         }
 
-        return nearest;
+        return best;
     }
 
     /// <summary>목표 쪽으로 거리를 줄이는 인접 칸 중, 다른 살아있는 유닛이 없는 칸으로 한 칸 이동.</summary>
