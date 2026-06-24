@@ -9,7 +9,7 @@ using UnityEngine;
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage (FSM에 보상 로직을 하드코딩하지 않기 위해 분리).
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/유닛만 실제 지급 연결됨. 아이템/소모품/진화의 돌/증강은 해당 시스템(태욱/미구현)이 붙을 때까지
+/// 골드/유닛/아이템/진화의 돌은 실제 지급 연결됨. 소모품/증강은 해당 시스템이 붙을 때까지
 /// 훅 + 경고 로그로 남긴다(역기획서 수치도 미확정). grep "[Reward] TODO"로 추적.
 /// </summary>
 public class RewardManager : MonoBehaviour
@@ -74,15 +74,16 @@ public class RewardManager : MonoBehaviour
                 Debug.Log($"[Reward] +{amount}G");
                 break;
 
-            // ── 아래는 해당 시스템이 붙으면 연결. 지금은 누락 추적용 훅 + 로그. ───────────────
             case RewardKind.Item:
-                Debug.LogWarning($"[Reward] TODO Item '{entry.refNameEn}' ×{amount} — ItemManager 미구현(태욱)");
+                if (amount > 0) GrantItem(entry.refNameEn, amount);
                 break;
+
+            // ── 아래는 해당 시스템이 붙으면 연결. 지금은 누락 추적용 훅 + 로그. ───────────────
             case RewardKind.Consumable:
                 Debug.LogWarning($"[Reward] TODO Consumable '{entry.refNameEn}' ×{amount} — 소모품 시스템 미구현");
                 break;
             case RewardKind.EvolutionStone:
-                Debug.LogWarning($"[Reward] TODO EvolutionStone '{entry.refNameEn}' ×{amount} — 진화의 돌 시스템 미구현(태욱)");
+                if (amount > 0) GrantStone(entry.refNameEn, amount);
                 break;
             case RewardKind.Unit:
                 if (amount > 0) GrantUnit(entry.refNameEn, amount);
@@ -137,5 +138,39 @@ public class RewardManager : MonoBehaviour
 
         if (granted > 0)
             Debug.Log($"[Reward] Unit '{nameEn}' ×{granted} 벤치 지급");
+    }
+
+    /// <summary>아이템 보상 지급. refNameEn으로 ItemDatabase 조회 → amount만큼 인벤토리에 추가.</summary>
+    private void GrantItem(string nameEn, int amount)
+    {
+        if (string.IsNullOrEmpty(nameEn)) return;
+
+        var item = GameManager.Instance.Item;
+        int granted = 0;
+        for (int i = 0; i < amount; i++)
+        {
+            if (!item.AddItemByNameEn(nameEn)) break; // 조회 실패 또는 인벤토리 가득(경고는 ItemManager가 로그)
+            granted++;
+        }
+
+        if (granted > 0)
+            Debug.Log($"[Reward] Item '{nameEn}' ×{granted} 인벤토리 지급");
+    }
+
+    /// <summary>진화의 돌 보상 지급. refNameEn으로 EvolutionStoneDatabase 조회 → amount만큼 인벤토리에 추가.</summary>
+    private void GrantStone(string nameEn, int amount)
+    {
+        if (string.IsNullOrEmpty(nameEn)) return;
+
+        var item = GameManager.Instance.Item;
+        int granted = 0;
+        for (int i = 0; i < amount; i++)
+        {
+            if (!item.AddStoneByNameEn(nameEn)) break;
+            granted++;
+        }
+
+        if (granted > 0)
+            Debug.Log($"[Reward] EvolutionStone '{nameEn}' ×{granted} 인벤토리 지급");
     }
 }

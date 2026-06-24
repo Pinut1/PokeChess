@@ -20,10 +20,10 @@ public static class PokeChessImporter
 
     // 내부 JSON 래퍼는 PokemonJsonDb로 명명 — 런타임 SO 클래스 PokemonDatabase와 이름 충돌 회피.
     [Serializable] private class PokemonJsonDb      { public List<PokemonEntry>     pokemon;    }
-    [Serializable] private class ItemDatabase       { public List<ItemEntry>        items;      }
+    [Serializable] private class ItemJsonDb         { public List<ItemEntry>        items;      }
     [Serializable] private class SynergyDatabase    { public List<SynergyEntry>     synergies;  }
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry>  consumables; }
-    [Serializable] private class StoneDatabase      { public List<StoneEntry>       stones; }
+    [Serializable] private class StoneJsonDb        { public List<StoneEntry>       stones; }
     [Serializable] private class StageJsonDb        { public List<StageEntry>       stages; }
     [Serializable] private class RewardJsonDb       { public List<RewardTableJson>  tables; }
     [Serializable] private class TrainerEntryJsonDb { public List<TrainerEntryJson> trainers; }
@@ -242,9 +242,11 @@ public static class PokeChessImporter
         if (jsonText.StartsWith("["))
             jsonText = $"{{\"items\":{jsonText}}}";
 
-        var db = JsonUtility.FromJson<ItemDatabase>(jsonText);
+        var db = JsonUtility.FromJson<ItemJsonDb>(jsonText);
         string dir = $"{SO_PATH}/Items";
         EnsureDir(dir);
+
+        var imported = new List<ItemData>();
 
         foreach (var e in db.items)
         {
@@ -260,10 +262,25 @@ public static class PokeChessImporter
             if (!string.IsNullOrEmpty(e.statKey2)) ApplyItemStat(so, e.statKey2, e.statValue2);
 
             EditorUtility.SetDirty(so);
+            imported.Add(so);
         }
 
+        UpdateItemDatabase(imported);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 아이템 {db.items.Count}종 Import 완료");
+        Debug.Log($"[PokeChess] 아이템 {db.items.Count}종 Import 완료 (ItemDatabase 갱신)");
+    }
+
+    /// <summary>중앙 ItemDatabase(Resources/ItemDatabase.asset)를 임포트된 전체 목록으로 갱신.</summary>
+    private static void UpdateItemDatabase(List<ItemData> all)
+    {
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+
+        var db = LoadOrCreate<ItemDatabase>($"{resDir}/ItemDatabase.asset");
+        db.all = all;
+        db.InvalidateCache();
+        EditorUtility.SetDirty(db);
     }
 
     [MenuItem("PokeChess/Import Consumable JSON")]
@@ -304,7 +321,7 @@ public static class PokeChessImporter
         if (jsonText.StartsWith("["))
             jsonText = $"{{\"stones\":{jsonText}}}";
 
-        var db = JsonUtility.FromJson<StoneDatabase>(jsonText);
+        var db = JsonUtility.FromJson<StoneJsonDb>(jsonText);
 
         // id로 그룹핑 → SO 1개당 매핑 여러 개
         var groups = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<StoneEntry>>();
@@ -317,6 +334,8 @@ public static class PokeChessImporter
 
         string dir = $"{SO_PATH}/EvolutionStones";
         EnsureDir(dir);
+
+        var imported = new List<EvolutionStoneData>();
 
         foreach (var kv in groups)
         {
@@ -340,10 +359,25 @@ public static class PokeChessImporter
                     });
 
             EditorUtility.SetDirty(so);
+            imported.Add(so);
         }
 
+        UpdateEvolutionStoneDatabase(imported);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료");
+        Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료 (EvolutionStoneDatabase 갱신)");
+    }
+
+    /// <summary>중앙 EvolutionStoneDatabase(Resources/EvolutionStoneDatabase.asset)를 임포트된 전체 목록으로 갱신.</summary>
+    private static void UpdateEvolutionStoneDatabase(List<EvolutionStoneData> all)
+    {
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+
+        var db = LoadOrCreate<EvolutionStoneDatabase>($"{resDir}/EvolutionStoneDatabase.asset");
+        db.all = all;
+        db.InvalidateCache();
+        EditorUtility.SetDirty(db);
     }
 
     [MenuItem("PokeChess/Import Synergy JSON")]
