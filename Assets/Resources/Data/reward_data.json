@@ -13,7 +13,7 @@
       "label": "관장전 클리어 보상 (예시)",
       "rewards": [
         { "kind": "gold", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "item", "amount": 1, "refNameEn": "DUMMY", "dropChance": 0.5 }
+        { "kind": "item", "amount": 1, "refNameEn": "Sitrus Berry", "dropChance": 0.5 }
       ]
     }
   ]
