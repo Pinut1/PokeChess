@@ -13,7 +13,7 @@ public class TradeDebugTest : MonoBehaviour
         if (gm == null || gm.Board == null || gm.Network == null) return;
 
         var bench = gm.Board.GetBenchSnapshot();
-        float x = 10f, y = 175f;   // 좌측(HUD 상태패널 아래)
+        float x = 10f, y = 460f;   // 좌측(ItemInventoryHud 인벤토리 패널 아래로 내림 — 최대 5행까지 자라도 안 겹치게)
         GUI.Label(new Rect(x, y, 300, 22), "통신교환(클릭 = 파트너 전송):");
         y += 24f;
         for (int i = 0; i < bench.Count; i++)

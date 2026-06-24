@@ -298,7 +298,6 @@ GameObject:
   - component: {fileID: 1558058642}
   - component: {fileID: 1558058646}
   - component: {fileID: 1558058641}
-  - component: {fileID: 1558058645}
   - component: {fileID: 1558058651}
   - component: {fileID: 1558058650}
   - component: {fileID: 1558058655}
@@ -317,6 +316,8 @@ GameObject:
   - component: {fileID: 1558058668}
   - component: {fileID: 1558058669}
   - component: {fileID: 1558058670}
+  - component: {fileID: 1558058672}
+  - component: {fileID: 1558058671}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -373,20 +374,6 @@ MonoBehaviour:
   sceneViewId: 1
   InstantiationId: 0
   isRuntimeInstantiated: 0
---- !u!114 &1558058645
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bab69dc41ac685c48813246b84881db2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SynergyDebugTest
-  _nextSpeciesId: 9001
-  _lastPlaced: {fileID: 0}
 --- !u!114 &1558058646
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -406,7 +393,7 @@ MonoBehaviour:
   _shopManager: {fileID: 1558058658}
   _rewardManager: {fileID: 1558058667}
   _synergyManager: {fileID: 1558058651}
-  _itemManager: {fileID: 0}
+  _itemManager: {fileID: 1558058672}
   _augmentManager: {fileID: 0}
   _uiManager: {fileID: 0}
   _playerHealthManager: {fileID: 1558058656}
@@ -608,7 +595,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 393c1ffbbbb38db4b924fef0e84431b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
-  _soloMode: 1
+  _soloMode: 0
 --- !u!114 &1558058665
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -694,6 +681,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e17e6948eb76e1344af6a1c993fc9ca3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrototypeHud
+--- !u!114 &1558058671
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02d2d67f784ddd1499d57609276aa925, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventoryHud
+  _camera: {fileID: 1293587738}
+  _raycastMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1558058672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44d012cffbbc085408982e031827a17d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemManager
 --- !u!1 &2053065678
 GameObject:
   m_ObjectHideFlags: 0
