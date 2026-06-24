@@ -422,13 +422,15 @@ public class BoardManager : MonoBehaviour
         var boardMatches = new List<HexCoords>();
         var benchMatches = new List<int>();
 
+        // 돌 낀 유닛은 머지 후보 제외 — 안 그러면 합체 시 소비된 유닛의 돌이 Destroy로 같이 증발한다.
+        // "머지하려면 돌부터 빼라"가 의도된 흐름(진화의 돌 설계 문서, 2026-06-22).
         foreach (var kv in _battleField)
-            if (kv.Value != null && kv.Value.data != null &&
+            if (kv.Value != null && kv.Value.data != null && !kv.Value.IsStoneEvolved &&
                 kv.Value.data.id == speciesId && kv.Value.starLevel == starLevel)
                 boardMatches.Add(kv.Key);
 
         for (int i = 0; i < _bench.Length; i++)
-            if (_bench[i] != null && _bench[i].data != null &&
+            if (_bench[i] != null && _bench[i].data != null && !_bench[i].IsStoneEvolved &&
                 _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
                 benchMatches.Add(i);
 
