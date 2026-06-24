@@ -237,16 +237,22 @@ public class BoardManager : MonoBehaviour
         }
         else
         {
-            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체
+            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체.
+            // unit이 보드에도 벤치에도 없는 경우(현재 호출부에서는 발생하지 않지만 방어) —
+            // occupant를 보낼 빈 벤치 슬롯을 새로 찾고, 그마저 없으면 occupant가 추적 불가능한 채로
+            // 유실되는 걸 막기 위해 배치 자체를 거부한다.
             int benchSlot = FindBenchSlot(unit);
+            if (benchSlot < 0) benchSlot = FirstEmptyBenchSlot();
+            if (benchSlot < 0)
+            {
+                Debug.LogWarning("[BoardManager] 배치 거부 — 점유 중인 유닛을 보낼 빈 벤치 슬롯이 없습니다.");
+                return false;
+            }
+
             _battleField[targetCoords] = unit;
             unit.isOnBoard = true;
-
-            if (benchSlot >= 0)
-            {
-                _bench[benchSlot] = occupant;
-                occupant.isOnBoard = false;
-            }
+            _bench[benchSlot] = occupant;
+            occupant.isOnBoard = false;
         }
 
         GameEvents.UnitPlaced(unit);
