@@ -74,6 +74,19 @@ public class RewardManager : MonoBehaviour
                 Debug.Log($"[Reward] +{amount}G");
                 break;
 
+            case RewardKind.ItemCoupon:
+                if (amount <= 0) break;
+
+                if (GameManager.Instance.Item == null)
+                {
+                    Debug.LogWarning("[Reward] ItemManager 없음 — 아이템 쿠폰 지급 실패");
+                    break;
+                }
+
+                GameManager.Instance.Item.AddItemCoupon(amount);
+                Debug.Log($"[Reward] +{amount} 아이템 쿠폰");
+                break;
+
             case RewardKind.Item:
                 if (amount > 0) GrantItem(entry.refNameEn, amount);
                 break;

@@ -5,6 +5,7 @@
       "label": "야생 클리어 보상 (예시 — 역기획서 확정 필요)",
       "rewards": [
         { "kind": "gold", "amount": 5, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1, "refNameEn": "", "dropChance": 1.0 },
         { "kind": "augment", "amount": 1, "refNameEn": "", "dropChance": 1.0 }
       ]
     },
