@@ -13,10 +13,9 @@ MonoBehaviour:
   m_Name: Champion Duplicator_Consumable
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
   id: 1
-  consumableName: "\xE8\uFFFD\u01FE\uFFFD \uFFFD\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD"
+  consumableName: "\uCC54\uD53C\uC5B8 \uBCF5\uC81C\uAE30"
   consumableNameEn: Champion Duplicator
   consumableType: duplicate_unit
-  description: "\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD \uFFFD\uFFFD\uFFFD\u03F8\uFFFD
-    1\uFFFD\u2E26 \uFFFD\u07F0\uFFFD\uFFFD\uFFFD \uFFFD\uFFFD\uFFFD\uFFFD\uFFFD\u03FF\uFFFD
-    \u0239\uFFFD\uFFFD\uFFFD\u0574\u03F4\uFFFD."
+  description: "\uC120\uD0DD\uD55C \uD3EC\uCF13\uBAAC 1\uAE30\uB97C \uCD94\uAC00\uB85C
+    \uC0DD\uC131\uD558\uC5EC \uD68D\uB4DD\uD569\uB2C8\uB2E4."
   icon: {fileID: 0}
