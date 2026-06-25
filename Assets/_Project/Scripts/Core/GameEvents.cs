@@ -54,6 +54,12 @@ public static class GameEvents
     /// <summary>파트너(상대 클라이언트) 골드 변경. 인자 = 파트너의 현재 골드. UI 표시용.</summary>
     public static event Action<int> OnPartnerGoldChanged;
 
+    /// <summary>아이템 쿠폰 변경. 인자 = 변경 후 쿠폰 총량</summary>
+    public static event Action<int> OnItemCouponChanged;
+
+    /// <summary>아이템/진화의 돌 인벤토리 변경. UI 갱신용.</summary>
+    public static event Action OnInventoryChanged;
+
     // ──────────────────────────────────────────
     // 증강
     // ──────────────────────────────────────────
@@ -100,8 +106,15 @@ public static class GameEvents
     // 샵
     // ──────────────────────────────────────────
 
-    /// <summary>샵 리롤됨</summary>
+    /// <summary>유닛 샵 리롤됨</summary>
     public static event Action OnShopRerolled;
+
+    /// <summary>아이템 샵 갱신됨</summary>
+    public static event Action OnItemShopRerolled;
+
+    /// <summary>아이템 상점 구매 완료. 인자 = 구매한 일반 아이템 또는 진화의 돌</summary>
+    public static event Action<ScriptableObject> OnItemPurchased;
+
 
     // ──────────────────────────────────────────
     // 라운드 / 페이즈
@@ -158,6 +171,8 @@ public static class GameEvents
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);
+    public static void ItemCouponChanged(int amount) => OnItemCouponChanged?.Invoke(amount);
+    public static void InventoryChanged() => OnInventoryChanged?.Invoke();
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
@@ -167,6 +182,8 @@ public static class GameEvents
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
     public static void TradeRejected()               => OnTradeRejected?.Invoke();
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
+    public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
+    public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
     public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
     public static void StageEntered(StageData stage) => OnStageEntered?.Invoke(stage);

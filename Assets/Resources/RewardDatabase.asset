@@ -21,7 +21,11 @@ MonoBehaviour:
       amount: 5
       refNameEn: 
       dropChance: 1
-    - kind: 6
+    - kind: 1
+      amount: 1
+      refNameEn: 
+      dropChance: 1
+    - kind: 7
       amount: 1
       refNameEn: 
       dropChance: 1
@@ -32,7 +36,11 @@ MonoBehaviour:
       amount: 10
       refNameEn: 
       dropChance: 1
-    - kind: 2
+    - kind: 1
+      amount: 1
+      refNameEn: 
+      dropChance: 1
+    - kind: 3
       amount: 1
       refNameEn: Sitrus Berry
       dropChance: 0.5
