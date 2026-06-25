@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce0b2aa1d1ea68479d78f222a007c12, type: 3}
+  m_Name: Champion Duplicator_Consumable
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
+  id: 1
+  consumableName: "\uCC54\uD53C\uC5B8 \uBCF5\uC81C\uAE30"
+  consumableNameEn: Champion Duplicator
+  consumableType: duplicate_unit
+  description: "\uC120\uD0DD\uD55C \uD3EC\uCF13\uBAAC 1\uAE30\uB97C \uCD94\uAC00\uB85C
+    \uC0DD\uC131\uD558\uC5EC \uD68D\uB4DD\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}
