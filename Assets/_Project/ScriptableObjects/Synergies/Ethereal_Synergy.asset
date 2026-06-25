@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
-  m_Name: Fire_Synergy
+  m_Name: Ethereal_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 4
-  synergyName: "\uBD88\uAF43"
-  synergyNameEn: Fire
+  id: 7
+  synergyName: "\uC815\uB839"
+  synergyNameEn: Ethereal
   tiers:
   - count: 2
-    effectDescription: "\uBC29\uC5B4\uB825 +10%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +20%"
   - count: 4
-    effectDescription: "\uBC29\uC5B4\uB825 +25%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +40%"
   - count: 6
-    effectDescription: "\uBC29\uC5B4\uB825 +40%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +60%"
   icon: {fileID: 0}

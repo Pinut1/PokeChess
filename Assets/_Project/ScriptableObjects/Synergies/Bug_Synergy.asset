@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
-  m_Name: Fire_Synergy
+  m_Name: Bug_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 4
-  synergyName: "\uBD88\uAF43"
-  synergyNameEn: Fire
+  id: 10
+  synergyName: "\uBC8C\uB808"
+  synergyNameEn: Bug
   tiers:
   - count: 2
-    effectDescription: "\uBC29\uC5B4\uB825 +10%"
+    effectDescription: "\uACF5\uACA9\uB825 +10"
+  - count: 3
+    effectDescription: "\uACF5\uACA9\uB825 +20"
   - count: 4
-    effectDescription: "\uBC29\uC5B4\uB825 +25%"
-  - count: 6
-    effectDescription: "\uBC29\uC5B4\uB825 +40%"
+    effectDescription: "\uACF5\uACA9\uB825 +35"
   icon: {fileID: 0}

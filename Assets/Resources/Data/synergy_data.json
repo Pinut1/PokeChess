@@ -2,31 +2,160 @@
   "synergies": [
     {
       "id": 1,
-      "name": "전기",
-      "nameEn": "Electric",
+      "name": "풀",
+      "nameEn": "Grass",
       "tiers": [
-        { "count": 2, "effect": "전기 유닛의 공격 속도 +15%" },
-        { "count": 4, "effect": "전기 유닛의 공격 속도 +35%" },
-        { "count": 6, "effect": "전기 유닛의 공격 속도 +60%, 기본 공격 시 10% 확률로 마비" }
+        { "count": 3, "effect": "공격속도 +0.1" },
+        { "count": 5, "effect": "공격속도 +0.2" },
+        { "count": 7, "effect": "공격속도 +0.3" },
+        { "count": 9, "effect": "공격속도 +0.4" }
       ]
     },
     {
       "id": 2,
-      "name": "비행",
-      "nameEn": "Flying",
+      "name": "독",
+      "nameEn": "Poison",
       "tiers": [
-        { "count": 2, "effect": "비행 유닛 회피율 +15%" },
-        { "count": 4, "effect": "비행 유닛 회피율 +30%" }
+        { "count": 3, "effect": "방어력 +15" },
+        { "count": 5, "effect": "방어력 +30" },
+        { "count": 7, "effect": "방어력 +50" },
+        { "count": 9, "effect": "방어력 +70" }
       ]
     },
     {
       "id": 3,
+      "name": "물",
+      "nameEn": "Water",
+      "tiers": [
+        { "count": 3, "effect": "전투 시작 시 보호막 (주문력의 20%)" },
+        { "count": 5, "effect": "전투 시작 시 보호막 (주문력의 35%)" },
+        { "count": 7, "effect": "전투 시작 시 보호막 (주문력의 50%)" },
+        { "count": 9, "effect": "전투 시작 시 보호막 (주문력의 70%)" }
+      ]
+    },
+    {
+      "id": 4,
       "name": "불꽃",
       "nameEn": "Fire",
       "tiers": [
-        { "count": 2, "effect": "불꽃 유닛의 공격력 +10%" },
-        { "count": 4, "effect": "불꽃 유닛의 공격력 +25%" },
-        { "count": 6, "effect": "불꽃 유닛의 공격력 +45%, 기본 공격에 화상 부여" }
+        { "count": 2, "effect": "방어력 +10%" },
+        { "count": 4, "effect": "방어력 +25%" },
+        { "count": 6, "effect": "방어력 +40%" }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "비행",
+      "nameEn": "Flying",
+      "tiers": [
+        { "count": 2, "effect": "공격속도 +10%" },
+        { "count": 4, "effect": "공격속도 +20%" },
+        { "count": 6, "effect": "공격속도 +35%" }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "노말",
+      "nameEn": "Normal",
+      "tiers": [
+        { "count": 2, "effect": "치명타 확률 +5%" },
+        { "count": 4, "effect": "치명타 확률 +10%" },
+        { "count": 6, "effect": "치명타 확률 +15%" }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "정령",
+      "nameEn": "Ethereal",
+      "tiers": [
+        { "count": 2, "effect": "마나 충전속도 +20%" },
+        { "count": 4, "effect": "마나 충전속도 +40%" },
+        { "count": 6, "effect": "마나 충전속도 +60%" }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "대지",
+      "nameEn": "Ground",
+      "tiers": [
+        { "count": 2, "effect": "체력 +15%" },
+        { "count": 3, "effect": "체력 +30%" },
+        { "count": 4, "effect": "체력 +50%" }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "전기",
+      "nameEn": "Electric",
+      "tiers": [
+        { "count": 2, "effect": "주문력 +20" },
+        { "count": 3, "effect": "주문력 +40" },
+        { "count": 4, "effect": "주문력 +65" }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "벌레",
+      "nameEn": "Bug",
+      "tiers": [
+        { "count": 2, "effect": "공격력 +10" },
+        { "count": 3, "effect": "공격력 +20" },
+        { "count": 4, "effect": "공격력 +35" }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "파괴",
+      "nameEn": "Breaker",
+      "tiers": [
+        { "count": 2, "effect": "공격력 +10%" },
+        { "count": 3, "effect": "공격력 +20%" },
+        { "count": 4, "effect": "공격력 +35%" }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "드래곤",
+      "nameEn": "Dragon",
+      "tiers": [
+        { "count": 2, "effect": "주문력 +15%" },
+        { "count": 3, "effect": "주문력 +30%" },
+        { "count": 4, "effect": "주문력 +50%" }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "돌연변이",
+      "nameEn": "Mutant",
+      "tiers": [
+        { "count": 2, "effect": "봇 유닛 추가 — 에브이" },
+        { "count": 3, "effect": "봇 유닛 추가 — 브래키" },
+        { "count": 4, "effect": "봇 유닛 추가 — 글레이시아" },
+        { "count": 5, "effect": "봇 유닛 추가 — 님피아" }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "얼음",
+      "nameEn": "Ice",
+      "tiers": [
+        { "count": 1, "effect": "적 전체 공격속도 -20% (고유)" }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "악",
+      "nameEn": "Dark",
+      "tiers": [
+        { "count": 1, "effect": "전투 시작 후 첫 스킬 사용 시 스턴 1.5초 (고유)" }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "치어리더",
+      "nameEn": "Cheerleader",
+      "tiers": [
+        { "count": 1, "effect": "공격속도 +15% 또는 마나 충전속도 +30% 선택 (고유)" }
       ]
     }
   ]

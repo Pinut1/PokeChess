@@ -21,7 +21,7 @@ public static class PokeChessImporter
     // 내부 JSON 래퍼는 PokemonJsonDb로 명명 — 런타임 SO 클래스 PokemonDatabase와 이름 충돌 회피.
     [Serializable] private class PokemonJsonDb      { public List<PokemonEntry>     pokemon;    }
     [Serializable] private class ItemJsonDb         { public List<ItemEntry>        items;      }
-    [Serializable] private class SynergyDatabase    { public List<SynergyEntry>     synergies;  }
+    [Serializable] private class SynergyJsonDb      { public List<SynergyEntry>     synergies;  }
     [Serializable] private class ConsumableDatabase { public List<ConsumableEntry>  consumables; }
     [Serializable] private class StoneJsonDb        { public List<StoneEntry>       stones; }
     [Serializable] private class StageJsonDb        { public List<StageEntry>       stages; }
@@ -386,9 +386,11 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/synergy_data");
         if (json == null) { Debug.LogError("[PokeChess] synergy_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<SynergyDatabase>(json.text);
+        var db = JsonUtility.FromJson<SynergyJsonDb>(json.text);
         string dir = $"{SO_PATH}/Synergies";
         EnsureDir(dir);
+
+        var imported = new List<SynergyData>();
 
         foreach (var e in db.synergies)
         {
@@ -404,10 +406,25 @@ public static class PokeChessImporter
                 so.tiers.Add(new SynergyTier { count = t.count, effectDescription = t.effect });
 
             EditorUtility.SetDirty(so);
+            imported.Add(so);
         }
 
+        UpdateSynergyDatabase(imported);
+
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 시너지 {db.synergies.Count}종 Import 완료");
+        Debug.Log($"[PokeChess] 시너지 {db.synergies.Count}종 Import 완료 (SynergyDatabase 갱신)");
+    }
+
+    /// <summary>중앙 SynergyDatabase(Resources/SynergyDatabase.asset)를 임포트된 전체 목록으로 갱신.</summary>
+    private static void UpdateSynergyDatabase(List<SynergyData> all)
+    {
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+
+        var db = LoadOrCreate<SynergyDatabase>($"{resDir}/SynergyDatabase.asset");
+        db.all = all;
+        db.InvalidateCache();
+        EditorUtility.SetDirty(db);
     }
 
     [MenuItem("PokeChess/Import Reward JSON")]

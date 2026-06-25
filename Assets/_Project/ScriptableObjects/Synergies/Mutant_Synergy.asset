@@ -10,16 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
-  m_Name: Electric_Synergy
+  m_Name: Mutant_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 9
-  synergyName: "\uC804\uAE30"
-  synergyNameEn: Electric
+  id: 13
+  synergyName: "\uB3CC\uC5F0\uBCC0\uC774"
+  synergyNameEn: Mutant
   tiers:
   - count: 2
-    effectDescription: "\uC8FC\uBB38\uB825 +20"
+    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uC5D0\uBE0C\uC774"
   - count: 3
-    effectDescription: "\uC8FC\uBB38\uB825 +40"
+    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uBE0C\uB798\uD0A4"
   - count: 4
-    effectDescription: "\uC8FC\uBB38\uB825 +65"
+    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uAE00\uB808\uC774\uC2DC\uC544"
+  - count: 5
+    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uB2D8\uD53C\uC544"
   icon: {fileID: 0}

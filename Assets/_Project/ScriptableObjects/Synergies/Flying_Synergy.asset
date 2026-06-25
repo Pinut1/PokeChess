@@ -12,12 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Flying_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 2
+  id: 5
   synergyName: "\uBE44\uD589"
   synergyNameEn: Flying
   tiers:
   - count: 2
-    effectDescription: "\uBE44\uD589 \uC720\uB2DB \uD68C\uD53C\uC728 +15%"
+    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +10%"
   - count: 4
-    effectDescription: "\uBE44\uD589 \uC720\uB2DB \uD68C\uD53C\uC728 +30%"
+    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +20%"
+  - count: 6
+    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +35%"
   icon: {fileID: 0}
