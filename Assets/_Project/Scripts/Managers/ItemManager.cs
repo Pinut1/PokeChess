@@ -7,6 +7,7 @@ using UnityEngine;
 /// 장착 단일 입구는 EquipToUnit(드래그&드롭 UI가 호출) — 성공 시 인벤토리에서 제거.
 /// 해제 단일 입구는 UnequipFromUnit — 성공 시 인벤토리로 반환.
 /// 아이템 쿠폰은 아이템 상점 전용 재화로 여기서 보관/소비한다.
+/// 유닛 판매 시 OnUnitSold를 받아 장착 아이템/진화의 돌을 자동 회수한다.
 /// </summary>
 public class ItemManager : MonoBehaviour
 {
@@ -25,6 +26,16 @@ public class ItemManager : MonoBehaviour
 
     public int InventoryCount => _items.Count + _stones.Count;
     public bool HasInventorySpace => InventoryCount < MAX_INVENTORY_SIZE;
+
+    private void OnEnable()
+    {
+        GameEvents.OnUnitSold += HandleUnitSold;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnUnitSold -= HandleUnitSold;
+    }
 
     private void Start()
     {
@@ -64,6 +75,35 @@ public class ItemManager : MonoBehaviour
 
         Debug.Log($"[ItemCoupon] 쿠폰 사용 -{amount} / 남은 쿠폰 {ItemCoupon}");
         return true;
+    }
+
+    // ──────────────────────────────────────────
+    // 판매 시 장착물 자동 회수
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 유닛 판매 시 장착 중인 일반 아이템/진화의 돌을 자동 해제해 인벤토리로 반환.
+    /// BoardManager.SellUnit에서 UnitSold 이벤트가 Destroy 전에 발행되므로 여기서 unit 상태를 읽을 수 있다.
+    /// </summary>
+    private void HandleUnitSold(PokemonUnit unit)
+    {
+        if (unit == null) return;
+
+        // 일반 아이템은 제거 중 리스트가 바뀌므로 복사본 기준으로 순회.
+        if (unit.items != null && unit.items.Count > 0)
+        {
+            var equippedItems = new List<ItemData>(unit.items);
+
+            foreach (var item in equippedItems)
+            {
+                if (item != null)
+                    UnequipFromUnit(item, unit);
+            }
+        }
+
+        // 진화의 돌은 제거 시 data가 베이스 포켓몬으로 원복됨.
+        if (unit.equippedStone != null)
+            UnequipFromUnit(unit.equippedStone, unit);
     }
 
     // ──────────────────────────────────────────
