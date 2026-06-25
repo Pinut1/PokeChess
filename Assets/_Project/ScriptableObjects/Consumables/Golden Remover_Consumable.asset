@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce0b2aa1d1ea68479d78f222a007c12, type: 3}
+  m_Name: Golden Remover_Consumable
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableData
+  id: 3
+  consumableName: "\uD669\uAE08\uC81C\uAC70\uAE30"
+  consumableNameEn: Golden Remover
+  consumableType: golden_remover
+  description: "\uC7A5\uCC29\uB41C \uC544\uC774\uD15C\uC744 \uC548\uC804\uD558\uAC8C
+    \uBD84\uB9AC\uD558\uC5EC \uC778\uBCA4\uD1A0\uB9AC\uB85C \uBC18\uD658\uD569\uB2C8\uB2E4."
+  icon: {fileID: 0}

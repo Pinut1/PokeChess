@@ -687,6 +687,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44d012cffbbc085408982e031827a17d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemManager
+  _consumableCatalog:
+  - {fileID: 11400000, guid: 6d20ef0d370db1845ba398774afa53fa, type: 2}
+  - {fileID: 11400000, guid: a3210bf8861a38f42a4e04f53e80fb4f, type: 2}
+  - {fileID: 11400000, guid: e081a34d2f992d5428a962859abc3ee9, type: 2}
 --- !u!114 &1558058673
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -697,7 +701,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2397079f2b955d74da35ae201e180887, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::SynergyHud
 --- !u!1 &2053065678
 GameObject:

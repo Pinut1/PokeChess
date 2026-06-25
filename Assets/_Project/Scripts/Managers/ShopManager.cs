@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 기물 상점 + 골드 경제 담당.
-/// 라운드마다 수입을 지급하고 샵을 자동 리롤한다. 구매 시 유닛을 생성해 벤치에 배치.
+/// 기물 상점 + 아이템 상점 + 골드 경제 담당.
+/// 라운드마다 수입을 지급하고 유닛 상점/아이템 상점을 자동 갱신한다.
+/// 유닛 상점은 골드로 구매/리롤, 아이템 상점은 아이템 쿠폰으로 구매한다.
 /// 매니저 간 직접 참조 금지 — 상태 변화는 GameEvents로 통지.
 /// </summary>
 public class ShopManager : MonoBehaviour
@@ -16,38 +17,66 @@ public class ShopManager : MonoBehaviour
     [Tooltip("_useDatabasePool이 꺼졌을 때만 사용하는 수동 풀. 켜져 있으면 무시되고 DB로 덮어씀.")]
     [SerializeField] private List<PokemonData> _pool = new();
 
-    [Header("샵 설정")]
+    [Header("유닛 상점 설정")]
     [SerializeField] private int _shopSize = 5;
     [SerializeField] private int _rerollCost = 2;
+
+    [Header("아이템 상점 설정")]
+    [SerializeField] private int _itemShopSize = 4;
+    [SerializeField] private int _itemPrice = 1;
 
     [Header("골드 설정")]
     [SerializeField] private int _startingGold = 10;
     [SerializeField] private int _incomePerRound = 5;
 
+    [Header("챔피언 풀 설정")]
+    [SerializeField] private int _cost1PoolCount = 29;
+    [SerializeField] private int _cost2PoolCount = 22;
+    [SerializeField] private int _cost3PoolCount = 18;
+    [SerializeField] private int _cost4PoolCount = 12;
+    [SerializeField] private int _cost5PoolCount = 10;
+
+    [Header("레벨 확률")]
+    [Tooltip("현재는 플레이어 레벨 시스템이 없어서 ShopManager 내부 기본값으로 사용. 추후 GameEvents.OnLevelChanged로 갱신.")]
+    [SerializeField] private int _currentLevel = 1;
+
     public int Gold { get; private set; }
     public int ShopSize => _shopSize;
+    public int ItemShopSize => _itemShopSize;
+    public int ItemPrice => _itemPrice;
 
-    /// <summary>현재 샵에 공개된 후보(읽기 전용). null = 구매됨/빈 슬롯.</summary>
+    /// <summary>현재 유닛 상점에 공개된 후보(읽기 전용). null = 구매됨/빈 슬롯.</summary>
     public IReadOnlyList<PokemonData> CurrentSlots => _slots;
 
+    /// <summary>현재 아이템 상점에 공개된 후보(읽기 전용). null = 구매됨/빈 슬롯.</summary>
+    public IReadOnlyList<ScriptableObject> CurrentItemSlots => _itemSlots;
+
     private PokemonData[] _slots;
+    private ScriptableObject[] _itemSlots;
+
+    /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
+    private readonly Dictionary<PokemonData, int> _remainingPool = new();
 
     private void Awake()
     {
         _slots = new PokemonData[_shopSize];
+        _itemSlots = new ScriptableObject[_itemShopSize];
+
         Gold = _startingGold;
     }
 
     private void OnEnable()
     {
         GameEvents.OnRoundChanged += HandleRoundChanged;
-        GameEvents.OnUnitSold     += HandleUnitSold;
+        GameEvents.OnUnitSold += HandleUnitSold;
+        GameEvents.OnLevelChanged += HandleLevelChanged;
     }
 
     private void OnDisable()
     {
         GameEvents.OnRoundChanged -= HandleRoundChanged;
-        GameEvents.OnUnitSold     -= HandleUnitSold;
+        GameEvents.OnUnitSold -= HandleUnitSold;
+        GameEvents.OnLevelChanged -= HandleLevelChanged;
     }
 
     private void Start()
@@ -57,8 +86,11 @@ public class ShopManager : MonoBehaviour
         if (_useDatabasePool)
             SeedPoolFromDatabase();
 
+        InitializeChampionPool();
+
         GameEvents.GoldChanged(Gold);
-        Roll(); // 초기 샵 공개
+        Roll();         // 초기 유닛 상점 공개
+        RollItemShop(); // 초기 아이템 상점 공개
     }
 
     /// <summary>
@@ -79,15 +111,56 @@ public class ShopManager : MonoBehaviour
         Debug.Log($"[Shop] PokemonDatabase에서 풀 {_pool.Count}종 시드 (shopBuyable)");
     }
 
+    /// <summary>포켓몬별 초기 풀 수량 설정.</summary>
+    private void InitializeChampionPool()
+    {
+        _remainingPool.Clear();
+
+        foreach (var data in _pool)
+        {
+            if (data == null) continue;
+
+            int count = GetInitialPoolCount(data.cost);
+            if (count <= 0) continue;
+
+            _remainingPool[data] = count;
+        }
+
+        Debug.Log($"[ShopPool] 챔피언 풀 초기화 완료: {_remainingPool.Count}종");
+    }
+
+    private int GetInitialPoolCount(int cost)
+    {
+        return cost switch
+        {
+            1 => _cost1PoolCount,
+            2 => _cost2PoolCount,
+            3 => _cost3PoolCount,
+            4 => _cost4PoolCount,
+            5 => _cost5PoolCount,
+            _ => 0
+        };
+    }
+
     private void HandleRoundChanged(int round)
     {
         AddGold(_incomePerRound);
-        Roll();
+
+        Roll();         // 유닛 상점은 매 라운드 자동 갱신
+        RollItemShop(); // 아이템 상점도 매 라운드 자동 갱신
     }
 
-    /// <summary>BoardManager.SellUnit이 발행한 판매 이벤트 → 환급 골드 지급.</summary>
+    private void HandleLevelChanged(int level)
+    {
+        _currentLevel = Mathf.Max(1, level);
+        Debug.Log($"[Shop] 플레이어 레벨 변경 반영: Lv.{_currentLevel}");
+    }
+
+    /// <summary>BoardManager.SellUnit이 발행한 판매 이벤트 → 환급 골드 지급 + 챔피언 풀 복귀.</summary>
     private void HandleUnitSold(PokemonUnit unit)
     {
+        ReturnToChampionPool(unit);
+
         int refund = SellValue(unit);
         if (refund > 0) AddGold(refund);
     }
@@ -99,15 +172,15 @@ public class ShopManager : MonoBehaviour
     public int SellValue(PokemonUnit unit)
     {
         if (unit == null || unit.data == null) return 0;
-        int baseUnits = unit.starLevel switch { 2 => 3, 3 => 9, _ => 1 };
+        int baseUnits = GetBaseUnitCount(unit.starLevel);
         return unit.data.cost * baseUnits;
     }
 
     // ──────────────────────────────────────────
-    // 샵
+    // 유닛 상점
     // ──────────────────────────────────────────
 
-    /// <summary>샵 풀에서 무작위로 _shopSize개를 다시 공개.</summary>
+    /// <summary>샵 풀에서 레벨별 코스트 확률과 남은 풀 수량을 기준으로 _shopSize개를 다시 공개.</summary>
     public void Roll()
     {
         if (_pool == null || _pool.Count == 0)
@@ -118,12 +191,85 @@ public class ShopManager : MonoBehaviour
         }
 
         for (int i = 0; i < _slots.Length; i++)
-            _slots[i] = _pool[Random.Range(0, _pool.Count)];
+            _slots[i] = RollOnePokemon();
 
         GameEvents.ShopRerolled();
     }
 
-    /// <summary>골드를 내고 샵을 새로 굴림. 성공 시 true.</summary>
+    private PokemonData RollOnePokemon()
+    {
+        // 선택된 코스트에 남은 포켓몬이 없을 수 있으니 여러 번 재시도
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            int cost = RollCostByLevel(_currentLevel);
+            var candidates = _pool.FindAll(p =>
+                p != null &&
+                p.cost == cost &&
+                _remainingPool.TryGetValue(p, out int remain) &&
+                remain > 0);
+
+            if (candidates.Count > 0)
+                return candidates[Random.Range(0, candidates.Count)];
+        }
+
+        // 재시도 실패 시 전체 남은 풀에서 아무거나 선택
+        var fallback = _pool.FindAll(p =>
+            p != null &&
+            _remainingPool.TryGetValue(p, out int remain) &&
+            remain > 0);
+
+        if (fallback.Count == 0)
+            return null;
+
+        return fallback[Random.Range(0, fallback.Count)];
+    }
+
+    private int RollCostByLevel(int level)
+    {
+        int[] rates = GetCostRates(level);
+        int total = 0;
+
+        for (int i = 0; i < rates.Length; i++)
+            total += rates[i];
+
+        if (total <= 0)
+            return 1;
+
+        int roll = Random.Range(0, total);
+        int cumulative = 0;
+
+        for (int i = 0; i < rates.Length; i++)
+        {
+            cumulative += rates[i];
+            if (roll < cumulative)
+                return i + 1; // index 0 = 1코스트
+        }
+
+        return 1;
+    }
+
+    /// <summary>
+    /// 레벨별 코스트 등장 확률.
+    /// 현재는 임시값이며, 추후 밸런스 표 확정 시 이 함수만 교체.
+    /// </summary>
+    private int[] GetCostRates(int level)
+    {
+        return level switch
+        {
+            1 => new[] { 100, 0, 0, 0, 0 },
+            2 => new[] { 80, 20, 0, 0, 0 },
+            3 => new[] { 65, 30, 5, 0, 0 },
+            4 => new[] { 50, 35, 15, 0, 0 },
+            5 => new[] { 35, 40, 20, 5, 0 },
+            6 => new[] { 25, 35, 30, 10, 0 },
+            7 => new[] { 20, 30, 33, 15, 2 },
+            8 => new[] { 15, 25, 35, 20, 5 },
+            9 => new[] { 10, 20, 30, 30, 10 },
+            _ => new[] { 10, 15, 25, 35, 15 }
+        };
+    }
+
+    /// <summary>골드를 내고 유닛 상점을 새로 굴림. 성공 시 true.</summary>
     public bool Reroll()
     {
         if (Gold < _rerollCost)
@@ -131,8 +277,9 @@ public class ShopManager : MonoBehaviour
             Debug.Log("[Shop] 골드 부족 — 리롤 불가");
             return false;
         }
+
         AddGold(-_rerollCost);
-        Roll();
+        Roll(); // 수동 리롤은 유닛 상점만 갱신. 아이템 상점은 갱신하지 않음.
         return true;
     }
 
@@ -143,6 +290,12 @@ public class ShopManager : MonoBehaviour
 
         PokemonData data = _slots[slot];
         if (data == null) return false;
+
+        if (!HasPoolStock(data, 1))
+        {
+            Debug.Log($"[ShopPool] {data.pokemonName} 남은 풀 수량 없음 — 구매 불가");
+            return false;
+        }
 
         if (Gold < data.cost)
         {
@@ -166,11 +319,174 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
+        DecreaseChampionPool(data, 1);
+
         AddGold(-data.cost);
         _slots[slot] = null;
         GameEvents.ShopRerolled(); // 표시 갱신(슬롯 비움 반영)
         Debug.Log($"[Shop] {data.pokemonName} 구매 (-{data.cost}G)");
         return true;
+    }
+
+    private bool HasPoolStock(PokemonData data, int amount)
+    {
+        if (data == null) return false;
+        return _remainingPool.TryGetValue(data, out int remain) && remain >= amount;
+    }
+
+    private void DecreaseChampionPool(PokemonData data, int amount)
+    {
+        if (data == null) return;
+        if (!_remainingPool.ContainsKey(data)) return;
+
+        _remainingPool[data] = Mathf.Max(0, _remainingPool[data] - amount);
+
+        Debug.Log($"[ShopPool] {data.pokemonName} 풀 감소 -{amount} / 남은 수량: {_remainingPool[data]}");
+    }
+
+    private void ReturnToChampionPool(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null) return;
+
+        PokemonData data = unit.data;
+
+        if (!_remainingPool.ContainsKey(data))
+            return;
+
+        int amount = GetBaseUnitCount(unit.starLevel);
+        int maxCount = GetInitialPoolCount(data.cost);
+
+        _remainingPool[data] = Mathf.Min(maxCount, _remainingPool[data] + amount);
+
+        Debug.Log($"[ShopPool] {data.pokemonName} 풀 복귀 +{amount} / 남은 수량: {_remainingPool[data]}");
+    }
+
+    private int GetBaseUnitCount(int starLevel)
+    {
+        return starLevel switch
+        {
+            2 => 3,
+            3 => 9,
+            _ => 1
+        };
+    }
+
+    // ──────────────────────────────────────────
+    // 아이템 상점
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 아이템 상점 자동 갱신.
+    /// 0번 슬롯 = 진화의 돌, 1~3번 슬롯 = 일반 아이템.
+    /// </summary>
+    public void RollItemShop()
+    {
+        if (_itemSlots == null || _itemSlots.Length != _itemShopSize)
+            _itemSlots = new ScriptableObject[_itemShopSize];
+
+        for (int i = 0; i < _itemSlots.Length; i++)
+        {
+            if (i == 0)
+                _itemSlots[i] = RollOneStone();
+            else
+                _itemSlots[i] = RollOneItem();
+        }
+
+        GameEvents.ItemShopRerolled();
+    }
+
+    private EvolutionStoneData RollOneStone()
+    {
+        var db = EvolutionStoneDatabase.Instance;
+        if (db == null || db.all == null || db.all.Count == 0)
+        {
+            Debug.LogWarning("[ItemShop] EvolutionStoneDatabase 비어있음 — 진화의 돌 슬롯 비움");
+            return null;
+        }
+
+        var candidates = db.all.FindAll(s => s != null);
+        if (candidates.Count == 0) return null;
+
+        return candidates[Random.Range(0, candidates.Count)];
+    }
+
+    private ItemData RollOneItem()
+    {
+        var db = ItemDatabase.Instance;
+        if (db == null || db.all == null || db.all.Count == 0)
+        {
+            Debug.LogWarning("[ItemShop] ItemDatabase 비어있음 — 아이템 슬롯 비움");
+            return null;
+        }
+
+        var candidates = db.all.FindAll(i => i != null);
+        if (candidates.Count == 0) return null;
+
+        return candidates[Random.Range(0, candidates.Count)];
+    }
+
+    /// <summary>아이템 상점 슬롯의 상품을 아이템 쿠폰으로 구매해 인벤토리에 추가. 성공 시 true.</summary>
+    public bool BuyItem(int slot)
+    {
+        if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
+
+        ScriptableObject product = _itemSlots[slot];
+        if (product == null) return false;
+
+        var itemManager = GameManager.Instance.Item;
+        if (itemManager == null)
+        {
+            Debug.LogWarning("[ItemShop] ItemManager 없음 — 구매 불가");
+            return false;
+        }
+
+        if (!itemManager.HasInventorySpace)
+        {
+            Debug.LogWarning("[ItemShop] 인벤토리 가득 참 — 구매 불가");
+            return false;
+        }
+
+        if (itemManager.ItemCoupon < _itemPrice)
+        {
+            Debug.Log($"[ItemShop] 아이템 쿠폰 부족 — 필요 {_itemPrice}, 보유 {itemManager.ItemCoupon}");
+            return false;
+        }
+
+        if (!itemManager.SpendItemCoupon(_itemPrice))
+            return false;
+
+        bool added = product switch
+        {
+            ItemData item => itemManager.AddItem(item),
+            EvolutionStoneData stone => itemManager.AddStone(stone),
+            _ => false
+        };
+
+        if (!added)
+        {
+            // 방어적 환불
+            itemManager.AddItemCoupon(_itemPrice);
+            Debug.LogWarning("[ItemShop] 인벤토리 추가 실패 — 쿠폰 환불");
+            return false;
+        }
+
+        _itemSlots[slot] = null;
+
+        GameEvents.ItemPurchased(product);
+        GameEvents.ItemShopRerolled();
+
+        Debug.Log($"[ItemShop] {GetItemShopName(product)} 구매 완료 (-{_itemPrice} 쿠폰)");
+        return true;
+    }
+
+    private string GetItemShopName(ScriptableObject product)
+    {
+        return product switch
+        {
+            ItemData item => item.itemName,
+            EvolutionStoneData stone => stone.stoneName,
+            _ => product != null ? product.name : "(null)"
+        };
     }
 
     // ──────────────────────────────────────────
@@ -185,5 +501,9 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>디버그/시드용: 런타임 풀 주입.</summary>
-    public void SetPool(List<PokemonData> pool) => _pool = pool;
+    public void SetPool(List<PokemonData> pool)
+    {
+        _pool = pool;
+        InitializeChampionPool();
+    }
 }
