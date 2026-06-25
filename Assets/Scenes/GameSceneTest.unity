@@ -317,6 +317,7 @@ GameObject:
   - component: {fileID: 1558058670}
   - component: {fileID: 1558058672}
   - component: {fileID: 1558058671}
+  - component: {fileID: 1558058673}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -423,10 +424,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f4829f67383d1047bccbb96f61b09ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyManager
-  _synergyDatabase:
-  - {fileID: 11400000, guid: 713c2788408c9fa4f9f81fe4e0908fce, type: 2}
-  - {fileID: 11400000, guid: b12671ea6e806614db2481d258ff9594, type: 2}
-  - {fileID: 11400000, guid: a90cb20bff774cd4797a0fdd74dd50a8, type: 2}
+  _overrideDatabase: []
 --- !u!114 &1558058655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -689,6 +687,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44d012cffbbc085408982e031827a17d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemManager
+--- !u!114 &1558058673
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2397079f2b955d74da35ae201e180887, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyHud
 --- !u!1 &2053065678
 GameObject:
   m_ObjectHideFlags: 0

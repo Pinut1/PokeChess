@@ -14,7 +14,10 @@ public class ItemInventoryHud : MonoBehaviour
 
     private const float SLOT_W = 90f, SLOT_H = 40f, SLOT_GAP = 4f;
     private const int   COLS = 4;
-    private const float PANEL_X = 10f, PANEL_Y = 170f;
+    private const float PANEL_X = 10f;
+    // 좌측 상단은 시너지 특성 패널(SynergyHud)이 사용 → 인벤토리는 하단 좌측(상점 바 위)으로.
+    // OnGUI에서 행 수에 맞춰 Screen.height 기준으로 매 프레임 설정(위로 성장).
+    private float _panelY;
 
     private ScriptableObject _dragging;
     private string _dragLabel;
@@ -37,16 +40,22 @@ public class ItemInventoryHud : MonoBehaviour
             return;
         }
 
+        // 하단 좌측 앵커: 현재 행 수만큼 높이를 잡아 상점 바(하단 중앙, ~Screen.height-120) 위에 배치.
+        int total = gm.Item.Items.Count + gm.Item.Stones.Count;
+        int rowCount = Mathf.Max(1, Mathf.CeilToInt(total / (float)COLS));
+        float panelH = 24f + rowCount * (SLOT_H + SLOT_GAP) + 6f;
+        _panelY = Screen.height - 150f - panelH;
+
         HandleInput(gm);
         DrawInventory(gm);
         DrawInspectPanel(gm);
         DrawDragGhost();
     }
 
-    private static Rect SlotRect(int index)
+    private Rect SlotRect(int index)
     {
         float x = PANEL_X + (index % COLS) * (SLOT_W + SLOT_GAP);
-        float y = PANEL_Y + 24f + (index / COLS) * (SLOT_H + SLOT_GAP);
+        float y = _panelY + 24f + (index / COLS) * (SLOT_H + SLOT_GAP);
         return new Rect(x, y, SLOT_W, SLOT_H);
     }
 
@@ -56,7 +65,7 @@ public class ItemInventoryHud : MonoBehaviour
         int total = item.Items.Count + item.Stones.Count;
         int rows = Mathf.Max(1, Mathf.CeilToInt(total / (float)COLS));
 
-        GUI.Box(new Rect(PANEL_X - 5f, PANEL_Y, COLS * (SLOT_W + SLOT_GAP) + 6f, 24f + rows * (SLOT_H + SLOT_GAP) + 6f),
+        GUI.Box(new Rect(PANEL_X - 5f, _panelY, COLS * (SLOT_W + SLOT_GAP) + 6f, 24f + rows * (SLOT_H + SLOT_GAP) + 6f),
             "인벤토리 (드래그해서 유닛에 장착)");
 
         int i = 0;
