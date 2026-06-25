@@ -28,6 +28,7 @@ public class BattleUnit
     // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
     public float currentMana;
     public float maxMana;            // = PokemonData.manaCost
+    public float manaGainMultiplier = 1f; // 마나 충전 속도 배수(정령 시너지/치어리더 등). 1=기본.
     public SkillEffectType skillEffectType;  // 효과 분기 (Attack/Spell=데미지, Stun/Slow/Taunt=CC, HpRegen/Shield/ManaRegen/AsBuff=지원)
     public SkillTargetType skillTargetType;
     public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
@@ -202,8 +203,10 @@ public class BattleManager : MonoBehaviour
             yield break;
         }
 
-        // TODO: GameManager.Instance.Synergy.GetActiveSynergies()로 활성 시너지 버프 적용.
-        // SynergyTier에 구조화된 효과 데이터가 아직 없어(설명 문자열뿐) v1에서는 보류.
+        // 활성 시너지 적용: ① 일반 스탯버프(SynergyConstants 수치) ② 특수효과(얼음 적디버프/치어리더 선택/돌연변이 봇소환).
+        // 악(첫 스킬 스턴)은 시전 훅이 필요해 별도(미구현). 향후 SynergyData.statType 추가 시 ①을 statType 기반 리팩터 가능.
+        ApplySynergyBuffs();
+        ApplySynergySpecials();
 
         bool? allyWon = null;
         int tick = 0;
@@ -230,6 +233,176 @@ public class BattleManager : MonoBehaviour
 
         Cleanup();
         GameEvents.BattleEnd(allyWon.Value);
+    }
+
+    // ─────────────────────────────────────────
+    // 시너지 버프 (수치 = SynergyConstants, 기획 §6)
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// 활성 시너지의 스탯 버프를 "그 트레잇을 보유한 아군"에게만 적용.
+    /// 카운트/티어 판정은 SynergyManager(황해인), 수치는 SynergyConstants(기획 §6), 적용은 여기(전투).
+    /// PVE라 적은 StageData 구성 → 시너지는 아군에만 적용(미러매치 가정 없음. ICE 적디버프만 추후 예외).
+    /// 주의: 포켓몬이 실제 보유한 시너지만 발동(ICE/DARK/CHEERLEADER는 현재 배정 유닛 없음).
+    /// </summary>
+    private void ApplySynergyBuffs()
+    {
+        var synergy = GameManager.Instance.Synergy;
+        if (synergy == null) return;
+
+        int appliedCount = 0;
+        foreach (var status in synergy.GetActiveSynergies())
+        {
+            if (status?.data == null) continue;
+            string synergyId = status.data.synergyNameEn; // 대문자 영문 ID(SynergyConstants가 대소문자 무관 조회)
+            int tier = status.activeTierIndex + 1;         // 1-base
+
+            foreach (var bu in _units)
+            {
+                if (bu.team != BattleTeam.Ally || bu.source == null || bu.source.data == null) continue;
+
+                // 해당 트레잇을 실제로 보유한 유닛에게만(데이터가 한/영 어느 키든 허용).
+                var syns = bu.source.data.synergies;
+                if (syns == null) continue;
+                if (!syns.Contains(status.data.synergyName) && !syns.Contains(status.data.synergyNameEn)) continue;
+
+                if (ApplySynergyBuff(bu, synergyId, tier)) appliedCount++;
+            }
+        }
+
+        if (appliedCount > 0)
+            Debug.Log($"[Synergy] 시너지 버프 {appliedCount}건 적용");
+    }
+
+    /// <summary>
+    /// SynergyConstants(기획 §6) 수치를 BattleUnit에 적용. percent는 1+v 곱, fixed는 v 가산.
+    /// 적용 성공 시 true. 수치 미정의(특수 MUTANT/DARK·고유 ICE/CHEERLEADER 포함)는 false.
+    /// </summary>
+    private static bool ApplySynergyBuff(BattleUnit bu, string synergyId, int tier)
+    {
+        float v = SynergyConstants.Value(synergyId, tier);
+        if (v <= 0f) return false; // 전용 로직 시너지(봇소환/CC/적디버프/선택)는 여기서 미처리
+
+        switch (synergyId?.ToUpperInvariant())
+        {
+            // ── 고정값(Fixed) ──
+            case "GRASS":    bu.attackSpeed += v; return true;   // 풀: atkSpeed +고정
+            case "POISON":   bu.defense     += v; return true;   // 독: defense +고정
+            case "ELECTRIC": bu.spellPower  += v; return true;   // 전기: spellPower +고정
+            case "BUG":      bu.attack      += v; return true;   // 벌레: attack +고정
+
+            // ── 비율(Percent) ──
+            case "FIRE":     bu.defense     *= 1f + v; return true; // 불꽃: defense %
+            case "FLYING":   bu.attackSpeed *= 1f + v; return true; // 비행: atkSpeed %
+            case "BREAKER":  bu.attack      *= 1f + v; return true; // 파괴: attack %
+            case "DRAGON":   bu.spellPower  *= 1f + v; return true; // 드래곤: spellPower %
+            case "GROUND":   { float add = bu.maxHp * v; bu.maxHp += add; bu.currentHp += add; return true; } // 대지: hp %
+            case "WATER":    bu.shield      += bu.spellPower * v; return true; // 물: spellPower×비율 보호막(전투 시작 1회)
+            case "NORMAL":   bu.critChance = Mathf.Min(1f, bu.critChance + v); return true; // 노말: 치명타 확률 +절대
+            case "ETHEREAL": bu.manaGainMultiplier += v; return true; // 정령: 마나 충전속도 배수 가산
+
+            default: return false;
+        }
+    }
+
+    // ─────────────────────────────────────────
+    // 특수 시너지 (봇소환/적디버프/선택형) — 수치 = SynergyConstants
+    // ─────────────────────────────────────────
+
+    private static readonly string[] MutantBots = { "Eevee", "Umbreon", "Glaceon", "Sylveon" };
+
+    /// <summary>전투 시작 시 특수 시너지 적용(일반 스탯버프 ApplySynergyBuffs 이후 호출).</summary>
+    private void ApplySynergySpecials()
+    {
+        // 얼음: 적 전체 공격속도 감소(고유, 1마리 활성).
+        if (GetActiveSynergy("Ice") != null)
+            foreach (var bu in _units)
+                if (bu.team == BattleTeam.Enemy)
+                    bu.attackSpeed *= 1f - SynergyConstants.IceEnemyAtkSpeedReduction;
+
+        // 치어리더: 플레이어 선택 버프를 아군 전체에(고유).
+        if (GetActiveSynergy("Cheerleader") != null)
+            ApplyCheerleaderChoice();
+
+        // 돌연변이: 활성 티어 수만큼 봇 누적 소환(에브이→브래키→글레이시아→님피아).
+        var mutant = GetActiveSynergy("Mutant");
+        if (mutant != null)
+            SpawnMutantBots(mutant.activeTierIndex + 1);
+    }
+
+    /// <summary>활성 시너지 중 영문 ID가 일치하는 것(없으면 null).</summary>
+    private static SynergyStatus GetActiveSynergy(string synergyId)
+    {
+        var syn = GameManager.Instance.Synergy;
+        if (syn == null) return null;
+        foreach (var s in syn.GetActiveSynergies())
+            if (s?.data != null &&
+                string.Equals(s.data.synergyNameEn, synergyId, System.StringComparison.OrdinalIgnoreCase))
+                return s;
+        return null;
+    }
+
+    /// <summary>치어리더: 선택(공속 +15% 또는 마나충전 +30%)을 아군 전체에.</summary>
+    private void ApplyCheerleaderChoice()
+    {
+        foreach (var bu in _units)
+        {
+            if (bu.team != BattleTeam.Ally) continue;
+            if (CheerleaderChoice.Current == CheerleaderChoice.Option.AttackSpeed)
+                bu.attackSpeed *= 1f + SynergyConstants.CheerleaderAtkSpeedPct;
+            else
+                bu.manaGainMultiplier += SynergyConstants.CheerleaderManaRegenPct;
+        }
+    }
+
+    /// <summary>돌연변이: 빈 아군 타일에 봇을 tier 수만큼 누적 소환. 봇은 전투 전용(source=null)이라 시너지 카운트·복원 대상 아님.</summary>
+    private void SpawnMutantBots(int tier)
+    {
+        var db = PokemonDatabase.Instance;
+        var board = GameManager.Instance.Board;
+        if (db == null || board == null) return;
+
+        // 빈 아군 좌표(스냅샷의 value==null) 수집.
+        var empty = new List<HexCoords>();
+        foreach (var kv in board.GetBoardSnapshot())
+            if (kv.Value == null) empty.Add(kv.Key);
+
+        int count = Mathf.Min(tier, MutantBots.Length);
+        int placed = 0;
+        for (int i = 0; i < count; i++)
+        {
+            if (placed >= empty.Count) { Debug.LogWarning("[Synergy] 돌연변이 봇 배치할 빈 타일 부족 — 일부 미소환"); break; }
+
+            var data = db.GetByNameEn(MutantBots[i]);
+            if (data == null) { Debug.LogWarning($"[Synergy] 돌연변이 봇 '{MutantBots[i]}' DB에 없음 — 스킵"); continue; }
+
+            var bot = CreateBotUnit(data, empty[placed++]);
+            _units.Add(bot);
+            SpawnVisual(bot);
+        }
+        if (placed > 0) Debug.Log($"[Synergy] 돌연변이 봇 {placed}마리 소환 (T{tier})");
+    }
+
+    /// <summary>봇 BattleUnit 생성(아군, source=null, 별/배수 없는 전투 전용 유닛 — 전투 후 복원 불필요).</summary>
+    private BattleUnit CreateBotUnit(PokemonData data, HexCoords coords)
+    {
+        var bu = new BattleUnit
+        {
+            source = null,
+            team = BattleTeam.Ally,
+            coords = coords,
+            maxHp = data.hp,
+            currentHp = data.hp,
+            attack = data.attack,
+            defense = data.defense,
+            spellPower = data.spellPower,
+            attackSpeed = data.attackSpeed,
+            range = Mathf.Max(1, data.range),
+            attackCooldown = 0f,
+            role = data.role ?? ""
+        };
+        ApplySkill(bu, data.skill, data.manaCost);
+        return bu;
     }
 
     // ─────────────────────────────────────────
@@ -378,6 +551,25 @@ public class BattleManager : MonoBehaviour
             role = data.role ?? ""
         };
         ApplySkill(bu, data.skill, data.manaCost);
+
+        // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
+        // (아군은 unit.items 리스트, 적은 heldItemEn 단일 문자열을 ItemDatabase로 해석)
+        if (!string.IsNullOrEmpty(e.heldItemEn))
+        {
+            var itemDb = ItemDatabase.Instance;
+            ItemData item = itemDb != null ? itemDb.GetByNameEn(e.heldItemEn) : null;
+            if (item != null)
+            {
+                bu.effects.Add(new ItemStatEffect(item));
+                bu.effects.Add(new ItemConditionalEffect(item, this));
+                if (item.ccImmune) bu.HasCcImmuneItem = true;
+            }
+            else
+            {
+                Debug.LogWarning($"[Battle] 적 보유 아이템 '{e.heldItemEn}'을 ItemDatabase에서 못 찾음 — 효과 미적용");
+            }
+        }
+
         return bu;
     }
 
@@ -780,11 +972,11 @@ public class BattleManager : MonoBehaviour
                 effect.OnKill(ctx.source, ctx.target);
     }
 
-    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한).</summary>
+    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지 등) 반영.</summary>
     private static void GainMana(BattleUnit unit, float amount)
     {
         if (!unit.HasSkill) return;
-        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount);
+        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier);
     }
 
     /// <summary>role 우선순위(낮을수록 먼저 타겟) → 동순위 내 최단거리로 타겟 선정(기둥C).</summary>
