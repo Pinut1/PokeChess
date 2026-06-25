@@ -1,0 +1,25 @@
+{
+  "consumables": [
+    {
+      "id": 1,
+      "name": "챔피언 복제기",
+      "nameEn": "Champion Duplicator",
+      "consumableType": "duplicate_unit",
+      "description": "선택한 포켓몬 1기를 추가로 생성하여 획득합니다."
+    },
+    {
+      "id": 2,
+      "name": "재조합기",
+      "nameEn": "Reforger",
+      "consumableType": "reforge_item",
+      "description": "장착 중인 아이템을 제거하고 새로운 아이템으로 재구성합니다."
+    },
+    {
+      "id": 3,
+      "name": "황금제거기",
+      "nameEn": "Golden Remover",
+      "consumableType": "golden_remover",
+      "description": "장착된 아이템을 안전하게 분리하여 인벤토리로 반환합니다."
+    }
+  ]
+}

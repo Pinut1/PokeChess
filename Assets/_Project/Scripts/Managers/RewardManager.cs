@@ -9,8 +9,9 @@ using UnityEngine;
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage (FSM에 보상 로직을 하드코딩하지 않기 위해 분리).
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/유닛/아이템/진화의 돌은 실제 지급 연결됨. 소모품/증강은 해당 시스템이 붙을 때까지
-/// 훅 + 경고 로그로 남긴다(역기획서 수치도 미확정). grep "[Reward] TODO"로 추적.
+/// 골드/유닛/아이템/진화의 돌/소모품은 실제 지급 연결됨.
+/// 증강은 해당 시스템이 붙을 때까지 훅 + 경고 로그로 남긴다(역기획서 수치도 미확정).
+/// grep "[Reward] TODO"로 추적.
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
@@ -78,9 +79,9 @@ public class RewardManager : MonoBehaviour
                 if (amount > 0) GrantItem(entry.refNameEn, amount);
                 break;
 
-            // ── 아래는 해당 시스템이 붙으면 연결. 지금은 누락 추적용 훅 + 로그. ───────────────
+            // ── 종류별 보상 지급 분기. 증강은 AugmentManager 연결 전까지 TODO 로그로 유지. ───────────────
             case RewardKind.Consumable:
-                Debug.LogWarning($"[Reward] TODO Consumable '{entry.refNameEn}' ×{amount} — 소모품 시스템 미구현");
+                if (amount > 0) GrantConsumable(entry.refNameEn, amount);
                 break;
             case RewardKind.EvolutionStone:
                 if (amount > 0) GrantStone(entry.refNameEn, amount);
@@ -172,5 +173,23 @@ public class RewardManager : MonoBehaviour
 
         if (granted > 0)
             Debug.Log($"[Reward] EvolutionStone '{nameEn}' ×{granted} 인벤토리 지급");
+    }
+
+    /// <summary>소모품 보상 지급. refNameEn으로 ConsumableData 조회 → amount만큼 인벤토리에 추가.</summary>
+    private void GrantConsumable(string nameEn, int amount)
+    {
+        if (string.IsNullOrEmpty(nameEn)) return;
+
+        var item = GameManager.Instance.Item;
+        int granted = 0;
+
+        for (int i = 0; i < amount; i++)
+        {
+            if (!item.AddConsumableByNameEn(nameEn)) break;
+            granted++;
+        }
+
+        if (granted > 0)
+            Debug.Log($"[Reward] Consumable '{nameEn}' ×{granted} 인벤토리 지급");
     }
 }

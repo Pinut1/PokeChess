@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 아이템/진화의 돌 인벤토리 보관 + 장착·해제 담당.
-/// 획득(보상/상점)은 AddItem/AddStone(또는 이름으로 AddItemByNameEn/AddStoneByNameEn)으로 인벤토리에 추가,
+/// 아이템/진화의 돌/소모품 인벤토리 보관 + 장착·해제 담당.
+/// 획득(보상/상점)은 AddItem/AddStone/AddConsumable
+/// 또는 이름 기반 AddItemByNameEn/AddStoneByNameEn/AddConsumableByNameEn으로 인벤토리에 추가,
 /// 장착 단일 입구는 EquipToUnit(드래그&드롭 UI가 호출) — 성공 시 인벤토리에서 제거.
 /// 해제 단일 입구는 UnequipFromUnit — 성공 시 인벤토리로 반환.
 /// </summary>
@@ -13,10 +14,15 @@ public class ItemManager : MonoBehaviour
 
     private readonly List<ItemData> _items = new();
     private readonly List<EvolutionStoneData> _stones = new();
+    private readonly List<ConsumableData> _consumables = new();
+
+    [SerializeField] private List<ConsumableData> _consumableCatalog = new();
 
     public IReadOnlyList<ItemData> Items => _items;
     public IReadOnlyList<EvolutionStoneData> Stones => _stones;
-    public int InventoryCount => _items.Count + _stones.Count;
+    public IReadOnlyList<ConsumableData> Consumables => _consumables;
+
+    public int InventoryCount => _items.Count + _stones.Count + _consumables.Count;
     public bool HasInventorySpace => InventoryCount < MAX_INVENTORY_SIZE;
 
     /// <summary>일반 아이템 획득(보상/상점 구매 성공 시 호출). 인벤토리 가득이면 false.</summary>
@@ -69,6 +75,50 @@ public class ItemManager : MonoBehaviour
             return false;
         }
         return AddStone(stone);
+    }
+
+    /// <summary>소모품 획득. 인벤토리 가득이면 false.</summary>
+    public bool AddConsumable(ConsumableData consumable)
+    {
+        if (consumable == null) return false;
+
+        if (!HasInventorySpace)
+        {
+            Debug.LogWarning($"[Item] 인벤토리 가득({InventoryCount}/{MAX_INVENTORY_SIZE}) — '{consumable.consumableName}' 획득 실패");
+            return false;
+        }
+
+        _consumables.Add(consumable);
+        return true;
+    }
+
+    /// <summary>영문명으로 ConsumableData 조회 후 획득(RewardManager 등 refNameEn 기반 호출용).</summary>
+    public bool AddConsumableByNameEn(string nameEn)
+    {
+        if (string.IsNullOrEmpty(nameEn))
+            return false;
+
+        ConsumableData consumable = null;
+
+        for (int i = 0; i < _consumableCatalog.Count; i++)
+        {
+            var data = _consumableCatalog[i];
+            if (data == null) continue;
+
+            if (data.consumableNameEn == nameEn)
+            {
+                consumable = data;
+                break;
+            }
+        }
+
+        if (consumable == null)
+        {
+            Debug.LogWarning($"[Item] '{nameEn}' ConsumableData 목록에 없음 — 획득 실패");
+            return false;
+        }
+
+        return AddConsumable(consumable);
     }
 
     /// <summary>
