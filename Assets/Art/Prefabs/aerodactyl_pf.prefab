@@ -48,9 +48,13 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -6919768555201016778, guid: f0c65e616e9c61047b68757857378cbe, type: 3}
+      propertyPath: m_Layer
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f0c65e616e9c61047b68757857378cbe, type: 3}
       propertyPath: m_Name
-      value: Aerodactyl
+      value: aerodactyl_pf
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
