@@ -153,6 +153,7 @@ public class ShopManager : MonoBehaviour
         // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
         GameEvents.GoldChanged(Gold);
         GameEvents.LevelChanged(_currentLevel);
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
         GameEvents.UnitCapChanged(UnitCap); // 첫 프레임부터 BoardManager 캡이 현재 레벨 기준이 되도록 동기화
 
         Roll();         // 초기 유닛 상점 공개
@@ -241,6 +242,7 @@ public class ShopManager : MonoBehaviour
         if (_currentLevel >= _maxLevel)
         {
             CurrentXp = 0;
+            GameEvents.XpChanged(CurrentXp, RequiredXp);
             return;
         }
 
@@ -249,7 +251,7 @@ public class ShopManager : MonoBehaviour
 
         TryLevelUp();
 
-        // TODO: GameEvents.XpChanged(CurrentXp, RequiredXp) 추가 후 UI 갱신 연결
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
     }
 
     /// <summary>
