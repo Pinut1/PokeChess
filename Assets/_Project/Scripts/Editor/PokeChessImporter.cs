@@ -485,6 +485,9 @@ public static class PokeChessImporter
         so.tables = tables;
         EditorUtility.SetDirty(so);
 
+        // reward_data의 refNameEn이 실제 데이터 시트에 존재하는지 검증
+        ValidateRewardRefs(jsonDb);
+
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 보상 테이블 {tables.Count}개 Import 완료 (RewardDatabase 단일 에셋 갱신)");
     }
@@ -599,6 +602,147 @@ public static class PokeChessImporter
     // ──────────────────────────────────────────
     // 유틸
     // ──────────────────────────────────────────
+
+    private static void ValidateRewardRefs(RewardJsonDb rewardDb)
+    {
+        if (rewardDb == null || rewardDb.tables == null)
+            return;
+
+        var itemNames = LoadItemNameSet();
+        var consumableNames = LoadConsumableNameSet();
+        var stoneNames = LoadStoneNameSet();
+
+        foreach (var table in rewardDb.tables)
+        {
+            if (table == null || table.rewards == null)
+                continue;
+
+            foreach (var reward in table.rewards)
+            {
+                if (reward == null)
+                    continue;
+
+                // gold, itemCoupon, augment처럼 refNameEn이 필요 없는 보상은 제외
+                if (string.IsNullOrWhiteSpace(reward.refNameEn))
+                    continue;
+
+                string kind = reward.kind ?? "";
+                string refNameEn = reward.refNameEn.Trim();
+
+                bool found = false;
+
+                switch (kind)
+                {
+                    case "item":
+                        found = itemNames.Contains(refNameEn);
+                        break;
+
+                    case "consumable":
+                        found = consumableNames.Contains(refNameEn);
+                        break;
+
+                    case "stone":
+                    case "evolutionStone":
+                    case "evolution_stone":
+                        found = stoneNames.Contains(refNameEn);
+                        break;
+
+                    default:
+                        Debug.LogWarning($"[PokeChess] Reward ref 검증 대상이 아닌 kind입니다: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                        continue;
+                }
+
+                if (found)
+                {
+                    Debug.Log($"[PokeChess] Reward ref 확인 OK: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[PokeChess] Reward ref 찾기 실패: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                }
+            }
+        }
+    }
+
+    private static HashSet<string> LoadItemNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/item_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] item_data.json 없음 — Reward item ref 검증 생략");
+            return set;
+        }
+
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"items\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<ItemJsonDb>(jsonText);
+        if (db?.items == null)
+            return set;
+
+        foreach (var item in db.items)
+        {
+            if (item != null && !string.IsNullOrWhiteSpace(item.nameEn))
+                set.Add(item.nameEn.Trim());
+        }
+
+        return set;
+    }
+
+    private static HashSet<string> LoadConsumableNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/consumable_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] consumable_data.json 없음 — Reward consumable ref 검증 생략");
+            return set;
+        }
+
+        var db = JsonUtility.FromJson<ConsumableDatabase>(json.text);
+        if (db?.consumables == null)
+            return set;
+
+        foreach (var consumable in db.consumables)
+        {
+            if (consumable != null && !string.IsNullOrWhiteSpace(consumable.nameEn))
+                set.Add(consumable.nameEn.Trim());
+        }
+
+        return set;
+    }
+
+    private static HashSet<string> LoadStoneNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/evolution_stone_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] evolution_stone_data.json 없음 — Reward stone ref 검증 생략");
+            return set;
+        }
+
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"stones\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<StoneJsonDb>(jsonText);
+        if (db?.stones == null)
+            return set;
+
+        foreach (var stone in db.stones)
+        {
+            if (stone != null && !string.IsNullOrWhiteSpace(stone.nameEn))
+                set.Add(stone.nameEn.Trim());
+        }
+
+        return set;
+    }
 
     private static Dictionary<string, TrainerEntryJson> LoadTrainerEntryMap()
     {
