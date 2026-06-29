@@ -34,9 +34,30 @@ public class BoardManager : MonoBehaviour
     // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
     private Vector3 _centerOffset;
 
+    // 보드 배치 가능 기물 수(캡). 캡 산정의 단일 소스는 ShopManager이며,
+    // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
+    private int _unitCap = 1;
+
     private void Awake()
     {
         _bench = new PokemonUnit[_benchSize];
+    }
+
+    private void OnEnable()
+    {
+        GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+    }
+
+    private void HandleUnitCapChanged(int cap)
+    {
+        // 캡 값은 ShopManager가 레벨별 테이블 기준으로 산정해 전달한다. 여기서는 그대로 반영만.
+        _unitCap = Mathf.Max(1, cap);
+        Debug.Log($"[BoardManager] 배치 가능 기물 수 변경 반영: {_unitCap}");
     }
 
     private void Start()
@@ -219,6 +240,20 @@ public class BoardManager : MonoBehaviour
 
         // 들어오는 유닛이 원래 보드 위에 있었다면 그 좌표를 기억(스왑/비우기용)
         bool fromBoard = TryFindBoardCoords(unit, out HexCoords fromCoords);
+
+        // 벤치 → 빈 보드 타일로 새로 올리는 경우에만 배치 가능 기물 수 제한 검사.
+        // 보드 → 보드 이동은 기물 수가 늘지 않으므로 허용.
+        // 벤치 → 점유된 보드 타일 스왑도 보드 위 기물 수가 늘지 않으므로 허용.
+        if (!fromBoard && occupant == null)
+        {
+            int currentBoardCount = GetUnitsOnBoard().Count;
+
+            if (currentBoardCount >= _unitCap)
+            {
+                Debug.Log($"[BoardManager] 배치 거부 — 배치 가능 기물 수 초과 ({currentBoardCount}/{_unitCap})");
+                return false;
+            }
+        }
 
         if (occupant == null)
         {

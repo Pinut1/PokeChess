@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 기물 상점 + 아이템 상점 + 골드 경제 담당.
-/// 라운드마다 수입을 지급하고 유닛 상점/아이템 상점을 자동 갱신한다.
+/// 기물 상점 + 아이템 상점 + 골드 경제 + 레벨/XP 진행 담당.
+/// 라운드마다 골드 수입을 지급하고 유닛 상점/아이템 상점을 자동 갱신한다.
 /// 유닛 상점은 골드로 구매/리롤, 아이템 상점은 아이템 쿠폰으로 구매한다.
+/// 레벨/XP는 ShopManager 내부에서 관리하고, 레벨 변경은 GameEvents.OnLevelChanged로 통지한다.
 /// 매니저 간 직접 참조 금지 — 상태 변화는 GameEvents로 통지.
 /// </summary>
 public class ShopManager : MonoBehaviour
@@ -37,10 +38,64 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private int _cost5PoolCount = 10;
 
     [Header("레벨 확률")]
-    [Tooltip("현재는 플레이어 레벨 시스템이 없어서 ShopManager 내부 기본값으로 사용. 추후 GameEvents.OnLevelChanged로 갱신.")]
+    [Tooltip("초기 플레이어 레벨. 레벨 변경 시 GameEvents.OnLevelChanged를 통해 ShopManager 내부 레벨이 갱신된다.")]
     [SerializeField] private int _currentLevel = 1;
 
+    [Header("레벨 / XP 설정")]
+    [Tooltip("최대 플레이어 레벨. 임시값이며 밸런스 확정 후 조정 가능.")]
+    [SerializeField] private int _maxLevel = 10;
+
+    [Tooltip("라운드 종료 시 기본 지급 XP. 임시값이며 밸런스 확정 후 조정 가능.")]
+    [SerializeField] private int _roundXpReward = 2;
+
+    [Tooltip("XP 구매 1회에 필요한 골드. 임시값이며 밸런스 확정 후 조정 가능.")]
+    [SerializeField] private int _buyXpCostGold = 4;
+
+    [Tooltip("XP 구매 1회에 지급되는 XP. 임시값이며 밸런스 확정 후 조정 가능.")]
+    [SerializeField] private int _buyXpAmount = 4;
+
+    [Tooltip("index 0은 사용하지 않음. level 1 필요 XP = _requiredXpByLevel[1]")]
+    [SerializeField]
+    private int[] _requiredXpByLevel =
+    {
+        0,  // dummy
+        2,  // Lv1 -> Lv2
+        2,  // Lv2 -> Lv3
+        6,  // Lv3 -> Lv4
+        10, // Lv4 -> Lv5
+        20, // Lv5 -> Lv6
+        36, // Lv6 -> Lv7
+        48, // Lv7 -> Lv8
+        76, // Lv8 -> Lv9
+        80, // Lv9 -> Lv10
+        0   // Lv10 max
+    };
+
+    [Tooltip("index 0은 사용하지 않음. level 1 unit cap = _unitCapByLevel[1]")]
+    [SerializeField]
+    private int[] _unitCapByLevel =
+    {
+        0,  // dummy
+        1,  // Lv1
+        2,  // Lv2
+        3,  // Lv3
+        4,  // Lv4
+        5,  // Lv5
+        6,  // Lv6
+        7,  // Lv7
+        8,  // Lv8
+        9,  // Lv9
+        10  // Lv10
+    };
     public int Gold { get; private set; }
+
+    public int CurrentLevel => _currentLevel;
+    public int CurrentXp { get; private set; }
+    public int RequiredXp => GetRequiredXp(_currentLevel);
+    public int UnitCap => GetUnitCap(_currentLevel);
+    public int BuyXpCostGold => _buyXpCostGold;
+    public int BuyXpAmount => _buyXpAmount;
+
     public int ShopSize => _shopSize;
     public int ItemShopSize => _itemShopSize;
     public int ItemPrice => _itemPrice;
@@ -63,6 +118,10 @@ public class ShopManager : MonoBehaviour
         _itemSlots = new ScriptableObject[_itemShopSize];
 
         Gold = _startingGold;
+        CurrentXp = 0;
+
+        // 인스펙터에서 잘못된 값이 들어와도 안전하게 보정
+        _currentLevel = Mathf.Clamp(_currentLevel, 1, _maxLevel);
     }
 
     private void OnEnable()
@@ -70,6 +129,7 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnRoundChanged += HandleRoundChanged;
         GameEvents.OnUnitSold += HandleUnitSold;
         GameEvents.OnLevelChanged += HandleLevelChanged;
+        GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
     }
 
     private void OnDisable()
@@ -77,6 +137,7 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnRoundChanged -= HandleRoundChanged;
         GameEvents.OnUnitSold -= HandleUnitSold;
         GameEvents.OnLevelChanged -= HandleLevelChanged;
+        GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
     }
 
     private void Start()
@@ -88,7 +149,12 @@ public class ShopManager : MonoBehaviour
 
         InitializeChampionPool();
 
+        // 초기 UI/상점 상태 동기화.
+        // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
         GameEvents.GoldChanged(Gold);
+        GameEvents.LevelChanged(_currentLevel);
+        GameEvents.UnitCapChanged(UnitCap); // 첫 프레임부터 BoardManager 캡이 현재 레벨 기준이 되도록 동기화
+
         Roll();         // 초기 유닛 상점 공개
         RollItemShop(); // 초기 아이템 상점 공개
     }
@@ -150,9 +216,119 @@ public class ShopManager : MonoBehaviour
         RollItemShop(); // 아이템 상점도 매 라운드 자동 갱신
     }
 
+    // ──────────────────────────────────────────
+    // 레벨 / XP
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 팀 라운드 결과 확정 후 기본 XP 지급.
+    /// 현재는 승패와 관계없이 라운드 종료 XP를 지급한다.
+    /// TODO: 기획 확정 시 outcome에 따라 XP 지급 여부/배율을 다르게 처리할 수 있음.
+    /// </summary>
+    private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
+    {
+        AddXp(_roundXpReward);
+    }
+
+    /// <summary>
+    /// XP를 증가시키고, 필요 XP를 넘으면 자동 레벨업을 처리한다.
+    /// 라운드 종료 XP와 XP 구매가 모두 이 함수를 통해 누적된다.
+    /// </summary>
+    public void AddXp(int amount)
+    {
+        if (amount <= 0) return;
+
+        if (_currentLevel >= _maxLevel)
+        {
+            CurrentXp = 0;
+            return;
+        }
+
+        CurrentXp += amount;
+        Debug.Log($"[LevelXP] XP +{amount} => {CurrentXp}/{RequiredXp}");
+
+        TryLevelUp();
+
+        // TODO: GameEvents.XpChanged(CurrentXp, RequiredXp) 추가 후 UI 갱신 연결
+    }
+
+    /// <summary>
+    /// 골드를 사용해 XP를 구매한다.
+    /// 성공 시 골드를 차감하고 _buyXpAmount만큼 XP를 지급한다.
+    /// </summary>
+    public bool BuyXp()
+    {
+        if (_currentLevel >= _maxLevel)
+        {
+            Debug.Log("[LevelXP] 최대 레벨 — XP 구매 불가");
+            return false;
+        }
+
+        if (Gold < _buyXpCostGold)
+        {
+            Debug.Log($"[LevelXP] 골드 부족 — XP 구매 실패 (필요 {_buyXpCostGold}, 보유 {Gold})");
+            return false;
+        }
+
+        AddGold(-_buyXpCostGold);
+        AddXp(_buyXpAmount);
+
+        Debug.Log($"[LevelXP] XP 구매 완료 (-{_buyXpCostGold}G, +{_buyXpAmount}XP)");
+        return true;
+    }
+
+    /// <summary>
+    /// 현재 XP가 필요 XP 이상이면 레벨업한다.
+    /// 여러 레벨을 한 번에 넘길 수 있으므로 while로 처리한다.
+    /// </summary>
+    private void TryLevelUp()
+    {
+        while (_currentLevel < _maxLevel && RequiredXp > 0 && CurrentXp >= RequiredXp)
+        {
+            CurrentXp -= RequiredXp;
+            _currentLevel++;
+
+            Debug.Log($"[LevelXP] 레벨업! Lv.{_currentLevel}");
+
+            // ShopManager 자신도 이 이벤트를 구독하고 있으므로,
+            // 레벨 변경 이후 상점 확률은 다음 Roll/Reroll부터 새 레벨 기준으로 적용된다.
+            GameEvents.LevelChanged(_currentLevel);
+
+            // 캡의 단일 소스로서 레벨업 시점에 변경된 배치 가능 기물 수를 통지한다.
+            GameEvents.UnitCapChanged(UnitCap);
+        }
+
+        if (_currentLevel >= _maxLevel)
+            CurrentXp = 0;
+    }
+
+    /// <summary>
+    /// 현재 레벨에서 다음 레벨까지 필요한 XP를 반환한다.
+    /// 배열 범위를 벗어나면 0을 반환하여 레벨업을 막는다.
+    /// </summary>
+    private int GetRequiredXp(int level)
+    {
+        if (_requiredXpByLevel == null || level < 0 || level >= _requiredXpByLevel.Length)
+            return 0;
+
+        return _requiredXpByLevel[level];
+    }
+
+    /// <summary>
+    /// 현재 레벨 기준 배치 가능 기물 수를 반환한다.
+    /// 배열이 없거나 범위를 벗어나면 임시로 레벨 값을 그대로 사용한다.
+    /// </summary>
+    private int GetUnitCap(int level)
+    {
+        if (_unitCapByLevel == null || level < 0 || level >= _unitCapByLevel.Length)
+            return Mathf.Max(1, level);
+
+        return Mathf.Max(1, _unitCapByLevel[level]);
+    }
+
     private void HandleLevelChanged(int level)
     {
-        _currentLevel = Mathf.Max(1, level);
+        _currentLevel = Mathf.Clamp(level, 1, _maxLevel);
         Debug.Log($"[Shop] 플레이어 레벨 변경 반영: Lv.{_currentLevel}");
     }
 
@@ -265,7 +441,7 @@ public class ShopManager : MonoBehaviour
             7 => new[] { 20, 30, 33, 15, 2 },
             8 => new[] { 15, 25, 35, 20, 5 },
             9 => new[] { 10, 20, 30, 30, 10 },
-            _ => new[] { 10, 15, 25, 35, 15 }
+            _ => new[] { 5, 15, 25, 35, 20 } // Lv10 이상은 동일 확률
         };
     }
 
