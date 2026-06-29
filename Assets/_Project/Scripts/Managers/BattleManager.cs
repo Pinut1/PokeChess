@@ -79,7 +79,29 @@ public class BattleManager : MonoBehaviour
         ApplySynergyBuffs();
         ApplySynergySpecials();
 
-        bool? allyWon = null;
+        // 시뮬레이션 루프(전멸 판정 시 조기 종료, 타임아웃 시 allyWon=null로 남김).
+        var result = new BattleLoopResult();
+        yield return SimulateBattleLoop(result);
+
+        // 타임아웃으로 승부가 안 났으면 잔여 HP로 판정.
+        bool allyWon = result.allyWon ?? DetermineWinnerByRemainingHp();
+
+        Cleanup();
+        GameEvents.BattleEnd(allyWon);
+    }
+
+    /// <summary>코루틴은 out 파라미터를 못 쓰므로 루프 결과를 담아 전달하는 홀더.</summary>
+    private sealed class BattleLoopResult
+    {
+        public bool? allyWon; // null = 타임아웃(미결), true/false = 한쪽 전멸로 확정.
+    }
+
+    /// <summary>
+    /// MAX_TICKS까지 매 틱 시뮬레이션. 한쪽이 전멸하면 result.allyWon에 결과를 담고 종료,
+    /// 타임아웃이면 result.allyWon을 null로 남겨 호출부가 잔여 HP로 판정하게 한다.
+    /// </summary>
+    private IEnumerator SimulateBattleLoop(BattleLoopResult result)
+    {
         int tick = 0;
 
         while (tick < MAX_TICKS)
@@ -91,19 +113,13 @@ public class BattleManager : MonoBehaviour
 
             if (!allyAlive || !enemyAlive)
             {
-                allyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리)
-                break;
+                result.allyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리)
+                yield break;
             }
 
             tick++;
             yield return new WaitForSeconds(TICK_INTERVAL);
         }
-
-        if (allyWon == null)
-            allyWon = DetermineWinnerByRemainingHp();
-
-        Cleanup();
-        GameEvents.BattleEnd(allyWon.Value);
     }
 
     // ─────────────────────────────────────────
@@ -286,19 +302,29 @@ public class BattleManager : MonoBehaviour
 
         var board = GameManager.Instance.Board;
 
-        // 아군: 내 보드 스냅샷 그대로.
+        SetupAllyUnits(board);
+        SetupEnemyUnits(board);
+        ApplyOnCombatStartEffects();
+        SetupVisuals(board);
+    }
+
+    /// <summary>아군: 내 보드 스냅샷 그대로 BattleUnit으로 추가.</summary>
+    private void SetupAllyUnits(BoardManager board)
+    {
         foreach (var kv in board.GetBoardSnapshot())
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
             _units.Add(CreateAllyUnit(unit, kv.Key));
         }
+    }
 
-        // 적: 현재 스테이지(RoundPhaseManager가 라운드별로 확정) → 미러 좌표에 생성.
+    /// <summary>적: 현재 스테이지를 미러 좌표에 생성. 스테이지/적이 없으면 "내 보드 미러"로 폴백.</summary>
+    private void SetupEnemyUnits(BoardManager board)
+    {
         StageData stage = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentStage : null;
         int enemyCount = stage != null ? SpawnEnemiesFromStage(stage, board) : 0;
 
-        // 폴백: 스테이지/적이 하나도 없으면 기존 "내 보드 미러"로 대결(씬/디버그 호환).
         if (enemyCount == 0)
         {
             if (stage == null)
@@ -311,12 +337,19 @@ public class BattleManager : MonoBehaviour
         {
             Debug.Log($"[Battle] '{stage.stageId}' 적 {enemyCount}기 생성");
         }
+    }
 
-        // [기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).
+    /// <summary>[기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).</summary>
+    private void ApplyOnCombatStartEffects()
+    {
         foreach (var bu in _units)
             foreach (var effect in bu.effects)
                 effect.OnCombatStart(bu);
+    }
 
+    /// <summary>전투 유닛 시각화 + 미러 보드(상대 보드 시각 분리) 생성.</summary>
+    private void SetupVisuals(BoardManager board)
+    {
         foreach (var bu in _units)
             SpawnVisual(bu);
 
