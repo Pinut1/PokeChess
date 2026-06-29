@@ -48,6 +48,9 @@ public static class GameEvents
     /// <summary>플레이어 레벨 변경. 인자 = 변경 후 레벨</summary>
     public static event Action<int> OnLevelChanged;
 
+    /// <summary>보드 배치 가능 기물 수 변경. 인자 = 변경 후 캡. ShopManager가 단일 소스로 발행.</summary>
+    public static event Action<int> OnUnitCapChanged;
+
     /// <summary>플레이어 체력 변경. 인자 = 변경 후 체력 (팀 공통 HP — GDD 기준)</summary>
     public static event Action<int> OnHealthChanged;
 
@@ -169,6 +172,7 @@ public static class GameEvents
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
+    public static void UnitCapChanged(int cap) => OnUnitCapChanged?.Invoke(cap);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);
     public static void ItemCouponChanged(int amount) => OnItemCouponChanged?.Invoke(amount);

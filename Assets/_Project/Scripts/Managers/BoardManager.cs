@@ -34,8 +34,8 @@ public class BoardManager : MonoBehaviour
     // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
     private Vector3 _centerOffset;
 
-    // 현재 플레이어 레벨 기준 보드 배치 가능 기물 수.
-    // ShopManager를 직접 참조하지 않고 GameEvents.OnLevelChanged를 통해 갱신한다.
+    // 보드 배치 가능 기물 수(캡). 캡 산정의 단일 소스는 ShopManager이며,
+    // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
     private int _unitCap = 1;
 
     private void Awake()
@@ -45,18 +45,18 @@ public class BoardManager : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnLevelChanged += HandleLevelChanged;
+        GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnLevelChanged -= HandleLevelChanged;
+        GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
     }
 
-    private void HandleLevelChanged(int level)
+    private void HandleUnitCapChanged(int cap)
     {
-        // 현재 기획 기준: 플레이어 레벨 = 보드 배치 가능 기물 수
-        _unitCap = Mathf.Max(1, level);
+        // 캡 값은 ShopManager가 레벨별 테이블 기준으로 산정해 전달한다. 여기서는 그대로 반영만.
+        _unitCap = Mathf.Max(1, cap);
         Debug.Log($"[BoardManager] 배치 가능 기물 수 변경 반영: {_unitCap}");
     }
 
@@ -374,8 +374,6 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>벤치에 빈 슬롯이 있는지.</summary>
     public bool HasBenchSpace() => FirstEmptyBenchSlot() >= 0;
-
-    
 
     /// <summary>
     /// 유닛을 보드/벤치 어디에 있든 제거하고 판매 처리. 골드 환급은 ShopManager가 OnUnitSold를 받아 처리한다.

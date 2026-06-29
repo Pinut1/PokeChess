@@ -112,8 +112,6 @@ public class ShopManager : MonoBehaviour
     /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
     private readonly Dictionary<PokemonData, int> _remainingPool = new();
 
-
-
     private void Awake()
     {
         _slots = new PokemonData[_shopSize];
@@ -155,6 +153,7 @@ public class ShopManager : MonoBehaviour
         // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
         GameEvents.GoldChanged(Gold);
         GameEvents.LevelChanged(_currentLevel);
+        GameEvents.UnitCapChanged(UnitCap); // 첫 프레임부터 BoardManager 캡이 현재 레벨 기준이 되도록 동기화
 
         Roll();         // 초기 유닛 상점 공개
         RollItemShop(); // 초기 아이템 상점 공개
@@ -295,7 +294,8 @@ public class ShopManager : MonoBehaviour
             // 레벨 변경 이후 상점 확률은 다음 Roll/Reroll부터 새 레벨 기준으로 적용된다.
             GameEvents.LevelChanged(_currentLevel);
 
-            // TODO: GameEvents.UnitCapChanged(UnitCap) 추가 후 보드/표시 연결
+            // 캡의 단일 소스로서 레벨업 시점에 변경된 배치 가능 기물 수를 통지한다.
+            GameEvents.UnitCapChanged(UnitCap);
         }
 
         if (_currentLevel >= _maxLevel)
@@ -441,8 +441,7 @@ public class ShopManager : MonoBehaviour
             7 => new[] { 20, 30, 33, 15, 2 },
             8 => new[] { 15, 25, 35, 20, 5 },
             9 => new[] { 10, 20, 30, 30, 10 },
-            10 => new[] { 5, 15, 25, 35, 20 },
-            _ => new[] { 5, 15, 25, 35, 20 }
+            _ => new[] { 5, 15, 25, 35, 20 } // Lv10 이상은 동일 확률
         };
     }
 
