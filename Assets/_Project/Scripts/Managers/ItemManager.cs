@@ -84,6 +84,10 @@ public class ItemManager : MonoBehaviour
     /// <summary>
     /// 유닛 판매 시 장착 중인 일반 아이템/진화의 돌을 자동 해제해 인벤토리로 반환.
     /// BoardManager.SellUnit에서 UnitSold 이벤트가 Destroy 전에 발행되므로 여기서 unit 상태를 읽을 수 있다.
+    ///
+    /// 회수는 인벤토리 캡을 무시한다(RecoverToInventory) — 이미 보유했던 장착물이라
+    /// 캡이 가득이어도 유실 없이 무조건 복귀(일시적 20칸 초과 허용)시키기 위함.
+    /// (UnequipFromUnit→AddItem 경로는 캡 가득 시 장착물을 유실하므로 회수에는 쓰지 않는다.)
     /// </summary>
     private void HandleUnitSold(PokemonUnit unit)
     {
@@ -96,14 +100,30 @@ public class ItemManager : MonoBehaviour
 
             foreach (var item in equippedItems)
             {
-                if (item != null)
-                    UnequipFromUnit(item, unit);
+                if (item == null) continue;
+                RecoverToInventory(unit.RemoveItem(item));
             }
         }
 
         // 진화의 돌은 제거 시 data가 베이스 포켓몬으로 원복됨.
         if (unit.equippedStone != null)
-            UnequipFromUnit(unit.equippedStone, unit);
+            RecoverToInventory(unit.RemoveStone());
+    }
+
+    /// <summary>판매 회수 전용 — 인벤토리 캡을 무시하고 일반 아이템을 복귀시킨다. null은 무시.</summary>
+    private void RecoverToInventory(ItemData item)
+    {
+        if (item == null) return;
+        _items.Add(item);
+        GameEvents.InventoryChanged();
+    }
+
+    /// <summary>판매 회수 전용 — 인벤토리 캡을 무시하고 진화의 돌을 복귀시킨다. null은 무시.</summary>
+    private void RecoverToInventory(EvolutionStoneData stone)
+    {
+        if (stone == null) return;
+        _stones.Add(stone);
+        GameEvents.InventoryChanged();
     }
 
     // ──────────────────────────────────────────
