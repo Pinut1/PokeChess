@@ -12,7 +12,7 @@ using UnityEngine;
 /// 일관성: 중앙 [[PokemonDatabase]]와 동일 패턴.
 /// </summary>
 [CreateAssetMenu(menuName = "PokeChess/StageDatabase", fileName = "StageDatabase")]
-public class StageDatabase : ScriptableObject
+public class StageDatabase : ScriptableDatabase<StageDatabase>
 {
     [Tooltip("임포터(Import Stage JSON)가 자동으로 채움. 수동 편집 비권장.")]
     public List<StageData> stages = new();
@@ -25,20 +25,6 @@ public class StageDatabase : ScriptableObject
     public int LastRound => (stages == null || stages.Count == 0)
         ? 0
         : stages.Max(s => Mathf.Max(s.order, s.round));
-
-    // 런타임 단일 접근. Resources 루트에 단 하나의 DB 에셋만 두면 됨.
-    private static StageDatabase _instance;
-    public static StageDatabase Instance
-    {
-        get
-        {
-            if (_instance == null)
-                _instance = Resources.Load<StageDatabase>("StageDatabase");
-            if (_instance == null)
-                Debug.LogError("[StageDatabase] Resources/StageDatabase.asset 없음 — 'Import Stage JSON' 먼저 실행");
-            return _instance;
-        }
-    }
 
     /// <summary>
     /// 현재 라운드에 해당하는 스테이지 선택. order==round → round==round → 인덱스 클램프 순.

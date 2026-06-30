@@ -2,135 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum BattleTeam { Ally, Enemy }
-
-/// <summary>
-/// 전투 중 한 유닛의 런타임 상태. 원본 PokemonUnit은 변경하지 않고 이 클래스에 스냅샷.
-/// </summary>
-public class BattleUnit
-{
-    public PokemonUnit source;     // 아군이면 보드 위 원본 참조(시각화 토글용), 적이면 null
-    public BattleTeam team;
-    public HexCoords coords;
-
-    public float currentHp;
-    public float maxHp;
-    public float attack;          // 평타 데미지
-    public float defense;         // 받는 데미지 경감
-    public float spellPower;      // 스킬 데미지(SPELL effectType) 기반값
-    public float attackSpeed;
-    public int range;
-
-    // ── 크리티컬 (아이템으로 부여, 기본 무영향) ──
-    public float critChance     = 0f;     // 0~1. criPct 아이템으로 증가
-    public float critMultiplier = 1.5f;   // 크리 시 배수(TFT 표준). criDmgPct 아이템으로 증가
-
-    // ── 마나/스킬 (maxMana <= 0 이면 스킬 없음 → 평타만) ──
-    public float currentMana;
-    public float maxMana;            // = PokemonData.manaCost
-    public float manaGainMultiplier = 1f; // 마나 충전 속도 배수(정령 시너지/치어리더 등). 1=기본.
-    public SkillEffectType skillEffectType;  // 효과 분기 (Attack/Spell=데미지, Stun/Slow/Taunt=CC, HpRegen/Shield/ManaRegen/AsBuff=지원)
-    public SkillTargetType skillTargetType;
-    public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
-    public int   skillLineLength;    // EnemyLine: 시전자 기준 직선(칸)
-
-    public bool HasSkill => maxMana > 0f;
-
-    public float attackCooldown;   // 0 이하가 되면 공격 가능
-    public GameObject visual;
-
-    // ── 효과 훅(기둥B) — 아이템/스킬/시너지가 전투 틱에 꽂히는 진입점 ──
-    public readonly List<ICombatEffect> effects = new();
-
-    // ── 조건부 아이템 효과 상태(기둥B 2단계) ──
-    public float shield;                  // 보호막 흡수량. 0 이하면 없음(shieldPctOnFatalHit).
-    public float burnDamagePerTick;       // 화상 중 매틱 고정(True) 피해. 0이면 화상 없음.
-    public float burnTicksRemaining;      // 화상 잔여 틱 수(시간이 아니라 틱 카운트).
-    public float moveSpeedMultiplier = 1f; // 이동 가속 배수(moveSpdPctOnKill로 누적 가산).
-
-    // ── CC 상태(기둥C) ──
-    public float stunRemaining;           // 0보다 크면 행동 불능.
-    public float slowMultiplier = 1f;     // 1=정상, 0.5=공속 50% 감소.
-    public float slowRemaining;           // 슬로우 잔여 시간. 0 도달 시 slowMultiplier 1로 복원.
-    public BattleUnit tauntedBy;          // null 아니면 이 유닛을 강제 타겟(도발자 생존 중에만 유효).
-    public bool HasCcImmuneItem;          // ccImmune 아이템 보유 여부.
-    public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
-    public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
-
-    // ── 지원 스킬 버프(AsBuff) — CC와 동일한 패턴(1=무효과, 시간 지나면 복원) ──
-    public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
-    public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
-
-    public bool IsAlive => currentHp > 0f;
-
-    // ─────────────────────────────────────────
-    // CC/지원 상태 변이 — 상태(필드)와 그 상태를 바꾸는 행동을 한 곳에 모음.
-    // BattleManager(타겟 선정)가 대상을 고른 뒤 이 메서드들로 위임한다.
-    // ─────────────────────────────────────────
-
-    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
-    public void TickCcState(float deltaTime)
-    {
-        if (stunRemaining > 0f)
-            stunRemaining = Mathf.Max(0f, stunRemaining - deltaTime);
-
-        if (slowRemaining > 0f)
-        {
-            slowRemaining = Mathf.Max(0f, slowRemaining - deltaTime);
-            if (slowRemaining <= 0f) slowMultiplier = 1f;
-        }
-
-        if (asBuffRemaining > 0f)
-        {
-            asBuffRemaining = Mathf.Max(0f, asBuffRemaining - deltaTime);
-            if (asBuffRemaining <= 0f) asBuffMultiplier = 1f;
-        }
-
-        if (tauntedBy != null && !tauntedBy.IsAlive)
-            tauntedBy = null;
-    }
-
-    /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
-    private bool TryConsumeCcImmunity()
-    {
-        if (!HasCcImmuneItem || ccImmuneConsumed) return false;
-        ccImmuneConsumed = true;
-        return true;
-    }
-
-    public void ApplyStun(float duration)
-    {
-        if (TryConsumeCcImmunity()) return;
-        stunRemaining = Mathf.Max(stunRemaining, duration);
-    }
-
-    public void ApplySlow(float multiplier, float duration)
-    {
-        if (TryConsumeCcImmunity()) return;
-        slowMultiplier = Mathf.Min(slowMultiplier, multiplier);
-        slowRemaining = Mathf.Max(slowRemaining, duration);
-    }
-
-    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
-    public void ApplyTaunt(BattleUnit caster)
-    {
-        if (TryConsumeCcImmunity()) return;
-        tauntedBy = caster;
-    }
-
-    public void ApplyHeal(float amount)
-        => currentHp = Mathf.Min(maxHp, currentHp + Mathf.Max(0f, amount));
-
-    public void ApplyShield(float amount)
-        => shield += Mathf.Max(0f, amount);
-
-    public void ApplyAsBuff(float multiplier, float duration)
-    {
-        asBuffMultiplier = Mathf.Max(asBuffMultiplier, multiplier);
-        asBuffRemaining  = Mathf.Max(asBuffRemaining, duration);
-    }
-}
-
 /// <summary>
 /// 자동 전투 진행 담당 (협동 PVE).
 /// GameEvents.OnBattleStart 수신 시 BoardManager 스냅샷으로 아군 팀을 만들고,
@@ -208,7 +79,29 @@ public class BattleManager : MonoBehaviour
         ApplySynergyBuffs();
         ApplySynergySpecials();
 
-        bool? allyWon = null;
+        // 시뮬레이션 루프(전멸 판정 시 조기 종료, 타임아웃 시 allyWon=null로 남김).
+        var result = new BattleLoopResult();
+        yield return SimulateBattleLoop(result);
+
+        // 타임아웃으로 승부가 안 났으면 잔여 HP로 판정.
+        bool allyWon = result.allyWon ?? DetermineWinnerByRemainingHp();
+
+        Cleanup();
+        GameEvents.BattleEnd(allyWon);
+    }
+
+    /// <summary>코루틴은 out 파라미터를 못 쓰므로 루프 결과를 담아 전달하는 홀더.</summary>
+    private sealed class BattleLoopResult
+    {
+        public bool? allyWon; // null = 타임아웃(미결), true/false = 한쪽 전멸로 확정.
+    }
+
+    /// <summary>
+    /// MAX_TICKS까지 매 틱 시뮬레이션. 한쪽이 전멸하면 result.allyWon에 결과를 담고 종료,
+    /// 타임아웃이면 result.allyWon을 null로 남겨 호출부가 잔여 HP로 판정하게 한다.
+    /// </summary>
+    private IEnumerator SimulateBattleLoop(BattleLoopResult result)
+    {
         int tick = 0;
 
         while (tick < MAX_TICKS)
@@ -220,19 +113,13 @@ public class BattleManager : MonoBehaviour
 
             if (!allyAlive || !enemyAlive)
             {
-                allyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리)
-                break;
+                result.allyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리)
+                yield break;
             }
 
             tick++;
             yield return new WaitForSeconds(TICK_INTERVAL);
         }
-
-        if (allyWon == null)
-            allyWon = DetermineWinnerByRemainingHp();
-
-        Cleanup();
-        GameEvents.BattleEnd(allyWon.Value);
     }
 
     // ─────────────────────────────────────────
@@ -415,19 +302,29 @@ public class BattleManager : MonoBehaviour
 
         var board = GameManager.Instance.Board;
 
-        // 아군: 내 보드 스냅샷 그대로.
+        SetupAllyUnits(board);
+        SetupEnemyUnits(board);
+        ApplyOnCombatStartEffects();
+        SetupVisuals(board);
+    }
+
+    /// <summary>아군: 내 보드 스냅샷 그대로 BattleUnit으로 추가.</summary>
+    private void SetupAllyUnits(BoardManager board)
+    {
         foreach (var kv in board.GetBoardSnapshot())
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
             _units.Add(CreateAllyUnit(unit, kv.Key));
         }
+    }
 
-        // 적: 현재 스테이지(RoundPhaseManager가 라운드별로 확정) → 미러 좌표에 생성.
+    /// <summary>적: 현재 스테이지를 미러 좌표에 생성. 스테이지/적이 없으면 "내 보드 미러"로 폴백.</summary>
+    private void SetupEnemyUnits(BoardManager board)
+    {
         StageData stage = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentStage : null;
         int enemyCount = stage != null ? SpawnEnemiesFromStage(stage, board) : 0;
 
-        // 폴백: 스테이지/적이 하나도 없으면 기존 "내 보드 미러"로 대결(씬/디버그 호환).
         if (enemyCount == 0)
         {
             if (stage == null)
@@ -440,12 +337,19 @@ public class BattleManager : MonoBehaviour
         {
             Debug.Log($"[Battle] '{stage.stageId}' 적 {enemyCount}기 생성");
         }
+    }
 
-        // [기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).
+    /// <summary>[기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).</summary>
+    private void ApplyOnCombatStartEffects()
+    {
         foreach (var bu in _units)
             foreach (var effect in bu.effects)
                 effect.OnCombatStart(bu);
+    }
 
+    /// <summary>전투 유닛 시각화 + 미러 보드(상대 보드 시각 분리) 생성.</summary>
+    private void SetupVisuals(BoardManager board)
+    {
         foreach (var bu in _units)
             SpawnVisual(bu);
 
