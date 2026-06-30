@@ -246,7 +246,7 @@ public class BoardManager : MonoBehaviour
         // 벤치 → 점유된 보드 타일 스왑도 보드 위 기물 수가 늘지 않으므로 허용.
         if (!fromBoard && occupant == null)
         {
-            int currentBoardCount = GetUnitsOnBoard().Count;
+            int currentBoardCount = CountUnitsOnBoard();
 
             if (currentBoardCount >= _unitCap)
             {
@@ -443,6 +443,20 @@ public class BoardManager : MonoBehaviour
             _battleField[coords] = null;
         else
             RemoveFromBenchByRef(unit);
+    }
+
+    /// <summary>현재 보드 위에 있는 유닛 수만 계산한다. List를 만들지 않아 배치 제한 체크용으로 가볍다.</summary>
+    private int CountUnitsOnBoard()
+    {
+        int count = 0;
+
+        foreach (var unit in _battleField.Values)
+        {
+            if (unit != null)
+                count++;
+        }
+
+        return count;
     }
 
     // ──────────────────────────────────────────

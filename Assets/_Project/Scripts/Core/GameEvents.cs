@@ -188,11 +188,11 @@ public static class GameEvents
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
-    public static void TradeRejected()               => OnTradeRejected?.Invoke();
-    public static void ShopRerolled()               => OnShopRerolled?.Invoke();
+    public static void TradeRejected()    => OnTradeRejected?.Invoke();
+    public static void ShopRerolled()     => OnShopRerolled?.Invoke();
     public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
     public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
-    public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
+    public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
     public static void StageEntered(StageData stage) => OnStageEntered?.Invoke(stage);
 
