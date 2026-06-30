@@ -165,17 +165,16 @@ public class RoundPhaseManager : MonoBehaviour
         }
     }
 
-    /// <summary>재접속 유예시간 종료. 둘 다 끊겼으면 세션 종료, 한 명만 남았으면 항복/나가기 선택 필요</summary>
+    /// <summary>
+    /// 재접속 유예시간 종료. 2인 협동 PVE라 둘 다 끊겼든 한 명만 남았든 공략이 불가능하므로
+    /// 어느 경우든 세션 종료(패배)로 처리한다. (남은 플레이어 솔로 전환/항복 선택지는 기획상 두지 않음.)
+    /// </summary>
     private void HandleGracePeriodExpired(bool bothDisconnected)
     {
-        if (bothDisconnected)
-        {
-            HandleSessionEnded();
-            return;
-        }
+        if (!bothDisconnected)
+            Debug.LogWarning("[Phase] 유예시간 종료 — 상대 미재접속(협동 불가) → 세션 종료");
 
-        Debug.LogWarning("[Phase] 유예시간 종료 — 남은 플레이어 항복/나가기 선택 필요 (UI 미구현)");
-        // TODO(UIManager): 항복/나가기 선택 UI 연결
+        HandleSessionEnded();
     }
 
     /// <summary>세션 종료(패배 처리). 전적 기록 시스템 미구현 — 로그만 출력</summary>
