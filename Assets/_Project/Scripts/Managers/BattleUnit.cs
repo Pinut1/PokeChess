@@ -56,6 +56,9 @@ public class BattleUnit
     public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
     public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
 
+    // ── 악(DARK) 시너지 — 첫 스킬 시전 시 대상 스턴(1회 소비) ──
+    public bool darkFirstSkillPending;    // true면 다음 스킬 시전 시 대상에 스턴 부여 후 false로 소비.
+
     // ── 지원 스킬 버프(AsBuff) — CC와 동일한 패턴(1=무효과, 시간 지나면 복원) ──
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
