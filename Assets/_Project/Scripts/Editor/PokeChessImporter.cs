@@ -96,21 +96,30 @@ public static class PokeChessImporter
         public string targetPokemon, evolvedPokemon;   // 매핑 (행마다 하나씩)
     }
 
-    
+
     [Serializable]
     private class StageEntry
     {
         public string stageId;
+
+        // 기존 chapter도 유지하고, 시트에서 stage라는 이름으로 들어와도 받을 수 있게 추가
         public int chapter;
+        public int stage;
         public int round;
         public int order;
 
+        // 기존 stageType도 유지하고, 신규 스키마의 battleType도 받을 수 있게 추가
         public string stageType;
+        public string battleType;
+
         public string preReward;
         public string trainerName;
-        public string trainerId;        // Trainer Entry 참조 키 (join 임포터에서 사용)
+        public string trainerId;
 
-        public string rewardTableId;    // "RW001" 등 문자열 키
+        // 기존 rewardTableId도 유지하고, 신규 시트의 rewardId도 받을 수 있게 추가
+        public string rewardTableId;
+        public string rewardId;
+
         public List<EnemyPlacementJson> enemies;
     }
 
@@ -128,8 +137,14 @@ public static class PokeChessImporter
         public string pokemonNameEn;
         public string pokemonNameKr;
         public int starLevel;
+
+        // 신규 스키마: Trainer Entry 시트는 slot(1~6)을 우선 사용
+        public int slot;
+
+        // 전환기 / 보스전 override용: q/r이 직접 들어오면 그대로 사용 가능
         public int q;
         public int r;
+
         public string heldItemEn;
 
         public float statMultiplier;
@@ -470,6 +485,9 @@ public static class PokeChessImporter
         so.tables = tables;
         EditorUtility.SetDirty(so);
 
+        // reward_data의 refNameEn이 실제 데이터 시트에 존재하는지 검증
+        ValidateRewardRefs(jsonDb);
+
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 보상 테이블 {tables.Count}개 Import 완료 (RewardDatabase 단일 에셋 갱신)");
     }
@@ -495,17 +513,23 @@ public static class PokeChessImporter
 
         foreach (var e in jsonDb.stages)
         {
+            int chapter = ResolveChapter(e);
+            int round = e.round;
+
             var stage = new StageData
             {
-                stageId = e.stageId,
-                chapter = e.chapter,
-                round = e.round,
-                order = e.order,
-                stageType = ParseStageType(e.stageType),
+                stageId = ResolveStageId(e, chapter, round),
+                chapter = chapter,
+                round = round,
+                order = ResolveOrder(e, stages.Count + 1),
+
+                stageType = ResolveStageType(e),
                 preReward = ParsePreStageReward(e.preReward),
+
                 trainerName = e.trainerName ?? "",
                 trainerId = e.trainerId ?? "",
-                rewardTableId = e.rewardTableId ?? "",
+                rewardTableId = ResolveRewardTableId(e),
+
                 enemies = new List<EnemyPlacement>()
             };
 
@@ -579,6 +603,147 @@ public static class PokeChessImporter
     // 유틸
     // ──────────────────────────────────────────
 
+    private static void ValidateRewardRefs(RewardJsonDb rewardDb)
+    {
+        if (rewardDb == null || rewardDb.tables == null)
+            return;
+
+        var itemNames = LoadItemNameSet();
+        var consumableNames = LoadConsumableNameSet();
+        var stoneNames = LoadStoneNameSet();
+
+        foreach (var table in rewardDb.tables)
+        {
+            if (table == null || table.rewards == null)
+                continue;
+
+            foreach (var reward in table.rewards)
+            {
+                if (reward == null)
+                    continue;
+
+                // gold, itemCoupon, augment처럼 refNameEn이 필요 없는 보상은 제외
+                if (string.IsNullOrWhiteSpace(reward.refNameEn))
+                    continue;
+
+                string kind = reward.kind ?? "";
+                string refNameEn = reward.refNameEn.Trim();
+
+                bool found = false;
+
+                switch (kind)
+                {
+                    case "item":
+                        found = itemNames.Contains(refNameEn);
+                        break;
+
+                    case "consumable":
+                        found = consumableNames.Contains(refNameEn);
+                        break;
+
+                    case "stone":
+                    case "evolutionStone":
+                    case "evolution_stone":
+                        found = stoneNames.Contains(refNameEn);
+                        break;
+
+                    default:
+                        Debug.LogWarning($"[PokeChess] Reward ref 검증 대상이 아닌 kind입니다: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                        continue;
+                }
+
+                if (found)
+                {
+                    Debug.Log($"[PokeChess] Reward ref 확인 OK: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[PokeChess] Reward ref 찾기 실패: table={table.rewardTableId}, kind={kind}, refNameEn={refNameEn}");
+                }
+            }
+        }
+    }
+
+    private static HashSet<string> LoadItemNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/item_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] item_data.json 없음 — Reward item ref 검증 생략");
+            return set;
+        }
+
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"items\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<ItemJsonDb>(jsonText);
+        if (db?.items == null)
+            return set;
+
+        foreach (var item in db.items)
+        {
+            if (item != null && !string.IsNullOrWhiteSpace(item.nameEn))
+                set.Add(item.nameEn.Trim());
+        }
+
+        return set;
+    }
+
+    private static HashSet<string> LoadConsumableNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/consumable_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] consumable_data.json 없음 — Reward consumable ref 검증 생략");
+            return set;
+        }
+
+        var db = JsonUtility.FromJson<ConsumableDatabase>(json.text);
+        if (db?.consumables == null)
+            return set;
+
+        foreach (var consumable in db.consumables)
+        {
+            if (consumable != null && !string.IsNullOrWhiteSpace(consumable.nameEn))
+                set.Add(consumable.nameEn.Trim());
+        }
+
+        return set;
+    }
+
+    private static HashSet<string> LoadStoneNameSet()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var json = Resources.Load<TextAsset>("Data/evolution_stone_data");
+        if (json == null)
+        {
+            Debug.LogWarning("[PokeChess] evolution_stone_data.json 없음 — Reward stone ref 검증 생략");
+            return set;
+        }
+
+        var jsonText = json.text.TrimStart();
+        if (jsonText.StartsWith("["))
+            jsonText = $"{{\"stones\":{jsonText}}}";
+
+        var db = JsonUtility.FromJson<StoneJsonDb>(jsonText);
+        if (db?.stones == null)
+            return set;
+
+        foreach (var stone in db.stones)
+        {
+            if (stone != null && !string.IsNullOrWhiteSpace(stone.nameEn))
+                set.Add(stone.nameEn.Trim());
+        }
+
+        return set;
+    }
+
     private static Dictionary<string, TrainerEntryJson> LoadTrainerEntryMap()
     {
         var map = new Dictionary<string, TrainerEntryJson>(StringComparer.OrdinalIgnoreCase);
@@ -619,13 +784,24 @@ public static class PokeChessImporter
             if (enemy == null)
                 continue;
 
+            int q = enemy.q;
+            int r = enemy.r;
+
+            // 신규 스키마: slot(1~6)이 있으면 StageLayout 기준으로 q/r 자동 변환
+            if (enemy.slot >= StageLayout.MinSlot && enemy.slot <= StageLayout.MaxSlot)
+            {
+                HexCoords hex = StageLayout.SlotToHex(enemy.slot);
+                q = hex.q;
+                r = hex.r;
+            }
+
             stage.enemies.Add(new EnemyPlacement
             {
                 pokemonNameEn = enemy.pokemonNameEn ?? "",
                 pokemonNameKr = enemy.pokemonNameKr ?? "",
                 starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
-                q = enemy.q,
-                r = enemy.r,
+                q = q,
+                r = r,
                 heldItemEn = enemy.heldItemEn ?? "",
                 statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
                 hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
@@ -749,6 +925,84 @@ public static class PokeChessImporter
             return result;
 
         Debug.LogWarning($"[PokeChess] 알 수 없는 StageType: {s}, WildCommon으로 처리");
+        return StageType.WildCommon;
+    }
+
+    private static int ResolveChapter(StageEntry e)
+    {
+        if (e.chapter > 0)
+            return e.chapter;
+
+        if (e.stage > 0)
+            return e.stage;
+
+        return 1;
+    }
+
+    private static string ResolveStageId(StageEntry e, int chapter, int round)
+    {
+        if (!string.IsNullOrEmpty(e.stageId))
+            return e.stageId;
+
+        return $"{chapter}-{round}";
+    }
+
+    private static int ResolveOrder(StageEntry e, int fallbackOrder)
+    {
+        if (e.order > 0)
+            return e.order;
+
+        int chapter = ResolveChapter(e);
+
+        if (chapter > 0 && e.round > 0)
+            return ((chapter - 1) * 100) + e.round;
+
+        return fallbackOrder;
+    }
+
+    private static string ResolveRewardTableId(StageEntry e)
+    {
+        string raw = !string.IsNullOrEmpty(e.rewardTableId)
+            ? e.rewardTableId
+            : e.rewardId;
+
+        if (string.IsNullOrEmpty(raw))
+            return "";
+
+        raw = raw.Trim();
+
+        if (raw.StartsWith("RW", StringComparison.OrdinalIgnoreCase))
+            return raw.ToUpperInvariant();
+
+        if (int.TryParse(raw, out int number))
+            return $"RW{number:000}";
+
+        return raw;
+    }
+
+    private static StageType ResolveStageType(StageEntry e)
+    {
+        // 기존 stage_data.json에 stageType이 있으면 기존 값 우선 사용
+        if (!string.IsNullOrEmpty(e.stageType) &&
+            Enum.TryParse(e.stageType, true, out StageType parsed))
+        {
+            return parsed;
+        }
+
+        string battleType = e.battleType ?? "";
+        string trainerId = e.trainerId ?? "";
+
+        string key = $"{battleType} {trainerId}".ToLowerInvariant();
+
+        if (key.Contains("champ") || key.Contains("champion") || key.Contains("boss"))
+            return StageType.ChampionBattle;
+
+        if (key.Contains("gym") || key.Contains("trainer"))
+            return StageType.GymBattle;
+
+        if (key.Contains("rare"))
+            return StageType.WildRare;
+
         return StageType.WildCommon;
     }
 
