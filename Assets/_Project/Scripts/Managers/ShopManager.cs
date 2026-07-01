@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// 기물 상점 + 아이템 상점 + 골드 경제 + 레벨/XP 진행 담당.
-/// 라운드마다 골드 수입을 지급하고 유닛 상점/아이템 상점을 자동 갱신한다.
+/// 라운드마다 유닛 상점/아이템 상점을 자동 갱신한다.
+/// Reward v2 보상은 RewardManager가 OnStageEntered 시점에 전투 전 선지급한다.
 /// 유닛 상점은 골드로 구매/리롤, 아이템 상점은 아이템 쿠폰으로 구매한다.
 /// 레벨/XP는 ShopManager 내부에서 관리하고, 레벨 변경은 GameEvents.OnLevelChanged로 통지한다.
 /// 매니저 간 직접 참조 금지 — 상태 변화는 GameEvents로 통지.
@@ -28,7 +29,6 @@ public class ShopManager : MonoBehaviour
 
     [Header("골드 설정")]
     [SerializeField] private int _startingGold = 10;
-    [SerializeField] private int _incomePerRound = 5;
 
     [Header("리롤권 설정")]
     [SerializeField] private bool _allowGoldUnitShopRerollWhenNoTicket = true;
@@ -216,7 +216,9 @@ public class ShopManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
-        AddGold(_incomePerRound);
+        // Reward v2에서는 라운드 골드/리롤권/쿠폰 보상을 RewardManager가
+        // OnStageEntered 시점에 전투 전 선지급한다.
+        // 여기서는 상점 자동 갱신만 담당한다.
 
         Roll();         // 유닛 상점은 매 라운드 자동 갱신
         RollItemShop(); // 아이템 상점도 매 라운드 자동 갱신
