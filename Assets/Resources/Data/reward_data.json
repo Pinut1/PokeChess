@@ -2,19 +2,54 @@
   "tables": [
     {
       "rewardTableId": "RW001",
-      "label": "야생 클리어 보상 (예시 — 역기획서 확정 필요)",
+      "label": "1라운드 전투 전 보상",
       "rewards": [
-        { "kind": "gold", "amount": 5, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "gold", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
         { "kind": "itemCoupon", "amount": 1, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "augment", "amount": 1, "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "itemShopReroll", "amount": 2, "refNameEn": "", "dropChance": 1.0 }
       ]
     },
     {
       "rewardTableId": "RW002",
-      "label": "관장전 클리어 보상 (예시)",
+      "label": "2라운드 전투 전 보상",
       "rewards": [
-        { "kind": "gold", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "item", "amount": 1, "refNameEn": "Sitrus Berry", "dropChance": 0.5 }
+        { "kind": "gold", "amount": 25, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2, "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW003",
+      "label": "3라운드 전투 전 보상",
+      "rewards": [
+        { "kind": "gold", "amount": 40, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 2, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger", "amount": 1, "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW004",
+      "label": "4라운드 전투 전 보상",
+      "rewards": [
+        { "kind": "gold", "amount": 55, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2, "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW005",
+      "label": "5라운드 전투 전 보상",
+      "rewards": [
+        { "kind": "gold", "amount": 70, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll", "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 2, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger", "amount": 1, "refNameEn": "", "dropChance": 1.0 }
       ]
     }
   ]

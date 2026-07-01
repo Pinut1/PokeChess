@@ -7,7 +7,11 @@ public enum RewardKind
 {
     Gold,            // 골드 (amount = 골드량)
     ItemCoupon,      // 아이템 쿠폰 (amount = 쿠폰 수량)
-    Reroll,          // 무료 리롤 횟수 (refNameEn 무시, amount = 횟수) — 스키마 v2 reroll
+
+    Reroll,          // 유닛상점 무료 리롤 횟수 (refNameEn 무시, amount = 횟수) — 스키마 v2 reroll
+    ItemShopReroll,  // 아이템상점 무료 리롤 횟수 (refNameEn 무시, amount = 횟수) — 스키마 v2 itemShopReroll
+    Reforger,        // 아이템 재조합/변환권 (refNameEn 무시, amount = 수량)
+
     Item,            // 완성 아이템 (refNameEn = ItemData 영문명, amount = 개수)
     Consumable,      // 소모품 (refNameEn = ConsumableData 영문명)
     EvolutionStone,  // 진화의 돌 (refNameEn = EvolutionStoneData 영문명)

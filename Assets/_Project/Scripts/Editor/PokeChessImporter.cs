@@ -164,7 +164,7 @@ public static class PokeChessImporter
     [Serializable]
     private class RewardEntryJson
     {
-        public string kind;        // gold / item / consumable / stone / unit / augment
+        public string kind;        // gold / itemCoupon / reroll / itemShopReroll / reforger / item / consumable / stone / unit / augment
         public int    amount;
         public string refNameEn;
         public float  dropChance;  // 0~1, 0이면 확정(1)로 보정
@@ -810,18 +810,61 @@ public static class PokeChessImporter
         }
     }
 
-    private static RewardKind ParseRewardKind(string s) => s switch
+    private static RewardKind ParseRewardKind(string s)
     {
-        "gold" => RewardKind.Gold,
-        "itemCoupon" or "coupon" or "item_coupon" => RewardKind.ItemCoupon,
-        "reroll" => RewardKind.Reroll,
-        "item" => RewardKind.Item,
-        "consumable" => RewardKind.Consumable,
-        "stone" or "evolutionStone" => RewardKind.EvolutionStone,
-        "unit" => RewardKind.Unit,
-        "augment" or "augmentChoice" => RewardKind.AugmentChoice,
-        _ => RewardKind.Gold,
-    };
+        string key = (s ?? "").Trim();
+
+        switch (key)
+        {
+            case "gold":
+                return RewardKind.Gold;
+
+            case "itemCoupon":
+            case "coupon":
+            case "item_coupon":
+                return RewardKind.ItemCoupon;
+
+            case "reroll":
+            case "unitShopReroll":
+            case "unit_shop_reroll":
+                return RewardKind.Reroll;
+
+            case "itemShopReroll":
+            case "item_shop_reroll":
+            case "itemReroll":
+            case "item_reroll":
+                return RewardKind.ItemShopReroll;
+
+            case "reforger":
+            case "reforge":
+            case "itemReforger":
+            case "item_reforger":
+                return RewardKind.Reforger;
+
+            case "item":
+                return RewardKind.Item;
+
+            case "consumable":
+                return RewardKind.Consumable;
+
+            case "stone":
+            case "evolutionStone":
+            case "evolution_stone":
+                return RewardKind.EvolutionStone;
+
+            case "unit":
+                return RewardKind.Unit;
+
+            case "augment":
+            case "augmentChoice":
+            case "augment_choice":
+                return RewardKind.AugmentChoice;
+
+            default:
+                Debug.LogWarning($"[PokeChess] 알 수 없는 RewardKind: '{s}' — Gold로 처리");
+                return RewardKind.Gold;
+        }
+    }
 
     private static void ApplyItemStat(ItemData so, string key, float value)
     {

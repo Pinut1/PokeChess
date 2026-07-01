@@ -92,6 +92,44 @@ public class RewardManager : MonoBehaviour
                 if (amount > 0) GrantItem(entry.refNameEn, amount);
                 break;
 
+            case RewardKind.Reroll:
+                if (amount <= 0) break;
+
+                if (GameManager.Instance.Shop == null)
+                {
+                    Debug.LogWarning("[Reward] ShopManager 없음 — 유닛상점 리롤권 지급 실패");
+                    break;
+                }
+
+                GameManager.Instance.Shop.AddUnitShopRerollTickets(amount);
+                Debug.Log($"[Reward] +{amount} 유닛상점 리롤권");
+                break;
+
+            case RewardKind.ItemShopReroll:
+                if (amount <= 0) break;
+
+                if (GameManager.Instance.Shop == null)
+                {
+                    Debug.LogWarning("[Reward] ShopManager 없음 — 아이템상점 리롤권 지급 실패");
+                    break;
+                }
+
+                GameManager.Instance.Shop.AddItemShopRerollTickets(amount);
+                Debug.Log($"[Reward] +{amount} 아이템상점 리롤권");
+                break;
+            case RewardKind.Reforger:
+                if (amount <= 0) break;
+
+                if (GameManager.Instance.Item == null)
+                {
+                    Debug.LogWarning("[Reward] ItemManager 없음 — Reforger 지급 실패");
+                    break;
+                }
+
+                GameManager.Instance.Item.AddReforger(amount);
+                Debug.Log($"[Reward] +{amount} Reforger");
+                break;
+
             // ── 종류별 보상 지급 분기. 증강은 AugmentManager 연결 전까지 TODO 로그로 유지. ───────────────
             case RewardKind.Consumable:
                 if (amount > 0) GrantConsumable(entry.refNameEn, amount);

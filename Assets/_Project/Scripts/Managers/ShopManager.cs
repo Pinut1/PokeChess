@@ -30,6 +30,10 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private int _startingGold = 10;
     [SerializeField] private int _incomePerRound = 5;
 
+    [Header("리롤권 설정")]
+    [SerializeField] private bool _allowGoldUnitShopRerollWhenNoTicket = true;
+    [SerializeField] private bool _allowGoldItemShopRerollWhenNoTicket = false;
+
     [Header("챔피언 풀 설정")]
     [SerializeField] private int _cost1PoolCount = 29;
     [SerializeField] private int _cost2PoolCount = 22;
@@ -88,6 +92,8 @@ public class ShopManager : MonoBehaviour
         10  // Lv10
     };
     public int Gold { get; private set; }
+    public int UnitShopRerollTickets { get; private set; }
+    public int ItemShopRerollTickets { get; private set; }
 
     public int CurrentLevel => _currentLevel;
     public int CurrentXp { get; private set; }
@@ -445,9 +451,24 @@ public class ShopManager : MonoBehaviour
         };
     }
 
-    /// <summary>골드를 내고 유닛 상점을 새로 굴림. 성공 시 true.</summary>
+    /// <summary>유닛 상점 리롤. 리롤권이 있으면 먼저 사용하고, 없으면 설정에 따라 골드를 사용한다.</summary>
     public bool Reroll()
     {
+        if (UnitShopRerollTickets > 0)
+        {
+            UnitShopRerollTickets--;
+            Roll();
+
+            Debug.Log($"[Shop] 유닛상점 리롤권 사용 — 남은 리롤권 {UnitShopRerollTickets}");
+            return true;
+        }
+
+        if (!_allowGoldUnitShopRerollWhenNoTicket)
+        {
+            Debug.Log("[Shop] 유닛상점 리롤권 없음 — 골드 리롤 비활성화");
+            return false;
+        }
+
         if (Gold < _rerollCost)
         {
             Debug.Log("[Shop] 골드 부족 — 리롤 불가");
@@ -455,7 +476,9 @@ public class ShopManager : MonoBehaviour
         }
 
         AddGold(-_rerollCost);
-        Roll(); // 수동 리롤은 유닛 상점만 갱신. 아이템 상점은 갱신하지 않음.
+        Roll();
+
+        Debug.Log($"[Shop] 골드 리롤 완료 (-{_rerollCost}G)");
         return true;
     }
 
@@ -571,6 +594,37 @@ public class ShopManager : MonoBehaviour
         GameEvents.ItemShopRerolled();
     }
 
+    /// <summary>아이템 상점 리롤. 기본은 아이템상점 리롤권만 사용한다.</summary>
+    public bool RerollItemShop()
+    {
+        if (ItemShopRerollTickets > 0)
+        {
+            ItemShopRerollTickets--;
+            RollItemShop();
+
+            Debug.Log($"[ItemShop] 아이템상점 리롤권 사용 — 남은 리롤권 {ItemShopRerollTickets}");
+            return true;
+        }
+
+        if (!_allowGoldItemShopRerollWhenNoTicket)
+        {
+            Debug.Log("[ItemShop] 아이템상점 리롤권 없음 — 골드 리롤 비활성화");
+            return false;
+        }
+
+        if (Gold < _rerollCost)
+        {
+            Debug.Log("[ItemShop] 골드 부족 — 아이템상점 리롤 불가");
+            return false;
+        }
+
+        AddGold(-_rerollCost);
+        RollItemShop();
+
+        Debug.Log($"[ItemShop] 골드 리롤 완료 (-{_rerollCost}G)");
+        return true;
+    }
+
     private EvolutionStoneData RollOneStone()
     {
         var db = EvolutionStoneDatabase.Instance;
@@ -674,6 +728,24 @@ public class ShopManager : MonoBehaviour
     {
         Gold = Mathf.Max(0, Gold + amount);
         GameEvents.GoldChanged(Gold);
+    }
+
+    /// <summary>유닛상점 무료 리롤권 지급.</summary>
+    public void AddUnitShopRerollTickets(int amount)
+    {
+        if (amount <= 0) return;
+
+        UnitShopRerollTickets += amount;
+        Debug.Log($"[Shop] 유닛상점 리롤권 +{amount} => {UnitShopRerollTickets}");
+    }
+
+    /// <summary>아이템상점 무료 리롤권 지급.</summary>
+    public void AddItemShopRerollTickets(int amount)
+    {
+        if (amount <= 0) return;
+
+        ItemShopRerollTickets += amount;
+        Debug.Log($"[ItemShop] 아이템상점 리롤권 +{amount} => {ItemShopRerollTickets}");
     }
 
     /// <summary>디버그/시드용: 런타임 풀 주입.</summary>
