@@ -1,106 +1,115 @@
 {
-  "_readme": "Trainer Entry 시트(정규화). trainerId -> 적 유닛 구성. GDD Stage Table이 stage별 trainerId로 이걸 참조한다. 임포터(Import Stage JSON, 태욱 join 구현 예정)가 stage_data.json의 trainerId로 이 파일을 조회해 StageData.enemies에 baking한다. 적 구성의 단일 출처 = 이 파일(여러 스테이지가 같은 trainer 재사용 가능). EnemyPlacement 필드는 기존 stage enemies와 동일(pokemonNameEn/starLevel/q/r/heldItemEn/statMultiplier/hpMultiplier/atkMultiplier). DUMMY=기획 미정 슬롯. starLevel/q/r/배수는 임시값 — 기획 확정 대상.",
+  "_readme": "Trainer Entry v2. 5라운드 구조 기준 trainerId -> 적 유닛 구성. stage_data.json은 trainerId로 이 파일을 참조하며, 적 구성의 단일 출처는 이 파일이다.",
   "trainers": [
     {
-      "trainerId": "WILD_COMMON", "trainerName": "",
+      "trainerId": "WILD_COMMON",
+      "trainerName": "",
       "enemies": [
-        { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 1, "r": 0 }
+        {
+          "pokemonNameEn": "Magikarp",
+          "pokemonNameKr": "잉어킹",
+          "starLevel": 1,
+          "q": 1,
+          "r": 0
+        }
       ]
     },
     {
-      "trainerId": "WILD_RARE", "trainerName": "",
+      "trainerId": "GYM_HAYATO",
+      "trainerName": "웅이",
       "enemies": [
-        { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Magikarp", "pokemonNameKr": "잉어킹", "starLevel": 1, "q": 2, "r": 0 }
+        {
+          "pokemonNameEn": "Geodude",
+          "pokemonNameKr": "꼬마돌",
+          "starLevel": 1,
+          "q": 1,
+          "r": 0
+        },
+        {
+          "pokemonNameEn": "Onix",
+          "pokemonNameKr": "롱스톤",
+          "starLevel": 2,
+          "q": 2,
+          "r": 0
+        }
       ]
     },
     {
-      "trainerId": "GYM_TSUKUSHI", "trainerName": "호일",
+      "trainerId": "GYM_NATSUME",
+      "trainerName": "이슬이",
       "enemies": [
-        { "pokemonNameEn": "Caterpie", "pokemonNameKr": "캐터피", "starLevel": 1, "q": 0, "r": 0 },
-        { "pokemonNameEn": "Metapod",  "pokemonNameKr": "단데기", "starLevel": 2, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Weedle",   "pokemonNameKr": "뿔충이", "starLevel": 1, "q": 2, "r": 0 },
-        { "pokemonNameEn": "Kakuna",   "pokemonNameKr": "딱충이", "starLevel": 2, "q": 3, "r": 0 }
+        {
+          "pokemonNameEn": "Psyduck",
+          "pokemonNameKr": "고라파덕",
+          "starLevel": 1,
+          "q": 1,
+          "r": 0
+        },
+        {
+          "pokemonNameEn": "Golduck",
+          "pokemonNameKr": "골덕",
+          "starLevel": 2,
+          "q": 2,
+          "r": 0
+        }
       ]
     },
     {
-      "trainerId": "GYM_ERIKA", "trainerName": "민화",
+      "trainerId": "WATARU",
+      "trainerName": "목호",
       "enemies": [
-        { "pokemonNameEn": "Weepinbell", "pokemonNameKr": "모다피",   "starLevel": 1, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Victreebel", "pokemonNameKr": "우츠보트", "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
+        {
+          "pokemonNameEn": "Dratini",
+          "pokemonNameKr": "미뇽",
+          "starLevel": 1,
+          "q": 0,
+          "r": 0
+        },
+        {
+          "pokemonNameEn": "Dragonair",
+          "pokemonNameKr": "신뇽",
+          "starLevel": 2,
+          "q": 1,
+          "r": 0
+        },
+        {
+          "pokemonNameEn": "Aerodactyl",
+          "pokemonNameKr": "프테라",
+          "starLevel": 2,
+          "q": 2,
+          "r": 0,
+          "statMultiplier": 1.5
+        },
+        {
+          "pokemonNameEn": "Dragonite",
+          "pokemonNameKr": "망나뇽",
+          "starLevel": 2,
+          "q": 3,
+          "r": 0,
+          "statMultiplier": 1.8
+        }
       ]
     },
     {
-      "trainerId": "GYM_HAYATO", "trainerName": "웅이",
+      "trainerId": "CHAMP_GREEN",
+      "trainerName": "그린",
       "enemies": [
-        { "pokemonNameEn": "Geodude", "pokemonNameKr": "꼬마돌", "starLevel": 1, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Onix",    "pokemonNameKr": "롱스톤", "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "GYM_MATIS", "trainerName": "꼭두",
-      "enemies": [
-        { "pokemonNameEn": "Miltank", "pokemonNameKr": "밀탱크", "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 2.0, "hpMultiplier": 1.5 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 2, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "GYM_NATSUME", "trainerName": "이슬이",
-      "enemies": [
-        { "pokemonNameEn": "Psyduck", "pokemonNameKr": "고라파덕", "starLevel": 1, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Golduck", "pokemonNameKr": "골덕",     "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "GYM_KYOU", "trainerName": "유빈",
-      "enemies": [
-        { "pokemonNameEn": "Gastly",  "pokemonNameKr": "고오스", "starLevel": 1, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Haunter", "pokemonNameKr": "팬텀",   "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "GYM_BIJUGI", "trainerName": "비주기",
-      "enemies": [
-        { "pokemonNameEn": "Meowth",   "pokemonNameKr": "나옹",     "starLevel": 1, "q": 0, "r": 0 },
-        { "pokemonNameEn": "Persian",  "pokemonNameKr": "페르시온", "starLevel": 2, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Onix",     "pokemonNameKr": "롱스톤",   "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "Sandshrew","pokemonNameKr": "에나비",   "starLevel": 1, "q": 3, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 1, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 2, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "GYM_IHYANG", "trainerName": "이향",
-      "enemies": [
-        { "pokemonNameEn": "Dratini",   "pokemonNameKr": "미뇽",   "starLevel": 1, "q": 0, "r": 0 },
-        { "pokemonNameEn": "Dragonair", "pokemonNameKr": "신뇽",   "starLevel": 2, "q": 1, "r": 0 },
-        { "pokemonNameEn": "Aerodactyl","pokemonNameKr": "프테라", "starLevel": 2, "q": 2, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 1, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 2, "r": 1 }
-      ]
-    },
-    {
-      "trainerId": "CHAMP_GREEN", "trainerName": "그린",
-      "enemies": [
-        { "pokemonNameEn": "Aerodactyl", "pokemonNameKr": "프테라", "starLevel": 2, "q": 1, "r": 0, "statMultiplier": 1.8 },
-        { "pokemonNameEn": "Dragonite",  "pokemonNameKr": "망나뇽", "starLevel": 3, "q": 2, "r": 0, "statMultiplier": 2.5 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 0 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 0, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 1, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 2, "r": 1 },
-        { "pokemonNameEn": "DUMMY", "pokemonNameKr": "더미", "starLevel": 1, "q": 3, "r": 1 }
+        {
+          "pokemonNameEn": "Aerodactyl",
+          "pokemonNameKr": "프테라",
+          "starLevel": 2,
+          "q": 1,
+          "r": 0,
+          "statMultiplier": 1.8
+        },
+        {
+          "pokemonNameEn": "Dragonite",
+          "pokemonNameKr": "망나뇽",
+          "starLevel": 3,
+          "q": 2,
+          "r": 0,
+          "statMultiplier": 2.5
+        }
       ]
     }
   ]
