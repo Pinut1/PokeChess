@@ -820,6 +820,8 @@ public static class PokeChessImporter
         "stone" or "evolutionStone" => RewardKind.EvolutionStone,
         "unit" => RewardKind.Unit,
         "augment" or "augmentChoice" => RewardKind.AugmentChoice,
+        "itemShopReroll" or "item_shop_reroll" => RewardKind.ItemShopReroll,
+        "reforger" => RewardKind.Reforger,
         _ => RewardKind.Gold,
     };
 

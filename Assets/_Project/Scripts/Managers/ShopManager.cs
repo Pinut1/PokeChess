@@ -26,16 +26,23 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private int _itemShopSize = 4;
     [SerializeField] private int _itemPrice = 1;
 
-    [Header("골드 설정")]
-    [SerializeField] private int _startingGold = 10;
-    [SerializeField] private int _incomePerRound = 5;
+    [Header("골드 설정 (밸런스 기획서 §7: 라운드 골드는 보상 선지급이 담당)")]
+    [Tooltip("⚠️ SerializeField — 인스펙터 값 우선. 선지급 모델에선 0(RW001이 1라운드 골드 제공, §7.5 누적검증도 시작골드 0 기준).")]
+    [SerializeField] private int _startingGold = 0;
 
-    [Header("챔피언 풀 설정")]
-    [SerializeField] private int _cost1PoolCount = 29;
-    [SerializeField] private int _cost2PoolCount = 22;
+    [Header("이자 (밸런스 기획서 §7.5)")]
+    [Tooltip("보유 골드 10당 지급 이자(원). 기본 1, 경제 증강 시 2. 2라운드부터 라운드 시작 시 지급.")]
+    [SerializeField] private int _interestPerTenGold = 1;
+    [Tooltip("이자 계산에 인정되는 보유 골드 상한(초과분은 이자 미발생). 기본 50 → 최대 이자 base 5 / 경제 10.")]
+    [SerializeField] private int _interestGoldCap = 50;
+
+    [Header("챔피언 풀 설정 (유닛당 카피 수, 밸런스 기획서 §2.3 확정: 30/25/18/10/9)")]
+    [Tooltip("⚠️ SerializeField라 씬/프리팹의 인스펙터 값이 우선. 확정값(30/25/18/10/9)으로 인스펙터도 맞춰야 함.")]
+    [SerializeField] private int _cost1PoolCount = 30;
+    [SerializeField] private int _cost2PoolCount = 25;
     [SerializeField] private int _cost3PoolCount = 18;
-    [SerializeField] private int _cost4PoolCount = 12;
-    [SerializeField] private int _cost5PoolCount = 10;
+    [SerializeField] private int _cost4PoolCount = 10;
+    [SerializeField] private int _cost5PoolCount = 9;
 
     [Header("레벨 확률")]
     [Tooltip("초기 플레이어 레벨. 레벨 변경 시 GameEvents.OnLevelChanged를 통해 ShopManager 내부 레벨이 갱신된다.")]
@@ -88,6 +95,15 @@ public class ShopManager : MonoBehaviour
         10  // Lv10
     };
     public int Gold { get; private set; }
+
+    /// <summary>무료 리롤 자원 잔여 횟수. 보상(RewardKind.Reroll)으로 누적, 리롤 시 골드보다 우선 소모.</summary>
+    public int RerollCount { get; private set; }
+
+    /// <summary>골드 리롤 1회 비용(무료 리롤 소진 후 폴백에 사용). UI 표시용 노출.</summary>
+    public int RerollCost => _rerollCost;
+
+    /// <summary>아이템 상점 무료 리롤 자원 잔여 횟수. 보상(RewardKind.ItemShopReroll)으로 누적.</summary>
+    public int ItemShopRerollCount { get; private set; }
 
     public int CurrentLevel => _currentLevel;
     public int CurrentXp { get; private set; }
@@ -154,6 +170,8 @@ public class ShopManager : MonoBehaviour
         GameEvents.GoldChanged(Gold);
         GameEvents.LevelChanged(_currentLevel);
         GameEvents.UnitCapChanged(UnitCap); // 첫 프레임부터 BoardManager 캡이 현재 레벨 기준이 되도록 동기화
+        GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
+        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount); // 아이템샵 무료 리롤 자원 초기 동기화
 
         Roll();         // 초기 유닛 상점 공개
         RollItemShop(); // 초기 아이템 상점 공개
@@ -210,10 +228,43 @@ public class ShopManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
-        AddGold(_incomePerRound);
+        // 라운드별 고정 골드는 보상 테이블 선지급(RewardManager, OnStageEntered)이 담당.
+        // 여기선 보유 골드 기반 이자만 지급(밸런스 기획서 §7.5). 1라운드는 이자 없음(4판 = 2~5라운드).
+        if (round >= 2)
+        {
+            int interest = CalculateInterest();
+            if (interest > 0)
+            {
+                AddGold(interest);
+                Debug.Log($"[Shop] 이자 +{interest}G (10G당 {_interestPerTenGold}, 상한 {_interestGoldCap}G)");
+            }
+        }
 
         Roll();         // 유닛 상점은 매 라운드 자동 갱신
         RollItemShop(); // 아이템 상점도 매 라운드 자동 갱신
+    }
+
+    /// <summary>
+    /// 보유 골드 기반 이자 = floor(min(보유, 상한)/10) × 10골드당이자. (롤체식 이자 + 밸런스 기획서 §7.5)
+    /// 예) 보유 50↑, 이자율 1 → 5원(롤체 기본 캡). 이자율 2(이자 증강) → 10원.
+    /// </summary>
+    private int CalculateInterest()
+    {
+        int eligible = Mathf.Min(Gold, _interestGoldCap);
+        return (eligible / 10) * _interestPerTenGold;
+    }
+
+    /// <summary>현재 10골드당 이자율(원). base 1, '이자 +1' 증강 스택마다 +1. UI/디버그 표시용.</summary>
+    public int InterestPerTenGold => _interestPerTenGold;
+
+    /// <summary>
+    /// 10골드당 이자율을 delta만큼 가산. '이자 +1' 증강 seam(덮어쓰기 아님 — 여러 이자 증강이 있으면 스택).
+    /// 경제 증강 예: AddInterestPerTenGold(1) → 10골드당 2원(50골드에서 최대 10원) + 별도 AddGold(50) 즉시지급.
+    /// </summary>
+    public void AddInterestPerTenGold(int delta)
+    {
+        _interestPerTenGold = Mathf.Max(0, _interestPerTenGold + delta);
+        Debug.Log($"[Shop] 이자율 {(delta >= 0 ? "+" : "")}{delta} => 10G당 {_interestPerTenGold}원");
     }
 
     // ──────────────────────────────────────────
@@ -425,8 +476,8 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 레벨별 코스트 등장 확률.
-    /// 현재는 임시값이며, 추후 밸런스 표 확정 시 이 함수만 교체.
+    /// 레벨별 코스트 등장 확률. Lv5~10은 밸런스 기획서 §2.4 확정값.
+    /// Lv1~4는 문서 미명시라 초반 진입 곡선용 임시값 유지.
     /// </summary>
     private int[] GetCostRates(int level)
     {
@@ -436,27 +487,49 @@ public class ShopManager : MonoBehaviour
             2 => new[] { 80, 20, 0, 0, 0 },
             3 => new[] { 65, 30, 5, 0, 0 },
             4 => new[] { 50, 35, 15, 0, 0 },
-            5 => new[] { 35, 40, 20, 5, 0 },
-            6 => new[] { 25, 35, 30, 10, 0 },
-            7 => new[] { 20, 30, 33, 15, 2 },
-            8 => new[] { 15, 25, 35, 20, 5 },
-            9 => new[] { 10, 20, 30, 30, 10 },
-            _ => new[] { 5, 15, 25, 35, 20 } // Lv10 이상은 동일 확률
+            // ── 밸런스 기획서 §2.4 확정 ──
+            5 => new[] { 45, 33, 20, 2, 0 },
+            6 => new[] { 30, 40, 25, 5, 0 },
+            7 => new[] { 19, 30, 40, 10, 1 },
+            8 => new[] { 15, 20, 32, 30, 3 },
+            9 => new[] { 10, 17, 25, 33, 15 },
+            _ => new[] { 5, 10, 20, 40, 25 } // Lv10 이상
         };
     }
 
-    /// <summary>골드를 내고 유닛 상점을 새로 굴림. 성공 시 true.</summary>
+    /// <summary>
+    /// 유닛 상점을 새로 굴림. 무료 리롤 자원을 우선 소모하고, 없으면 골드로 폴백. 성공 시 true.
+    /// 실제 소모가 일어나면 GameEvents.RerollSpent를 발행(리롤 환급 증강 등의 훅).
+    /// </summary>
     public bool Reroll()
     {
-        if (Gold < _rerollCost)
+        if (RerollCount > 0)
         {
-            Debug.Log("[Shop] 골드 부족 — 리롤 불가");
+            RerollCount--;
+            GameEvents.RerollCountChanged(RerollCount);
+        }
+        else if (Gold >= _rerollCost)
+        {
+            AddGold(-_rerollCost);
+        }
+        else
+        {
+            Debug.Log("[Shop] 리롤 불가 — 무료 리롤/골드 부족");
             return false;
         }
 
-        AddGold(-_rerollCost);
         Roll(); // 수동 리롤은 유닛 상점만 갱신. 아이템 상점은 갱신하지 않음.
+        GameEvents.RerollSpent(); // 리롤 환급 증강(45%) 등이 구독 → 확률 판정 후 AddReroll로 환급
         return true;
+    }
+
+    /// <summary>무료 리롤 자원 지급(보상/증강 환급). 결과는 GameEvents.RerollCountChanged로 통지.</summary>
+    public void AddReroll(int amount)
+    {
+        if (amount <= 0) return;
+        RerollCount += amount;
+        GameEvents.RerollCountChanged(RerollCount);
+        Debug.Log($"[Shop] 무료 리롤 +{amount} => {RerollCount}");
     }
 
     /// <summary>슬롯의 포켓몬을 구매해 벤치에 배치. 성공 시 true.</summary>
@@ -569,6 +642,30 @@ public class ShopManager : MonoBehaviour
         }
 
         GameEvents.ItemShopRerolled();
+    }
+
+    /// <summary>아이템 상점 무료 리롤 자원 지급(보상). 결과는 GameEvents.ItemShopRerollCountChanged로 통지.</summary>
+    public void AddItemShopReroll(int amount)
+    {
+        if (amount <= 0) return;
+        ItemShopRerollCount += amount;
+        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount);
+        Debug.Log($"[ItemShop] 무료 리롤 +{amount} => {ItemShopRerollCount}");
+    }
+
+    /// <summary>아이템 상점을 무료 리롤 자원으로 새로 굴림(수동). 자원이 없으면 실패. 성공 시 true.</summary>
+    public bool RerollItemShop()
+    {
+        if (ItemShopRerollCount <= 0)
+        {
+            Debug.Log("[ItemShop] 무료 리롤 없음 — 아이템샵 리롤 불가");
+            return false;
+        }
+
+        ItemShopRerollCount--;
+        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount);
+        RollItemShop();
+        return true;
     }
 
     private EvolutionStoneData RollOneStone()

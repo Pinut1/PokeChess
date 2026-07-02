@@ -12,7 +12,9 @@ public enum RewardKind
     Consumable,      // 소모품 (refNameEn = ConsumableData 영문명)
     EvolutionStone,  // 진화의 돌 (refNameEn = EvolutionStoneData 영문명)
     Unit,            // 유닛 지급 (refNameEn = PokemonData 영문명, 컴패니언 등)
-    AugmentChoice    // 증강 3택1 트리거 (refNameEn 무시 — AugmentManager가 처리)
+    AugmentChoice,   // 증강 3택1 트리거 (refNameEn 무시 — AugmentManager가 처리)
+    ItemShopReroll,  // 아이템 상점 무료 리롤 횟수 (refNameEn 무시, amount = 횟수) — 밸런스 기획서 §7.3
+    Reforger         // 재련기(아이템 재련) 지급 (amount = 개수) — 아이템 데이터 미구현, RewardManager TODO 스텁
 }
 
 /// <summary>
