@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: edf82b326f83d8b4886c4385b8e4cfb4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Black Team/Pawn/CHESS_MoveOnlyBackward.asset
+  uploadId: 899236

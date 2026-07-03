@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e31b4d7b68034ac4ebf0c7855f312a3c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/UI/Actionable.prefab
+  uploadId: 899236

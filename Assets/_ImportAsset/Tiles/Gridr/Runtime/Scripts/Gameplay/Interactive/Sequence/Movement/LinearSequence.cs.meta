@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: c3f2f79606a843ab8ce82996d885c566
+timeCreated: 1729494148
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Sequence/Movement/LinearSequence.cs
+  uploadId: 899236

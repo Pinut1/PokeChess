@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: b9e4ecf82b59aee488d6cfcfc73703fb
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: f595ea91fa2054d418cf3c38a8a13489, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Snapping/SnapToGrid.cs
+  uploadId: 899236

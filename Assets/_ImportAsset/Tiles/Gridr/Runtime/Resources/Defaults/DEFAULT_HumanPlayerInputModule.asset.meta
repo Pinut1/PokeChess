@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1f0c344c6e188164abca78970ca5a978
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Defaults/DEFAULT_HumanPlayerInputModule.asset
+  uploadId: 899236

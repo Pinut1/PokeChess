@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 1718251d298c491bbd13aafc4b7f54df
+timeCreated: 1652257749
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/BuilderSettings/DrawSquareBuilderValuesUtil.cs
+  uploadId: 899236

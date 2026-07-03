@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 1230f7c0df5445afa22565f851f2b419
+timeCreated: 1649926401
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Selection/SelectionFilter.cs
+  uploadId: 899236

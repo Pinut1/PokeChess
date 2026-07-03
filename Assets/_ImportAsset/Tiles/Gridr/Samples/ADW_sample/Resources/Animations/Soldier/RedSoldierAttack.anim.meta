@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 53b20bea2792ef04bb2adf2de709690b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Animations/Soldier/RedSoldierAttack.anim
+  uploadId: 899236

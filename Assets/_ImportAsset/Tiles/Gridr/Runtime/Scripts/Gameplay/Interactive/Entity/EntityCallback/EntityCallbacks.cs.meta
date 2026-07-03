@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 3e58cad8797e43faa12f932d9ecf0dea
+timeCreated: 1661860477
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Entity/EntityCallback/EntityCallbacks.cs
+  uploadId: 899236

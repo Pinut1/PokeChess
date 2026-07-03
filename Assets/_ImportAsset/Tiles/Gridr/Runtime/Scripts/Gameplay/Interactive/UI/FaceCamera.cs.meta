@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 3a8452da227141f5be5a198ae3840188
+timeCreated: 1653822160
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/UI/FaceCamera.cs
+  uploadId: 899236

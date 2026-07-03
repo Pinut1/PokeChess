@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 3fcaf5c1dbb74c42bbb63f9af4c6f11e
+timeCreated: 1665745301
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Sequences/InflictDamageSequence.cs
+  uploadId: 899236

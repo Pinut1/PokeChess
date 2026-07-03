@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 0172e89663064ca2ac869865d639afb5
+timeCreated: 1666901765
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/MoveController.cs
+  uploadId: 899236

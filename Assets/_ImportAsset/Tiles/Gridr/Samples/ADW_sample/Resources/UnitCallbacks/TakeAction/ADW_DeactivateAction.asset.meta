@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d7d3fab50dcdeb54d8deee0d637403ae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/UnitCallbacks/TakeAction/ADW_DeactivateAction.asset
+  uploadId: 899236

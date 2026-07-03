@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: ebac6035ae814390aad4cdbb5fcf3806
+timeCreated: 1665749591
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Properties/MoveCounter.cs
+  uploadId: 899236

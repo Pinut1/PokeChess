@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: b75f0673cbbe4fa2ae0a2b016296ec60
+timeCreated: 1727266674
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/AI/AdwAiPlayerInputModule.cs
+  uploadId: 899236

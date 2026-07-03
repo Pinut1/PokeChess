@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a8825da227e1a744daf7c0a48120120e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Callbacks/CHESS_OnEnterDefaultState.asset
+  uploadId: 899236

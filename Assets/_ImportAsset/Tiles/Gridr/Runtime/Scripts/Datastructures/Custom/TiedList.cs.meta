@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: d15f9264922e4ea895776f6a485d6a82
+timeCreated: 1638819435
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Datastructures/Custom/TiedList.cs
+  uploadId: 899236

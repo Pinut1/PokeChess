@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fb7dd36ba32dc31469d4ed50e350547f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Materials/BlackSquareMaterial.mat
+  uploadId: 899236

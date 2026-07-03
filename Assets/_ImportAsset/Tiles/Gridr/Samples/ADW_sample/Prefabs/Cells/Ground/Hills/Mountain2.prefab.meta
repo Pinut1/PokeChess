@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8ccbe27a99991244cba6b7ee919c4b29
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/Ground/Hills/Mountain2.prefab
+  uploadId: 899236

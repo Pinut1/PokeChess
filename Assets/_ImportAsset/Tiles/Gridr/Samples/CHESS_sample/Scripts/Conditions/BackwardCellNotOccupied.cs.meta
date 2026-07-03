@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 35e8056de7994862b1116e1a455a5fe4
+timeCreated: 1665773104
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Conditions/BackwardCellNotOccupied.cs
+  uploadId: 899236

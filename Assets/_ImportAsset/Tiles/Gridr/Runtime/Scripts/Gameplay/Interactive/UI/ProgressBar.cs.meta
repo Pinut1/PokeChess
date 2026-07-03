@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 4f79090fb5954eb98a64d67687849c52
+timeCreated: 1660123326
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/UI/ProgressBar.cs
+  uploadId: 899236

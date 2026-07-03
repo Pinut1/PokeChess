@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e58cad8797e43faa12f932d9ecf0dea, type: 3}
+  m_Name: ADW_OnArtilleryMovementSuccessful
+  m_EditorClassIdentifier: 
+  callbacks:
+  - {fileID: 11400000, guid: b35189ad5b8bb6f49b972fd6bf6c2a8d, type: 2}
+  - {fileID: 11400000, guid: d7d3fab50dcdeb54d8deee0d637403ae, type: 2}
+  - {fileID: 11400000, guid: 75c2bb5fce0559343917f34e52408170, type: 2}
+  - {fileID: 11400000, guid: d301c29bd64d2184e8dec0cf65d9f63b, type: 2}

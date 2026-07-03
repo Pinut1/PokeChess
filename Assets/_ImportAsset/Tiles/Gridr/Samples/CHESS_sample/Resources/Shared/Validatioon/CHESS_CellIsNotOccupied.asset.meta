@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6cf2f1265bc7f0f45bdfe99e96543305
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Validatioon/CHESS_CellIsNotOccupied.asset
+  uploadId: 899236

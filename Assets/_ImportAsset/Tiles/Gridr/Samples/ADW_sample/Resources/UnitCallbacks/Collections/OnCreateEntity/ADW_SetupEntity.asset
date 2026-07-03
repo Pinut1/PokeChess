@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e58cad8797e43faa12f932d9ecf0dea, type: 3}
+  m_Name: ADW_SetupEntity
+  m_EditorClassIdentifier: 
+  callbacks:
+  - {fileID: 11400000, guid: 75c2bb5fce0559343917f34e52408170, type: 2}
+  - {fileID: 11400000, guid: de984aebc82345c418e1b7fe8739a470, type: 2}

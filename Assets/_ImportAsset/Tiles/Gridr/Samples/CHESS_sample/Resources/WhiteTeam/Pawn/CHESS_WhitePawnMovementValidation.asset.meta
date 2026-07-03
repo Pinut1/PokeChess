@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 76d972ad97fd59b4bad083a8703fddd4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/WhiteTeam/Pawn/CHESS_WhitePawnMovementValidation.asset
+  uploadId: 899236

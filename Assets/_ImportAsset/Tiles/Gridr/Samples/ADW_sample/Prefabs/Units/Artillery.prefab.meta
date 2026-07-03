@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a4feafa47053b7e4dac8a09dacb05b24
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Units/Artillery.prefab
+  uploadId: 899236

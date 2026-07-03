@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ea9e17965c9a16c48961426ab5551cea
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Callbacks/CHESS_RemovePieceOnCapture.asset
+  uploadId: 899236

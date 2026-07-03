@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e58cad8797e43faa12f932d9ecf0dea, type: 3}
+  m_Name: CHESS_OnEnterMovementConfirm
+  m_EditorClassIdentifier: 
+  callbacks:
+  - {fileID: 11400000, guid: ea8fac109be7e0946b5ec3b9613ead27, type: 2}
+  - {fileID: 11400000, guid: 006eb7cf5aec6fe4c8f4634315f29c2c, type: 2}

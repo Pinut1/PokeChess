@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: b3f3c5cfad45432384d25afa7bf676ed
+timeCreated: 1651945615
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/Enums/DrawType.cs
+  uploadId: 899236

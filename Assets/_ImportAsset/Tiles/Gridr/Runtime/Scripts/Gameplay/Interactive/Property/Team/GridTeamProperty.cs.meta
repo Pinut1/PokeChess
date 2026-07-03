@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 81a0ab8e8fea4eba82233fba06592e48
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - team: {fileID: 11400000, guid: 1b4f9377d044f994c820cb17a42d0672, type: 2}
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: 5ee9d60bcb743a547b5303d0bdd1ca85, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Property/Team/GridTeamProperty.cs
+  uploadId: 899236

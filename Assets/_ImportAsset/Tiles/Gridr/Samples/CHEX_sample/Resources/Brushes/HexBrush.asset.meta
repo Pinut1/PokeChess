@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4dc5254c7f81b3149b05e6e068940219
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHEX_sample/Resources/Brushes/HexBrush.asset
+  uploadId: 899236

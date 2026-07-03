@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e323fb9553b9ba543bbcd8b1dff2bcc7
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHEX_sample/Hex_sample.unity
+  uploadId: 899236

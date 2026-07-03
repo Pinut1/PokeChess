@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4fb1dabed01a9554c81264c18aa79c5f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/ActionValidation/CaptureConditions/ADW_CaptureIsNotSameTeam.asset
+  uploadId: 899236

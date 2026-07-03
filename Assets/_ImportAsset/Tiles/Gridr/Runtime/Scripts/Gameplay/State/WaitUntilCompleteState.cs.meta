@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: d864c3cf48874fc2a5228d9f9ff462d9
+timeCreated: 1655813594
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/State/WaitUntilCompleteState.cs
+  uploadId: 899236

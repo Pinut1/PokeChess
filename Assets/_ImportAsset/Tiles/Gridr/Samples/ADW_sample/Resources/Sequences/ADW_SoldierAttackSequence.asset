@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fcaf5c1dbb74c42bbb63f9af4c6f11e, type: 3}
+  m_Name: ADW_SoldierAttackSequence
+  m_EditorClassIdentifier: 
+  animationBank: {fileID: 11400000, guid: eee2132f7063f2f45a0af01c87b9093e, type: 2}
+  visualEffect: {fileID: 5292790756249572748, guid: a15f40769d4d4d347b4486332436b2e9, type: 3}

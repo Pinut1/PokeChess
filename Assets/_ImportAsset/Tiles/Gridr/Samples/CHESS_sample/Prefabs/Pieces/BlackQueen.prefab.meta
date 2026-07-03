@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: c20088d55c16b15419c75ee178044a3a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/BlackQueen.prefab
+  uploadId: 899236

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3ec074e5a123b934a9917b7bf99f09e8
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/WhitePawn.prefab
+  uploadId: 899236

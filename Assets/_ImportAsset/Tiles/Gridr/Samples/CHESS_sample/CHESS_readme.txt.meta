@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 14ab5ec50b6765a4e98b9c3f907e293f
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/CHESS_readme.txt
+  uploadId: 899236

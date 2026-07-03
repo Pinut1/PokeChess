@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: b6a8c7b5d9fe45bda3bffb08e038462a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: 3d07ac3a6712ed34eaca6a22e0ed1e88, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Events/GameEvents/PropertyGameEvent.cs
+  uploadId: 899236

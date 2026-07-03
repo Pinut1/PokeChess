@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 76ccf4621f9444c2bf836d277e144ba8
+timeCreated: 1663077185
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/InvokeCloseAction.cs
+  uploadId: 899236

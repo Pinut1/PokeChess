@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2c97e4bf8f54e2a408ccb69a5de2139f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/Road/Road1.prefab
+  uploadId: 899236

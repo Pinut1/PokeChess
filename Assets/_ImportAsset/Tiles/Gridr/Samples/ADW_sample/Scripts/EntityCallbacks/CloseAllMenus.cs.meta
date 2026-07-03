@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 94e3b13a99374c49a489deda85bfbf55
+timeCreated: 1727950036
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/CloseAllMenus.cs
+  uploadId: 899236

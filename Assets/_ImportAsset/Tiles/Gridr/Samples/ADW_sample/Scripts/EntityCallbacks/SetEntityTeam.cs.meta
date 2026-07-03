@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 797f554c9c49472dac6eebe95f4f39c6
+timeCreated: 1661934806
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/SetEntityTeam.cs
+  uploadId: 899236

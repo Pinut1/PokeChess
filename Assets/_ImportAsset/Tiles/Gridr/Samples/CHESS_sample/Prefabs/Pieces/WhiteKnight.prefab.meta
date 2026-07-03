@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8d93b1500a8061d489feeb8ccd1003ba
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/WhiteKnight.prefab
+  uploadId: 899236

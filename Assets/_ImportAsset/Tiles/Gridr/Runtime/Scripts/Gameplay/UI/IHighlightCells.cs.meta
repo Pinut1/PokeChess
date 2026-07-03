@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 1af253746097448eacd062089fc571c7
+timeCreated: 1663010237
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/UI/IHighlightCells.cs
+  uploadId: 899236

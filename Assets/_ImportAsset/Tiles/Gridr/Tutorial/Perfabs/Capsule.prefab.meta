@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4da2e97f25ffcf0448fe6ad61b4edaf7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Tutorial/Perfabs/Capsule.prefab
+  uploadId: 899236

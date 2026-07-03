@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7c00a8aff48a20e41b0c2c8bc90cec22
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Cell Data/Directions/Cardinal/Right.asset
+  uploadId: 899236

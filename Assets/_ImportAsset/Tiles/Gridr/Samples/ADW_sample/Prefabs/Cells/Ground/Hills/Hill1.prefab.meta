@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5f81f32a1cb834c4aba6d3cabbe8541a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/Ground/Hills/Hill1.prefab
+  uploadId: 899236

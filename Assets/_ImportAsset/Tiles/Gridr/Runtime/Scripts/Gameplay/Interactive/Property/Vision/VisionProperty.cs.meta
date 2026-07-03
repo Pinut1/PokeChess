@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 684b61ca21ee45b4b1b17a238c2b6321
+timeCreated: 1709280098
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Property/Vision/VisionProperty.cs
+  uploadId: 899236

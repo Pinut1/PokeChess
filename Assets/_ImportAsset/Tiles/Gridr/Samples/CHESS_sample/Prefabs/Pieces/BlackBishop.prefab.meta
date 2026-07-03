@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ff50345c98f27654aaf410c25d164c50
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/BlackBishop.prefab
+  uploadId: 899236

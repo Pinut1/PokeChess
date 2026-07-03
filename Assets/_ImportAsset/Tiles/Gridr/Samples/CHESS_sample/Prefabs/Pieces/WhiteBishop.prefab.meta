@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: d7c515b95da623049a7a4b2e7b1a44f6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/WhiteBishop.prefab
+  uploadId: 899236

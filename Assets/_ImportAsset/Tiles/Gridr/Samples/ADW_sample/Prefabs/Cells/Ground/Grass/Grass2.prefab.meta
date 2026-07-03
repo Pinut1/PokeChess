@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1332dc9e105f79e409720c00a87c40ae
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/Ground/Grass/Grass2.prefab
+  uploadId: 899236

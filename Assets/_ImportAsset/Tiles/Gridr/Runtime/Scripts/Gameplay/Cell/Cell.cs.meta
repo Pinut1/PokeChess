@@ -1,0 +1,21 @@
+fileFormatVersion: 2
+guid: c3ba7013f1be47a4bfa76123a7e2eeab
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - data: {fileID: 11400000, guid: 58f43716cc00ca14baf0da42eee60a3a, type: 2}
+  - groundPoint: {instanceID: 0}
+  - gridDisplay: {instanceID: 0}
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: 895fba582ac12844991c8479d8674fa2, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Cell/Cell.cs
+  uploadId: 899236

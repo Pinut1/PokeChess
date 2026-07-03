@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: 6b15af3704334aa38edef2e4551c0aff
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - onActionTaken: {fileID: 11400000, guid: a2b26fa1bd675aa409a5b3b776018777, type: 2}
+  - onActionEnabled: {fileID: 11400000, guid: ce50429f064269e4ea52cd88b93fdcea, type: 2}
+  - onActionStarted: {fileID: 11400000, guid: 4a0826714a9fd9a4982726886ae2ce21, type: 2}
+  - entity: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Action/GridAction.cs
+  uploadId: 899236

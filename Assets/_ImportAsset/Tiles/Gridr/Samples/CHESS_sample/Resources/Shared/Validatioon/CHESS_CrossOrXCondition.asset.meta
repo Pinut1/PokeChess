@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f4846795f6f043e49baa265c4a55deee
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Validatioon/CHESS_CrossOrXCondition.asset
+  uploadId: 899236

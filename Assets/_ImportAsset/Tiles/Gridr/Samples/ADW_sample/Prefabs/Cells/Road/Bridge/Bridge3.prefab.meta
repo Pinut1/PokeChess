@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 35a424b15dd86e54ca386d81f722c793
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/Road/Bridge/Bridge3.prefab
+  uploadId: 899236

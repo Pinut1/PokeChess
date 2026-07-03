@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 218f798c69c54478adfa2a710d35cfd2
+timeCreated: 1667377489
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/GridAnimated.cs
+  uploadId: 899236

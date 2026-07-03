@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 824aa92946334898bcd9f54352248289, type: 3}
+  m_Name: ADW_ArtilleryAnimationBank
+  m_EditorClassIdentifier: 
+  redTeam: {fileID: 11400000, guid: d699cc84fb673b743afe2ecb41bd837a, type: 2}
+  blueTeam: {fileID: 11400000, guid: 9363e5ea76643574abc17516a28225c1, type: 2}
+  redTeamIdle: {fileID: 7400000, guid: f0dfdb14c5f63c64b8d3be842802b411, type: 2}
+  redTeamAttack: {fileID: 7400000, guid: 5a9b9bf0cadc8f446bb198ecf979bf02, type: 2}
+  redTeamMovement: {fileID: 0}
+  redTeamAttacks:
+    north: {fileID: 0}
+    northEast: {fileID: 0}
+    east: {fileID: 0}
+    southEast: {fileID: 0}
+    south: {fileID: 0}
+    southWest: {fileID: 0}
+    west: {fileID: 0}
+    northWest: {fileID: 0}
+  blueTeamIdle: {fileID: 7400000, guid: 6d387f829482b1e4ebce089dc24ce177, type: 2}
+  blueTeamAttack: {fileID: 7400000, guid: f57e0e87f38ab4346b7120412dd75e8f, type: 2}
+  blueTeamMovement: {fileID: 0}
+  blueTeamAttacks:
+    north: {fileID: 0}
+    northEast: {fileID: 0}
+    east: {fileID: 0}
+    southEast: {fileID: 0}
+    south: {fileID: 0}
+    southWest: {fileID: 0}
+    west: {fileID: 0}
+    northWest: {fileID: 0}

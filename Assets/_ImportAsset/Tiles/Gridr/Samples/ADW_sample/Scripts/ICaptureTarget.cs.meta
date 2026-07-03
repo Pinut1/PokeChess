@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: a3be5bd0c69d4cd18c69ac74995e40d0
+timeCreated: 1656751659
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/ICaptureTarget.cs
+  uploadId: 899236

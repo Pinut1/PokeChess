@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1620878739516608143
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1620878739516608137}
+  - component: {fileID: 6541080340109174499}
+  - component: {fileID: 6822804318107665838}
+  - component: {fileID: 3113026132827169485}
+  m_Layer: 0
+  m_Name: HumanPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1620878739516608137
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620878739516608143}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: -1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6541080340109174499
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620878739516608143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6cf4a893f474c5da8e24b6610238144, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerName: Human
+  playerInputModule: {fileID: 11400000, guid: 1f0c344c6e188164abca78970ca5a978, type: 2}
+  properties:
+  - {fileID: 6822804318107665838}
+  - {fileID: 3113026132827169485}
+  setupEntityCallbacks: {fileID: 11400000, guid: 61557180383a7c04fb414949a9e85fa3, type: 2}
+--- !u!114 &6822804318107665838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620878739516608143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81a0ab8e8fea4eba82233fba06592e48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  team: {fileID: 11400000, guid: d699cc84fb673b743afe2ecb41bd837a, type: 2}
+  onChangedTeam:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &3113026132827169485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620878739516608143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 801bd5211fcb4def8fec9ab6ba244fb2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  balance: 200
+  onBankChanged: {fileID: 11400000, guid: 9cd502f81184be04784a8971157004b6, type: 2}

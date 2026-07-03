@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1dff1ce955aa6e6469a7c8ad79682d06
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/BlackKing.prefab
+  uploadId: 899236

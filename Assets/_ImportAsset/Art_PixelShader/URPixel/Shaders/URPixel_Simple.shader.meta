@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 5b6e543287d54fe4c8df2279080210a9
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 291309
+  packageName: URP Pixel Shaders
+  packageVersion: 1.0
+  assetPath: Assets/URPixel/Shaders/URPixel_Simple.shader
+  uploadId: 686376

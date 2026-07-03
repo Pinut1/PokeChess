@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1b4f9377d044f994c820cb17a42d0672
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Teams/ADW_NeutralTeam.asset
+  uploadId: 899236

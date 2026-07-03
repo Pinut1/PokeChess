@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: d109a125f48f41b68a3d2930009342a3
+timeCreated: 1676537334
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/Utils/MonoBehaviourEditor.cs
+  uploadId: 899236

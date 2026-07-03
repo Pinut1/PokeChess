@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: fd4b691c229347d982523dd37358e4d9
+timeCreated: 1667417442
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Sequence/Movement/StepSequence.cs
+  uploadId: 899236

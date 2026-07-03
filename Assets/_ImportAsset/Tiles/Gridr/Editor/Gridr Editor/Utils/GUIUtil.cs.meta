@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: ff8ac1ad45284dc58ed9fc8efa03dd4d
+timeCreated: 1651777461
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/Utils/GUIUtil.cs
+  uploadId: 899236

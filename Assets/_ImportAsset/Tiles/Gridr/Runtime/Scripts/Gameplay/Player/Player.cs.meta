@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: f6cf4a893f474c5da8e24b6610238144
+timeCreated: 1652943695
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Player/Player.cs
+  uploadId: 899236

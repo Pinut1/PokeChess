@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: c53c95937c0f46d6bd878ec48c5e92c8
+timeCreated: 1643630544
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Datastructures/Grid/GridPosition.cs
+  uploadId: 899236

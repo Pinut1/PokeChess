@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 4dfb099cb9f641a5aa23b01b7fe74317
+timeCreated: 1661457936
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Validation/Generic/CellIsPassable.cs
+  uploadId: 899236

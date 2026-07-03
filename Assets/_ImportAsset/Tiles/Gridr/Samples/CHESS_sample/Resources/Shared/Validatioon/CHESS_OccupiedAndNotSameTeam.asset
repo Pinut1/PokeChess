@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecf12bdc0f154f2ca74cc6cb71fcb481, type: 3}
+  m_Name: CHESS_OccupiedAndNotSameTeam
+  m_EditorClassIdentifier: 
+  description: 
+  condition1: {fileID: 11400000, guid: fef6dfb2a4ceb814cb9976bf019af1db, type: 2}
+  condition2: {fileID: 11400000, guid: 56b52f3a2614fe646a020a6792a90b2f, type: 2}

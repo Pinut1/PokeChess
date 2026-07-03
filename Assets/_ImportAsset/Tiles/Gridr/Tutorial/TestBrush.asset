@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc15f62e64c43b149bdd1e453a50c4d0, type: 3}
+  m_Name: TestBrush
+  m_EditorClassIdentifier: 
+  brushes:
+  - {fileID: 6826450851416061175, guid: 554c5e9b3d199754abed819548ee63b8, type: 3}
+  - {fileID: 1078610282529972216, guid: dcb9d052c0e40d3429dc2f9f872a3ca8, type: 3}

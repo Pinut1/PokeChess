@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 7d480fb21be49da43920277e19ad363e
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Effects/Explosion.prefab
+  uploadId: 899236

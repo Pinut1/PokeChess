@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 66b0bf79a3070ed4ebedcff1dd8b2fca
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/CHESS_King.asset
+  uploadId: 899236

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 054eeb4842bf4f9a88f4588c13b81fd5
+timeCreated: 1655104399
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/CaptureButton.cs
+  uploadId: 899236

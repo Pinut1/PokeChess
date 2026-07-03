@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6f6f0f59054d62543a641eec56c2507a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/ActionValidation/MovementConditions/ADW_CellPassable.asset
+  uploadId: 899236

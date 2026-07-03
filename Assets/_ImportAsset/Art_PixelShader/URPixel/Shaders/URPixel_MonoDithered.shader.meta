@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c979f664238655e4c9f364ceec8a338e
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 291309
+  packageName: URP Pixel Shaders
+  packageVersion: 1.0
+  assetPath: Assets/URPixel/Shaders/URPixel_MonoDithered.shader
+  uploadId: 686376

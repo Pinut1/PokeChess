@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 10fa7ee0147f4340b146c8ec5173a49b
+timeCreated: 1649098754
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Selection/IListener.cs
+  uploadId: 899236

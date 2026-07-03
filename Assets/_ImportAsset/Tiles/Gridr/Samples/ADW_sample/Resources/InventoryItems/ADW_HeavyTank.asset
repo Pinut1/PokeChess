@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ad388bc7c16fb044ab296e73ddef3d8, type: 3}
+  m_Name: ADW_HeavyTank
+  m_EditorClassIdentifier: 
+  itemName: Heavy Tankl
+  entity: {fileID: 6869913243136508533, guid: 6a6d2ecf507549e46835a020324f3721, type: 3}
+  unitIcon: {fileID: 7023210354209206974, guid: 17792667367561949a9d41e581b5981b, type: 3}
+  category: {fileID: 11400000, guid: 3b691fb092e8d6f4dac1af59d906d247, type: 2}
+  cost: 500

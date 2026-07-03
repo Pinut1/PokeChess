@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: e10419d3949e4764aac237f5ffee557c
+timeCreated: 1671436856
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/HighlightCellsInMovementRange.cs
+  uploadId: 899236

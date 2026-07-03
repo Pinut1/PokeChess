@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: d9c83bb0babc4cedb046df94a5998184
+timeCreated: 1663828316
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Callbacks/RemovePieceOnCapture.cs
+  uploadId: 899236

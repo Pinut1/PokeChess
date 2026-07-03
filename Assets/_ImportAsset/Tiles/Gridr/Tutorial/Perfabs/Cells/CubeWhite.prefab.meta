@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 554c5e9b3d199754abed819548ee63b8
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Tutorial/Perfabs/Cells/CubeWhite.prefab
+  uploadId: 899236

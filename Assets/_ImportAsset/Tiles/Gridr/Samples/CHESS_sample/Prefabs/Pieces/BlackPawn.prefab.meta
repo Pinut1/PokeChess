@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 73418addd185ce6429b709d14c826622
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/BlackPawn.prefab
+  uploadId: 899236

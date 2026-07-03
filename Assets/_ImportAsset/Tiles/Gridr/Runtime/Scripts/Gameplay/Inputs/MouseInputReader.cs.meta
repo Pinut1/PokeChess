@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: f5a927f8bb4949ee893aa743d95294ac
+timeCreated: 1648150910
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Inputs/MouseInputReader.cs
+  uploadId: 899236

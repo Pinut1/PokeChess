@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 34ceaa4b7c900e941bd237993230058b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/BlackRook.prefab
+  uploadId: 899236

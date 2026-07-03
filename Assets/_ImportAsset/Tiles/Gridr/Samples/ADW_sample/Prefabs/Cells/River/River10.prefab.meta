@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ac799e1f7dada3f4db5207df478e6765
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Cells/River/River10.prefab
+  uploadId: 899236

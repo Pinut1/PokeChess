@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 19729d4894dc4d5e9898f4f070418d87
+timeCreated: 1654517089
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Data/Editor/TextureScale.cs
+  uploadId: 899236

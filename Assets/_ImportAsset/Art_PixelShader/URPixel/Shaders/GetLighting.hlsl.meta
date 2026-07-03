@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 02f115cb78fb8ad4fab68a957870ee36
+ShaderIncludeImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 291309
+  packageName: URP Pixel Shaders
+  packageVersion: 1.0
+  assetPath: Assets/URPixel/Shaders/GetLighting.hlsl
+  uploadId: 686376

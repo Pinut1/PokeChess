@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a15f40769d4d4d347b4486332436b2e9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/Effects/Gunfire.prefab
+  uploadId: 899236

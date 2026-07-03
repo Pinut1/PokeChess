@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 628d25c49bc20f44e965baa830457c0e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Cell Data/Directions/SquareDirections/OrthogonalDown.asset
+  uploadId: 899236

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 6ab446b859a94885ae4474b41a9f36c6
+timeCreated: 1663076886
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/TurnOffCaptureButton.cs
+  uploadId: 899236

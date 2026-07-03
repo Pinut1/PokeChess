@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 385bf9bd057943dd829327cddc86ff2d
+timeCreated: 1651945665
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/Enums/SelectedTab.cs
+  uploadId: 899236

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fcd3cffc2ad82e244baf5cfec435799c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Validatioon/CHES_PathIsStraight.asset
+  uploadId: 899236

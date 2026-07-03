@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bd85adb37f13adb4393b899cfce5ae6f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Validatioon/Pieces/CHESS_KnightMovementValidation.asset
+  uploadId: 899236

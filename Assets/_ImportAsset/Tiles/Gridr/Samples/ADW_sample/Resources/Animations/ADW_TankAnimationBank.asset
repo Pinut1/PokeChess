@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 824aa92946334898bcd9f54352248289, type: 3}
+  m_Name: ADW_TankAnimationBank
+  m_EditorClassIdentifier: 
+  redTeam: {fileID: 11400000, guid: d699cc84fb673b743afe2ecb41bd837a, type: 2}
+  blueTeam: {fileID: 11400000, guid: 9363e5ea76643574abc17516a28225c1, type: 2}
+  redTeamIdle: {fileID: 7400000, guid: 7c12f5b0e43e47d468bd171b865f7bab, type: 2}
+  redTeamAttack: {fileID: 7400000, guid: e9c2b3116ceb96744902ef1df75af563, type: 2}
+  redTeamMovement: {fileID: 7400000, guid: f2aab61d3df623d44ae8a06dd0db2032, type: 2}
+  redTeamAttacks:
+    north: {fileID: 0}
+    northEast: {fileID: 0}
+    east: {fileID: 0}
+    southEast: {fileID: 0}
+    south: {fileID: 0}
+    southWest: {fileID: 0}
+    west: {fileID: 0}
+    northWest: {fileID: 0}
+  blueTeamIdle: {fileID: 7400000, guid: 91df4fa11b6f58243aa8dd2e2cf2635e, type: 2}
+  blueTeamAttack: {fileID: 7400000, guid: 859d4b636024d174fa404dbfaf79ac12, type: 2}
+  blueTeamMovement: {fileID: 7400000, guid: c3d1438c77b039b448dbf9316da84c28, type: 2}
+  blueTeamAttacks:
+    north: {fileID: 0}
+    northEast: {fileID: 0}
+    east: {fileID: 0}
+    southEast: {fileID: 0}
+    south: {fileID: 0}
+    southWest: {fileID: 0}
+    west: {fileID: 0}
+    northWest: {fileID: 0}

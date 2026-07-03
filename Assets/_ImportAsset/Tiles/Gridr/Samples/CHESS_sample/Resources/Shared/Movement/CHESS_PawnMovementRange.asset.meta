@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e6a9fa045f6238942a3b763816f52c30
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Movement/CHESS_PawnMovementRange.asset
+  uploadId: 899236

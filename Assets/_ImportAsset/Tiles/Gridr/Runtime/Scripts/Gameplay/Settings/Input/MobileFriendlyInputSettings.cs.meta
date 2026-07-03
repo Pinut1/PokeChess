@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 83bb0baabb844b4bb0cec7d621c0ef28
+timeCreated: 1652169068
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Settings/Input/MobileFriendlyInputSettings.cs
+  uploadId: 899236

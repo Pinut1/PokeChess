@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ad3c7a57ee9793046b6db8871ed494fd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/ActionValidation/AttackConditions/ADW_CellIsInAttackRange.asset
+  uploadId: 899236

@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 858c38353e2cc4d44b365d6055c48715, type: 3}
+  m_Name: ADW_GrounData
+  m_EditorClassIdentifier: 
+  connections: {fileID: 11400000, guid: 43accb7251af04343909c9a60f34890e, type: 2}
+  squareName: Ground
+  cost: 1
+  connected: 1

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: eb7a5bffeaa3f4148b7cae5258ddc471
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Tutorial/Scene/tutorial_scene.unity
+  uploadId: 899236

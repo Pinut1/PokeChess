@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 5d3a0b8020414b949c7eb59afdbe8a3f
+timeCreated: 1662536352
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Action/Conditions/Generic/ForwardShape.cs
+  uploadId: 899236

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e553b67bb25b8634fa201493ae5206e9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Sequences/ADW_ArtilleryAttackSequence.asset
+  uploadId: 899236

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 12f12bbe3272eed49adc096e5dca5a5a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Shared/Callbacks/CHESS_IncrementMoveCounter.asset
+  uploadId: 899236

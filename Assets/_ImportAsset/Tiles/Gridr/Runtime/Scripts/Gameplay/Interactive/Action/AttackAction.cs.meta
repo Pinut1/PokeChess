@@ -1,0 +1,24 @@
+fileFormatVersion: 2
+guid: 9a3c7aa8ed8e40b1872986b656f293e6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - onActionEnabled: {fileID: 11400000, guid: ce50429f064269e4ea52cd88b93fdcea, type: 2}
+  - onActionStarted: {fileID: 11400000, guid: 4a0826714a9fd9a4982726886ae2ce21, type: 2}
+  - entity: {instanceID: 0}
+  - onActionTaken: {fileID: 11400000, guid: 4d640f5851eac5e4a833fc2da725cbc3, type: 2}
+  - attackData: {fileID: 11400000, guid: 30005be9412f8b849b80b171c5d479fd, type: 2}
+  - attackValidation: {fileID: 11400000, guid: 3ce89ff9f2de4a94a99b773b676fbf1b, type: 2}
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: 55fbdc6e16cab9541aa1a2a4deabadcb, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Action/AttackAction.cs
+  uploadId: 899236

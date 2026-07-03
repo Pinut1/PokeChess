@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 0dd34db7b4e44d2784b65802d3fb7634
+timeCreated: 1662364786
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/ActivateActions.cs
+  uploadId: 899236

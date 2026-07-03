@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: f271c9cce42043f7a365ffd17426d274
+timeCreated: 1726419431
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/UI/MoveObject.cs
+  uploadId: 899236

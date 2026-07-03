@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 6f1f228302664fd6a78683f0d41dbb08
+timeCreated: 1662404932
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Validation/Capture/Conditions/CaptureableIsNotSameTeam.cs
+  uploadId: 899236

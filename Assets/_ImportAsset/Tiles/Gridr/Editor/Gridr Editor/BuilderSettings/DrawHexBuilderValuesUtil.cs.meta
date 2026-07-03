@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: d04b5deefa884d239035affe780b77fc
+timeCreated: 1652274529
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Editor/Gridr Editor/BuilderSettings/DrawHexBuilderValuesUtil.cs
+  uploadId: 899236

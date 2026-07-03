@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 30005be9412f8b849b80b171c5d479fd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Data/DEFAULT_AttackData.asset
+  uploadId: 899236

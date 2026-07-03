@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: c0bcd840b5dd4ee5b6744a9aa0c4701d
+timeCreated: 1724183505
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/UI/BuildInventoryUI.cs
+  uploadId: 899236

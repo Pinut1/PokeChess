@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ed4b332710e3d95458e09d8192abcd1a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Prefabs/Pieces/WhiteKing.prefab
+  uploadId: 899236

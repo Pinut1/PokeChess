@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cc10e567952b40618aa2b6edebd815e5, type: 3}
+  m_Name: CHESS_ForwardXorDiagonalCapture
+  m_EditorClassIdentifier: 
+  description: This condition chains two conditions using logical XOR. In this case
+    the cell being validated will return as valid if it is in straight in front of
+    the GridEnity and not marked as occupied, OR it is the Cell diagonally in front
+    of the GridEntity, and it can capture on that cell. But importantly, not both.
+  condition1: {fileID: 11400000, guid: 3876651ab25586b4c9887f7dbd2c6715, type: 2}
+  condition2: {fileID: 11400000, guid: 04bcc4235e1d42741a73ec6cfb8cbe79, type: 2}

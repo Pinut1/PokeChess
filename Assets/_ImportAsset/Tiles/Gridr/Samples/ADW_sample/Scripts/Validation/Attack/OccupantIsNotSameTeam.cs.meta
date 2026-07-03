@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 620c8ca7d1b843858a6a5a9066201365
+timeCreated: 1663064014
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Validation/Attack/OccupantIsNotSameTeam.cs
+  uploadId: 899236

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 5f4f7a08aa074582a6c43b86bda44702
+timeCreated: 1647606763
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/State/State.cs
+  uploadId: 899236

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: e8dce1ad2b894a3e9e9d0620b39fe20a
+timeCreated: 1664609499
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/State/InputModule.cs
+  uploadId: 899236

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: de984aebc82345c418e1b7fe8739a470
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/UnitCallbacks/Entity/ADW_SetUnitTeam.asset
+  uploadId: 899236

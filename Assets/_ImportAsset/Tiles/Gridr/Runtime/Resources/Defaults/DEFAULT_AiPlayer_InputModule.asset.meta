@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ebe2d210a3211b749bfe8b3c302e203f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Defaults/DEFAULT_AiPlayer_InputModule.asset
+  uploadId: 899236

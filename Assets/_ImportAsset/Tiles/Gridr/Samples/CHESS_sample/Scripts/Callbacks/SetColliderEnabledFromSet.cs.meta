@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: f91b7d8035654b97b59158a3d8a47d2a
+timeCreated: 1663925531
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Callbacks/SetColliderEnabledFromSet.cs
+  uploadId: 899236

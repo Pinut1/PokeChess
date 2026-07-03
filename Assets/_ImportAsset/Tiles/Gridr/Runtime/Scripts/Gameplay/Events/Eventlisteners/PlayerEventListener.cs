@@ -1,0 +1,12 @@
+﻿//Created by Carl Hinas | https://www.generalgames.org
+//generalgames.bsky.social
+
+namespace Gridr.Gameplay.Events
+{
+    public class PlayerEventListener : GameEventListener<Player>
+    {
+        public PlayerGameEvent gameEvent;
+        public void OnEnable() => gameEvent.AddListener(this);
+        public void OnDisable() => gameEvent.RemoveListener(this);
+    }
+}

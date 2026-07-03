@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 10d376436ceb9b540b808ac1e3f04bc0
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/UI/PurchaseItemButon_canvas.prefab
+  uploadId: 899236

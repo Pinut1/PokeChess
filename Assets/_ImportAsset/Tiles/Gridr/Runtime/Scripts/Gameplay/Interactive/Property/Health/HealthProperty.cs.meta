@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 75f2e0348cf84b2bb7fe13207ae95750
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: f2b943b37c356984e91c1d880b7d8569, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Property/Health/HealthProperty.cs
+  uploadId: 899236

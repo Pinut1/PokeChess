@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 711133f1308346540965bf8368991737
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHEX_sample/Resources/InputModules/CHEX_AttackInput.asset
+  uploadId: 899236

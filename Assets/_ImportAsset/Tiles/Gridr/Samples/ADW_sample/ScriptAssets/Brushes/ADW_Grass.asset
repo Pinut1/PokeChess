@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc15f62e64c43b149bdd1e453a50c4d0, type: 3}
+  m_Name: ADW_Grass
+  m_EditorClassIdentifier: 
+  brushes:
+  - {fileID: 2247237155887822944, guid: 12afa156e117d7b43b2f6344e8ef8718, type: 3}
+  - {fileID: 2247237155887822944, guid: 1332dc9e105f79e409720c00a87c40ae, type: 3}
+  - {fileID: 2247237155887822944, guid: 91cf485b760b73f41b6ad8ade1a76cdb, type: 3}
+  - {fileID: 2247237155887822944, guid: aa0162e4efeab5142b583a84d6c13327, type: 3}
+  - {fileID: 2247237155887822944, guid: ffb0808bedc3a614a95daf6379bf421a, type: 3}
+  - {fileID: 2247237155887822944, guid: a4112d3d1a7d7454582b3cddee2100f9, type: 3}
+  - {fileID: 2247237155887822944, guid: 2c50bdba97f408140b74f54f0dce7d5c, type: 3}
+  - {fileID: 2247237155887822944, guid: 4325f095cc1c9cb4ba9d88755c89bb0e, type: 3}
+  - {fileID: 2247237155887822944, guid: ddc64b85c08cf484fadfb3d3be5a967e, type: 3}

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce2cd4deabd45d08cdb97be10ecb4fd, type: 3}
+  m_Name: OrthogonalSquare
+  m_EditorClassIdentifier: 
+  directions:
+  - {fileID: 11400000, guid: 628d25c49bc20f44e965baa830457c0e, type: 2}
+  - {fileID: 11400000, guid: 99c49fefa524e7948941cb61c9324e94, type: 2}
+  - {fileID: 11400000, guid: 5ff375be95bab2e48a500d23b6e4c09a, type: 2}
+  - {fileID: 11400000, guid: c2fc7340f8b4baa428da6610a90c2c0e, type: 2}

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: c82d6860f15445f89c5a39614cb8b6bc
+timeCreated: 1724161047
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Properties/GoldResourceProperty.cs
+  uploadId: 899236

@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 09bb7a191f3a4cc8bb5af7b0c8130c8a
+timeCreated: 1648109522
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/State/Attack/ConfirmAttackState.cs
+  uploadId: 899236

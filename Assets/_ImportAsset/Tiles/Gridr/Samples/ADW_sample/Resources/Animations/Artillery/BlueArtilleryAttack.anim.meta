@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f57e0e87f38ab4346b7120412dd75e8f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Animations/Artillery/BlueArtilleryAttack.anim
+  uploadId: 899236

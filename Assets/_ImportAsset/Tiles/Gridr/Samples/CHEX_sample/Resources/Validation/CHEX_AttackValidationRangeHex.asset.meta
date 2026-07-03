@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a8f8a38f1a299fd4684eb87d00e5f4d0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHEX_sample/Resources/Validation/CHEX_AttackValidationRangeHex.asset
+  uploadId: 899236

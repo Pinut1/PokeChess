@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8f266127e005b964fa38d49c8dc6232c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Defaults/DEFAULT_OnStartmovementInputModule.asset
+  uploadId: 899236

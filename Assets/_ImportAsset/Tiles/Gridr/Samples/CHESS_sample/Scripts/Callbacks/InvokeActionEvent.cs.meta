@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 071c28603e1b4258a7f3d79159848972
+timeCreated: 1663843802
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Callbacks/InvokeActionEvent.cs
+  uploadId: 899236

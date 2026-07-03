@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: fc259403f10c46a0a5cdebdf12a8cfac
+timeCreated: 1663136952
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/DeselectEntity.cs
+  uploadId: 899236

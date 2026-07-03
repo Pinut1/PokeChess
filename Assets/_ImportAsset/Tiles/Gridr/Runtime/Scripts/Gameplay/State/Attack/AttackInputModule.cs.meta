@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: cdc3c7896b8a42ddb0de944b63ffaeb8
+timeCreated: 1664706114
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/State/Attack/AttackInputModule.cs
+  uploadId: 899236

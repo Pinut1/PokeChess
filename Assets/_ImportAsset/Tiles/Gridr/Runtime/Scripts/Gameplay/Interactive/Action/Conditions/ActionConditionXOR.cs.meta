@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: cc10e567952b40618aa2b6edebd815e5
+timeCreated: 1663761555
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Action/Conditions/ActionConditionXOR.cs
+  uploadId: 899236

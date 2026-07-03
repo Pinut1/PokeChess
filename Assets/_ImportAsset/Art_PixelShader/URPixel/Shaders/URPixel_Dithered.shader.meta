@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: a2882fcb0c3527b47a2015203e3f08d7
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 291309
+  packageName: URP Pixel Shaders
+  packageVersion: 1.0
+  assetPath: Assets/URPixel/Shaders/URPixel_Dithered.shader
+  uploadId: 686376

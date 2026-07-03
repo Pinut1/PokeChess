@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f09bb69ae03ff5440a260392e4cc7dd5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/InputModule/ADW_ConfirmCaptureInput.asset
+  uploadId: 899236

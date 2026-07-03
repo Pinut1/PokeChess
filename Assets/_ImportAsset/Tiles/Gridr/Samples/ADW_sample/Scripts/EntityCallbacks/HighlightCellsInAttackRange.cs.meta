@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 7a8ef1c5f43240ab88e8d368fc665aa5
+timeCreated: 1663051566
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/HighlightCellsInAttackRange.cs
+  uploadId: 899236

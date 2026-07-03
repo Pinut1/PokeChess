@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 06e0327d5a944fb8ac4a961e99de4173
+timeCreated: 1665750715
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Callbacks/IncrementMoveCounter.cs
+  uploadId: 899236

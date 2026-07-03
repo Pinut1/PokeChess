@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 8e1fbee0e7b44126bffdbe8b9690ad61
+timeCreated: 1663066265
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/EntityCallbacks/HightlightActionableCells.cs
+  uploadId: 899236

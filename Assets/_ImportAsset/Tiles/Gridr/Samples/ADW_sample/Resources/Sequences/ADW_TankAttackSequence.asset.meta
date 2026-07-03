@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 28ec7ea695837b74b987b9a6104e6141
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Sequences/ADW_TankAttackSequence.asset
+  uploadId: 899236

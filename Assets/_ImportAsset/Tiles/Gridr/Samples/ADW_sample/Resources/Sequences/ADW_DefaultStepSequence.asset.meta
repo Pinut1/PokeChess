@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0d3f7f5427eb2c04fab45bea15330624
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Sequences/ADW_DefaultStepSequence.asset
+  uploadId: 899236

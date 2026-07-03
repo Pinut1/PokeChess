@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 2458fef1cc244b19a213b1c519b7b5c8
+timeCreated: 1643662131
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Pathfinding/DijkstraTuple.cs
+  uploadId: 899236

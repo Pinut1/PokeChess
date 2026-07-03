@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cb0f6e2bfc294db4ca91d389fa1ff1eb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Cell Data/Directions/HexDirections/HexDirection6.asset
+  uploadId: 899236

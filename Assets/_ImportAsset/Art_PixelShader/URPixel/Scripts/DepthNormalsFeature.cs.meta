@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: dfb864e54d767574fade42bde848a940
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: 44a656678f2872841bbd432208b41f20, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 291309
+  packageName: URP Pixel Shaders
+  packageVersion: 1.0
+  assetPath: Assets/URPixel/Scripts/DepthNormalsFeature.cs
+  uploadId: 686376

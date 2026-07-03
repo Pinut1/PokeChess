@@ -1,0 +1,50 @@
+fileFormatVersion: 2
+guid: 71d63f9f5c397c04dac8827309de3b29
+SpriteAtlasImporter:
+  externalObjects: {}
+  textureSettings:
+    serializedVersion: 2
+    anisoLevel: 1
+    compressionQuality: 50
+    maxTextureSize: 2048
+    textureCompression: 0
+    filterMode: 0
+    generateMipMaps: 0
+    readable: 1
+    crunchedCompression: 0
+    sRGB: 1
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  packingSettings:
+    serializedVersion: 2
+    padding: 4
+    blockOffset: 1
+    allowAlphaSplitting: 0
+    enableRotation: 1
+    enableTightPacking: 1
+    enableAlphaDilation: 0
+  secondaryTextureSettings: {}
+  variantMultiplier: 1
+  bindAsDefault: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Resources/Textures/world_sprite_atlas.spriteatlasv2
+  uploadId: 899236

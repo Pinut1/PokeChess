@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ef9ab35d84830124b9e9a2eeabb23ea0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Resources/Black Team/Pawn/CHESS_BackwardOrCapture.asset
+  uploadId: 899236

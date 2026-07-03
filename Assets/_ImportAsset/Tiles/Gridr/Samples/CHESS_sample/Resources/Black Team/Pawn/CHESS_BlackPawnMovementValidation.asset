@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50841b782f8a4a7699141e3bff88a7d2, type: 3}
+  m_Name: CHESS_BlackPawnMovementValidation
+  m_EditorClassIdentifier: 
+  conditions:
+  - {fileID: 11400000, guid: e6a9fa045f6238942a3b763816f52c30, type: 2}
+  - {fileID: 11400000, guid: d805ad886ba050644b6dca696d9621f7, type: 2}
+  - {fileID: 11400000, guid: 95b205204a66f6a48ad61f5489fe1dcb, type: 2}

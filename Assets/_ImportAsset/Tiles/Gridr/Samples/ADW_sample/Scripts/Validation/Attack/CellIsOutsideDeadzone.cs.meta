@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 228a25a3caf54ae29bb0a7d551a36465
+timeCreated: 1661517239
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Validation/Attack/CellIsOutsideDeadzone.cs
+  uploadId: 899236

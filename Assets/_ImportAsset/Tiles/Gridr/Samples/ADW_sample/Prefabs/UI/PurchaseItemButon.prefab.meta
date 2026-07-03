@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 16107f86a780a2547966a187283e4721
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Prefabs/UI/PurchaseItemButon.prefab
+  uploadId: 899236

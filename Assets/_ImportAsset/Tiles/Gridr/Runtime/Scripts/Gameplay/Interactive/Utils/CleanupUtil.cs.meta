@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 383b1a95e9964bf689620a26df510310
+timeCreated: 1727810748
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Scripts/Gameplay/Interactive/Utils/CleanupUtil.cs
+  uploadId: 899236

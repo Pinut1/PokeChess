@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: ae1df15b43d74c0fb66b7d0bba557292
+timeCreated: 1663788116
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/CHESS_sample/Scripts/Conditions/CellOccupantIsNotSameTeam.cs
+  uploadId: 899236

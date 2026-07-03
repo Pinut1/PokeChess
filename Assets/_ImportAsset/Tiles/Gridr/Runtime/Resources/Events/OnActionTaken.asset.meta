@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a2b26fa1bd675aa409a5b3b776018777
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Runtime/Resources/Events/OnActionTaken.asset
+  uploadId: 899236

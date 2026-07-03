@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 3dec96dac7664368bcc25891cda0ea8f
+timeCreated: 1661516997
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231887
+  packageName: Gridr - Turn Based Framework
+  packageVersion: 1.4.5
+  assetPath: Assets/Gridr/Samples/ADW_sample/Scripts/Validation/Generic/CellOccupied.cs
+  uploadId: 899236
