@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 484d1bef240dfec4d8afcde1b1bf51f7
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 233969
+  packageName: Click Effects & Ground Indicators | VFX Essentials
+  packageVersion: 1.1.0
+  assetPath: Assets/Click VFX/Assets/Scripts/PreviewEvent.cs
+  uploadId: 592060
