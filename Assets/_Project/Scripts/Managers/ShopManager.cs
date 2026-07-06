@@ -129,6 +129,9 @@ public class ShopManager : MonoBehaviour
     /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
     private readonly Dictionary<PokemonData, int> _remainingPool = new();
 
+    /// <summary>진화체 → 기본종(풀 관리 대상) 역매핑. 진화 유닛 판매 시 소비된 기본종 카피를 올바른 풀로 되돌리기 위함.</summary>
+    private readonly Dictionary<PokemonData, PokemonData> _evolvedToBase = new();
+
     private void Awake()
     {
         _slots = new PokemonData[_shopSize];
@@ -223,7 +226,39 @@ public class ShopManager : MonoBehaviour
             _remainingPool[data] = count;
         }
 
+        BuildEvolutionToBaseMap();
+
         Debug.Log($"[ShopPool] 챔피언 풀 초기화 완료: {_remainingPool.Count}종");
+    }
+
+    /// <summary>
+    /// 풀에 있는 각 기본종의 진화 사슬(evolvesIntoEn)을 따라가 진화체 → 기본종 매핑을 만든다.
+    /// 3합체 시 유닛의 data가 진화체로 스왑되므로, 판매 시 이 맵으로 기본종 풀에 카피를 되돌린다.
+    /// (이게 없으면 진화 유닛 판매가 풀에 아무것도 반환하지 않아 상점 풀이 영구 고갈됨.)
+    /// </summary>
+    private void BuildEvolutionToBaseMap()
+    {
+        _evolvedToBase.Clear();
+
+        var db = PokemonDatabase.Instance;
+        if (db == null) return;
+
+        foreach (var baseData in _remainingPool.Keys)
+        {
+            var current = baseData;
+            // 최종형까지 사슬을 따라가며 각 진화체를 기본종으로 매핑. 사이클 방지용으로 방문 집합 사용.
+            var visited = new HashSet<PokemonData> { current };
+            while (current != null && !string.IsNullOrEmpty(current.evolvesIntoEn))
+            {
+                var next = db.GetByNameEn(current.evolvesIntoEn);
+                if (next == null || !visited.Add(next)) break;
+
+                if (!_evolvedToBase.ContainsKey(next))
+                    _evolvedToBase[next] = baseData;
+
+                current = next;
+            }
+        }
     }
 
     private int GetInitialPoolCount(int cost)
@@ -613,7 +648,8 @@ public class ShopManager : MonoBehaviour
     {
         if (unit == null || unit.data == null) return;
 
-        PokemonData data = unit.data;
+        // 진화 유닛(data가 진화체로 스왑됨)이면 소비된 기본종 풀로 되돌린다.
+        PokemonData data = _evolvedToBase.TryGetValue(unit.data, out var baseData) ? baseData : unit.data;
 
         if (!_remainingPool.ContainsKey(data))
             return;

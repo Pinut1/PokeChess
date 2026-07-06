@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -15,6 +16,9 @@ using UnityEngine;
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
+    /// <summary>이미 선지급한 stageId 집합. 선지급 모델이라 같은 스테이지 재진입(재접속/UI 리싱크/중복 발행) 시 보상이 중복 지급되는 것을 막는다.</summary>
+    private readonly HashSet<string> _paidStages = new();
+
     private void OnEnable()  => GameEvents.OnStageEntered += HandleStageEntered;
     private void OnDisable() => GameEvents.OnStageEntered -= HandleStageEntered;
 
@@ -24,6 +28,13 @@ public class RewardManager : MonoBehaviour
         if (stage == null)
         {
             Debug.LogWarning("[Reward] StageEntered stage 없음 — 보상 스킵");
+            return;
+        }
+
+        // 중복 지급 방지: 같은 stageId는 판당 1회만 선지급한다.
+        if (!string.IsNullOrEmpty(stage.stageId) && !_paidStages.Add(stage.stageId))
+        {
+            Debug.Log($"[Reward] '{stage.stageId}' 이미 지급됨 — 중복 선지급 스킵");
             return;
         }
 
