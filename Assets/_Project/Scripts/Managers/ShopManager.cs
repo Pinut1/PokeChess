@@ -5,7 +5,8 @@ using UnityEngine;
 /// 기물 상점 + 아이템 상점 + 골드 경제 + 레벨/XP 진행 담당.
 /// 라운드마다 골드 수입을 지급하고 유닛 상점/아이템 상점을 자동 갱신한다.
 /// 유닛 상점은 골드로 구매/리롤, 아이템 상점은 아이템 쿠폰으로 구매한다.
-/// 레벨/XP는 ShopManager 내부에서 관리하고, 레벨 변경은 GameEvents.OnLevelChanged로 통지한다.
+/// 레벨/XP는 ShopManager 내부에서 관리하고,
+/// 레벨/XP/배치 가능 기물 수 변경은 GameEvents로 통지한다.
 /// 매니저 간 직접 참조 금지 — 상태 변화는 GameEvents로 통지.
 /// </summary>
 public class ShopManager : MonoBehaviour
@@ -137,6 +138,18 @@ public class ShopManager : MonoBehaviour
         CurrentXp = 0;
 
         // 인스펙터에서 잘못된 값이 들어와도 안전하게 보정
+        // index 0은 dummy이므로 실제 지원 가능한 최대 레벨은 배열 길이 - 1.
+        int xpMaxLevel = _requiredXpByLevel != null && _requiredXpByLevel.Length > 1
+            ? _requiredXpByLevel.Length - 1
+            : 1;
+
+        int capMaxLevel = _unitCapByLevel != null && _unitCapByLevel.Length > 1
+            ? _unitCapByLevel.Length - 1
+            : 1;
+
+        int tableMaxLevel = Mathf.Max(1, Mathf.Min(xpMaxLevel, capMaxLevel));
+
+        _maxLevel = Mathf.Clamp(_maxLevel, 1, tableMaxLevel);
         _currentLevel = Mathf.Clamp(_currentLevel, 1, _maxLevel);
     }
 
@@ -168,8 +181,8 @@ public class ShopManager : MonoBehaviour
         // 초기 UI/상점 상태 동기화.
         // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
         GameEvents.GoldChanged(Gold);
-        GameEvents.LevelChanged(_currentLevel);
-        GameEvents.UnitCapChanged(UnitCap); // 첫 프레임부터 BoardManager 캡이 현재 레벨 기준이 되도록 동기화
+        GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
         GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
         GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount); // 아이템샵 무료 리롤 자원 초기 동기화
 
@@ -292,6 +305,7 @@ public class ShopManager : MonoBehaviour
         if (_currentLevel >= _maxLevel)
         {
             CurrentXp = 0;
+            GameEvents.XpChanged(CurrentXp, RequiredXp);
             return;
         }
 
@@ -300,7 +314,7 @@ public class ShopManager : MonoBehaviour
 
         TryLevelUp();
 
-        // TODO: GameEvents.XpChanged(CurrentXp, RequiredXp) 추가 후 UI 갱신 연결
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
     }
 
     /// <summary>
@@ -344,9 +358,6 @@ public class ShopManager : MonoBehaviour
             // ShopManager 자신도 이 이벤트를 구독하고 있으므로,
             // 레벨 변경 이후 상점 확률은 다음 Roll/Reroll부터 새 레벨 기준으로 적용된다.
             GameEvents.LevelChanged(_currentLevel);
-
-            // 캡의 단일 소스로서 레벨업 시점에 변경된 배치 가능 기물 수를 통지한다.
-            GameEvents.UnitCapChanged(UnitCap);
         }
 
         if (_currentLevel >= _maxLevel)
@@ -359,7 +370,7 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     private int GetRequiredXp(int level)
     {
-        if (_requiredXpByLevel == null || level < 0 || level >= _requiredXpByLevel.Length)
+        if (_requiredXpByLevel == null || level <= 0 || level >= _requiredXpByLevel.Length)
             return 0;
 
         return _requiredXpByLevel[level];
@@ -371,7 +382,7 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     private int GetUnitCap(int level)
     {
-        if (_unitCapByLevel == null || level < 0 || level >= _unitCapByLevel.Length)
+        if (_unitCapByLevel == null || level <= 0 || level >= _unitCapByLevel.Length)
             return Mathf.Max(1, level);
 
         return Mathf.Max(1, _unitCapByLevel[level]);
@@ -380,7 +391,12 @@ public class ShopManager : MonoBehaviour
     private void HandleLevelChanged(int level)
     {
         _currentLevel = Mathf.Clamp(level, 1, _maxLevel);
+
         Debug.Log($"[Shop] 플레이어 레벨 변경 반영: Lv.{_currentLevel}");
+
+        // UnitCap의 단일 소스는 ShopManager.
+        // 레벨 변경이 반영될 때마다 현재 레벨 기준 배치 가능 기물 수를 통지한다.
+        GameEvents.UnitCapChanged(UnitCap);
     }
 
     /// <summary>BoardManager.SellUnit이 발행한 판매 이벤트 → 환급 골드 지급 + 챔피언 풀 복귀.</summary>

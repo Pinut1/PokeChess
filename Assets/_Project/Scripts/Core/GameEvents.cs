@@ -48,6 +48,9 @@ public static class GameEvents
     /// <summary>플레이어 레벨 변경. 인자 = 변경 후 레벨</summary>
     public static event Action<int> OnLevelChanged;
 
+    /// <summary>XP 변경. 인자 = (현재 XP, 다음 레벨 필요 XP). ShopManager가 발행.</summary>
+    public static event Action<int, int> OnXpChanged;
+
     /// <summary>보드 배치 가능 기물 수 변경. 인자 = 변경 후 캡. ShopManager가 단일 소스로 발행.</summary>
     public static event Action<int> OnUnitCapChanged;
 
@@ -181,6 +184,7 @@ public static class GameEvents
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
+    public static void XpChanged(int current, int required) => OnXpChanged?.Invoke(current, required);
     public static void UnitCapChanged(int cap) => OnUnitCapChanged?.Invoke(cap);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);
@@ -200,7 +204,7 @@ public static class GameEvents
     public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
     public static void ItemShopRerollCountChanged(int count) => OnItemShopRerollCountChanged?.Invoke(count);
     public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
-    public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
+    public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
     public static void StageEntered(StageData stage) => OnStageEntered?.Invoke(stage);
 
