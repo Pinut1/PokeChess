@@ -1,42 +1,29 @@
 using UnityEngine;
 
 /// <summary>
-/// 스테이지 클리어 보상 지급 담당.
-/// 팀 라운드 결과(OnTeamRoundResolved) 확정 시 현재 스테이지의 rewardTableId로 RewardDatabase를 조회해 지급한다.
-/// 보상 배수(기획): BothWin=100%, Split(한 명만 패)=50%, BothLose(둘 다 패)=0%.
-/// 각 클라이언트가 자기 플레이어 몫을 지급한다(스플릿이면 두 플레이어 모두 절반).
+/// 스테이지 보상 지급 담당.
+/// 밸런스 기획서 §7: "모든 보상은 해당 라운드 전투 시작 전 선지급"(보상 → 상점 → 덱 구성 → 전투).
+/// 따라서 라운드 진입(OnStageEntered) 시 현재 스테이지의 rewardTableId로 RewardDatabase를 조회해 전액 지급한다.
+/// 승/패 배수 없음 — 공유 라이프 모델(BothLose만 -1)이라 라운드 시작 시점엔 결과가 없고, 선지급이 곧 상점 예산이 된다.
+/// 각 클라이언트가 자기 플레이어 몫을 지급한다(2인 각자 경제).
 ///
-/// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage (FSM에 보상 로직을 하드코딩하지 않기 위해 분리).
+/// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage. StageEntered 인자로 직접 받으므로 pull도 불필요.
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/유닛/아이템/진화의 돌/소모품은 실제 지급 연결됨.
-/// 증강은 해당 시스템이 붙을 때까지 훅 + 경고 로그로 남긴다(역기획서 수치도 미확정).
-/// grep "[Reward] TODO"로 추적.
+/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품은 실제 지급 연결됨.
+/// 증강(AugmentChoice)·재련기(Reforger)는 해당 시스템이 붙을 때까지 훅 + 경고 로그로 남긴다. grep "[Reward] TODO"로 추적.
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
-    private void OnEnable()  => GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
-    private void OnDisable() => GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
+    private void OnEnable()  => GameEvents.OnStageEntered += HandleStageEntered;
+    private void OnDisable() => GameEvents.OnStageEntered -= HandleStageEntered;
 
-    private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
+    /// <summary>라운드 진입(전투 전) 시 해당 스테이지 보상을 전액 선지급.</summary>
+    private void HandleStageEntered(StageData stage)
     {
-        // 보상 배수: 둘 다 승=100%, 스플릿=50%, 둘 다 패=0%(지급 없음).
-        float mult = outcome switch
-        {
-            TeamRoundOutcome.BothWin => 1f,
-            TeamRoundOutcome.Split   => 0.5f,
-            _                        => 0f
-        };
-        if (mult <= 0f)
-        {
-            Debug.Log("[Reward] 둘 다 패배 — 보상 없음");
-            return;
-        }
-
-        StageData stage = GameManager.Instance.Phase != null ? GameManager.Instance.Phase.CurrentStage : null;
         if (stage == null)
         {
-            Debug.LogWarning("[Reward] CurrentStage 없음 — 보상 스킵 (StageDatabase 미임포트/매칭 실패)");
+            Debug.LogWarning("[Reward] StageEntered stage 없음 — 보상 스킵");
             return;
         }
 
@@ -50,13 +37,13 @@ public class RewardManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Reward] '{stage.stageId}' 보상 지급: {table.label} ({table.rewards.Count}항목, 배수 {mult:P0})");
+        Debug.Log($"[Reward] '{stage.stageId}' 보상 선지급: {table.label} ({table.rewards.Count}항목)");
         foreach (var entry in table.rewards)
-            GrantEntry(entry, stage, mult);
+            GrantEntry(entry, stage);
     }
 
-    /// <summary>보상 한 항목 지급. dropChance로 확률 판정 후 배수 적용 종류별 분기.</summary>
-    private void GrantEntry(RewardEntry entry, StageData stage, float mult)
+    /// <summary>보상 한 항목 지급. dropChance로 확률 판정 후 종류별 분기(전액).</summary>
+    private void GrantEntry(RewardEntry entry, StageData stage)
     {
         if (entry == null) return;
 
@@ -64,8 +51,7 @@ public class RewardManager : MonoBehaviour
         if (entry.dropChance < 1f && Random.value > entry.dropChance)
             return;
 
-        // 스플릿이면 수량 절반(내림). 1개짜리 유닛 보상은 0이 될 수 있음(의도 — 절반).
-        int amount = Mathf.FloorToInt(entry.amount * mult);
+        int amount = entry.amount;
 
         switch (entry.kind)
         {
@@ -102,8 +88,31 @@ public class RewardManager : MonoBehaviour
             case RewardKind.Unit:
                 if (amount > 0) GrantUnit(entry.refNameEn, amount);
                 break;
+            case RewardKind.Reroll:
+                // 무료 리롤 자원 지급. ShopManager.AddReroll → GameEvents.RerollCountChanged로 HUD 동기화.
+                if (amount > 0)
+                {
+                    GameManager.Instance.Shop.AddReroll(amount);
+                    Debug.Log($"[Reward] +{amount} 무료 리롤");
+                }
+                break;
+            case RewardKind.ItemShopReroll:
+                // 아이템 상점 무료 리롤 자원 지급(밸런스 기획서 §7.3, 라운드당 2개).
+                if (amount > 0)
+                {
+                    GameManager.Instance.Shop.AddItemShopReroll(amount);
+                    Debug.Log($"[Reward] +{amount} 아이템샵 리롤");
+                }
+                break;
+
+            case RewardKind.Reforger:
+                // 재련기(아이템 재련). 아이템 데이터/인벤 처리 미구현 → 훅+TODO로 유지(그린라이트 후 연결).
+                if (amount > 0)
+                    Debug.LogWarning($"[Reward] TODO Reforger +{amount} — 재련기 아이템 미구현, 지급 스킵");
+                break;
+
             case RewardKind.AugmentChoice:
-                Debug.LogWarning("[Reward] TODO AugmentChoice — AugmentManager 미구현(태욱), preReward 흐름과 통합 예정");
+                Debug.LogWarning("[Reward] TODO AugmentChoice — AugmentManager 미구현(해인), preReward 흐름과 통합 예정");
                 break;
         }
     }

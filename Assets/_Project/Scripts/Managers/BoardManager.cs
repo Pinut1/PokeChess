@@ -255,43 +255,61 @@ public class BoardManager : MonoBehaviour
             }
         }
 
+        // 분기별 배치 처리. 실패(벤치 슬롯 확보 불가 등) 시 상태 변경 없이 거부.
+        bool placed;
         if (occupant == null)
-        {
-            // 빈 타일: 단순 이동/신규 배치
-            if (fromBoard) _battleField[fromCoords] = null;
-            else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
-
-            _battleField[targetCoords] = unit;
-            unit.isOnBoard = true;
-        }
+            placed = PlaceOnEmptyTile(unit, targetCoords, fromBoard, fromCoords);
         else if (fromBoard)
-        {
-            // 보드 ↔ 보드 스왑 (둘 다 보드에 남음)
-            _battleField[fromCoords] = occupant;
-            _battleField[targetCoords] = unit;
-        }
+            placed = SwapOnBoard(unit, targetCoords, fromCoords, occupant);
         else
-        {
-            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체.
-            // unit이 보드에도 벤치에도 없는 경우(현재 호출부에서는 발생하지 않지만 방어) —
-            // occupant를 보낼 빈 벤치 슬롯을 새로 찾고, 그마저 없으면 occupant가 추적 불가능한 채로
-            // 유실되는 걸 막기 위해 배치 자체를 거부한다.
-            int benchSlot = FindBenchSlot(unit);
-            if (benchSlot < 0) benchSlot = FirstEmptyBenchSlot();
-            if (benchSlot < 0)
-            {
-                Debug.LogWarning("[BoardManager] 배치 거부 — 점유 중인 유닛을 보낼 빈 벤치 슬롯이 없습니다.");
-                return false;
-            }
+            placed = SwapBenchIntoBoard(unit, targetCoords, occupant);
 
-            _battleField[targetCoords] = unit;
-            unit.isOnBoard = true;
-            _bench[benchSlot] = occupant;
-            occupant.isOnBoard = false;
-        }
+        if (!placed) return false;
 
         GameEvents.UnitPlaced(unit);
         if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+        return true;
+    }
+
+    /// <summary>빈 보드 타일로 단순 이동/신규 배치. 들어온 출처(보드/벤치)에 따라 원위치를 비운다.</summary>
+    private bool PlaceOnEmptyTile(PokemonUnit unit, HexCoords targetCoords, bool fromBoard, HexCoords fromCoords)
+    {
+        if (fromBoard) _battleField[fromCoords] = null;
+        else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
+
+        _battleField[targetCoords] = unit;
+        unit.isOnBoard = true;
+        return true;
+    }
+
+    /// <summary>보드 ↔ 보드 스왑. 두 유닛 모두 보드에 남는다.</summary>
+    private bool SwapOnBoard(PokemonUnit unit, HexCoords targetCoords, HexCoords fromCoords, PokemonUnit occupant)
+    {
+        _battleField[fromCoords] = occupant;
+        _battleField[targetCoords] = unit;
+        return true;
+    }
+
+    /// <summary>
+    /// 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛을 교체.
+    /// unit이 보드에도 벤치에도 없는 경우(현재 호출부에서는 발생하지 않지만 방어) —
+    /// occupant를 보낼 빈 벤치 슬롯을 새로 찾고, 그마저 없으면 occupant가 추적 불가능한 채로
+    /// 유실되는 걸 막기 위해 배치 자체를 거부한다.
+    /// </summary>
+    private bool SwapBenchIntoBoard(PokemonUnit unit, HexCoords targetCoords, PokemonUnit occupant)
+    {
+        int benchSlot = FindBenchSlot(unit);
+        if (benchSlot < 0) benchSlot = FirstEmptyBenchSlot();
+        if (benchSlot < 0)
+        {
+            Debug.LogWarning("[BoardManager] 배치 거부 — 점유 중인 유닛을 보낼 빈 벤치 슬롯이 없습니다.");
+            return false;
+        }
+
+        _battleField[targetCoords] = unit;
+        unit.isOnBoard = true;
+        _bench[benchSlot] = occupant;
+        occupant.isOnBoard = false;
         return true;
     }
 
@@ -518,7 +536,8 @@ public class BoardManager : MonoBehaviour
 
         // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
         // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
-        string evolvedEn = survivor.data.evolvesIntoEn;
+        // 진화잠금(이브이 영웅증강 등)이면 종 스왑을 건너뛰고 별만 올린다 — 3성까지 원본 종 유지.
+        string evolvedEn = survivor.evolutionLocked ? null : survivor.data.evolvesIntoEn;
         if (!string.IsNullOrEmpty(evolvedEn))
         {
             var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
