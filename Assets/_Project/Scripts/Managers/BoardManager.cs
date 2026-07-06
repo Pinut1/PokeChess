@@ -358,7 +358,14 @@ public class BoardManager : MonoBehaviour
         else
         {
             int fromSlot = FindBenchSlot(unit);
-            if (fromSlot >= 0) _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
+            if (fromSlot < 0)
+            {
+                // 들어온 유닛이 보드에도 벤치에도 없음 — occupant를 되돌려놓을 원위치가 없으므로
+                // 스왑을 거부한다. (그대로 진행하면 occupant를 덮어써 유실됨)
+                Debug.LogWarning($"[Board] TryDropOnBench 거부: 들어온 유닛의 원위치를 찾지 못해 스왑 불가(occupant 보호)");
+                return false;
+            }
+            _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
         }
 
         _bench[slot] = unit;
