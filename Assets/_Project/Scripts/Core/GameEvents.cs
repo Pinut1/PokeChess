@@ -14,6 +14,18 @@ public enum TeamRoundOutcome
 }
 
 /// <summary>
+/// 세션 종료(패배) 사유. MatchRecorder가 전적(endReason)에 기록하고,
+/// 결과 화면 문구 분기(UI)에도 사용. (RPC 전송은 없지만 기록값이므로 이름 변경 주의.)
+/// </summary>
+public enum SessionEndReason
+{
+    TeamHpZero,        // 팀 공통 HP 소진
+    ReconnectFailed,   // 본인 재접속 실패
+    PartnerAbandoned,  // 상대 미재접속(협동 불가)
+    BothDisconnected   // 둘 다 연결 끊김
+}
+
+/// <summary>
 /// 매니저 간 직접 참조 대신 이벤트로 통신.
 /// 새 이벤트는 반드시 여기에만 추가할 것.
 /// </summary>
@@ -163,8 +175,8 @@ public static class GameEvents
     /// <summary>재접속 유예시간 종료. 인자 = 둘 다 끊겼는지 여부 (true면 세션 종료)</summary>
     public static event Action<bool> OnGracePeriodExpired;
 
-    /// <summary>세션 종료(패배 처리). 전적 기록은 미구현 — 로그로만 처리</summary>
-    public static event Action OnSessionEnded;
+    /// <summary>세션 종료(패배 처리). 인자 = 종료 사유. RoundPhaseManager(GameOver 전환)·MatchRecorder(전적 기록)가 구독.</summary>
+    public static event Action<SessionEndReason> OnSessionEnded;
 
     /// <summary>
     /// 마지막 라운드(챕터 최종 스테이지) 클리어 — 게임 완주(승리).
@@ -172,6 +184,16 @@ public static class GameEvents
     /// RoundPhaseManager가 GamePhase.Victory로 전환. (다음 라운드를 브로드캐스트하지 않음.)
     /// </summary>
     public static event Action OnGameCleared;
+
+    // ──────────────────────────────────────────
+    // 전적
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 전적 1건 기록 완료(승패 무관). 인자 = 방금 저장된 기록. MatchRecorder가 발행.
+    /// UI(결과 화면/전적 창)가 구독해 즉시 표시. 과거 전적 조회는 MatchHistoryStore.LoadRecent() pull.
+    /// </summary>
+    public static event Action<MatchRecord> OnMatchRecorded;
 
     // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
@@ -211,6 +233,7 @@ public static class GameEvents
     public static void OpponentDisconnected(float graceSeconds) => OnOpponentDisconnected?.Invoke(graceSeconds);
     public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();
     public static void GracePeriodExpired(bool bothDisconnected) => OnGracePeriodExpired?.Invoke(bothDisconnected);
-    public static void SessionEnded()               => OnSessionEnded?.Invoke();
+    public static void SessionEnded(SessionEndReason reason) => OnSessionEnded?.Invoke(reason);
     public static void GameCleared()                => OnGameCleared?.Invoke();
+    public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
 }

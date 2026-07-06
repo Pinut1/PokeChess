@@ -168,17 +168,20 @@ public class RoundPhaseManager : MonoBehaviour
     /// <summary>
     /// 재접속 유예시간 종료. 2인 협동 PVE라 둘 다 끊겼든 한 명만 남았든 공략이 불가능하므로
     /// 어느 경우든 세션 종료(패배)로 처리한다. (남은 플레이어 솔로 전환/항복 선택지는 기획상 두지 않음.)
+    /// 자기 핸들러 직접 호출이 아니라 이벤트로 발행해야 다른 구독자(MatchRecorder 등)도 종료를 인지한다.
     /// </summary>
     private void HandleGracePeriodExpired(bool bothDisconnected)
     {
         if (!bothDisconnected)
             Debug.LogWarning("[Phase] 유예시간 종료 — 상대 미재접속(협동 불가) → 세션 종료");
 
-        HandleSessionEnded();
+        GameEvents.SessionEnded(bothDisconnected
+            ? SessionEndReason.BothDisconnected
+            : SessionEndReason.PartnerAbandoned);
     }
 
-    /// <summary>세션 종료(패배 처리). 전적 기록 시스템 미구현 — 로그만 출력</summary>
-    private void HandleSessionEnded()
+    /// <summary>세션 종료(패배 처리). 전적 기록은 MatchRecorder가 같은 이벤트를 구독해 담당.</summary>
+    private void HandleSessionEnded(SessionEndReason reason)
     {
         if (_phaseTimer != null)
         {
@@ -188,7 +191,7 @@ public class RoundPhaseManager : MonoBehaviour
 
         EnterPhase(GamePhase.GameOver);
         string stageId = CurrentStage != null ? CurrentStage.stageId : "(없음)";
-        Debug.LogWarning($"[Phase] 세션 종료 — 패배 처리 (도달 라운드 {CurrentRound}, 스테이지 {stageId}) — 전적 기록 시스템 미구현, 로그만 출력");
+        Debug.LogWarning($"[Phase] 세션 종료 — 패배 처리 (사유 {reason}, 도달 라운드 {CurrentRound}, 스테이지 {stageId})");
     }
 
     // ─────────────────────────────────────────
