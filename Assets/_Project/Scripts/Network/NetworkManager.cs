@@ -42,6 +42,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
     private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
 
+    /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글. 빌드/검증 편의용.</summary>
+    public static bool DebugInfiniteTeamHealth = false;
+
     /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
     private bool _roundResultResolved;
 
@@ -387,6 +390,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>MasterClient에서만 실행: 현재 팀 HP를 읽어 데미지만큼 깎아 Room 속성에 기록.</summary>
     private void ApplyTeamDamageLocal(int damage)
     {
+        if (DebugInfiniteTeamHealth)
+        {
+            Debug.Log("[Network] 디버그 무한 HP — 팀 데미지 무시");
+            return;
+        }
+
         if (_soloMode)
         {
             _soloTeamHp = Mathf.Max(0, _soloTeamHp - damage);
@@ -741,6 +750,9 @@ public class NetworkManager : MonoBehaviour
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;
 
+    /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글.</summary>
+    public static bool DebugInfiniteTeamHealth = false;
+
     private void Start()
     {
         Debug.LogWarning("[Network] PUN2 미설치 — 오프라인 모드로 실행 중");
@@ -776,6 +788,11 @@ public class NetworkManager : MonoBehaviour
 
     public void ReportBattleLoss(int damage)
     {
+        if (DebugInfiniteTeamHealth)
+        {
+            Debug.Log("[Network] 디버그 무한 HP — 팀 데미지 무시");
+            return;
+        }
         if (_teamHp < 0) return;
         _teamHp = Mathf.Max(0, _teamHp - damage);
         GameEvents.HealthChanged(_teamHp);

@@ -18,7 +18,7 @@ public class SynergyStatus
 /// <summary>
 /// 보드 위 유닛 기준 시너지 카운트/활성 티어 계산 담당.
 /// OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 → BoardManager.GetUnitsOnBoard() pull → 전체 재계산.
-/// 실제 버프 적용은 BattleManager가 전투 시작 시 GetActiveSynergies()를 pull해서 처리 (TODO: BattleManager 구현 시).
+/// 실제 버프 적용은 BattleManager가 전투 시작 시 GetActiveSynergies()를 pull해서 처리한다.
 /// </summary>
 public class SynergyManager : MonoBehaviour
 {

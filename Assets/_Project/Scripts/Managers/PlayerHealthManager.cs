@@ -11,10 +11,11 @@ using UnityEngine;
 /// </summary>
 public class PlayerHealthManager : MonoBehaviour
 {
-    [Header("라이프 설정 (공용 라이프 — 기획: 3개)")]
-    // GDD 규칙: 공용 라이프 3개. 한 라운드에 두 플레이어가 모두 패배해야 1 감소(스플릿은 라이프 유지).
+    [Header("라이프 설정 (공용 라이프 — 밸런스 기획서 §2.1: 1)")]
+    // 밸런스 기획서 §2.1: 공유 HP 1 (한 번 지면 게임 종료). 두 플레이어가 모두 패배(BothLose)하면 1 감소 → 즉시 게임오버.
     // 실제 라이프 차감은 NetworkManager가 팀 결과(BothLose) 판정 시 권위로 처리한다.
-    [SerializeField] private int _maxLives = 3;
+    // ⚠️ SerializeField — 씬/프리팹 인스펙터 값이 우선. 인스펙터도 1로 맞출 것.
+    [SerializeField] private int _maxLives = 1;
 
     /// <summary>현재 공용 라이프. NetworkManager(Room 속성)에서 읽음.</summary>
     public int Health => GameManager.Instance != null && GameManager.Instance.Network != null

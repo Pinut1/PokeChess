@@ -49,14 +49,19 @@ public class PrototypeHud : MonoBehaviour
     // ── 상단 좌측: 라운드·페이즈 / 팀 라이프 / 골드 / 레벨·XP / 파트너 골드 / 아이템 정보 ──
     private void DrawStatusPanel(GameManager gm)
     {
-        // 레벨 / XP 표시가 추가되어 높이를 180 → 230으로 확장
-        GUILayout.BeginArea(new Rect(10, 10, 280, 230), GUI.skin.box);
+        // 레벨 / XP + 디버그 토글이 추가되어 높이를 230 → 268로 확장
+        GUILayout.BeginArea(new Rect(10, 10, 280, 268), GUI.skin.box);
 
         if (gm.Phase != null)
             GUILayout.Label($"라운드 {gm.Phase.CurrentRound}   |   {PhaseKr(gm.Phase.CurrentPhase)}");
 
         if (gm.PlayerHealth != null)
             GUILayout.Label($"팀 라이프: {Mathf.Max(0, gm.PlayerHealth.Health)} / {gm.PlayerHealth.MaxHealth}");
+
+        // 디버그: 무한 HP 토글 (검증 편의용 — 팀 데미지 전부 무시)
+        string infHpLabel = NetworkManager.DebugInfiniteTeamHealth ? "무한 HP: ON ▣" : "무한 HP: OFF ☐";
+        if (GUILayout.Button(infHpLabel))
+            NetworkManager.DebugInfiniteTeamHealth = !NetworkManager.DebugInfiniteTeamHealth;
 
         if (gm.Shop != null)
         {
@@ -111,8 +116,11 @@ public class PrototypeHud : MonoBehaviour
 
         float by = y + h + gap;
 
-        // 유닛 상점 리롤
-        if (GUI.Button(new Rect(startX, by, w, 30), "리롤 (2G)"))
+        // 유닛 상점 리롤 — 무료 리롤 자원 우선, 없으면 골드.
+        string rerollLabel = shop.RerollCount > 0
+            ? $"리롤 (무료 {shop.RerollCount})"
+            : $"리롤 ({shop.RerollCost}G)";
+        if (GUI.Button(new Rect(startX, by, w, 30), rerollLabel))
             shop.Reroll();
 
         // XP 구매 버튼

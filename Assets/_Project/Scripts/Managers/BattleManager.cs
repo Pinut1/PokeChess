@@ -74,8 +74,9 @@ public class BattleManager : MonoBehaviour
             yield break;
         }
 
-        // 활성 시너지 적용: ① 일반 스탯버프(SynergyConstants 수치) ② 특수효과(얼음 적디버프/치어리더 선택/돌연변이 봇소환).
-        // 악(첫 스킬 스턴)은 시전 훅이 필요해 별도(미구현). 향후 SynergyData.statType 추가 시 ①을 statType 기반 리팩터 가능.
+        // 활성 시너지 적용: ① 일반 스탯버프(SynergyConstants 수치)
+        // ② 특수효과(얼음 적디버프/치어리더 선택/돌연변이 봇소환/악 첫스킬 스턴).
+        // 향후 SynergyData.statType 추가 시 ①을 statType 기반 리팩터 가능.
         ApplySynergyBuffs();
         ApplySynergySpecials();
 
@@ -196,7 +197,9 @@ public class BattleManager : MonoBehaviour
     // 특수 시너지 (봇소환/적디버프/선택형) — 수치 = SynergyConstants
     // ─────────────────────────────────────────
 
-    private static readonly string[] MutantBots = { "Eevee", "Umbreon", "Glaceon", "Sylveon" };
+    // 돌연변이 봇(덱기획: 돌연변이 2/3/4/5 단계별 = 에브이/브래키/글레이시아/님피아).
+    // 에브이=Espeon(이브이 Eevee 아님 — 이전 코드 오타 수정).
+    private static readonly string[] MutantBots = { "Espeon", "Umbreon", "Glaceon", "Sylveon" };
 
     /// <summary>전투 시작 시 특수 시너지 적용(일반 스탯버프 ApplySynergyBuffs 이후 호출).</summary>
     private void ApplySynergySpecials()
@@ -211,10 +214,63 @@ public class BattleManager : MonoBehaviour
         if (GetActiveSynergy("Cheerleader") != null)
             ApplyCheerleaderChoice();
 
-        // 돌연변이: 활성 티어 수만큼 봇 누적 소환(에브이→브래키→글레이시아→님피아).
-        var mutant = GetActiveSynergy("Mutant");
-        if (mutant != null)
-            SpawnMutantBots(mutant.activeTierIndex + 1);
+        // 돌연변이 봇 소환. 이브이 영웅증강(진화잠금 이브이 3성)이 보드에 있으면 봇 전원(4마리) 즉시 소환 —
+        // 이 경우 이브이 단독이라 일반 돌연변이 시너지 카운트로는 티어가 안 오르므로 전용 경로로 처리.
+        // 없으면 일반 돌연변이 시너지 활성 티어 수만큼 소환.
+        if (HasHeroEeveeThreeStar())
+            SpawnMutantBots(MutantBots.Length);
+        else
+        {
+            var mutant = GetActiveSynergy("Mutant");
+            if (mutant != null)
+                SpawnMutantBots(mutant.activeTierIndex + 1);
+        }
+
+        // 악: 트레잇 보유 아군은 첫 스킬 시전 시 대상 스턴(전용 로직 — CastSkill에서 1회 소비).
+        var dark = GetActiveSynergy("Dark");
+        if (dark != null)
+            MarkDarkFirstSkillStun(dark);
+    }
+
+    /// <summary>
+    /// 악(DARK) 시너지 활성 시, 그 트레잇을 실제 보유한 아군에 첫 스킬 스턴 플래그를 세운다.
+    /// 실제 스턴 부여는 CastSkill이 첫 시전 때 darkFirstSkillPending을 소비하며 처리.
+    /// (트레잇 보유 판정은 ApplySynergyBuffs와 동일 — 데이터가 한/영 어느 키든 허용.)
+    /// </summary>
+    private void MarkDarkFirstSkillStun(SynergyStatus dark)
+    {
+        int marked = 0;
+        foreach (var bu in _units)
+        {
+            if (bu.team != BattleTeam.Ally || bu.source == null || bu.source.data == null) continue;
+
+            var syns = bu.source.data.synergies;
+            if (syns == null) continue;
+            if (!syns.Contains(dark.data.synergyName) && !syns.Contains(dark.data.synergyNameEn)) continue;
+
+            bu.darkFirstSkillPending = true;
+            marked++;
+        }
+
+        if (marked > 0)
+            Debug.Log($"[Synergy] 악 첫스킬 스턴 대상 {marked}기 마킹");
+    }
+
+    /// <summary>
+    /// 이브이 영웅증강(진화잠금) 이브이가 3성으로 아군 보드에 있는지. 봇 전원소환 트리거.
+    /// evolutionLocked는 이브이 영웅증강만 세우는 플래그라 종·성만 추가 확인하면 충분.
+    /// </summary>
+    private bool HasHeroEeveeThreeStar()
+    {
+        foreach (var bu in _units)
+        {
+            var src = bu.source;
+            if (bu.team != BattleTeam.Ally || src == null || src.data == null) continue;
+            if (src.evolutionLocked && src.starLevel >= 3 &&
+                string.Equals(src.data.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>활성 시너지 중 영문 ID가 일치하는 것(없으면 null).</summary>
@@ -510,7 +566,8 @@ public class BattleManager : MonoBehaviour
             attackCooldown = 0f,
             role = unit.Role
         };
-        if (unit.data != null) ApplySkill(bu, unit.data.skill, unit.ManaCost);
+        // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
+        if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
 
         foreach (var item in unit.items)
         {
@@ -676,6 +733,15 @@ public class BattleManager : MonoBehaviour
     private void CastSkill(BattleUnit caster, BattleUnit primaryTarget)
     {
         caster.currentMana = 0f;
+
+        // [악 시너지] 첫 스킬 시전 시 대상 스턴(1회 소비). 스킬 종류와 무관하게 적용되며,
+        // 살아있는 적 대상이 있을 때만(지원 스킬의 primaryTarget이 아군일 가능성 방어).
+        if (caster.darkFirstSkillPending)
+        {
+            caster.darkFirstSkillPending = false;
+            if (primaryTarget != null && primaryTarget.IsAlive && primaryTarget.team == BattleTeam.Enemy)
+                primaryTarget.ApplyStun(SynergyConstants.DarkFirstSkillStunSeconds);
+        }
 
         // 데미지 스킬만 처리. 지원(HP_REGEN/SHIELD/AS_BUFF/MANA_REGEN)은 Phase2, CC(SLOW/STUN/TAUNT)는 기둥C에서 구현.
         bool isDamage = caster.skillEffectType == SkillEffectType.Attack ||

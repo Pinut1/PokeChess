@@ -38,6 +38,27 @@ Assets/_Project/Scripts/
 ## 미확정 / 추후 수정 필요
 - `PokemonData.synergies`가 현재 `List<string>` — 기획팀 시너지 목록 확정 후 `List<SynergyType>` enum으로 교체 필요. `SynergyManager`에서 시너지 비교할 때 오타 주의.
 
+## 기술 부채 추적 (TODO / PLACEHOLDER)
+코드에 흩어진 미완/임시 항목을 한곳에 모음. 상태: 🔴 기획 수치 대기 / 🟡 타 담당 / 🟢 영욱 영역.
+
+**🔴 기획 수치 확정 대기 (메커니즘 구현됨, 값만 PLACEHOLDER)**
+- `BattleManager` CC 지속/감속(`STUN_DURATION`/`SLOW_*`), 지원스킬 위력(`MANA_REGEN_SKILL_AMOUNT`/`AS_BUFF_*`), role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
+- `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
+- `Core/PokemonUnit` 특수진화체 별배율 ×1.5
+- `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`
+- `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
+
+**🟡 타 담당 영역**
+- 증강: `Augments/Implementations/*` `Apply()` 4종, `AugmentFactory` 미구현 — 황해인
+- `Managers/UIManager` 스텁, `ShopManager`의 `XpChanged` 이벤트화 — 태욱(상점)·해인(UI)
+- `Managers/RewardManager` `AugmentChoice` 지급 — AugmentManager(해인) 연결 대기
+
+**🟢 영욱 영역 (Core/전투/보드/네트워크)**
+- ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
+- 전적 기록 시스템 미구현 — `RoundPhaseManager`/`GameEvents`는 세션 종료를 로그로만 처리. 별도 시스템 작업 필요.
+- `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
+- 악 외 미구현 전투 메커니즘 없음(CC/지원/타겟팅은 메커니즘 완료, 수치만 🔴)
+
 ## 작업 분배 (태욱 — 상점/아이템/UI)
 레벨/XP 시스템(PR #13) 후속으로 태욱이 이어받을 작업:
 - **XP 변경 이벤트화**: 현재 HUD는 `ShopManager.CurrentXp`를 매 프레임 폴링 중. `GameEvents.XpChanged(CurrentXp, RequiredXp)` 추가 후 UI를 이벤트 구독으로 전환. (캡은 이미 `OnUnitCapChanged`로 이벤트화됨)

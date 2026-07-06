@@ -522,7 +522,8 @@ public class BoardManager : MonoBehaviour
 
         // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
         // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
-        string evolvedEn = survivor.data.evolvesIntoEn;
+        // 진화잠금(이브이 영웅증강 등)이면 종 스왑을 건너뛰고 별만 올린다 — 3성까지 원본 종 유지.
+        string evolvedEn = survivor.evolutionLocked ? null : survivor.data.evolvesIntoEn;
         if (!string.IsNullOrEmpty(evolvedEn))
         {
             var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;

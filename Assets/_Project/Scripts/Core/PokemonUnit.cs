@@ -44,6 +44,53 @@ public class PokemonUnit : MonoBehaviour
     public bool isTradeEvolved;
 
     // ──────────────────────────────────────────
+    // 영웅 증강 런타임 변형 (증강 시스템=해인이 선택 시 설정하는 seam)
+    // ──────────────────────────────────────────
+    // 증강 시스템이 아직 없어 기본값은 전부 '무효과'. 켜지면 전투/진화가 자동 반영된다.
+    // 이브이 영웅증강 = evolutionLocked + heroStatMultiplier, 파치리스 영웅증강 = roleOverride + grantedSkill.
+
+    /// <summary>이브이 영웅증강: true면 별업 시 진화체로 스왑하지 않고 종을 유지(3성까지 이브이).
+    /// <see cref="BoardManager"/>.CheckEvolution이 참조. 이 플래그가 이브이 3성 봇소환의 판정 기준이기도 함(BattleManager).</summary>
+    public bool evolutionLocked;
+
+    /// <summary>영웅증강 전용 스탯 배수(이브이 ×1.4). MaxHp/Attack/SpellPower에 곱해지며 특수진화 ×1.5와 독립적으로 누적.</summary>
+    public float heroStatMultiplier = 1f;
+
+    /// <summary>파치리스 영웅증강: 비어있지 않으면 <see cref="Role"/>이 이 값을 반환(서포터→탱커). 시너지는 data.synergies 그대로 유지.</summary>
+    public string roleOverride;
+
+    /// <summary>파치리스 영웅증강: null이 아니면 전투에서 data.skill 대신 이 스킬을 시전(도발 부여). 마나비용은 grantedSkillManaCost(0이면 data.manaCost).</summary>
+    public PokemonSkillData grantedSkill;
+    public int grantedSkillManaCost;
+
+    /// <summary>주입 스킬이 유효한지(파치리스 도발 등).</summary>
+    public bool HasGrantedSkill => grantedSkill != null && grantedSkill.HasSkill;
+
+    /// <summary>전투가 실제로 시전할 스킬(주입 스킬 우선, 없으면 원본 종 스킬). 스냅샷(ApplySkill)이 이걸 읽는다.</summary>
+    public PokemonSkillData EffectiveSkill => HasGrantedSkill ? grantedSkill : (data != null ? data.skill : null);
+
+    /// <summary>EffectiveSkill에 대응하는 마나비용.</summary>
+    public int EffectiveManaCost => HasGrantedSkill && grantedSkillManaCost > 0 ? grantedSkillManaCost : ManaCost;
+
+    /// <summary>이브이 영웅증강 적용(진화잠금 + 스탯 배수). 증강 시스템 연결 시 이 API로 호출.</summary>
+    public void ApplyEeveeHeroAugment(float statMultiplier = 1.4f)
+    {
+        evolutionLocked    = true;
+        heroStatMultiplier = statMultiplier;
+        currentHp          = Mathf.Min(currentHp, MaxHp);
+        GameEvents.UnitChanged(this);
+    }
+
+    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입). 증강 시스템 연결 시 이 API로 호출.</summary>
+    public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0)
+    {
+        roleOverride          = newRole;
+        grantedSkill          = tauntSkill;
+        grantedSkillManaCost  = manaCost;
+        GameEvents.UnitChanged(this);
+    }
+
+    // ──────────────────────────────────────────
     // 별 강화 스케일링
     // ──────────────────────────────────────────
     // TFT 표준: 성이 오를 때마다 약 1.8배. (2성=1.8x, 3성=1.8x1.8=3.24x)
@@ -71,14 +118,14 @@ public class PokemonUnit : MonoBehaviour
     // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
     // ──────────────────────────────────────────
 
-    public float MaxHp        => data != null ? data.hp * StarMultiplier * SpecialEvolutionMultiplier : 0f;
-    public float Attack       => data != null ? data.attack * StarMultiplier * SpecialEvolutionMultiplier : 0f;
-    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * SpecialEvolutionMultiplier : 0f;
+    public float MaxHp        => data != null ? data.hp * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
+    public float Attack       => data != null ? data.attack * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
+    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
     public float Defense      => data != null ? data.defense : 0f;
     public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
     public int   Range        => data != null ? data.range : 0;
     public int   ManaCost     => data != null ? data.manaCost : 0;
-    public string Role        => data != null ? data.role : "";
+    public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");
 
     private void Start()
     {
