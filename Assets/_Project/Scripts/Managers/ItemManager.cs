@@ -17,6 +17,9 @@ public class ItemManager : MonoBehaviour
     [Header("아이템 쿠폰")]
     [SerializeField] private int _startingItemCoupon = 0;
 
+    [Header("리포저")]
+    [SerializeField] private int _startingReforger = 0;
+
     private readonly List<ItemData> _items = new();
     private readonly List<EvolutionStoneData> _stones = new();
     private readonly List<ConsumableData> _consumables = new();
@@ -28,6 +31,8 @@ public class ItemManager : MonoBehaviour
     public IReadOnlyList<ConsumableData> Consumables => _consumables;
 
     public int ItemCoupon { get; private set; }
+
+    public int ReforgerCount { get; private set; }
 
     public int InventoryCount => _items.Count + _stones.Count + _consumables.Count;
     public bool HasInventorySpace => InventoryCount < MAX_INVENTORY_SIZE;
@@ -45,6 +50,8 @@ public class ItemManager : MonoBehaviour
     private void Start()
     {
         ItemCoupon = _startingItemCoupon;
+        ReforgerCount = _startingReforger;
+
         GameEvents.ItemCouponChanged(ItemCoupon);
         GameEvents.InventoryChanged();
     }
@@ -79,6 +86,39 @@ public class ItemManager : MonoBehaviour
         GameEvents.ItemCouponChanged(ItemCoupon);
 
         Debug.Log($"[ItemCoupon] 쿠폰 사용 -{amount} / 남은 쿠폰 {ItemCoupon}");
+        return true;
+    }
+
+    // ──────────────────────────────────────────
+    // 리포저
+    // ──────────────────────────────────────────
+
+    /// <summary>리포저 증가/감소. 결과는 0 미만으로 내려가지 않음.</summary>
+    public void AddReforger(int amount)
+    {
+        if (amount == 0) return;
+
+        ReforgerCount = Mathf.Max(0, ReforgerCount + amount);
+        GameEvents.InventoryChanged();
+
+        Debug.Log($"[Reforger] 리포저 변경: {ReforgerCount}");
+    }
+
+    /// <summary>리포저 사용. 보유량이 부족하면 false.</summary>
+    public bool SpendReforger(int amount)
+    {
+        if (amount <= 0) return true;
+
+        if (ReforgerCount < amount)
+        {
+            Debug.Log($"[Reforger] 리포저 부족 — 필요 {amount}, 보유 {ReforgerCount}");
+            return false;
+        }
+
+        ReforgerCount -= amount;
+        GameEvents.InventoryChanged();
+
+        Debug.Log($"[Reforger] 리포저 사용 -{amount} / 남은 리포저 {ReforgerCount}");
         return true;
     }
 
