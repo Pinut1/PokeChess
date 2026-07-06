@@ -10,8 +10,8 @@ using UnityEngine;
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage. StageEntered 인자로 직접 받으므로 pull도 불필요.
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품은 실제 지급 연결됨.
-/// 증강(AugmentChoice)·재련기(Reforger)는 해당 시스템이 붙을 때까지 훅 + 경고 로그로 남긴다. grep "[Reward] TODO"로 추적.
+/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품/재련기(Reforger)는 실제 지급 연결됨.
+/// 증강(AugmentChoice)은 AugmentManager가 붙을 때까지 훅 + 경고 로그로 남긴다. grep "[Reward] TODO"로 추적.
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
@@ -106,9 +106,17 @@ public class RewardManager : MonoBehaviour
                 break;
 
             case RewardKind.Reforger:
-                // 재련기(아이템 재련). 아이템 데이터/인벤 처리 미구현 → 훅+TODO로 유지(그린라이트 후 연결).
-                if (amount > 0)
-                    Debug.LogWarning($"[Reward] TODO Reforger +{amount} — 재련기 아이템 미구현, 지급 스킵");
+                // 재련기(아이템 재련) 보유량 지급. ItemManager.AddReforger → InventoryChanged로 HUD 동기화.
+                if (amount <= 0) break;
+
+                if (GameManager.Instance.Item == null)
+                {
+                    Debug.LogWarning("[Reward] ItemManager 없음 — 재련기 지급 실패");
+                    break;
+                }
+
+                GameManager.Instance.Item.AddReforger(amount);
+                Debug.Log($"[Reward] +{amount} 재련기");
                 break;
 
             case RewardKind.AugmentChoice:
