@@ -328,6 +328,94 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
+    // 통신기 골드 전송 (선차감 → 상대 수신 → ack, 실패 시 환급)
+    // ─────────────────────────────────────────
+
+    /// <summary>ack 대기 중인 송금액. 0 = 대기 없음. 실패 ack 시 이만큼 환급.</summary>
+    private int _pendingGoldTransfer;
+
+    /// <summary>
+    /// 내 골드를 파트너에게 전송. 골드는 각자 로컬 권위(ShopManager)라 통신교환과 같은
+    /// 피어 ack 모델을 쓴다 — 보내는 쪽이 자기 잔액을 검증·선차감하고, 받는 쪽이 자기 권위로 가산.
+    /// 선차감이라 ack 대기 중 이중 송금/초과 지출이 불가능하고, 실패 ack 시 전액 환급된다.
+    /// </summary>
+    public void SendGoldToPartner(int amount)
+    {
+        if (amount <= 0) return;
+        if (_soloMode || !PhotonNetwork.InRoom)
+        {
+            Debug.LogWarning("[GoldTransfer] 파트너 없음 — 전송 불가");
+            GameEvents.GoldTransferRejected("파트너 없음");
+            return;
+        }
+        if (_pendingGoldTransfer > 0)
+        {
+            Debug.LogWarning("[GoldTransfer] 이전 전송 처리 중");
+            GameEvents.GoldTransferRejected("이전 전송 처리 중");
+            return;
+        }
+
+        // 유예시간(재접속 대기) 중인 파트너에게 보낸 RPC는 버퍼되지 않고 유실됨 — 골드 증발 방지.
+        var others = PhotonNetwork.PlayerListOthers;
+        if (others == null || others.Length == 0 || others[0].IsInactive)
+        {
+            Debug.LogWarning("[GoldTransfer] 파트너 연결 끊김 — 전송 불가");
+            GameEvents.GoldTransferRejected("파트너 연결 끊김");
+            return;
+        }
+
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (shop == null || shop.Gold < amount)
+        {
+            Debug.LogWarning($"[GoldTransfer] 골드 부족 — 보유 {(shop != null ? shop.Gold : 0)} < 요청 {amount}");
+            GameEvents.GoldTransferRejected("골드 부족");
+            return;
+        }
+
+        shop.AddGold(-amount); // 선차감 (OnGoldChanged → BoardSyncBroadcaster가 파트너 표시 동기화)
+        _pendingGoldTransfer = amount;
+        Debug.Log($"[GoldTransfer] 전송 요청: {amount}G → 파트너");
+        photonView.RPC(nameof(RPC_GoldReceive), RpcTarget.Others, amount);
+    }
+
+    [PunRPC]
+    private void RPC_GoldReceive(int amount)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (amount <= 0 || shop == null)
+        {
+            Debug.LogWarning($"[GoldTransfer] 수신 거부 (amount={amount}, shop={(shop != null)})");
+            photonView.RPC(nameof(RPC_GoldTransferAck), RpcTarget.Others, false);
+            return;
+        }
+
+        shop.AddGold(amount);
+        Debug.Log($"[GoldTransfer] 수신: 파트너에게서 {amount}G");
+        GameEvents.PartnerGoldReceived(amount);
+        photonView.RPC(nameof(RPC_GoldTransferAck), RpcTarget.Others, true);
+    }
+
+    [PunRPC]
+    private void RPC_GoldTransferAck(bool success)
+    {
+        if (_pendingGoldTransfer <= 0) return;
+        int amount = _pendingGoldTransfer;
+        _pendingGoldTransfer = 0;
+
+        if (!success)
+        {
+            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            shop?.AddGold(amount); // 환급
+            Debug.LogWarning($"[GoldTransfer] 전송 실패 — {amount}G 환급");
+            GameEvents.GoldTransferRejected("상대 수신 실패 — 환급됨");
+            return;
+        }
+
+        Debug.Log($"[GoldTransfer] 전송 완료: {amount}G");
+        GameEvents.GoldTransferCompleted(amount);
+    }
+
+    // ─────────────────────────────────────────
     // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
     // ─────────────────────────────────────────
 
@@ -826,6 +914,13 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
     public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
+
+    /// <summary>오프라인은 파트너가 없어 골드 전송 불가.</summary>
+    public void SendGoldToPartner(int amount)
+    {
+        Debug.LogWarning("[GoldTransfer] 오프라인 — 파트너 없음, 전송 불가");
+        GameEvents.GoldTransferRejected("파트너 없음");
+    }
 }
 
 #endif

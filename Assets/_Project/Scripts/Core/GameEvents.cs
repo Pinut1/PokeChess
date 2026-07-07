@@ -120,6 +120,15 @@ public static class GameEvents
     /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
     public static event Action OnTradeRejected;
 
+    /// <summary>통신기 골드 전송으로 파트너에게서 골드 수령 완료(받는 쪽). 인자 = 받은 골드. 골드 잔액 표시는 OnGoldChanged가 담당.</summary>
+    public static event Action<int> OnPartnerGoldReceived;
+
+    /// <summary>통신기 골드 전송 완료(보낸 쪽, 상대 수신 ack까지 확인). 인자 = 보낸 골드.</summary>
+    public static event Action<int> OnGoldTransferCompleted;
+
+    /// <summary>통신기 골드 전송 실패(보낸 쪽 피드백용). 인자 = 사유 문구. 선차감분은 환급된 상태로 발행됨.</summary>
+    public static event Action<string> OnGoldTransferRejected;
+
     // ──────────────────────────────────────────
     // 샵
     // ──────────────────────────────────────────
@@ -220,6 +229,9 @@ public static class GameEvents
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
     public static void TradeRejected()               => OnTradeRejected?.Invoke();
+    public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
+    public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);
+    public static void GoldTransferRejected(string reason) => OnGoldTransferRejected?.Invoke(reason);
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RerollCountChanged(int count) => OnRerollCountChanged?.Invoke(count);
     public static void RerollSpent()                => OnRerollSpent?.Invoke();
