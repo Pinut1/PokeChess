@@ -1,0 +1,57 @@
+{
+  "_readme": "스테이지 클리어 보상표(1-5 슬라이스). 확정본=포켓체스_밸런스_기획서.md §7.3(황해인, v1.0). 모든 보상은 해당 라운드 '전투 시작 전 선지급'. 누적 골드 목표 200(2R40/3R70/5R200). 리롤=매라운드 10개(5R합산50). 아이템샵쿠폰=1/1/2/1/2, 아이템샵리롤=2 고정, Reforger=3·5R 각1. kind 매핑: gold/reroll/itemCoupon 구현됨. itemShopReroll=아이템샵 리롤 자원(ShopManager.AddItemShopReroll). reforger=재련기(아이템 미구현 → RewardManager TODO 스텁).",
+  "tables": [
+    {
+      "rewardTableId": "RW001",
+      "label": "1라운드(야생·잉어킹) 클리어 보상",
+      "rewards": [
+        { "kind": "gold",           "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW002",
+      "label": "2라운드(관장·웅이) 클리어 보상",
+      "rewards": [
+        { "kind": "gold",           "amount": 25, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW003",
+      "label": "3라운드(관장·이슬이) 클리어 보상",
+      "rewards": [
+        { "kind": "gold",           "amount": 40, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon",     "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger",       "amount": 1,  "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW004",
+      "label": "4라운드(관장·목호) 클리어 보상",
+      "rewards": [
+        { "kind": "gold",           "amount": 55, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+      ]
+    },
+    {
+      "rewardTableId": "RW005",
+      "label": "5라운드(챔피언·그린 보스) 클리어 보상",
+      "rewards": [
+        { "kind": "gold",           "amount": 70, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon",     "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger",       "amount": 1,  "refNameEn": "", "dropChance": 1.0 }
+      ]
+    }
+  ]
+}

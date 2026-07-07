@@ -18,12 +18,16 @@ public class SynergyStatus
 /// <summary>
 /// 보드 위 유닛 기준 시너지 카운트/활성 티어 계산 담당.
 /// OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 → BoardManager.GetUnitsOnBoard() pull → 전체 재계산.
-/// 실제 버프 적용은 BattleManager가 전투 시작 시 GetActiveSynergies()를 pull해서 처리 (TODO: BattleManager 구현 시).
+/// 실제 버프 적용은 BattleManager가 전투 시작 시 GetActiveSynergies()를 pull해서 처리한다.
 /// </summary>
 public class SynergyManager : MonoBehaviour
 {
-    [Header("시너지 데이터베이스 (ScriptableObjects/Synergies 에셋 할당)")]
-    [SerializeField] private List<SynergyData> _synergyDatabase = new();
+    [Header("(선택) 수동 오버라이드 — 비우면 중앙 SynergyDatabase 사용")]
+    [Tooltip("디버그/테스트용. 평상시엔 비워두고 'Import Synergy JSON'으로 채워진 중앙 DB를 자동 사용.")]
+    [SerializeField] private List<SynergyData> _overrideDatabase = new();
+
+    // 실제 사용하는 시너지 목록(중앙 DB 또는 오버라이드). Awake에서 확정.
+    private List<SynergyData> _all = new();
 
     // 한글명/영문명 → SynergyData (PokemonData.synergies가 어느 쪽이든 매칭되도록 양쪽 키 등록)
     private readonly Dictionary<string, SynergyData> _synergyLookup = new();
@@ -36,15 +40,20 @@ public class SynergyManager : MonoBehaviour
 
     private void Awake()
     {
-        foreach (var data in _synergyDatabase)
+        // 중앙 DB 우선(PokemonDatabase 등과 동일 패턴). 인스펙터 오버라이드가 있으면 그걸 사용(디버그용).
+        _all = (_overrideDatabase != null && _overrideDatabase.Count > 0)
+            ? _overrideDatabase
+            : (SynergyDatabase.Instance != null ? SynergyDatabase.Instance.all : new List<SynergyData>());
+
+        foreach (var data in _all)
         {
             if (data == null) continue;
             if (!string.IsNullOrEmpty(data.synergyName))   _synergyLookup[data.synergyName]   = data;
             if (!string.IsNullOrEmpty(data.synergyNameEn)) _synergyLookup[data.synergyNameEn] = data;
         }
 
-        if (_synergyDatabase.Count == 0)
-            Debug.LogWarning("[Synergy] 시너지 데이터베이스가 비어있음 — 인스펙터에 Synergies 에셋 할당 필요");
+        if (_all.Count == 0)
+            Debug.LogWarning("[Synergy] 시너지 데이터 비어있음 — 'Import Synergy JSON' 실행 필요(SynergyDatabase.asset 생성)");
     }
 
     // ─────────────────────────────────────────
@@ -104,7 +113,7 @@ public class SynergyManager : MonoBehaviour
         }
 
         _statuses.Clear();
-        foreach (var data in _synergyDatabase)
+        foreach (var data in _all)
         {
             if (data == null) continue;
 

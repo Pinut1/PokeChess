@@ -298,8 +298,6 @@ GameObject:
   - component: {fileID: 1558058642}
   - component: {fileID: 1558058646}
   - component: {fileID: 1558058641}
-  - component: {fileID: 1558058643}
-  - component: {fileID: 1558058645}
   - component: {fileID: 1558058651}
   - component: {fileID: 1558058650}
   - component: {fileID: 1558058655}
@@ -312,9 +310,15 @@ GameObject:
   - component: {fileID: 1558058660}
   - component: {fileID: 1558058659}
   - component: {fileID: 1558058658}
-  - component: {fileID: 1558058657}
   - component: {fileID: 1558058666}
   - component: {fileID: 1558058644}
+  - component: {fileID: 1558058667}
+  - component: {fileID: 1558058668}
+  - component: {fileID: 1558058670}
+  - component: {fileID: 1558058672}
+  - component: {fileID: 1558058671}
+  - component: {fileID: 1558058673}
+  - component: {fileID: 1558058674}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -349,28 +353,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1558058643
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 661b28e1b6b341f45ae098cac74aec9b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UnitSyncTest
-  _units:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  _minX: -4
-  _maxX: 4
-  _minZ: -4
-  _maxZ: 4
-  _moveInterval: 2
-  _smoothTime: 0.5
 --- !u!114 &1558058644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -393,18 +375,6 @@ MonoBehaviour:
   sceneViewId: 1
   InstantiationId: 0
   isRuntimeInstantiated: 0
---- !u!114 &1558058645
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bab69dc41ac685c48813246b84881db2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SynergyDebugTest
 --- !u!114 &1558058646
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -422,8 +392,9 @@ MonoBehaviour:
   _boardManager: {fileID: 1558058663}
   _battleManager: {fileID: 1558058661}
   _shopManager: {fileID: 1558058658}
+  _rewardManager: {fileID: 1558058667}
   _synergyManager: {fileID: 1558058651}
-  _itemManager: {fileID: 0}
+  _itemManager: {fileID: 1558058672}
   _augmentManager: {fileID: 0}
   _uiManager: {fileID: 0}
   _playerHealthManager: {fileID: 1558058656}
@@ -441,6 +412,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoundPhaseManager
   _shoppingDuration: 30
   _resultDuration: 3
+  _autoStartBattleOnTimeout: 1
 --- !u!114 &1558058651
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -453,10 +425,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f4829f67383d1047bccbb96f61b09ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyManager
-  _synergyDatabase:
-  - {fileID: 11400000, guid: 713c2788408c9fa4f9f81fe4e0908fce, type: 2}
-  - {fileID: 11400000, guid: b12671ea6e806614db2481d258ff9594, type: 2}
-  - {fileID: 11400000, guid: a90cb20bff774cd4797a0fdd74dd50a8, type: 2}
+  _overrideDatabase: []
 --- !u!114 &1558058655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -520,21 +489,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b57f5a66393c193418ec363426d3a254, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealthManager
-  _maxHealth: 100
-  _damagePerLoss: 10
---- !u!114 &1558058657
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 65152b4a841739d45a28b581e51d74c1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShopDebugTest
-  _seedTestPoolIfEmpty: 1
+  _maxLives: 3
 --- !u!114 &1558058658
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -547,13 +502,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75f9207571285aa4995e48b90c398127, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopManager
-  _pool:
-  - {fileID: 0}
-  - {fileID: 0}
+  _useDatabasePool: 1
+  _pool: []
   _shopSize: 5
   _rerollCost: 2
+  _itemShopSize: 4
+  _itemPrice: 1
   _startingGold: 10
-  _incomePerRound: 5
+  _interestPerTenGold: 1
+  _interestGoldCap: 50
+  _cost1PoolCount: 30
+  _cost2PoolCount: 25
+  _cost3PoolCount: 18
+  _cost4PoolCount: 10
+  _cost5PoolCount: 9
+  _currentLevel: 1
+  _maxLevel: 10
+  _roundXpReward: 2
+  _buyXpCostGold: 4
+  _buyXpAmount: 4
+  _requiredXpByLevel: 000000000200000002000000060000000a0000001400000024000000300000004c0000005000000000000000
+  _unitCapByLevel: 000000000100000002000000030000000400000005000000060000000700000008000000090000000a000000
 --- !u!114 &1558058659
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -566,7 +535,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8916053d61b8c741850ee5ab43be40e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OpponentBoardView
-  _boardOffset: {x: 100, y: 0, z: 0}
+  _boardOffset: {x: 500, y: 0, z: 0}
   _unitHeight: 0.5
   _starColors:
   - {r: 0.6, g: 0.8, b: 1, a: 1}
@@ -639,7 +608,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 393c1ffbbbb38db4b924fef0e84431b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
-  _soloMode: 0
+  _soloMode: 1
 --- !u!114 &1558058665
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -670,6 +639,100 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54062ad92c4a24e44901b875cbb4e3c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameSceneBootstrap
+--- !u!114 &1558058667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63153d96d674a504caa2acc985a6b853, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RewardManager
+--- !u!114 &1558058668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c39320e141bbb344aa95a4d48aeca37b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TradeDebugTest
+--- !u!114 &1558058670
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e17e6948eb76e1344af6a1c993fc9ca3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PrototypeHud
+--- !u!114 &1558058671
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02d2d67f784ddd1499d57609276aa925, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemInventoryHud
+  _camera: {fileID: 1293587738}
+  _raycastMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1558058672
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44d012cffbbc085408982e031827a17d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemManager
+  _startingItemCoupon: 0
+  _startingReforger: 0
+  _consumableCatalog:
+  - {fileID: 11400000, guid: 6d20ef0d370db1845ba398774afa53fa, type: 2}
+  - {fileID: 11400000, guid: a3210bf8861a38f42a4e04f53e80fb4f, type: 2}
+  - {fileID: 11400000, guid: e081a34d2f992d5428a962859abc3ee9, type: 2}
+--- !u!114 &1558058673
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2397079f2b955d74da35ae201e180887, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyHud
+--- !u!114 &1558058674
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b7edb818b61f434883a064f1f10805b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MatchRecorder
 --- !u!1 &2053065678
 GameObject:
   m_ObjectHideFlags: 0

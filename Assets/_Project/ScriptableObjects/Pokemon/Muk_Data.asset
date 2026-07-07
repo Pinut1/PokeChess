@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Muk_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 89
+  pokemonName: "\uC9C8\uBED0\uAE30"
+  pokemonNameEn: Muk
+  cost: 3
+  hp: 1100
+  attack: 45
+  defense: 60
+  attackSpeed: 0.5
+  range: 2
+  spellPower: 150
+  manaCost: 60
+  synergies:
+  - Poison
+  role: Tanker
+  skillId: POISON_TANKER
+  skill:
+    skillId: POISON_TANKER
+    skillName: "\uB3C4\uBC1C"
+    description: "\uC8FC\uBCC0 \uC801 \uC5B4\uADF8\uB85C \uC9D1\uC911"
+    effectType: 8
+    targetType: 4
+    areaRadius: 1
+    lineLength: 1
+    vfxId: VFX_Poison_Tanker
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

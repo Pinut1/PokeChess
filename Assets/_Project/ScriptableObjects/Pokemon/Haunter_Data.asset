@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Haunter_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 93
+  pokemonName: "\uACE0\uC6B0\uC2A4\uD2B8"
+  pokemonNameEn: Haunter
+  cost: 2
+  hp: 550
+  attack: 20
+  defense: 20
+  attackSpeed: 0.5
+  range: 2
+  spellPower: 130
+  manaCost: 55
+  synergies:
+  - Poison
+  role: Magician
+  skillId: POISON_MAGICIAN
+  skill:
+    skillId: POISON_MAGICIAN
+    skillName: "\uB3C5\uAC00\uC2A4"
+    description: "\uAD11\uC5ED \uB3C5 \uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 4
+    areaRadius: 1
+    lineLength: 4
+    vfxId: VFX_Poison_Magician
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Dodrio_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 85
+  pokemonName: "\uB450\uD2B8\uB9AC\uC624"
+  pokemonNameEn: Dodrio
+  cost: 1
+  hp: 650
+  attack: 40
+  defense: 35
+  attackSpeed: 0.4
+  range: 2
+  spellPower: 45
+  manaCost: 100
+  synergies:
+  - Normal
+  - Flying
+  role: Warrior
+  skillId: NORMAL_WARRIOR
+  skill:
+    skillId: NORMAL_WARRIOR
+    skillName: "\uB354\uBE14\uD0A5"
+    description: "\uADFC\uC811 2\uC5F0\uC18D \uB370\uBBF8\uC9C0"
+    effectType: 0
+    targetType: 3
+    areaRadius: 0
+    lineLength: 1
+    vfxId: VFX_Normal_Warrior
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

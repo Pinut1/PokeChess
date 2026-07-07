@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Butterfree_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 12
+  pokemonName: "\uBC84\uD130\uD50C"
+  pokemonNameEn: Butterfree
+  cost: 1
+  hp: 450
+  attack: 40
+  defense: 15
+  attackSpeed: 0.6
+  range: 3
+  spellPower: 32
+  manaCost: 80
+  synergies:
+  - Grass
+  - Flying
+  role: Archer
+  skillId: GRASS_ARCHER
+  skill:
+    skillId: GRASS_ARCHER
+    skillName: "\uC5D0\uB108\uC9C0\uBCFC"
+    description: "\uB2E8\uC77C \uC801 \uD480 \uC18D\uC131 \uB370\uBBF8\uC9C0"
+    effectType: 0
+    targetType: 3
+    areaRadius: 0
+    lineLength: 4
+    vfxId: VFX_Grass_Archer
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}
