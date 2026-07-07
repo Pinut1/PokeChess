@@ -704,6 +704,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemManager
   _startingItemCoupon: 0
+  _startingReforger: 0
   _consumableCatalog:
   - {fileID: 11400000, guid: 6d20ef0d370db1845ba398774afa53fa, type: 2}
   - {fileID: 11400000, guid: a3210bf8861a38f42a4e04f53e80fb4f, type: 2}

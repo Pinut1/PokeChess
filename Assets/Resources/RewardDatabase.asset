@@ -14,29 +14,110 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RewardDatabase
   tables:
   - rewardTableId: RW001
-    label: "\uC57C\uC0DD \uD074\uB9AC\uC5B4 \uBCF4\uC0C1 (\uC608\uC2DC \u2014 \uC5ED\uAE30\uD68D\uC11C
-      \uD655\uC815 \uD544\uC694)"
+    label: "1\uB77C\uC6B4\uB4DC(\uC57C\uC0DD\xB7\uC789\uC5B4\uD0B9) \uD074\uB9AC\uC5B4
+      \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 5
+      amount: 10
+      refNameEn: 
+      dropChance: 1
+    - kind: 2
+      amount: 10
       refNameEn: 
       dropChance: 1
     - kind: 1
       amount: 1
       refNameEn: 
       dropChance: 1
-    - kind: 7
-      amount: 1
+    - kind: 8
+      amount: 2
       refNameEn: 
       dropChance: 1
   - rewardTableId: RW002
-    label: "\uAD00\uC7A5\uC804 \uD074\uB9AC\uC5B4 \uBCF4\uC0C1 (\uC608\uC2DC)"
+    label: "2\uB77C\uC6B4\uB4DC(\uAD00\uC7A5\xB7\uC6C5\uC774) \uD074\uB9AC\uC5B4
+      \uBCF4\uC0C1"
     rewards:
     - kind: 0
+      amount: 25
+      refNameEn: 
+      dropChance: 1
+    - kind: 2
       amount: 10
       refNameEn: 
       dropChance: 1
-    - kind: 3
+    - kind: 1
       amount: 1
-      refNameEn: Sitrus Berry
-      dropChance: 0.5
+      refNameEn: 
+      dropChance: 1
+    - kind: 8
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+  - rewardTableId: RW003
+    label: "3\uB77C\uC6B4\uB4DC(\uAD00\uC7A5\xB7\uC774\uC2AC\uC774) \uD074\uB9AC\uC5B4
+      \uBCF4\uC0C1"
+    rewards:
+    - kind: 0
+      amount: 40
+      refNameEn: 
+      dropChance: 1
+    - kind: 2
+      amount: 10
+      refNameEn: 
+      dropChance: 1
+    - kind: 1
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+    - kind: 8
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+    - kind: 9
+      amount: 1
+      refNameEn: 
+      dropChance: 1
+  - rewardTableId: RW004
+    label: "4\uB77C\uC6B4\uB4DC(\uAD00\uC7A5\xB7\uBAA9\uD638) \uD074\uB9AC\uC5B4
+      \uBCF4\uC0C1"
+    rewards:
+    - kind: 0
+      amount: 55
+      refNameEn: 
+      dropChance: 1
+    - kind: 2
+      amount: 10
+      refNameEn: 
+      dropChance: 1
+    - kind: 1
+      amount: 1
+      refNameEn: 
+      dropChance: 1
+    - kind: 8
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+  - rewardTableId: RW005
+    label: "5\uB77C\uC6B4\uB4DC(\uCC54\uD53C\uC5B8\xB7\uADF8\uB9B0 \uBCF4\uC2A4)
+      \uD074\uB9AC\uC5B4 \uBCF4\uC0C1"
+    rewards:
+    - kind: 0
+      amount: 70
+      refNameEn: 
+      dropChance: 1
+    - kind: 2
+      amount: 10
+      refNameEn: 
+      dropChance: 1
+    - kind: 1
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+    - kind: 8
+      amount: 2
+      refNameEn: 
+      dropChance: 1
+    - kind: 9
+      amount: 1
+      refNameEn: 
+      dropChance: 1
