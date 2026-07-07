@@ -19,13 +19,22 @@ MonoBehaviour:
     order: 1
     stageType: 0
     preReward: 0
-    trainerName: 
-    trainerId: WILD_COMMON
+    trainerName: "\uC57C\uC0DD"
+    trainerId: WILD_R1
     enemies:
-    - pokemonNameEn: Magikarp
-      pokemonNameKr: "\uC789\uC5B4\uD0B9"
+    - pokemonNameEn: Pidgey
+      pokemonNameKr: "\uAD6C\uAD6C"
       starLevel: 1
       q: 1
+      r: 0
+      heldItemEn: 
+      statMultiplier: 1
+      hpMultiplier: 1
+      atkMultiplier: 1
+    - pokemonNameEn: Caterpie
+      pokemonNameKr: "\uCE90\uD130\uD53C"
+      starLevel: 1
+      q: 2
       r: 0
       heldItemEn: 
       statMultiplier: 1
@@ -36,48 +45,11 @@ MonoBehaviour:
     chapter: 1
     round: 2
     order: 2
-    stageType: 1
-    preReward: 0
-    trainerName: 
-    trainerId: WILD_RARE
-    enemies:
-    - pokemonNameEn: Magikarp
-      pokemonNameKr: "\uC789\uC5B4\uD0B9"
-      starLevel: 1
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Magikarp
-      pokemonNameKr: "\uC789\uC5B4\uD0B9"
-      starLevel: 1
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW001
-  - stageId: 1-3
-    chapter: 1
-    round: 3
-    order: 3
     stageType: 2
-    preReward: 0
-    trainerName: "\uD638\uC77C"
-    trainerId: GYM_TSUKUSHI
+    preReward: 1
+    trainerName: "\uAD00\uC7A5 R2"
+    trainerId: GYM_R2
     enemies:
-    - pokemonNameEn: Caterpie
-      pokemonNameKr: "\uCE90\uD130\uD53C"
-      starLevel: 1
-      q: 0
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
     - pokemonNameEn: Metapod
       pokemonNameKr: "\uB2E8\uB370\uAE30"
       starLevel: 2
@@ -87,8 +59,8 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: Weedle
-      pokemonNameKr: "\uBFD4\uCDA9\uC774"
+    - pokemonNameEn: Diglett
+      pokemonNameKr: "\uB514\uADF8\uB2E4"
       starLevel: 1
       q: 2
       r: 0
@@ -96,9 +68,9 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: Kakuna
-      pokemonNameKr: "\uB531\uCDA9\uC774"
-      starLevel: 2
+    - pokemonNameEn: Geodude
+      pokemonNameKr: "\uAF2C\uB9C8\uB3CC"
+      starLevel: 1
       q: 3
       r: 0
       heldItemEn: 
@@ -106,249 +78,65 @@ MonoBehaviour:
       hpMultiplier: 1
       atkMultiplier: 1
     rewardTableId: RW002
+  - stageId: 1-3
+    chapter: 1
+    round: 3
+    order: 3
+    stageType: 2
+    preReward: 0
+    trainerName: "\uAD00\uC7A5 R3"
+    trainerId: GYM_R3
+    enemies:
+    - pokemonNameEn: Onix
+      pokemonNameKr: "\uB871\uC2A4\uD1A4"
+      starLevel: 2
+      q: 1
+      r: 0
+      heldItemEn: 
+      statMultiplier: 1
+      hpMultiplier: 1
+      atkMultiplier: 1
+    - pokemonNameEn: Graveler
+      pokemonNameKr: "\uB370\uAD6C\uB9AC"
+      starLevel: 2
+      q: 2
+      r: 0
+      heldItemEn: 
+      statMultiplier: 1
+      hpMultiplier: 1
+      atkMultiplier: 1
+    - pokemonNameEn: Diglett
+      pokemonNameKr: "\uB514\uADF8\uB2E4"
+      starLevel: 2
+      q: 0
+      r: 1
+      heldItemEn: 
+      statMultiplier: 1
+      hpMultiplier: 1
+      atkMultiplier: 1
+    - pokemonNameEn: Gastly
+      pokemonNameKr: "\uACE0\uC624\uC2A4"
+      starLevel: 1
+      q: 3
+      r: 1
+      heldItemEn: 
+      statMultiplier: 1
+      hpMultiplier: 1
+      atkMultiplier: 1
+    rewardTableId: RW003
   - stageId: 1-4
     chapter: 1
     round: 4
     order: 4
     stageType: 2
     preReward: 0
-    trainerName: "\uBBFC\uD654"
-    trainerId: GYM_ERIKA
+    trainerName: "\uAD00\uC7A5 R4"
+    trainerId: GYM_R4
     enemies:
-    - pokemonNameEn: Weepinbell
-      pokemonNameKr: "\uBAA8\uB2E4\uD53C"
-      starLevel: 1
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Victreebel
-      pokemonNameKr: "\uC6B0\uCE20\uBCF4\uD2B8"
-      starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-5
-    chapter: 1
-    round: 5
-    order: 5
-    stageType: 2
-    preReward: 1
-    trainerName: "\uC6C5\uC774"
-    trainerId: GYM_HAYATO
-    enemies:
-    - pokemonNameEn: Geodude
-      pokemonNameKr: "\uAF2C\uB9C8\uB3CC"
-      starLevel: 1
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Onix
-      pokemonNameKr: "\uB871\uC2A4\uD1A4"
-      starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-6
-    chapter: 1
-    round: 6
-    order: 6
-    stageType: 2
-    preReward: 0
-    trainerName: "\uAF2D\uB450"
-    trainerId: GYM_MATIS
-    enemies:
-    - pokemonNameEn: Miltank
-      pokemonNameKr: "\uBC00\uD0F1\uD06C"
-      starLevel: 2
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 2
-      hpMultiplier: 1.5
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 2
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-7
-    chapter: 1
-    round: 7
-    order: 7
-    stageType: 2
-    preReward: 3
-    trainerName: "\uC774\uC2AC\uC774"
-    trainerId: GYM_NATSUME
-    enemies:
-    - pokemonNameEn: Psyduck
-      pokemonNameKr: "\uACE0\uB77C\uD30C\uB355"
-      starLevel: 1
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Golduck
-      pokemonNameKr: "\uACE8\uB355"
-      starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-8
-    chapter: 1
-    round: 8
-    order: 8
-    stageType: 2
-    preReward: 0
-    trainerName: "\uC720\uBE48"
-    trainerId: GYM_KYOU
-    enemies:
-    - pokemonNameEn: Gastly
-      pokemonNameKr: "\uACE0\uC624\uC2A4"
-      starLevel: 1
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
     - pokemonNameEn: Haunter
       pokemonNameKr: "\uD32C\uD140"
       starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-9
-    chapter: 1
-    round: 9
-    order: 9
-    stageType: 2
-    preReward: 0
-    trainerName: "\uBE44\uC8FC\uAE30"
-    trainerId: GYM_BIJUGI
-    enemies:
-    - pokemonNameEn: Meowth
-      pokemonNameKr: "\uB098\uC639"
-      starLevel: 1
-      q: 0
+      q: 1
       r: 0
       heldItemEn: 
       statMultiplier: 1
@@ -357,7 +145,7 @@ MonoBehaviour:
     - pokemonNameEn: Persian
       pokemonNameKr: "\uD398\uB974\uC2DC\uC628"
       starLevel: 2
-      q: 1
+      q: 2
       r: 0
       heldItemEn: 
       statMultiplier: 1
@@ -366,32 +154,23 @@ MonoBehaviour:
     - pokemonNameEn: Onix
       pokemonNameKr: "\uB871\uC2A4\uD1A4"
       starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Sandshrew
-      pokemonNameKr: "\uC5D0\uB098\uBE44"
-      starLevel: 1
       q: 3
       r: 0
       heldItemEn: 
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 1
+    - pokemonNameEn: Poliwhirl
+      pokemonNameKr: "\uC288\uB959\uCC59\uC774"
+      starLevel: 2
+      q: 0
       r: 1
       heldItemEn: 
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
+    - pokemonNameEn: Sandshrew
+      pokemonNameKr: "\uBAA8\uB798\uB450\uC9C0"
       starLevel: 1
       q: 2
       r: 1
@@ -399,24 +178,24 @@ MonoBehaviour:
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-10
+    rewardTableId: RW004
+  - stageId: 1-5
     chapter: 1
-    round: 10
-    order: 10
-    stageType: 2
-    preReward: 1
-    trainerName: "\uC774\uD5A5"
-    trainerId: GYM_IHYANG
+    round: 5
+    order: 5
+    stageType: 3
+    preReward: 0
+    trainerName: "\uCC54\uD53C\uC5B8"
+    trainerId: CHAMP_R5
     enemies:
-    - pokemonNameEn: Dratini
-      pokemonNameKr: "\uBBF8\uB1FD"
-      starLevel: 1
-      q: 0
+    - pokemonNameEn: Dragonite
+      pokemonNameKr: "\uB9DD\uB098\uB1FD"
+      starLevel: 3
+      q: 2
       r: 0
       heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
+      statMultiplier: 2
+      hpMultiplier: 1.3
       atkMultiplier: 1
     - pokemonNameEn: Dragonair
       pokemonNameKr: "\uC2E0\uB1FD"
@@ -424,125 +203,34 @@ MonoBehaviour:
       q: 1
       r: 0
       heldItemEn: 
-      statMultiplier: 1
+      statMultiplier: 1.5
       hpMultiplier: 1
       atkMultiplier: 1
     - pokemonNameEn: Aerodactyl
       pokemonNameKr: "\uD504\uD14C\uB77C"
       starLevel: 2
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
       q: 3
       r: 0
       heldItemEn: 
-      statMultiplier: 1
+      statMultiplier: 1.5
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 1
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 2
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    rewardTableId: RW002
-  - stageId: 1-11
-    chapter: 1
-    round: 11
-    order: 11
-    stageType: 3
-    preReward: 0
-    trainerName: "\uADF8\uB9B0"
-    trainerId: CHAMP_GREEN
-    enemies:
-    - pokemonNameEn: Aerodactyl
-      pokemonNameKr: "\uD504\uD14C\uB77C"
+    - pokemonNameEn: Haunter
+      pokemonNameKr: "\uD32C\uD140"
       starLevel: 2
-      q: 1
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1.8
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: Dragonite
-      pokemonNameKr: "\uB9DD\uB098\uB1FD"
-      starLevel: 3
-      q: 2
-      r: 0
-      heldItemEn: 
-      statMultiplier: 2.5
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 0
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 3
-      r: 0
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
       q: 0
       r: 1
       heldItemEn: 
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 1
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
-      q: 2
-      r: 1
-      heldItemEn: 
-      statMultiplier: 1
-      hpMultiplier: 1
-      atkMultiplier: 1
-    - pokemonNameEn: DUMMY
-      pokemonNameKr: "\uB354\uBBF8"
-      starLevel: 1
+    - pokemonNameEn: Onix
+      pokemonNameKr: "\uB871\uC2A4\uD1A4"
+      starLevel: 2
       q: 3
       r: 1
       heldItemEn: 
       statMultiplier: 1
       hpMultiplier: 1
       atkMultiplier: 1
-    rewardTableId: RW002
+    rewardTableId: RW005
