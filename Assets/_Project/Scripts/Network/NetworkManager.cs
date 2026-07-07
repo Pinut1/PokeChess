@@ -66,6 +66,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool IsMasterClient => _soloMode || PhotonNetwork.IsMasterClient;
     public int  PlayerCount   => _soloMode ? 1 : PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
 
+    // 전적 기록(MatchRecorder) 등이 Photon 타입에 직접 의존하지 않도록 문자열로 노출.
+    public string RoomName       => _soloMode ? "solo" : PhotonNetwork.CurrentRoom?.Name ?? "";
+    public string LocalNickname  => _soloMode ? "SoloPlayer" : PhotonNetwork.NickName;
+    public string PartnerNickname
+    {
+        get
+        {
+            if (_soloMode || !PhotonNetwork.InRoom) return "";
+            var others = PhotonNetwork.PlayerListOthers;
+            return others != null && others.Length > 0 ? others[0].NickName : "";
+        }
+    }
+
     /// <summary>상대방 재접속 유예 타이머</summary>
     private Coroutine _opponentGraceRoutine;
 
@@ -400,7 +413,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             _soloTeamHp = Mathf.Max(0, _soloTeamHp - damage);
             GameEvents.HealthChanged(_soloTeamHp);
-            if (_soloTeamHp <= 0) GameEvents.SessionEnded();
+            if (_soloTeamHp <= 0) GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
             return;
         }
 
@@ -687,7 +700,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (health <= 0)
         {
             Debug.LogWarning("[Network] 팀 공통 HP 0 — 세션 종료(게임오버)");
-            GameEvents.SessionEnded();
+            GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
         }
     }
 
@@ -730,7 +743,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         Debug.LogWarning("[Network] 재접속 실패 — 세션 종료(패배 처리)");
         _selfReconnectRoutine = null;
-        GameEvents.SessionEnded();
+        GameEvents.SessionEnded(SessionEndReason.ReconnectFailed);
     }
 }
 
@@ -746,6 +759,11 @@ public class NetworkManager : MonoBehaviour
     public bool IsInRoom       => false;
     public bool IsMasterClient => true;   // 오프라인에서는 항상 호스트 취급
     public int  PlayerCount    => 1;
+
+    // 실구현과 동일한 표면(전적 기록 등에서 사용).
+    public string RoomName        => "offline";
+    public string LocalNickname   => "OfflinePlayer";
+    public string PartnerNickname => "";
 
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;
@@ -796,7 +814,7 @@ public class NetworkManager : MonoBehaviour
         if (_teamHp < 0) return;
         _teamHp = Mathf.Max(0, _teamHp - damage);
         GameEvents.HealthChanged(_teamHp);
-        if (_teamHp <= 0) GameEvents.SessionEnded();
+        if (_teamHp <= 0) GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
     }
 
     /// <summary>오프라인(1인=팀): 승=BothWin, 패=BothLose(라이프 -1). 즉시 판정.</summary>
