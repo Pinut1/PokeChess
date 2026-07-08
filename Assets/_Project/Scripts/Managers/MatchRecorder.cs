@@ -87,10 +87,31 @@ public class MatchRecorder : MonoBehaviour
         var record = BuildRecord(result, endReason);
 
         if (MatchHistoryStore.Append(record))
+        {
             Debug.Log($"[MatchHistory] 전적 기록: {record.result}/{record.endReason} " +
                       $"(라운드 {record.finalRound}, 스테이지 {record.finalStageId}) → {MatchHistoryStore.FilePath}");
+            GameEvents.MatchRecorded(record);
+        }
+        else
+        {
+            Debug.LogWarning($"[MatchHistory] 전적 저장 실패 — MatchRecorded 미발행 ({record.result}/{record.endReason})");
+        }
 
-        GameEvents.MatchRecorded(record);
+        ResetForNextMatch();
+    }
+
+    /// <summary>
+    /// 씬 리로드 없이 다음 판이 시작될 수 있도록 판 단위 상태를 초기화.
+    /// _matchActive=false라 중복 종료 이벤트는 계속 무시되고,
+    /// 다음 RoundChanged가 오면 새 판으로 추적을 시작한다.
+    /// </summary>
+    private void ResetForNextMatch()
+    {
+        _matchActive      = false;
+        _finalRound       = 0;
+        _finalStageId     = "";
+        _selfLevel        = 1;
+        _lastPartnerBoard = null;
     }
 
     private MatchRecord BuildRecord(string result, string endReason)
