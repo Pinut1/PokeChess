@@ -34,9 +34,30 @@ public class BoardManager : MonoBehaviour
     // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
     private Vector3 _centerOffset;
 
+    // 보드 배치 가능 기물 수(캡). 캡 산정의 단일 소스는 ShopManager이며,
+    // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
+    private int _unitCap = 1;
+
     private void Awake()
     {
         _bench = new PokemonUnit[_benchSize];
+    }
+
+    private void OnEnable()
+    {
+        GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+    }
+
+    private void HandleUnitCapChanged(int cap)
+    {
+        // 캡 값은 ShopManager가 레벨별 테이블 기준으로 산정해 전달한다. 여기서는 그대로 반영만.
+        _unitCap = Mathf.Max(1, cap);
+        Debug.Log($"[BoardManager] 배치 가능 기물 수 변경 반영: {_unitCap}");
     }
 
     private void Start()
@@ -220,37 +241,75 @@ public class BoardManager : MonoBehaviour
         // 들어오는 유닛이 원래 보드 위에 있었다면 그 좌표를 기억(스왑/비우기용)
         bool fromBoard = TryFindBoardCoords(unit, out HexCoords fromCoords);
 
-        if (occupant == null)
+        // 벤치 → 빈 보드 타일로 새로 올리는 경우에만 배치 가능 기물 수 제한 검사.
+        // 보드 → 보드 이동은 기물 수가 늘지 않으므로 허용.
+        // 벤치 → 점유된 보드 타일 스왑도 보드 위 기물 수가 늘지 않으므로 허용.
+        if (!fromBoard && occupant == null)
         {
-            // 빈 타일: 단순 이동/신규 배치
-            if (fromBoard) _battleField[fromCoords] = null;
-            else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
+            int currentBoardCount = CountUnitsOnBoard();
 
-            _battleField[targetCoords] = unit;
-            unit.isOnBoard = true;
-        }
-        else if (fromBoard)
-        {
-            // 보드 ↔ 보드 스왑 (둘 다 보드에 남음)
-            _battleField[fromCoords] = occupant;
-            _battleField[targetCoords] = unit;
-        }
-        else
-        {
-            // 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛 교체
-            int benchSlot = FindBenchSlot(unit);
-            _battleField[targetCoords] = unit;
-            unit.isOnBoard = true;
-
-            if (benchSlot >= 0)
+            if (currentBoardCount >= _unitCap)
             {
-                _bench[benchSlot] = occupant;
-                occupant.isOnBoard = false;
+                Debug.Log($"[BoardManager] 배치 거부 — 배치 가능 기물 수 초과 ({currentBoardCount}/{_unitCap})");
+                return false;
             }
         }
 
+        // 분기별 배치 처리. 실패(벤치 슬롯 확보 불가 등) 시 상태 변경 없이 거부.
+        bool placed;
+        if (occupant == null)
+            placed = PlaceOnEmptyTile(unit, targetCoords, fromBoard, fromCoords);
+        else if (fromBoard)
+            placed = SwapOnBoard(unit, targetCoords, fromCoords, occupant);
+        else
+            placed = SwapBenchIntoBoard(unit, targetCoords, occupant);
+
+        if (!placed) return false;
+
         GameEvents.UnitPlaced(unit);
         if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+        return true;
+    }
+
+    /// <summary>빈 보드 타일로 단순 이동/신규 배치. 들어온 출처(보드/벤치)에 따라 원위치를 비운다.</summary>
+    private bool PlaceOnEmptyTile(PokemonUnit unit, HexCoords targetCoords, bool fromBoard, HexCoords fromCoords)
+    {
+        if (fromBoard) _battleField[fromCoords] = null;
+        else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
+
+        _battleField[targetCoords] = unit;
+        unit.isOnBoard = true;
+        return true;
+    }
+
+    /// <summary>보드 ↔ 보드 스왑. 두 유닛 모두 보드에 남는다.</summary>
+    private bool SwapOnBoard(PokemonUnit unit, HexCoords targetCoords, HexCoords fromCoords, PokemonUnit occupant)
+    {
+        _battleField[fromCoords] = occupant;
+        _battleField[targetCoords] = unit;
+        return true;
+    }
+
+    /// <summary>
+    /// 벤치 → 점유된 보드 타일: 벤치 슬롯과 보드 유닛을 교체.
+    /// unit이 보드에도 벤치에도 없는 경우(현재 호출부에서는 발생하지 않지만 방어) —
+    /// occupant를 보낼 빈 벤치 슬롯을 새로 찾고, 그마저 없으면 occupant가 추적 불가능한 채로
+    /// 유실되는 걸 막기 위해 배치 자체를 거부한다.
+    /// </summary>
+    private bool SwapBenchIntoBoard(PokemonUnit unit, HexCoords targetCoords, PokemonUnit occupant)
+    {
+        int benchSlot = FindBenchSlot(unit);
+        if (benchSlot < 0) benchSlot = FirstEmptyBenchSlot();
+        if (benchSlot < 0)
+        {
+            Debug.LogWarning("[BoardManager] 배치 거부 — 점유 중인 유닛을 보낼 빈 벤치 슬롯이 없습니다.");
+            return false;
+        }
+
+        _battleField[targetCoords] = unit;
+        unit.isOnBoard = true;
+        _bench[benchSlot] = occupant;
+        occupant.isOnBoard = false;
         return true;
     }
 
@@ -299,7 +358,14 @@ public class BoardManager : MonoBehaviour
         else
         {
             int fromSlot = FindBenchSlot(unit);
-            if (fromSlot >= 0) _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
+            if (fromSlot < 0)
+            {
+                // 들어온 유닛이 보드에도 벤치에도 없음 — occupant를 되돌려놓을 원위치가 없으므로
+                // 스왑을 거부한다. (그대로 진행하면 occupant를 덮어써 유실됨)
+                Debug.LogWarning($"[Board] TryDropOnBench 거부: 들어온 유닛의 원위치를 찾지 못해 스왑 불가(occupant 보호)");
+                return false;
+            }
+            _bench[fromSlot] = occupant; // 벤치↔벤치 스왑
         }
 
         _bench[slot] = unit;
@@ -404,13 +470,28 @@ public class BoardManager : MonoBehaviour
             RemoveFromBenchByRef(unit);
     }
 
+    /// <summary>현재 보드 위에 있는 유닛 수만 계산한다. List를 만들지 않아 배치 제한 체크용으로 가볍다.</summary>
+    private int CountUnitsOnBoard()
+    {
+        int count = 0;
+
+        foreach (var unit in _battleField.Values)
+        {
+            if (unit != null)
+                count++;
+        }
+
+        return count;
+    }
+
     // ──────────────────────────────────────────
     // 합체 (일반 진화 = 동일 종 3개 → 별업, GDD 4.2)
     // ──────────────────────────────────────────
 
     /// <summary>
     /// 보드+벤치 통틀어 같은 종(data.id)·같은 성(starLevel) 유닛이 3개 이상이면 1개로 합쳐 별업.
-    /// 1성→2성→3성, 3성이 상한. 별업 후 한 단계 더 가능하면 연쇄 진화.
+    /// 별업 시 종이 진화체(evolvesIntoEn)로 바뀐다 — 꼬마돌1성×3 → 데구리2성, 데구리2성×3 → 딱구리3성.
+    /// 1성→2성→3성, 3성이 상한. 진화 대상이 없으면(최종형/데이터 미비) 종은 유지하고 별만 올림.
     /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
     /// </summary>
     private void CheckEvolution(int speciesId, int starLevel)
@@ -421,13 +502,15 @@ public class BoardManager : MonoBehaviour
         var boardMatches = new List<HexCoords>();
         var benchMatches = new List<int>();
 
+        // 돌 낀 유닛은 머지 후보 제외 — 안 그러면 합체 시 소비된 유닛의 돌이 Destroy로 같이 증발한다.
+        // "머지하려면 돌부터 빼라"가 의도된 흐름(진화의 돌 설계 문서, 2026-06-22).
         foreach (var kv in _battleField)
-            if (kv.Value != null && kv.Value.data != null &&
+            if (kv.Value != null && kv.Value.data != null && !kv.Value.IsStoneEvolved &&
                 kv.Value.data.id == speciesId && kv.Value.starLevel == starLevel)
                 boardMatches.Add(kv.Key);
 
         for (int i = 0; i < _bench.Length; i++)
-            if (_bench[i] != null && _bench[i].data != null &&
+            if (_bench[i] != null && _bench[i].data != null && !_bench[i].IsStoneEvolved &&
                 _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
                 benchMatches.Add(i);
 
@@ -455,21 +538,33 @@ public class BoardManager : MonoBehaviour
         foreach (var u in consumed)
             if (u != survivor && u != null) Destroy(u.gameObject);
 
-        // 별업 + 재배치
+        // 별업 + 종 진화(evolvesIntoEn으로 스왑) + 재배치
         survivor.starLevel = Mathf.Clamp(starLevel + 1, 1, 3);
-        survivor.ResetForBattle();
+
+        // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
+        // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
+        // 진화잠금(이브이 영웅증강 등)이면 종 스왑을 건너뛰고 별만 올린다 — 3성까지 원본 종 유지.
+        string evolvedEn = survivor.evolutionLocked ? null : survivor.data.evolvesIntoEn;
+        if (!string.IsNullOrEmpty(evolvedEn))
+        {
+            var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
+            if (evolved != null) survivor.data = evolved;
+            else Debug.LogWarning($"[Evolve] 진화체 '{evolvedEn}' 가 PokemonDatabase에 없음 — 종 유지(별만 상승). 데이터 보강 필요");
+        }
+
+        survivor.ResetForBattle();   // 진화체 MaxHp 기준 풀회복 (data 스왑 후 호출)
         if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
         else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
 
         _isEvolving = false;
 
-        Debug.Log($"[Evolve] 종 {speciesId} {starLevel}성 3개 합체 → {survivor.starLevel}성");
+        Debug.Log($"[Evolve] {starLevel}성 3개 합체 → {survivor.data.pokemonName} {survivor.starLevel}성");
 
-        // 이벤트 발화(시너지 재계산/뷰 갱신)
+        // 이벤트 발화(시너지 재계산/뷰 갱신 — 진화로 종이 바뀌었으니 모델 갱신도 뷰가 처리)
         if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
         else                 GameEvents.UnitBenched(survivor);
 
-        // 연쇄(예: 2성 3개 → 3성)
-        CheckEvolution(speciesId, survivor.starLevel);
+        // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
+        CheckEvolution(survivor.data.id, survivor.starLevel);
     }
 }

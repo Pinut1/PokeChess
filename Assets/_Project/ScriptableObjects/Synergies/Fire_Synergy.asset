@@ -12,15 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Fire_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 3
+  id: 4
   synergyName: "\uBD88\uAF43"
   synergyNameEn: Fire
   tiers:
   - count: 2
-    effectDescription: "\uBD88\uAF43 \uC720\uB2DB\uC758 \uACF5\uACA9\uB825 +10%"
+    effectDescription: "\uBC29\uC5B4\uB825 +10%"
   - count: 4
-    effectDescription: "\uBD88\uAF43 \uC720\uB2DB\uC758 \uACF5\uACA9\uB825 +25%"
+    effectDescription: "\uBC29\uC5B4\uB825 +25%"
   - count: 6
-    effectDescription: "\uBD88\uAF43 \uC720\uB2DB\uC758 \uACF5\uACA9\uB825 +45%,
-      \uAE30\uBCF8 \uACF5\uACA9\uC5D0 \uD654\uC0C1 \uBD80\uC5EC"
+    effectDescription: "\uBC29\uC5B4\uB825 +40%"
   icon: {fileID: 0}

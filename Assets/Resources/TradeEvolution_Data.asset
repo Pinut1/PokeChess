@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35dc0e69f6569c144802c2d799f0154d, type: 3}
+  m_Name: TradeEvolution_Data
+  m_EditorClassIdentifier: Assembly-CSharp::TradeEvolutionData
+  mappings:
+  - targetPokemonEn: Golbat
+    evolvedPokemonEn: Crobat
+    note: "\uD06C\uB85C\uBC43 (Golbat\u2192Crobat, \uD655\uC778)"
+  - targetPokemonEn: Kadabra
+    evolvedPokemonEn: Alakazam
+    note: "\uD6C4\uB518 (Kadabra\u2192Alakazam)"
+  - targetPokemonEn: Abra
+    evolvedPokemonEn: Kadabra
+    note: "\uC724\uAC94\uB77C (\uBCF4\uD1B5 \uC77C\uBC18\uC9C4\uD654\uC778\uB370
+      DB\uAC00 trade \uD45C\uAE30 \u2014 \uD655\uC778)"
+  - targetPokemonEn: Graveler
+    evolvedPokemonEn: Golem
+    note: "\uB531\uAD6C\uB9AC (Graveler\u2192Golem)"
+  - targetPokemonEn: Geodude
+    evolvedPokemonEn: Graveler
+    note: "\uB370\uAD6C\uB9AC (\uBCF4\uD1B5 \uC77C\uBC18\uC9C4\uD654 \u2014 \uD655\uC778)"
+  - targetPokemonEn: Slowpoke
+    evolvedPokemonEn: Slowking
+    note: "\uC57C\uB3C4\uD0B9 (Slowpoke\u2192Slowking, \uD655\uC778)"
+  - targetPokemonEn: Haunter
+    evolvedPokemonEn: Gengar
+    note: "\uD32C\uD140 (Haunter\u2192Gengar)"
+  - targetPokemonEn: Onix
+    evolvedPokemonEn: Steelix
+    note: "\uAC15\uCCA0\uD1A4 (Onix\u2192Steelix)"
+  - targetPokemonEn: Scyther
+    evolvedPokemonEn: Scizor
+    note: "\uD56B\uC0BC (Scyther\u2192Scizor)"

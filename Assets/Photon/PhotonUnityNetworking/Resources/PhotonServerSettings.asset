@@ -46,6 +46,12 @@ MonoBehaviour:
   - RPC_SetTarget
   - RPC_OnBoardSnapshot
   - RPC_ReportBattleLoss
+  - RPC_OnGameCleared
+  - RPC_OnTeamRoundResolved
+  - RPC_TradeAck
+  - RPC_TradeReceive
+  - RPC_GoldReceive
+  - RPC_GoldTransferAck
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

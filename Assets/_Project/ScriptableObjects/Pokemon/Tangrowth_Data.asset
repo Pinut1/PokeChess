@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Tangrowth_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 465
+  pokemonName: "\uB369\uCFE0\uB9BC\uBCF4"
+  pokemonNameEn: Tangrowth
+  cost: 1
+  hp: 650
+  attack: 30
+  defense: 35
+  attackSpeed: 0.4
+  range: 1
+  spellPower: 130
+  manaCost: 84
+  synergies:
+  - Grass
+  role: Assassin
+  skillId: GRASS_ASSASSIN
+  skill:
+    skillId: GRASS_ASSASSIN
+    skillName: "\uC528\uD3ED\uD0C4"
+    description: "\uB2E8\uC77C \uC801 \uACE0\uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 3
+    areaRadius: 0
+    lineLength: 1
+    vfxId: VFX_Grass_Assassin
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

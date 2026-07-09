@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Lapras_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 131
+  pokemonName: "\uB77C\uD504\uB77C\uC2A4"
+  pokemonNameEn: Lapras
+  cost: 4
+  hp: 850
+  attack: 55
+  defense: 30
+  attackSpeed: 0.8
+  range: 1
+  spellPower: 175
+  manaCost: 50
+  synergies:
+  - Water
+  role: Supporter
+  skillId: WATER_SUPPORTER
+  skill:
+    skillId: WATER_SUPPORTER
+    skillName: "\uBB3C\uC758\uC7A5\uB9C9"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 \uBCF4\uD638\uB9C9"
+    effectType: 3
+    targetType: 1
+    areaRadius: 0
+    lineLength: 4
+    vfxId: VFX_Water_Supporter
+  evolvesIntoEn: 
+  shopBuyable: 1
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Gloom_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 44
+  pokemonName: "\uB0C4\uC0C8\uAF2C"
+  pokemonNameEn: Gloom
+  cost: 4
+  hp: 850
+  attack: 50
+  defense: 30
+  attackSpeed: 0.7
+  range: 2
+  spellPower: 175
+  manaCost: 55
+  synergies:
+  - Grass
+  - Poison
+  role: Supporter
+  skillId: GRASS_SUPPORTER
+  skill:
+    skillId: GRASS_SUPPORTER
+    skillName: "\uC528\uBFCC\uB9AC\uAE30"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 HP \uD68C\uBCF5"
+    effectType: 2
+    targetType: 2
+    areaRadius: 2
+    lineLength: 4
+    vfxId: VFX_Grass_Supporter
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

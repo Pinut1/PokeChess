@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Magneton_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 82
+  pokemonName: "\uB808\uC5B4\uCF54\uC77C"
+  pokemonNameEn: Magneton
+  cost: 4
+  hp: 1100
+  attack: 62
+  defense: 55
+  attackSpeed: 0.6
+  range: 2
+  spellPower: 220
+  manaCost: 65
+  synergies:
+  - Electric
+  - Breaker
+  role: Assassin
+  skillId: ELECTRIC_ASSASSIN
+  skill:
+    skillId: ELECTRIC_ASSASSIN
+    skillName: "\uC804\uAD11\uC11D\uD654"
+    description: "\uB2E8\uC77C \uC801 \uACE0\uB370\uBBF8\uC9C0 + \uC2A4\uD134"
+    effectType: 7
+    targetType: 3
+    areaRadius: 0
+    lineLength: 1
+    vfxId: VFX_Electric_Assassin
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

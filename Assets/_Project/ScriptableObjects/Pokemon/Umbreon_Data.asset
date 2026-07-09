@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Umbreon_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 197
+  pokemonName: "\uBE0C\uB798\uD0A4"
+  pokemonNameEn: Umbreon
+  cost: 4
+  hp: 1100
+  attack: 72
+  defense: 60
+  attackSpeed: 0.6
+  range: 1
+  spellPower: 85
+  manaCost: 85
+  synergies:
+  - Mutant
+  role: Warrior
+  skillId: MUTANT_WARRIOR
+  skill:
+    skillId: MUTANT_WARRIOR
+    skillName: "\uB3CC\uC9C4"
+    description: "\uADFC\uC811 \uB3CC\uC5F0\uBCC0\uC774 \uC18D\uC131 \uB370\uBBF8\uC9C0"
+    effectType: 0
+    targetType: 3
+    areaRadius: 0
+    lineLength: 1
+    vfxId: VFX_Mutant_Warrior
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 0}
+  icon: {fileID: 0}

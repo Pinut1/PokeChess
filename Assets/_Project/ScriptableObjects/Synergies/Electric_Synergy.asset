@@ -12,17 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Electric_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 1
+  id: 9
   synergyName: "\uC804\uAE30"
   synergyNameEn: Electric
   tiers:
   - count: 2
-    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
-      +15%"
+    effectDescription: "\uC8FC\uBB38\uB825 +20"
+  - count: 3
+    effectDescription: "\uC8FC\uBB38\uB825 +40"
   - count: 4
-    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
-      +35%"
-  - count: 6
-    effectDescription: "\uC804\uAE30 \uC720\uB2DB\uC758 \uACF5\uACA9 \uC18D\uB3C4
-      +60%, \uAE30\uBCF8 \uACF5\uACA9 \uC2DC 10% \uD655\uB960\uB85C \uB9C8\uBE44"
+    effectDescription: "\uC8FC\uBB38\uB825 +65"
   icon: {fileID: 0}

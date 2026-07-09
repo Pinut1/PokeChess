@@ -2,6 +2,30 @@ using System;
 using UnityEngine;
 
 /// <summary>
+/// 한 라운드의 팀(2인) 단위 결과. 각자 보드 승패를 MasterClient가 집계해 판정.
+/// 라이프/보상 규칙: BothWin=풀 보상, Split=라이프 유지+보상 50%, BothLose=라이프 -1+보상 0.
+/// (RPC 전송용으로 int 캐스팅하므로 값 순서를 바꾸지 말 것.)
+/// </summary>
+public enum TeamRoundOutcome
+{
+    BothWin = 0,   // 둘 다 승리
+    Split   = 1,   // 한 명만 패배
+    BothLose = 2   // 둘 다 패배
+}
+
+/// <summary>
+/// 세션 종료(패배) 사유. MatchRecorder가 전적(endReason)에 기록하고,
+/// 결과 화면 문구 분기(UI)에도 사용. (RPC 전송은 없지만 기록값이므로 이름 변경 주의.)
+/// </summary>
+public enum SessionEndReason
+{
+    TeamHpZero,        // 팀 공통 HP 소진
+    ReconnectFailed,   // 본인 재접속 실패
+    PartnerAbandoned,  // 상대 미재접속(협동 불가)
+    BothDisconnected   // 둘 다 연결 끊김
+}
+
+/// <summary>
 /// 매니저 간 직접 참조 대신 이벤트로 통신.
 /// 새 이벤트는 반드시 여기에만 추가할 것.
 /// </summary>
@@ -14,8 +38,14 @@ public static class GameEvents
     /// <summary>전투 시작</summary>
     public static event Action OnBattleStart;
 
-    /// <summary>전투 종료. true = 승, false = 패</summary>
+    /// <summary>전투 종료(각자 보드 로컬 결과). true = 승, false = 패</summary>
     public static event Action<bool> OnBattleEnd;
+
+    /// <summary>
+    /// 팀(2인) 단위 라운드 결과 확정. MasterClient가 두 플레이어 승패를 집계해 발행.
+    /// 라이프 차감은 NetworkManager(권위)가 처리하고, 보상은 RewardManager가 배수로 지급한다.
+    /// </summary>
+    public static event Action<TeamRoundOutcome> OnTeamRoundResolved;
 
     /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
     public static event Action OnAllPlayersReady;
@@ -30,11 +60,23 @@ public static class GameEvents
     /// <summary>플레이어 레벨 변경. 인자 = 변경 후 레벨</summary>
     public static event Action<int> OnLevelChanged;
 
+    /// <summary>XP 변경. 인자 = (현재 XP, 다음 레벨 필요 XP). ShopManager가 발행.</summary>
+    public static event Action<int, int> OnXpChanged;
+
+    /// <summary>보드 배치 가능 기물 수 변경. 인자 = 변경 후 캡. ShopManager가 단일 소스로 발행.</summary>
+    public static event Action<int> OnUnitCapChanged;
+
     /// <summary>플레이어 체력 변경. 인자 = 변경 후 체력 (팀 공통 HP — GDD 기준)</summary>
     public static event Action<int> OnHealthChanged;
 
     /// <summary>파트너(상대 클라이언트) 골드 변경. 인자 = 파트너의 현재 골드. UI 표시용.</summary>
     public static event Action<int> OnPartnerGoldChanged;
+
+    /// <summary>아이템 쿠폰 변경. 인자 = 변경 후 쿠폰 총량</summary>
+    public static event Action<int> OnItemCouponChanged;
+
+    /// <summary>아이템/진화의 돌 인벤토리 변경. UI 갱신용.</summary>
+    public static event Action OnInventoryChanged;
 
     // ──────────────────────────────────────────
     // 증강
@@ -62,15 +104,53 @@ public static class GameEvents
     /// <summary>유닛 판매됨</summary>
     public static event Action<PokemonUnit> OnUnitSold;
 
+    /// <summary>
+    /// 유닛의 종(data)·성(starLevel)이 배치/벤치 외의 경로로 바뀜 (예: 진화의 돌 장착/제거).
+    /// BoardManager가 구독 → CheckEvolution 재실행해야 함. 안 그러면 돌 제거로 원복된
+    /// 유닛이 같은 종 3마리를 채워도 합체가 트리거되지 않는다.
+    /// </summary>
+    public static event Action<PokemonUnit> OnUnitChanged;
+
     /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
     public static event Action OnSynergyUpdated;
+
+    /// <summary>통신교환으로 파트너에게서 유닛을 받아 벤치에 배치 완료(A측). 인자 = 받은 유닛(진화체일 수 있음).</summary>
+    public static event Action<PokemonUnit> OnTradeUnitReceived;
+
+    /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
+    public static event Action OnTradeRejected;
+
+    /// <summary>통신기 골드 전송으로 파트너에게서 골드 수령 완료(받는 쪽). 인자 = 받은 골드. 골드 잔액 표시는 OnGoldChanged가 담당.</summary>
+    public static event Action<int> OnPartnerGoldReceived;
+
+    /// <summary>통신기 골드 전송 완료(보낸 쪽, 상대 수신 ack까지 확인). 인자 = 보낸 골드.</summary>
+    public static event Action<int> OnGoldTransferCompleted;
+
+    /// <summary>통신기 골드 전송 실패(보낸 쪽 피드백용). 인자 = 사유 문구. 선차감분은 환급된 상태로 발행됨.</summary>
+    public static event Action<string> OnGoldTransferRejected;
 
     // ──────────────────────────────────────────
     // 샵
     // ──────────────────────────────────────────
 
-    /// <summary>샵 리롤됨</summary>
+    /// <summary>유닛 샵 리롤됨</summary>
     public static event Action OnShopRerolled;
+
+    /// <summary>무료 리롤 자원 변경. 인자 = 변경 후 잔여 리롤 횟수. ShopManager가 단일 소스로 발행(보상 지급/소모 시).</summary>
+    public static event Action<int> OnRerollCountChanged;
+
+    /// <summary>수동 리롤 1회가 실제로 소모됨(무료/골드 무관). 리롤 환급 증강 등의 훅 — 구독 측이 확률 판정 후 Shop.AddReroll로 환급.</summary>
+    public static event Action OnRerollSpent;
+
+    /// <summary>아이템 샵 갱신됨</summary>
+    public static event Action OnItemShopRerolled;
+
+    /// <summary>아이템 상점 무료 리롤 자원 변경. 인자 = 변경 후 잔여 횟수. ShopManager가 단일 소스로 발행.</summary>
+    public static event Action<int> OnItemShopRerollCountChanged;
+
+    /// <summary>아이템 상점 구매 완료. 인자 = 구매한 일반 아이템 또는 진화의 돌</summary>
+    public static event Action<ScriptableObject> OnItemPurchased;
+
 
     // ──────────────────────────────────────────
     // 라운드 / 페이즈
@@ -81,6 +161,15 @@ public static class GameEvents
 
     /// <summary>페이즈 전환. 인자 = 새 페이즈</summary>
     public static event Action<GamePhase> OnPhaseChanged;
+
+    /// <summary>
+    /// 현재 라운드의 스테이지가 확정됨(라운드 시작 시점). 인자 = 진입한 StageData.
+    /// RoundPhaseManager가 StageDatabase에서 해석 후 발행.
+    /// 구독 측 훅(기획 확정 후 담당자가 채움):
+    ///   - 전투 전 보상/증강(preReward), 트레이너 등장 연출, 스테이지 타입별 BGM/배경 등.
+    /// 전투의 적 구성은 BattleManager가 Phase.CurrentStage에서 직접 읽으므로 이 이벤트 구독 불필요.
+    /// </summary>
+    public static event Action<StageData> OnStageEntered;
 
     // ──────────────────────────────────────────
     // 연결 끊김 / 재접속
@@ -95,8 +184,25 @@ public static class GameEvents
     /// <summary>재접속 유예시간 종료. 인자 = 둘 다 끊겼는지 여부 (true면 세션 종료)</summary>
     public static event Action<bool> OnGracePeriodExpired;
 
-    /// <summary>세션 종료(패배 처리). 전적 기록은 미구현 — 로그로만 처리</summary>
-    public static event Action OnSessionEnded;
+    /// <summary>세션 종료(패배 처리). 인자 = 종료 사유. RoundPhaseManager(GameOver 전환)·MatchRecorder(전적 기록)가 구독.</summary>
+    public static event Action<SessionEndReason> OnSessionEnded;
+
+    /// <summary>
+    /// 마지막 라운드(챕터 최종 스테이지) 클리어 — 게임 완주(승리).
+    /// MasterClient가 최종 라운드 결과 후 BroadcastGameCleared로 전체에 발행 →
+    /// RoundPhaseManager가 GamePhase.Victory로 전환. (다음 라운드를 브로드캐스트하지 않음.)
+    /// </summary>
+    public static event Action OnGameCleared;
+
+    // ──────────────────────────────────────────
+    // 전적
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 전적 1건 기록 완료(승패 무관). 인자 = 방금 저장된 기록. MatchRecorder가 발행.
+    /// UI(결과 화면/전적 창)가 구독해 즉시 표시. 과거 전적 조회는 MatchHistoryStore.LoadRecent() pull.
+    /// </summary>
+    public static event Action<MatchRecord> OnMatchRecorded;
 
     // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
@@ -105,22 +211,41 @@ public static class GameEvents
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
+    public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
+    public static void XpChanged(int current, int required) => OnXpChanged?.Invoke(current, required);
+    public static void UnitCapChanged(int cap) => OnUnitCapChanged?.Invoke(cap);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);
+    public static void ItemCouponChanged(int amount) => OnItemCouponChanged?.Invoke(amount);
+    public static void InventoryChanged() => OnInventoryChanged?.Invoke();
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
+    public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
+    public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
+    public static void TradeRejected()               => OnTradeRejected?.Invoke();
+    public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
+    public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);
+    public static void GoldTransferRejected(string reason) => OnGoldTransferRejected?.Invoke(reason);
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
-    public static void RoundChanged(int round)      => OnRoundChanged?.Invoke(round);
+    public static void RerollCountChanged(int count) => OnRerollCountChanged?.Invoke(count);
+    public static void RerollSpent()                => OnRerollSpent?.Invoke();
+    public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
+    public static void ItemShopRerollCountChanged(int count) => OnItemShopRerollCountChanged?.Invoke(count);
+    public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
+    public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
+    public static void StageEntered(StageData stage) => OnStageEntered?.Invoke(stage);
 
     public static void OpponentDisconnected(float graceSeconds) => OnOpponentDisconnected?.Invoke(graceSeconds);
     public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();
     public static void GracePeriodExpired(bool bothDisconnected) => OnGracePeriodExpired?.Invoke(bothDisconnected);
-    public static void SessionEnded()               => OnSessionEnded?.Invoke();
+    public static void SessionEnded(SessionEndReason reason) => OnSessionEnded?.Invoke(reason);
+    public static void GameCleared()                => OnGameCleared?.Invoke();
+    public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
 }
