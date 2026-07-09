@@ -42,7 +42,7 @@ Assets/_Project/Scripts/
 코드에 흩어진 미완/임시 항목을 한곳에 모음. 상태: 🔴 기획 수치 대기 / 🟡 타 담당 / 🟢 영욱 영역.
 
 **🔴 기획 수치 확정 대기 (메커니즘 구현됨, 값만 PLACEHOLDER)**
-- `BattleManager` CC 지속/감속(`STUN_DURATION`/`SLOW_*`), 지원스킬 위력(`MANA_REGEN_SKILL_AMOUNT`/`AS_BUFF_*`), role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
+- `BattleManager` CC 지속/감속(`STUN_DURATION`/`SLOW_*`/`TAUNT_DURATION`), 지원스킬 위력(`MANA_REGEN_BUFF_*`/`AS_BUFF_*`), role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
 - `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
 - `Core/PokemonUnit` 특수진화체 별배율 ×1.5
 - `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`
