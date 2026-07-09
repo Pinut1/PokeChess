@@ -32,6 +32,7 @@ public class BattleUnit
     public SkillTargetType skillTargetType;
     public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
     public int   skillLineLength;    // EnemyLine: 시전자 기준 직선(칸)
+    public string skillVfxId;        // 시전 시 재생할 VFX(VfxDatabase 키). 비어있으면 재생 없음.
 
     public bool HasSkill => maxMana > 0f;
 
