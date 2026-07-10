@@ -27,8 +27,9 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     private const string PREFS_REFRESH_TOKEN = "supabase_refresh_token";
 
-    private string _accessToken = "";
-    private string _userId      = "";
+    private string _accessToken       = "";
+    private string _userId            = "";
+    private string _upsertedNickname; // 마지막으로 서버에 반영한 닉네임 (중복 upsert 방지)
 
     public bool HasSession => !string.IsNullOrEmpty(_accessToken);
 
@@ -95,14 +96,27 @@ public class SupabaseMatchUploader : MonoBehaviour
     private IEnumerator UpsertProfile()
     {
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
-        string nickname = net != null ? net.LocalNickname : "";
+        yield return UpsertProfile(net != null ? net.LocalNickname : "");
+    }
+
+    /// <summary>
+    /// profiles에 닉네임 반영. 세션 확보 직후 + 전적 업로드 시점에 호출된다 —
+    /// 세션 시작 때는 로비 입력 전이라 임시값(Player_xxxx)일 수 있어서,
+    /// 실제 판에 쓰인 닉네임(self_record 기준)으로 따라잡는 구조.
+    /// </summary>
+    private IEnumerator UpsertProfile(string nickname)
+    {
+        nickname = (nickname ?? "").Trim();
+        if (nickname.Length == 0 || nickname == _upsertedNickname) yield break;
 
         string body = "[{\"id\":\"" + _userId + "\",\"nickname\":" + JsonString(nickname) + "}]";
         using var req = BuildJsonPost($"{_projectUrl}/rest/v1/profiles?on_conflict=id", body, authed: true);
         req.SetRequestHeader("Prefer", "resolution=merge-duplicates");
         yield return req.SendWebRequest();
 
-        if (req.result != UnityWebRequest.Result.Success)
+        if (req.result == UnityWebRequest.Result.Success)
+            _upsertedNickname = nickname;
+        else
             Debug.LogWarning($"[Supabase] 프로필 upsert 실패 ({req.responseCode}): {req.downloadHandler.text}");
     }
 
@@ -121,6 +135,9 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     private IEnumerator UploadMatch(MatchRecord r)
     {
+        // 판에 실제 쓰인 닉네임으로 프로필 최신화 (로비 입력이 세션 시작보다 늦는 경우 대비)
+        if (r.self != null) yield return UpsertProfile(r.self.nickname);
+
         string body = BuildMatchRow(r);
         // unique(user_id, match_id) 충돌 시 409 대신 무시 — 재시도/중복 안전
         string url = $"{_projectUrl}/rest/v1/matches?on_conflict=user_id,match_id";
