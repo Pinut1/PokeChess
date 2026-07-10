@@ -37,6 +37,10 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     private void Start()
     {
+        // 인스펙터 붙여넣기 시 섞여 들어오는 공백/개행 방어
+        _projectUrl = (_projectUrl ?? "").Trim().TrimEnd('/');
+        _anonKey    = (_anonKey ?? "").Trim();
+
         if (string.IsNullOrEmpty(_projectUrl) || string.IsNullOrEmpty(_anonKey))
         {
             Debug.LogWarning("[Supabase] URL/anon key 미설정 — 전적 업로드 비활성 (로컬 jsonl만 기록)");

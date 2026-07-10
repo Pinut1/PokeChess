@@ -335,6 +335,7 @@ GameObject:
   - component: {fileID: 1558058674}
   - component: {fileID: 1558058675}
   - component: {fileID: 1558058676}
+  - component: {fileID: 1558058677}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -773,6 +774,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ff1c33b366bae54a8ebd65c698879df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EeveeHeroDebugTest
+--- !u!114 &1558058677
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa8e6f8ec209bf447849ca7c8502226c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SupabaseMatchUploader
+  _projectUrl: https://bhrobrousftinuvdmyqk.supabase.co
+  _anonKey: '  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJocm9icm91c2Z0aW51dmRteXFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzMyMjAsImV4cCI6MjA5OTIwOTIyMH0.U-tnpv9Z_BW5eyc7FOI3PptrXtaZYKMN7u7ykWASYfM'
 --- !u!1 &2053065678
 GameObject:
   m_ObjectHideFlags: 0
