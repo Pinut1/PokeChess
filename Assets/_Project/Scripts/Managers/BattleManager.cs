@@ -547,6 +547,7 @@ public class BattleManager : MonoBehaviour
         bu.skillTargetType  = skill.targetType;
         bu.skillAreaRadius  = Mathf.Max(1, skill.areaRadius);
         bu.skillLineLength  = Mathf.Max(1, skill.lineLength);
+        bu.skillVfxId       = skill.vfxId;
     }
 
     private BattleUnit CreateBattleUnit(PokemonUnit unit, BattleTeam team, HexCoords coords)
@@ -760,6 +761,8 @@ public class BattleManager : MonoBehaviour
         DamageType type = caster.skillEffectType == SkillEffectType.Attack ? DamageType.Physical : DamageType.Magic;
 
         var targets = GetSkillTargets(caster, primaryTarget);
+        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets); // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생
+
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
@@ -784,6 +787,7 @@ public class BattleManager : MonoBehaviour
                           caster.skillEffectType == SkillEffectType.AsBuff;
 
         var targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
+        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets);
 
         foreach (var t in targets)
         {
