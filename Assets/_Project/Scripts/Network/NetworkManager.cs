@@ -20,8 +20,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // 상수
     // ─────────────────────────────────────────
 
-    private const int   MAX_PLAYERS = 2;
-    private const float CONNECT_TIMEOUT = 10f;
+    private const int   MAX_PLAYERS         = 2;
+    private const float CONNECT_TIMEOUT     = 10f;
+    // Photon 플레이어 닉네임 최대 길이.
+    private const int   MAX_NICKNAME_LENGTH = 16;
 
     /// <summary>"준비 완료" 여부를 Player CustomProperties에 저장할 때 쓰는 키</summary>
     private const string READY_PROP_KEY = "Ready";
@@ -110,7 +112,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 닉네임/인증값을 다시 설정하지 않는다(재접속 식별자 보존). 씬 동기화는 Awake에서 이미 켬.
         if (PhotonNetwork.IsConnected) return;
 
-        PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
+        // 실제 로비에서 닉네임이 전달되지 않은 테스트 상황을 대비한 임시값.
+        // 이미 로그인/로비 UI에서 닉네임을 설정했다면 해당 값을 덮어쓰지 않는다.
+        if (string.IsNullOrWhiteSpace(PhotonNetwork.NickName))
+            PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
 
         // ReconnectAndRejoin이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
         // AuthValues를 미리 고정해두지 않으면 재접속 시 새 UserId가 발급되어
@@ -119,6 +124,56 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     private Coroutine _connectTimeoutRoutine;
+
+    /// <summary>
+    /// 로그인 또는 로비 UI에서 입력받은 닉네임을
+    /// 현재 Photon 로컬 플레이어의 닉네임으로 적용한다.
+    ///
+    /// 설정된 닉네임은 방 입장 후 다른 플레이어에게 공유되며,
+    /// MatchRecorder가 LocalNickname / PartnerNickname을 통해
+    /// 전적 기록에 자동으로 저장한다.
+    /// </summary>
+    /// <param name="nickname">사용자가 입력한 닉네임</param>
+    /// <returns>닉네임 적용에 성공하면 true, 적용할 수 없으면 false</returns>
+    public bool TrySetLocalNickname(string nickname)
+    {
+        // 솔로 모드는 Photon 플레이어 정보를 사용하지 않는다.
+        if (_soloMode)
+        {
+            Debug.LogWarning("[Network] 솔로 모드에서는 Photon 닉네임을 사용하지 않습니다.");
+            return false;
+        }
+
+        // 현재 UI에는 방 입장 후 닉네임 변경 경로가 없지만,
+        // 다른 스크립트에서 이 공개 메서드를 잘못 호출하는 경우를 방지한다.
+        // 한 판 도중 닉네임이 바뀌어 파트너 표시와 전적 기록이 어긋나지 않도록 차단한다.
+        if (PhotonNetwork.InRoom)
+        {
+            Debug.LogWarning("[Network] 방 입장 후에는 닉네임을 변경할 수 없습니다.");
+            return false;
+        }
+
+        // 입력 앞뒤의 불필요한 공백을 제거한다.
+        string trimmedNickname = nickname?.Trim();
+
+        // 공백 또는 빈 문자열은 유효한 닉네임으로 인정하지 않는다.
+        if (string.IsNullOrEmpty(trimmedNickname))
+        {
+            Debug.LogWarning("[Network] 닉네임이 비어 있습니다.");
+            return false;
+        }
+
+        // 로비 UI와 네트워크 데이터의 닉네임 길이를 일정하게 제한한다.
+        if (trimmedNickname.Length > MAX_NICKNAME_LENGTH)
+            trimmedNickname = trimmedNickname[..MAX_NICKNAME_LENGTH];
+
+        // Photon 플레이어 정보에 적용.
+        // 방에 들어가면 파트너가 Player.NickName으로 이 값을 조회할 수 있다.
+        PhotonNetwork.NickName = trimmedNickname;
+
+        Debug.Log($"[Network] 닉네임 설정 완료: {PhotonNetwork.NickName}");
+        return true;
+    }
 
     public void Connect()
     {
@@ -862,6 +917,16 @@ public class NetworkManager : MonoBehaviour
     private void Start()
     {
         Debug.LogWarning("[Network] PUN2 미설치 — 오프라인 모드로 실행 중");
+    }
+
+    /// <summary>
+    /// PUN2 미설치 환경에서는 Photon 닉네임을 설정하지 않는다.
+    /// 실제 구현부와 동일한 공개 API를 유지하기 위한 오프라인 스텁.
+    /// </summary>
+    public bool TrySetLocalNickname(string nickname)
+    {
+        Debug.LogWarning("[Network] 오프라인 모드에서는 Photon 닉네임을 설정할 수 없습니다.");
+        return false;
     }
 
     public void Connect()           => Debug.Log("[Network] 오프라인 모드");
