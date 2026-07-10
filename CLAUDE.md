@@ -42,7 +42,11 @@ Assets/_Project/Scripts/
 코드에 흩어진 미완/임시 항목을 한곳에 모음. 상태: 🔴 기획 수치 대기 / 🟡 타 담당 / 🟢 영욱 영역.
 
 **🔴 기획 수치 확정 대기 (메커니즘 구현됨, 값만 PLACEHOLDER)**
-- `BattleManager` CC 지속/감속(`STUN_DURATION`/`SLOW_*`/`TAUNT_DURATION`), 지원스킬 위력(`MANA_REGEN_BUFF_*`/`AS_BUFF_*`), role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
+- ~~마나 충전 모델~~ ✅ 확정(7/10): 초당 10 고정만(`MANA_PER_SECOND`). 평타/피격비례 제거됨
+- ~~TAUNT~~ ✅ 날따름 확정(7/10): 시전자 중심 반경, 지속 1.0×1.4×성급(1/1.8/2.8), 원래 타겟 스냅샷→복귀
+- ~~지원스킬 위력~~ ✅ 확정(7/10): spellPower×0.5(`SUPPORT_SPELLPOWER_COEF`, 임시 계수). 단 AsBuff "증가량"·ManaRegen "회복량" 해석(%(p) vs 즉시 마나)은 해인님 재확인 대기, `AS_BUFF_DURATION`은 여전히 PLACEHOLDER
+- 스킬용 STUN: 스코프 아웃(7/10, 증강 6종에 없음 — 메커니즘만 유지), SLOW: 보류(유닛/아이템 미구현)
+- `BattleManager` role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
 - `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
 - `Core/PokemonUnit` 특수진화체 별배율 ×1.5
 - `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`

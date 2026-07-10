@@ -16,23 +16,28 @@ public class BattleManager : MonoBehaviour
     private const float TICK_INTERVAL = 0.1f;
     private const int MAX_TICKS = 300; // 30초 타임아웃
 
-    // 마나(TFT식): 평타 1회당 고정 획득 + 피해 받을 때 피해량 비례 획득(피격당 상한).
-    private const float MANA_PER_ATTACK = 10f;
-    private const float MANA_PER_DAMAGE_TAKEN = 0.05f;  // 받은 피해의 5%
-    private const float MANA_GAIN_CAP_PER_HIT = 20f;    // 한 번 피격으로 얻는 마나 상한
+    // 마나 충전 — 기획 확정(2026-07-10): 초당 10 고정만. 평타/피격비례 충전은 스코프 아웃.
+    // 밸런스는 충전 방식이 아니라 유닛별 manaCost(마나통) 크기로 조절한다.
+    private const float MANA_PER_SECOND = 10f;
 
-    // CC(기둥C) — PLACEHOLDER(기획확정 전): 지속시간/감속률.
-    private const float STUN_DURATION = 1.5f;
+    // CC(기둥C) — 기획 확정(2026-07-10): 스킬용 STUN은 이번 스코프 아웃(증강 6종에 없음),
+    // SLOW는 보류(대상 유닛/아이템 미구현). 메커니즘은 유지하되 데이터가 안 쓴다.
+    private const float STUN_DURATION = 1.5f;   // 악 시너지 스턴(SynergyConstants)과는 별개
     private const float SLOW_DURATION = 3f;
     private const float SLOW_MULTIPLIER = 0.5f;
-    private const float TAUNT_DURATION = 3f;
 
-    // 지원 스킬(HpRegen/Shield/ManaRegen/AsBuff) — PLACEHOLDER(기획확정 전): 위력/지속시간.
-    // ManaRegen은 스킬 가이드 §3-2 기준 즉시 지급이 아니라 시간제 충전속도 버프.
-    private const float MANA_REGEN_BUFF_MULTIPLIER = 1.5f;
-    private const float MANA_REGEN_BUFF_DURATION = 3f;
-    private const float AS_BUFF_MULTIPLIER = 1.5f;
-    private const float AS_BUFF_DURATION = 3f;
+    // 날따름(TAUNT, 파치리스 영웅증강 스킬) — 기획 확정(2026-07-10):
+    // 지속 = base(1.0s) × 1.4(영웅증강 스탯보정) × 성급(1성 1.0 / 2성 1.8 / 3성 2.8)
+    // → 1.4s / 2.52s / 3.92s. 날따름은 영웅증강 주입 스킬이라 1.4를 상수로 취급한다.
+    private const float TAUNT_BASE_DURATION  = 1.0f;
+    private const float TAUNT_HERO_STAT_MULT = 1.4f;
+    private static readonly float[] TAUNT_STAR_MULT = { 1.0f, 1.0f, 1.8f, 2.8f }; // starLevel(1~3) 인덱스
+
+    // 지원 스킬 위력 — 기획 확정(2026-07-10): spellPower × 0.5 (임시 계수, 밸런스 후 조정).
+    // AsBuff = (spellPower×계수)%p 공속 증가, ManaRegen = 즉시 마나 (spellPower×계수) 회복으로 해석.
+    // (※ "증가량/회복량" 해석은 해인님 재확인 예정)
+    private const float SUPPORT_SPELLPOWER_COEF = 0.5f;
+    private const float AS_BUFF_DURATION = 3f;  // 지속시간은 언급 없음 — PLACEHOLDER 유지
 
     // role 기반 타겟 우선순위(기둥C) — PLACEHOLDER(기획확정 전): 낮을수록 먼저 타겟팅.
     private static readonly Dictionary<string, int> ROLE_TARGET_PRIORITY = new()
@@ -511,7 +516,8 @@ public class BattleManager : MonoBehaviour
             attackSpeed = data.attackSpeed,
             range = Mathf.Max(1, data.range),
             attackCooldown = 0f,
-            role = data.role ?? ""
+            role = data.role ?? "",
+            starLevel = Mathf.Clamp(e.starLevel, 1, 3)
         };
         ApplySkill(bu, data.skill, data.manaCost);
 
@@ -568,7 +574,8 @@ public class BattleManager : MonoBehaviour
             attackSpeed = unit.AttackSpeed,
             range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
             attackCooldown = 0f,
-            role = unit.Role
+            role = unit.Role,
+            starLevel = Mathf.Clamp(unit.starLevel, 1, 3) // 날따름 지속시간 공식용
         };
         // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
         if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
@@ -629,9 +636,28 @@ public class BattleManager : MonoBehaviour
             if (!bu.IsAlive) continue;
 
             bu.TickCcState(TICK_INTERVAL);
+
+            // 마나 충전(기획 확정): 초당 10 고정. 스턴 중에도 차오른다(행동만 불능).
+            GainMana(bu, MANA_PER_SECOND * TICK_INTERVAL);
+
             if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
 
-            BattleUnit target = (bu.tauntedBy != null && bu.tauntedBy.IsAlive) ? bu.tauntedBy : FindNearestEnemy(bu);
+            // 타겟 우선순위: 도발자(강제) > 도발 종료 복귀 타겟(날따름 스냅샷) > 일반 타겟팅
+            BattleUnit target;
+            if (bu.tauntedBy != null && bu.tauntedBy.IsAlive)
+            {
+                target = bu.tauntedBy;
+            }
+            else if (bu.tauntReturnTarget != null && bu.tauntReturnTarget.IsAlive)
+            {
+                target = bu.tauntReturnTarget;
+            }
+            else
+            {
+                bu.tauntReturnTarget = null; // 복귀 대상이 죽었으면 소비하고 일반 타겟팅으로
+                target = FindNearestEnemy(bu);
+            }
+            bu.lastTickTarget = target; // 도발 발동 시 "원래 타겟" 스냅샷의 원천
             if (target == null) continue;
 
             int distance = bu.coords.DistanceTo(target.coords);
@@ -719,11 +745,10 @@ public class BattleManager : MonoBehaviour
     /// <summary>크리 기대값 배수(난수 없는 결정론 — 2인 동기화 안전). 크리 없으면 1.</summary>
     private static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
 
-    /// <summary>평타 1회: attack 기반 물리 피해(파이프라인) + 시전자 마나 획득.</summary>
+    /// <summary>평타 1회: attack 기반 물리 피해(파이프라인). 마나는 초당 충전만(기획 확정) — 평타 획득 없음.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
-        GainMana(attacker, MANA_PER_ATTACK);
 
         foreach (var effect in attacker.effects)
             effect.OnBasicAttack(attacker, target);
@@ -789,8 +814,18 @@ public class BattleManager : MonoBehaviour
                           caster.skillEffectType == SkillEffectType.ManaRegen ||
                           caster.skillEffectType == SkillEffectType.AsBuff;
 
-        var targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
+        // 날따름(Taunt)은 "시전자 중심 반경 내 적"(기획 확정) — 대상 중심인 EnemyArea와 달라 별도 타겟팅.
+        List<BattleUnit> targets;
+        if (caster.skillEffectType == SkillEffectType.Taunt)
+            targets = GetEnemiesAroundCaster(caster, caster.skillAreaRadius);
+        else
+            targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
+
         BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets);
+
+        // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
+        float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
+                              TAUNT_STAR_MULT[Mathf.Clamp(caster.starLevel, 1, 3)];
 
         foreach (var t in targets)
         {
@@ -798,14 +833,14 @@ public class BattleManager : MonoBehaviour
 
             switch (caster.skillEffectType)
             {
-                case SkillEffectType.Stun:
+                case SkillEffectType.Stun: // 기획 확정: 이번 스코프 데이터 미사용(증강 확장 예정) — 메커니즘만 유지
                     t.ApplyStun(STUN_DURATION);
                     break;
-                case SkillEffectType.Slow:
+                case SkillEffectType.Slow: // 보류(유닛/아이템 미구현) — 수치 미확정
                     t.ApplySlow(SLOW_MULTIPLIER, SLOW_DURATION);
                     break;
                 case SkillEffectType.Taunt:
-                    t.ApplyTaunt(caster, TAUNT_DURATION);
+                    t.ApplyTaunt(caster, tauntDuration);
                     break;
                 case SkillEffectType.HpRegen:
                     t.ApplyHeal(caster.spellPower);
@@ -813,14 +848,25 @@ public class BattleManager : MonoBehaviour
                 case SkillEffectType.Shield:
                     t.ApplyShield(caster.spellPower);
                     break;
-                case SkillEffectType.ManaRegen:
-                    t.ApplyManaRegenBuff(MANA_REGEN_BUFF_MULTIPLIER, MANA_REGEN_BUFF_DURATION);
+                case SkillEffectType.ManaRegen: // 기획 확정: 회복량 = spellPower × 0.5 (즉시 지급)
+                    GainMana(t, caster.spellPower * SUPPORT_SPELLPOWER_COEF);
                     break;
-                case SkillEffectType.AsBuff:
-                    t.ApplyAsBuff(AS_BUFF_MULTIPLIER, AS_BUFF_DURATION);
+                case SkillEffectType.AsBuff:    // 기획 확정: 증가량 = spellPower × 0.5 (%p로 해석)
+                    t.ApplyAsBuff(1f + caster.spellPower * SUPPORT_SPELLPOWER_COEF / 100f, AS_BUFF_DURATION);
                     break;
             }
         }
+    }
+
+    /// <summary>시전자 중심 반경 내 살아있는 적 전부 (날따름 전용 타겟팅).</summary>
+    private List<BattleUnit> GetEnemiesAroundCaster(BattleUnit caster, int radius)
+    {
+        var result = new List<BattleUnit>();
+        foreach (var u in _units)
+            if (u.team != caster.team && u.IsAlive &&
+                caster.coords.DistanceTo(u.coords) <= radius)
+                result.Add(u);
+        return result;
     }
 
     /// <summary>targetType별 아군 대상 목록(지원 스킬용). AllySelf=자신, AllyArea=반경 내 아군, AllySingle=최저 HP비율 아군.</summary>
@@ -940,20 +986,19 @@ public class BattleManager : MonoBehaviour
         foreach (var effect in ctx.target.effects)
             effect.OnTakeDamage(ctx.target, ctx);
 
-        // 적용 + 피격자 마나 획득(피해 비례, 피격당 상한)
+        // 피해 적용. 피격 비례 마나 획득은 기획 확정(초당 충전만)으로 제거됨.
         ctx.target.currentHp -= ctx.amount;
-        GainMana(ctx.target, Mathf.Min(ctx.amount * MANA_PER_DAMAGE_TAKEN, MANA_GAIN_CAP_PER_HIT));
 
         if (!ctx.target.IsAlive)
             foreach (var effect in ctx.source.effects)
                 effect.OnKill(ctx.source, ctx.target);
     }
 
-    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지 등 상시) × manaRegenBuffMultiplier(ManaRegen 스킬 시간제) 반영.</summary>
+    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지/치어리더 등 상시 배수) 반영.</summary>
     private static void GainMana(BattleUnit unit, float amount)
     {
         if (!unit.HasSkill) return;
-        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier * unit.manaRegenBuffMultiplier);
+        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier);
     }
 
     /// <summary>role 우선순위(낮을수록 먼저 타겟) → 동순위 내 최단거리로 타겟 선정(기둥C).</summary>
