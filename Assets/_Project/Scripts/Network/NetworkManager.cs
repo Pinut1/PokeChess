@@ -71,6 +71,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // 전적 기록(MatchRecorder) 등이 Photon 타입에 직접 의존하지 않도록 문자열로 노출.
     public string RoomName       => _soloMode ? "solo" : PhotonNetwork.CurrentRoom?.Name ?? "";
     public string LocalNickname  => _soloMode ? "SoloPlayer" : PhotonNetwork.NickName;
+
+    /// <summary>
+    /// 현재 판의 고유 ID(GUID). 협동에선 MasterClient가 방 잠금 시점에 Room 커스텀 속성으로
+    /// 배포해 두 클라이언트가 같은 값을 갖는다 — 전적 matchId의 "방이름+분단위 시각" 방식이
+    /// 분 경계에서 어긋날 수 있던 문제의 교체분(Phase 2). 솔로는 라운드 1 시작마다 재발급.
+    /// 아직 미배포/미입장이면 ""(호출부가 폴백 처리).
+    /// </summary>
+    public string MatchGuid
+    {
+        get
+        {
+            if (_soloMode) return _soloMatchGuid;
+            if (PhotonNetwork.InRoom &&
+                PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MATCH_GUID_ROOM_KEY, out object g))
+                return g as string ?? "";
+            return "";
+        }
+    }
+    private string _soloMatchGuid = "";
+    private const string MATCH_GUID_ROOM_KEY = "MatchGuid";
     public string PartnerNickname
     {
         get
@@ -245,7 +265,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>MasterClient가 다음 라운드 시작을 전체에 알림</summary>
     public void BroadcastRoundStart(int round)
     {
-        if (_soloMode) { GameEvents.RoundChanged(round); return; }
+        if (_soloMode)
+        {
+            // 솔로: 새 판(라운드 1)마다 matchId용 GUID 재발급
+            if (round == 1) _soloMatchGuid = System.Guid.NewGuid().ToString("N");
+            GameEvents.RoundChanged(round);
+            return;
+        }
 
         if (!IsMasterClient) return;
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
@@ -746,6 +772,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!IsMasterClient) return;
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
+
+        // 이번 판의 matchId(GUID)를 Room 속성으로 배포 — 두 클라이언트가 같은 값으로 전적을 묶는다.
+        // 씬 로드 전에 설정해 게임 시작 시점엔 양쪽 모두 동기화돼 있음.
+        PhotonNetwork.CurrentRoom.SetCustomProperties(
+            new Hashtable { { MATCH_GUID_ROOM_KEY, System.Guid.NewGuid().ToString("N") } });
+
         PhotonNetwork.LoadLevel("GameSceneTest");
         // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
         // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
@@ -907,6 +939,7 @@ public class NetworkManager : MonoBehaviour
     public string RoomName        => "offline";
     public string LocalNickname   => "OfflinePlayer";
     public string PartnerNickname => "";
+    public string MatchGuid       => ""; // 오프라인은 GUID 미발급 — MatchRecorder가 구형 방식으로 폴백
 
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;

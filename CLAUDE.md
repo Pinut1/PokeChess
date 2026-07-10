@@ -59,7 +59,7 @@ Assets/_Project/Scripts/
 
 **🟢 영욱 영역 (Core/전투/보드/네트워크)**
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
-- ✅ 전적 기록 시스템 — 구현 완료(`MatchRecorder`가 `OnGameCleared`/`OnSessionEnded(reason)` 구독 → `MatchHistoryStore` jsonl 저장 + `OnMatchRecorded` 발행). 남은 것: GameScene 매니저 오브젝트에 `MatchRecorder` 컴포넌트 부착(씬 배선), 전적 창 UI(태욱·해인 — `MatchHistoryStore.LoadRecent()` pull + `OnMatchRecorded` 구독), 닉네임 입력(현재 랜덤 `Player_xxxx` — 검색 키 불가), matchId를 Room 속성 GUID로 교체(Phase 2).
+- ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`). 남은 것: 전적창의 서버 조회 연동(Phase 3, 현재 로컬만 표시).
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
 - 악 외 미구현 전투 메커니즘 없음(CC/지원/타겟팅은 메커니즘 완료, 수치만 🔴)
 

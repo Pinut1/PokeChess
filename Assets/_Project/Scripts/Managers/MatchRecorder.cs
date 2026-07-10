@@ -120,11 +120,15 @@ public class MatchRecorder : MonoBehaviour
         var gm = GameManager.Instance;
         var net = gm != null ? gm.Network : null;
 
-        // 두 클라이언트가 같은 판을 같은 ID로 갖도록 방이름 + 시작시각(분 단위).
-        // 분 경계를 초 단위 차이로 넘으면 어긋날 수 있음 — Phase 2(서버 업로드) 때
-        // MasterClient가 GUID를 Room 커스텀 속성으로 배포하는 방식으로 교체 예정.
-        string roomName = net != null ? net.RoomName : "unknown";
-        string matchId  = $"{roomName}_{_startedUtc:yyyyMMddHHmm}";
+        // matchId: NetworkManager가 배포한 판 GUID(협동=Room 커스텀 속성, 솔로=라운드1 재발급)
+        // 우선 — 두 클라이언트가 항상 같은 값을 가진다. GUID가 없으면(오프라인 스텁 등)
+        // 구형 "방이름+분단위 시각"으로 폴백.
+        string matchId = net != null ? net.MatchGuid : "";
+        if (string.IsNullOrEmpty(matchId))
+        {
+            string roomName = net != null ? net.RoomName : "unknown";
+            matchId = $"{roomName}_{_startedUtc:yyyyMMddHHmm}";
+        }
 
         return new MatchRecord
         {
