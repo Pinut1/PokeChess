@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -13,6 +13,7 @@ public class NetworkConnectionTest : MonoBehaviourPunCallbacks
     private NetworkManager _network;
     private List<RoomInfo> _roomList = new();
     private Vector2 _roomListScroll;
+    private string _nicknameInput = "";
 
     private void Awake()
     {
@@ -45,24 +46,52 @@ public class NetworkConnectionTest : MonoBehaviourPunCallbacks
         GUILayout.Label($"AutoSync  : {PhotonNetwork.AutomaticallySyncScene}");
         GUILayout.Label($"Scene     : {SceneManager.GetActiveScene().name}");
 
+        GUILayout.Label($"Nickname  : {_network.LocalNickname}");
+        GUILayout.Label($"Partner   : {_network.PartnerNickname}");
+
         GUILayout.Space(10);
 
         if (!_network.IsInRoom)
         {
-            if (GUILayout.Button("JoinOrCreate Room (TestRoom)")) _network.JoinOrCreateRoom("TestRoom");
-            if (GUILayout.Button("Find Random Room"))             _network.JoinRandomRoom();
+            GUILayout.Label("Nickname");
+            _nicknameInput = GUILayout.TextField(_nicknameInput, 16);
+
+            if (GUILayout.Button("JoinOrCreate Room (TestRoom)"))
+            {
+                if (_network.TrySetLocalNickname(_nicknameInput))
+                    _network.JoinOrCreateRoom("TestRoom");
+            }
+
+            if (GUILayout.Button("Find Random Room"))
+            {
+                if (_network.TrySetLocalNickname(_nicknameInput))
+                    _network.JoinRandomRoom();
+            }
 
             GUILayout.Space(10);
             GUILayout.Label($"Room List ({_roomList.Count})");
-            _roomListScroll = GUILayout.BeginScrollView(_roomListScroll, GUILayout.Height(150));
+
+            _roomListScroll = GUILayout.BeginScrollView(
+                _roomListScroll,
+                GUILayout.Height(150)
+            );
+
             foreach (var room in _roomList)
-                GUILayout.Label($"- {room.Name}  ({room.PlayerCount}/{room.MaxPlayers})  Open:{room.IsOpen}");
+            {
+                GUILayout.Label(
+                    $"- {room.Name}  ({room.PlayerCount}/{room.MaxPlayers})  Open:{room.IsOpen}"
+                );
+            }
+
             GUILayout.EndScrollView();
         }
         else
         {
-            if (GUILayout.Button("Broadcast Round 1")) _network.BroadcastRoundStart(1);
-            if (GUILayout.Button("Leave Room"))        _network.LeaveRoom();
+            if (GUILayout.Button("Broadcast Round 1"))
+                _network.BroadcastRoundStart(1);
+
+            if (GUILayout.Button("Leave Room"))
+                _network.LeaveRoom();
         }
 
         GUILayout.EndArea();
