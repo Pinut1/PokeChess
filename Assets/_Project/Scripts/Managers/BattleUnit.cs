@@ -52,7 +52,8 @@ public class BattleUnit
     public float stunRemaining;           // 0보다 크면 행동 불능.
     public float slowMultiplier = 1f;     // 1=정상, 0.5=공속 50% 감소.
     public float slowRemaining;           // 슬로우 잔여 시간. 0 도달 시 slowMultiplier 1로 복원.
-    public BattleUnit tauntedBy;          // null 아니면 이 유닛을 강제 타겟(도발자 생존 중에만 유효).
+    public BattleUnit tauntedBy;          // null 아니면 이 유닛을 강제 타겟(시간 만료 또는 도발자 사망 시 해제).
+    public float tauntRemaining;          // 도발 잔여 시간. 0 도달 시 tauntedBy 해제.
     public bool HasCcImmuneItem;          // ccImmune 아이템 보유 여부.
     public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
     public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
@@ -64,6 +65,11 @@ public class BattleUnit
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
 
+    // ── 지원 스킬 버프(ManaRegen) — 시간제 충전속도 배수. manaGainMultiplier(정령 시너지 등
+    // 전투 내내 유지되는 가산 배수)와 별도 필드인 이유: 같은 필드를 쓰면 만료 복원 때 시너지 버프까지 지워짐.
+    public float manaRegenBuffMultiplier = 1f; // 1=정상, 1.5=충전속도 50% 증가.
+    public float manaRegenBuffRemaining;       // 버프 잔여 시간. 0 도달 시 1로 복원.
+
     public bool IsAlive => currentHp > 0f;
 
     // ─────────────────────────────────────────
@@ -71,7 +77,7 @@ public class BattleUnit
     // BattleManager(타겟 선정)가 대상을 고른 뒤 이 메서드들로 위임한다.
     // ─────────────────────────────────────────
 
-    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 도발자 사망 시 해제.</summary>
+    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff/ManaRegen버프 잔여시간 차감 및 만료 복원, taunt 시간 만료·도발자 사망 시 해제.</summary>
     public void TickCcState(float deltaTime)
     {
         if (stunRemaining > 0f)
@@ -89,8 +95,21 @@ public class BattleUnit
             if (asBuffRemaining <= 0f) asBuffMultiplier = 1f;
         }
 
-        if (tauntedBy != null && !tauntedBy.IsAlive)
-            tauntedBy = null;
+        if (manaRegenBuffRemaining > 0f)
+        {
+            manaRegenBuffRemaining = Mathf.Max(0f, manaRegenBuffRemaining - deltaTime);
+            if (manaRegenBuffRemaining <= 0f) manaRegenBuffMultiplier = 1f;
+        }
+
+        if (tauntedBy != null)
+        {
+            tauntRemaining = Mathf.Max(0f, tauntRemaining - deltaTime);
+            if (tauntRemaining <= 0f || !tauntedBy.IsAlive)
+            {
+                tauntedBy = null;
+                tauntRemaining = 0f;
+            }
+        }
     }
 
     /// <summary>ccImmune 면역을 1회 소모(보유 시 무효화하고 true 반환).</summary>
@@ -114,11 +133,12 @@ public class BattleUnit
         slowRemaining = Mathf.Max(slowRemaining, duration);
     }
 
-    /// <summary>도발자 생존 동안 강제 타겟(시간제가 아님 — 기획에서 시간제 도발을 원하면 tauntRemaining 필드 추가로 전환).</summary>
-    public void ApplyTaunt(BattleUnit caster)
+    /// <summary>duration 동안 강제 타겟(스킬 가이드 §3-2 시간제). 도발자가 먼저 죽으면 조기 해제.</summary>
+    public void ApplyTaunt(BattleUnit caster, float duration)
     {
         if (TryConsumeCcImmunity()) return;
         tauntedBy = caster;
+        tauntRemaining = Mathf.Max(tauntRemaining, duration);
     }
 
     public void ApplyHeal(float amount)
@@ -131,5 +151,11 @@ public class BattleUnit
     {
         asBuffMultiplier = Mathf.Max(asBuffMultiplier, multiplier);
         asBuffRemaining  = Mathf.Max(asBuffRemaining, duration);
+    }
+
+    public void ApplyManaRegenBuff(float multiplier, float duration)
+    {
+        manaRegenBuffMultiplier = Mathf.Max(manaRegenBuffMultiplier, multiplier);
+        manaRegenBuffRemaining  = Mathf.Max(manaRegenBuffRemaining, duration);
     }
 }

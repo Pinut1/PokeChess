@@ -25,9 +25,12 @@ public class BattleManager : MonoBehaviour
     private const float STUN_DURATION = 1.5f;
     private const float SLOW_DURATION = 3f;
     private const float SLOW_MULTIPLIER = 0.5f;
+    private const float TAUNT_DURATION = 3f;
 
     // 지원 스킬(HpRegen/Shield/ManaRegen/AsBuff) — PLACEHOLDER(기획확정 전): 위력/지속시간.
-    private const float MANA_REGEN_SKILL_AMOUNT = 30f;
+    // ManaRegen은 스킬 가이드 §3-2 기준 즉시 지급이 아니라 시간제 충전속도 버프.
+    private const float MANA_REGEN_BUFF_MULTIPLIER = 1.5f;
+    private const float MANA_REGEN_BUFF_DURATION = 3f;
     private const float AS_BUFF_MULTIPLIER = 1.5f;
     private const float AS_BUFF_DURATION = 3f;
 
@@ -802,7 +805,7 @@ public class BattleManager : MonoBehaviour
                     t.ApplySlow(SLOW_MULTIPLIER, SLOW_DURATION);
                     break;
                 case SkillEffectType.Taunt:
-                    t.ApplyTaunt(caster);
+                    t.ApplyTaunt(caster, TAUNT_DURATION);
                     break;
                 case SkillEffectType.HpRegen:
                     t.ApplyHeal(caster.spellPower);
@@ -811,7 +814,7 @@ public class BattleManager : MonoBehaviour
                     t.ApplyShield(caster.spellPower);
                     break;
                 case SkillEffectType.ManaRegen:
-                    GainMana(t, MANA_REGEN_SKILL_AMOUNT);
+                    t.ApplyManaRegenBuff(MANA_REGEN_BUFF_MULTIPLIER, MANA_REGEN_BUFF_DURATION);
                     break;
                 case SkillEffectType.AsBuff:
                     t.ApplyAsBuff(AS_BUFF_MULTIPLIER, AS_BUFF_DURATION);
@@ -946,11 +949,11 @@ public class BattleManager : MonoBehaviour
                 effect.OnKill(ctx.source, ctx.target);
     }
 
-    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지 등) 반영.</summary>
+    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지 등 상시) × manaRegenBuffMultiplier(ManaRegen 스킬 시간제) 반영.</summary>
     private static void GainMana(BattleUnit unit, float amount)
     {
         if (!unit.HasSkill) return;
-        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier);
+        unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier * unit.manaRegenBuffMultiplier);
     }
 
     /// <summary>role 우선순위(낮을수록 먼저 타겟) → 동순위 내 최단거리로 타겟 선정(기둥C).</summary>
