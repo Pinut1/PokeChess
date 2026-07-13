@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// 프로토타입 HUD (IMGUI). 내 골드 / 파트너 골드 / 팀 라이프 / 라운드·페이즈 / 상점(구매·리롤)을 한 곳에 표시.
-/// 정식 uGUI HUD는 UIManager(황해인) 담당 — 이 컴포넌트는 그 전까지 프로토 플레이/검증용 통합 HUD다.
+/// 진행 정보와 XP 구매 UI는 UIManager가 담당하며,
+/// 이 컴포넌트는 남은 프로토타입 기능의 플레이 검증용 HUD다.
 /// 값은 GameManager.Instance.X에서 pull, 파트너 골드만 이벤트(OnPartnerGoldChanged)로 캐시.
 /// (씬에 흩어진 디버그 OnGUI(ShopDebugTest 상점, RoundPhaseManager Ready)는 이걸 쓰면 꺼도 됨.)
 /// </summary>
@@ -46,10 +47,10 @@ public class PrototypeHud : MonoBehaviour
         GUI.Label(new Rect(0, Screen.height / 2f - 60f, Screen.width, 120f), "STAGE CLEAR!", style);
     }
 
-    // ── 상단 좌측: 라운드·페이즈 / 팀 라이프 / 골드 / 레벨·XP / 파트너 골드 / 아이템 정보 ──
+    // ── 상단 좌측: 라운드·페이즈 / 팀 라이프 / 골드 / 파트너 골드 / 아이템 정보 ──
     private void DrawStatusPanel(GameManager gm)
     {
-        // 레벨 / XP + 디버그 토글이 추가되어 높이를 230 → 268로 확장
+        // 진행 정보 중 XP·레벨·유닛 캡은 UIManager가 담당한다.
         GUILayout.BeginArea(new Rect(10, 10, 280, 268), GUI.skin.box);
 
         if (gm.Phase != null)
@@ -66,12 +67,6 @@ public class PrototypeHud : MonoBehaviour
         if (gm.Shop != null)
         {
             GUILayout.Label($"내 골드: {gm.Shop.Gold} G");
-
-            // 레벨 / XP 시스템 검증용 표시
-            GUILayout.Space(4);
-            GUILayout.Label($"레벨: {gm.Shop.CurrentLevel}");
-            GUILayout.Label($"XP: {gm.Shop.CurrentXp} / {gm.Shop.RequiredXp}");
-            GUILayout.Label($"배치 가능 기물 수: {gm.Shop.UnitCap}");
         }
 
         GUILayout.Space(4);
@@ -87,7 +82,7 @@ public class PrototypeHud : MonoBehaviour
         GUILayout.EndArea();
     }
 
-    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 리롤 + XP 구매 + 판매 ──
+    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 리롤 + 판매 ──
     private void DrawShopBar(GameManager gm)
     {
         var shop = gm.Shop;
@@ -123,17 +118,8 @@ public class PrototypeHud : MonoBehaviour
         if (GUI.Button(new Rect(startX, by, w, 30), rerollLabel))
             shop.Reroll();
 
-        // XP 구매 버튼
-        // 버튼이 직접 레벨업하는 것이 아니라, 골드를 사용해 XP를 구매하고 필요 XP 도달 시 자동 레벨업된다.
-        bool canBuyXp = shop.RequiredXp > 0 && shop.Gold >= shop.BuyXpCostGold;
-
-        GUI.enabled = canBuyXp;
-        if (GUI.Button(new Rect(startX + (w + gap), by, w, 30), $"XP 구매 ({shop.BuyXpCostGold}G)"))
-            shop.BuyXp();
-        GUI.enabled = true;
-
         // 첫 벤치 유닛 판매
-        if (GUI.Button(new Rect(startX + (w + gap) * 2, by, w, 30), "첫 벤치 판매"))
+        if (GUI.Button(new Rect(startX + (w + gap), by, w, 30), "첫 벤치 판매"))
         {
             var bench = gm.Board.GetBenchSnapshot();
 
@@ -146,13 +132,6 @@ public class PrototypeHud : MonoBehaviour
                 }
             }
         }
-
-        // XP 구매 버튼 보조 표시
-        GUI.Label(
-            new Rect(startX + (w + gap), by + 32f, w + 80f, 24f),
-            $"Lv.{shop.CurrentLevel}  XP {shop.CurrentXp}/{shop.RequiredXp}  +{shop.BuyXpAmount}XP"
-        );
-
         // 준비 완료는 우측 하단(DrawReady)으로 분리.
     }
 

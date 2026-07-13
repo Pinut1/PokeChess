@@ -3,24 +3,32 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// UI 업데이트 담당. 김태욱 파트.
+/// 게임 UI 표시와 입력 연결을 담당한다. 김태욱 파트.
 ///
 /// 현재 구현 범위:
-/// - 롤체식 전적창 MVP
-/// - 왼쪽: 최근 전적 리스트
-/// - 오른쪽: 선택한 전적 상세
-/// - MatchHistoryStore.LoadRecent()를 이용한 과거 전적 조회
-/// - GameEvents.OnMatchRecorded 구독을 통한 새 전적 실시간 반영
+/// 1. 플레이어 진행 HUD
+///    - 골드, 레벨, XP, 배치 가능 기물 수 표시
+///    - GameEvents 변경 이벤트를 구독해 표시값 캐시
+///    - XP 구매 입력을 ShopManager.BuyXp()에 연결
+/// 2. 전적창 MVP
+///    - MatchHistoryStore.LoadRecent()를 이용한 과거 전적 조회
+///    - GameEvents.OnMatchRecorded 구독을 통한 신규 전적 실시간 반영
+///    - 최근 전적 목록과 선택 전적 상세 표시
 ///
-/// 주의:
-/// - 새 스크립트 추가 없이 기존 UIManager 스텁에 구현.
-/// - 현재는 OnGUI 기반 MVP.
-/// - 추후 정식 Canvas UI가 만들어지면 표시 부분만 TMP/Image/Button 구조로 교체하면 됨.
+/// 구조 원칙:
+/// - 진행 상태는 OnGUI에서 ShopManager를 매번 조회하지 않는다.
+/// - 상태 변경 시 GameEvents를 통해 전달받아 로컬 캐시에 저장하고, OnGUI는 캐시만 그린다.
+/// - Start의 SyncProgressState()는 이벤트 구독 이전에 발생한 초기값을 보완하기 위한 1회 동기화다.
+/// - 현재 표시는 OnGUI 기반 MVP이며, 추후 Canvas/TMP UI로 교체해도 이벤트 구독 구조는 그대로 재사용한다.
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     [Header("Match History")]
     [SerializeField] private int _recentMatchCount = 10;
+
+    // ──────────────────────────────────────────
+    // 전적 데이터 및 전적창 상태
+    // ──────────────────────────────────────────
 
     private readonly List<MatchRecord> _recentMatches = new List<MatchRecord>();
 
@@ -30,6 +38,26 @@ public class UIManager : MonoBehaviour
     private Vector2 _detailScroll;
 
     private Rect _matchHistoryWindowRect = new Rect(260f, 80f, 980f, 650f);
+
+    // ──────────────────────────────────────────
+    // 플레이어 진행 상태 캐시
+    // ──────────────────────────────────────────
+    // 아래 값은 GameEvents를 통해 갱신한다.
+    // OnGUI에서 ShopManager.CurrentXp 등을 직접 조회하지 않아 매 프레임 폴링을 피한다.
+    // XP 구매 비용/획득량은 런타임 중 변하지 않는 설정값이므로 시작 시 한 번만 가져온다.
+
+    private int _gold;
+    private int _currentLevel = 1;
+    private int _currentXp;
+    private int _requiredXp;
+    private int _unitCap = 1;
+
+    private int _buyXpCostGold;
+    private int _buyXpAmount;
+
+    // ──────────────────────────────────────────
+    // OnGUI 스타일 캐시
+    // ──────────────────────────────────────────
 
     private GUIStyle _titleStyle;
     private GUIStyle _sectionTitleStyle;
@@ -43,19 +71,85 @@ public class UIManager : MonoBehaviour
     private GUIStyle _selectedListCardStyle;
     private GUIStyle _normalListCardStyle;
 
+    // ──────────────────────────────────────────
+    // Unity 생명주기 / 이벤트 구독
+    // ──────────────────────────────────────────
     private void OnEnable()
     {
         GameEvents.OnMatchRecorded += HandleMatchRecorded;
+
+        GameEvents.OnGoldChanged += HandleGoldChanged;
+        GameEvents.OnLevelChanged += HandleLevelChanged;
+        GameEvents.OnXpChanged += HandleXpChanged;
+        GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
     }
 
     private void OnDisable()
     {
         GameEvents.OnMatchRecorded -= HandleMatchRecorded;
+
+        GameEvents.OnGoldChanged -= HandleGoldChanged;
+        GameEvents.OnLevelChanged -= HandleLevelChanged;
+        GameEvents.OnXpChanged -= HandleXpChanged;
+        GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
     }
 
     private void Start()
     {
         RefreshMatchHistory();
+        SyncProgressState();
+    }
+
+
+    /// <summary>
+    /// UI가 이벤트 구독을 시작하기 전에 ShopManager가 초기 이벤트를 발행했을 가능성에 대비해
+    /// 현재 진행 상태를 한 번만 직접 가져온다.
+    ///
+    /// 이 메서드는 Start에서 1회 실행되며, OnGUI에서 반복 호출하는 폴링이 아니다.
+    /// 이후 골드/레벨/XP/유닛 캡 변화는 각 GameEvents 핸들러가 캐시를 갱신한다.
+    /// </summary>
+    private void SyncProgressState()
+    {
+        var gm = GameManager.Instance;
+        if (gm == null || gm.Shop == null)
+            return;
+
+        var shop = gm.Shop;
+
+        _gold = shop.Gold;
+        _currentLevel = shop.CurrentLevel;
+        _currentXp = shop.CurrentXp;
+        _requiredXp = shop.RequiredXp;
+        _unitCap = shop.UnitCap;
+
+        // 구매 비용과 획득량은 현재 별도 변경 이벤트가 없는 고정 설정값이므로 초기화 시 캐시한다.
+        _buyXpCostGold = shop.BuyXpCostGold;
+        _buyXpAmount = shop.BuyXpAmount;
+    }
+
+    /// <summary>골드 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
+    private void HandleGoldChanged(int gold)
+    {
+        _gold = gold;
+    }
+
+    /// <summary>레벨 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
+    private void HandleLevelChanged(int level)
+    {
+        _currentLevel = level;
+    }
+
+    /// <summary>XP 변경 이벤트를 받아 현재 XP와 다음 레벨 필요 XP를 함께 갱신한다.</summary>
+    private void HandleXpChanged(int currentXp, int requiredXp)
+    {
+        _currentXp = currentXp;
+        _requiredXp = requiredXp;
+    }
+
+    /// <summary>레벨에 따른 보드 배치 가능 기물 수 변경을 HUD 캐시에 반영한다.</summary>
+    private void HandleUnitCapChanged(int unitCap)
+    {
+        _unitCap = unitCap;
     }
 
     private void OnGUI()
@@ -63,11 +157,96 @@ public class UIManager : MonoBehaviour
         EnsureStyles();
 
         DrawOpenButton();
+        DrawProgressPanel();
 
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
     }
 
+
+    // ──────────────────────────────────────────
+    // 플레이어 진행 HUD
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 이벤트로 갱신된 진행 상태 캐시를 화면에 표시한다.
+    /// 이 메서드는 표시 과정에서 ShopManager의 현재 상태를 직접 조회하지 않는다.
+    /// 단, 사용자가 XP 구매 버튼을 눌렀을 때만 ShopManager.BuyXp()를 호출한다.
+    /// </summary>
+    private void DrawProgressPanel()
+    {
+        const float width = 250f;
+        const float height = 145f;
+
+        // PrototypeHud의 유닛 상점 배치값과 동일하게 계산한다.
+        const int shopSlotCount = 5;
+        const float shopSlotWidth = 110f;
+        const float shopSlotGap = 6f;
+
+        float shopTotalWidth = shopSlotCount * (shopSlotWidth + shopSlotGap);
+        float shopStartX = (Screen.width - shopTotalWidth) / 2f;
+
+        // 유닛 상점 왼쪽에 패널 배치.
+        // 작은 해상도에서는 화면 밖으로 나가지 않도록 최소 10px을 보장한다.
+        float x = Mathf.Max(10f, shopStartX - width - 20f);
+        float y = Screen.height - 190f;
+
+        GUI.Box(new Rect(x, y, width, height), "플레이어 정보");
+
+        GUI.Label(
+            new Rect(x + 15f, y + 28f, 220f, 22f),
+            $"골드: {_gold} G"
+        );
+
+        GUI.Label(
+            new Rect(x + 15f, y + 50f, 220f, 22f),
+            $"레벨: {_currentLevel} · 배치 가능: {_unitCap}"
+        );
+
+        string xpText = _requiredXp > 0
+            ? $"XP: {_currentXp} / {_requiredXp}"
+            : "XP: MAX";
+
+        GUI.Label(
+            new Rect(x + 15f, y + 72f, 220f, 22f),
+            xpText
+        );
+
+        bool hasPurchaseConfig = _buyXpCostGold > 0 && _buyXpAmount > 0;
+
+        bool canBuyXp =
+            hasPurchaseConfig &&
+            _requiredXp > 0 &&
+            _gold >= _buyXpCostGold;
+
+        GUI.enabled = canBuyXp;
+
+        string buttonLabel = hasPurchaseConfig
+            ? $"XP 구매 ({_buyXpCostGold}G → +{_buyXpAmount}XP)"
+            : "XP 구매 준비 중";
+
+        if (GUI.Button(
+            new Rect(x + 15f, y + 100f, 220f, 32f),
+            buttonLabel
+        ))
+        {
+            var gm = GameManager.Instance;
+
+            if (gm != null && gm.Shop != null)
+                gm.Shop.BuyXp();
+        }
+
+        GUI.enabled = true;
+    }
+
+    // ──────────────────────────────────────────
+    // 전적창 UI
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 화면 상단 중앙에 전적창 열기/닫기 버튼을 표시한다.
+    /// 전적창을 열 때는 로컬 저장소의 최신 전적을 다시 불러온다.
+    /// </summary>
     private void DrawOpenButton()
     {
         const float width = 160f;
@@ -87,6 +266,10 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 이동 가능한 전적창 윈도우를 생성한다.
+    /// 창이 화면 밖으로 완전히 벗어나지 않도록 현재 위치를 보정한다.
+    /// </summary>
     private void DrawMatchHistoryWindow()
     {
         _matchHistoryWindowRect.x = Mathf.Clamp(_matchHistoryWindowRect.x, 0f, Screen.width - 160f);
@@ -100,6 +283,11 @@ public class UIManager : MonoBehaviour
         );
     }
 
+    /// <summary>
+    /// 전적창 내부 전체 구성을 그린다.
+    /// 상단 요약, 왼쪽 전적 목록, 오른쪽 선택 전적 상세 영역으로 구성된다.
+    /// 저장된 전적이 없으면 빈 상태 안내만 표시한다.
+    /// </summary>
     private void DrawMatchHistoryWindowContent(int windowId)
     {
         float width = _matchHistoryWindowRect.width;
@@ -116,12 +304,18 @@ public class UIManager : MonoBehaviour
 
         _selectedMatchIndex = Mathf.Clamp(_selectedMatchIndex, 0, _recentMatches.Count - 1);
 
+        // 왼쪽: 최근 전적 목록
         DrawMatchList(new Rect(24f, 120f, 300f, height - 145f));
+        // 오른쪽: 현재 선택한 전적의 상세 정보
         DrawMatchDetail(new Rect(340f, 120f, width - 365f, height - 145f), _recentMatches[_selectedMatchIndex]);
 
         GUI.DragWindow(new Rect(0f, 0f, width, 28f));
     }
 
+    /// <summary>
+    /// 전적창 헤더를 표시한다.
+    /// 최근 전적 수와 해당 목록 기준 승률을 계산해 함께 보여준다.
+    /// </summary>
     private void DrawHeader(float width)
     {
         GUI.Label(new Rect(24f, 32f, 220f, 36f), "전적", _titleStyle);
@@ -144,6 +338,10 @@ public class UIManager : MonoBehaviour
             RefreshMatchHistory();
     }
 
+    /// <summary>
+    /// 최근 전적 목록을 스크롤 영역으로 표시한다.
+    /// 각 전적은 선택 가능한 카드 형태로 그려진다.
+    /// </summary>
     private void DrawMatchList(Rect rect)
     {
         GUI.Box(rect, "");
@@ -164,6 +362,11 @@ public class UIManager : MonoBehaviour
         GUI.EndScrollView();
     }
 
+    /// <summary>
+    /// 전적 목록의 카드 한 장을 표시한다.
+    /// 승패, 최종 스테이지, 라운드, 플레이 모드, 플레이 시간과 경과 시간을 요약한다.
+    /// 카드를 누르면 해당 전적이 상세 영역의 선택 대상으로 지정된다.
+    /// </summary>
     private void DrawMatchListCard(MatchRecord record, int index, Rect rect)
     {
         if (record == null)
@@ -216,6 +419,11 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 현재 선택한 전적의 상세 정보를 표시한다.
+    /// 경기 결과와 본인·파트너 기록을 출력하고,
+    /// 하단에는 개발 확인용 매치 메타 정보를 표시한다.
+    /// </summary>
     private void DrawMatchDetail(Rect rect, MatchRecord record)
     {
         GUI.Box(rect, "");
@@ -288,6 +496,11 @@ public class UIManager : MonoBehaviour
         GUI.EndScrollView();
     }
 
+    /// <summary>
+    /// 본인 또는 파트너 한 명의 전적 정보를 표시한다.
+    /// 닉네임, 레벨, 보드 유닛, 활성 시너지와 증강 정보를 순서대로 그린다.
+    /// 반환값은 다음 UI 요소를 배치할 Y 좌표다.
+    /// </summary>
     private float DrawPlayerSection(PlayerRecord player, string roleLabel, float y)
     {
         if (player == null)
@@ -322,6 +535,10 @@ public class UIManager : MonoBehaviour
         return y + 8f;
     }
 
+    /// <summary>
+    /// 전적에 저장된 보드 유닛들을 카드 형태로 배치한다.
+    /// 한 줄에 최대 6개를 표시하며, 반환값은 다음 요소를 배치할 Y 좌표다.
+    /// </summary>
     private float DrawUnitCards(UnitRecord[] units, float y)
     {
         if (units == null || units.Length == 0)
@@ -351,6 +568,9 @@ public class UIManager : MonoBehaviour
         return y + rowCount * (cardHeight + gap);
     }
 
+    /// <summary>
+    /// 전적 유닛 한 마리의 이름, 성급과 장착 아이템 슬롯을 표시한다.
+    /// </summary>
     private void DrawUnitCard(UnitRecord unit, Rect rect)
     {
         if (unit == null)
@@ -367,6 +587,10 @@ public class UIManager : MonoBehaviour
         DrawItemSlots(unit, new Rect(rect.x + 6f, rect.y + 48f, rect.width - 12f, 14f));
     }
 
+    /// <summary>
+    /// 유닛의 일반 아이템 슬롯 3개와 진화의 돌 정보를 표시한다.
+    /// 현재 OnGUI MVP에서는 아이템 이름을 간단한 텍스트로 함께 보여준다.
+    /// </summary>
     private void DrawItemSlots(UnitRecord unit, Rect rect)
     {
         const int slotCount = 3;
@@ -395,6 +619,11 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 시너지나 증강 문자열 배열을 여러 개의 배지 형태로 줄바꿈해 표시한다.
+    /// 값이 없으면 전달받은 빈 상태 문구를 대신 표시한다.
+    /// 반환값은 다음 요소를 배치할 Y 좌표다.
+    /// </summary>
     private float DrawTextBadges(string[] values, string emptyText, float y)
     {
         if (values == null || values.Length == 0)
@@ -425,6 +654,14 @@ public class UIManager : MonoBehaviour
         return y + lineHeight;
     }
 
+    // ──────────────────────────────────────────
+    // 전적 데이터 갱신 / 실시간 반영
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 로컬 전적 저장소에서 최근 전적을 다시 불러온다.
+    /// 기존 목록을 교체하고 현재 선택 인덱스가 유효한 범위에 있도록 보정한다.
+    /// </summary>
     private void RefreshMatchHistory()
     {
         _recentMatches.Clear();
@@ -441,6 +678,10 @@ public class UIManager : MonoBehaviour
             _selectedMatchIndex = Mathf.Clamp(_selectedMatchIndex, 0, _recentMatches.Count - 1);
     }
 
+    /// <summary>
+    /// 새 전적 기록 이벤트를 받아 목록 가장 앞에 즉시 추가한다.
+    /// 설정된 최대 표시 개수를 초과한 오래된 전적은 목록 끝에서 제거한다.
+    /// </summary>
     private void HandleMatchRecorded(MatchRecord record)
     {
         if (record == null)
@@ -454,6 +695,14 @@ public class UIManager : MonoBehaviour
         _selectedMatchIndex = 0;
     }
 
+    // ──────────────────────────────────────────
+    // OnGUI 스타일 생성
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 전적창에서 사용하는 OnGUI 스타일을 최초 1회 생성해 캐시한다.
+    /// OnGUI가 반복 호출될 때마다 GUIStyle 객체를 다시 만들지 않도록 한다.
+    /// </summary>
     private void EnsureStyles()
     {
         if (_titleStyle != null)
@@ -530,6 +779,10 @@ public class UIManager : MonoBehaviour
         };
     }
 
+    // ──────────────────────────────────────────
+    // 전적 표시용 계산 / 포맷 유틸리티
+    // ──────────────────────────────────────────
+
     private int CountWins()
     {
         int count = 0;
@@ -550,6 +803,10 @@ public class UIManager : MonoBehaviour
                record.result.Equals("Victory", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// 파트너 데이터에 닉네임, 보드, 시너지 또는 증강 중 하나라도 있으면
+    /// 팀플레이 전적으로 판단한다.
+    /// </summary>
     private static bool HasPartner(MatchRecord record)
     {
         if (record == null || record.partner == null)
@@ -644,6 +901,9 @@ public class UIManager : MonoBehaviour
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
     }
 
+    /// <summary>
+    /// 본인과 파트너의 보드 유닛 수를 기준으로 상세 스크롤 콘텐츠 높이를 계산한다.
+    /// </summary>
     private static float GetDetailContentHeight(MatchRecord record)
     {
         float height = 360f;
@@ -663,6 +923,10 @@ public class UIManager : MonoBehaviour
         return Mathf.Max(520f, height);
     }
 
+    /// <summary>
+    /// 저장된 종료 사유 문자열에 연결 종료 관련 키워드가 포함됐는지 확인한다.
+    /// 과거 기록의 서로 다른 종료 사유 표현을 호환하기 위해 여러 키워드를 검사한다.
+    /// </summary>
     private static bool IsDisconnectedMatch(MatchRecord record)
     {
         if (record == null || string.IsNullOrWhiteSpace(record.endReason))
