@@ -9680,7 +9680,7 @@ GameObject:
   - component: {fileID: 1574516568193800042}
   - component: {fileID: 1574516568193800053}
   m_Layer: 0
-  m_Name: VFX_Grass_Assassin_Spell_Hit
+  m_Name: VFX_Grass_ASSASSIN_SPELL_Hit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

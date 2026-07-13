@@ -14550,7 +14550,7 @@ GameObject:
   - component: {fileID: 5724093481334579545}
   - component: {fileID: 5724093481334579526}
   m_Layer: 0
-  m_Name: VFX_Dark_Assassin_Spell_Hit
+  m_Name: VFX_Dark_ASSASSIN_SPELL_Hit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -19566,7 +19566,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 0.6084906, g: 0.9561947, b: 1, a: 1}
-      maxColor: {r: 0.6802385, g: 0.24056602, b: 1, a: 0.8666667}
+      maxColor: {r: 0.14756097, g: 0.0012014981, b: 0.254717, a: 0.8666667}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 0.58369845, b: 0.25, a: 1}
@@ -25547,7 +25547,7 @@ ParticleSystem:
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
-        key1: {r: 0, g: 0.20210934, b: 1, a: 0}
+        key1: {r: 0.18039216, g: 0.050980393, b: 0.27450982, a: 0}
         key2: {r: 0, g: 0.553, b: 1, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -25571,7 +25571,7 @@ ParticleSystem:
         atime6: 0
         atime7: 0
         m_Mode: 0
-        m_ColorSpace: -1
+        m_ColorSpace: 0
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       minGradient:
@@ -35259,8 +35259,8 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0.6007476, g: 0.93372756, b: 0.9433962, a: 0}
-        key1: {r: 0.21226418, g: 0.29232794, b: 1, a: 1}
+        key0: {r: 0.18039216, g: 0.050980393, b: 0.4627451, a: 0}
+        key1: {r: 0.33333334, g: 0.050980393, b: 0.53333336, a: 1}
         key2: {r: 1, g: 0.74614906, b: 0.05098039, a: 1}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -35284,7 +35284,7 @@ ParticleSystem:
         atime6: 0
         atime7: 0
         m_Mode: 0
-        m_ColorSpace: -1
+        m_ColorSpace: 0
         m_NumColorKeys: 2
         m_NumAlphaKeys: 4
       minGradient:

@@ -14650,7 +14650,7 @@ GameObject:
   - component: {fileID: 3244775856695447565}
   - component: {fileID: 3244775856695447566}
   m_Layer: 0
-  m_Name: VFX_Bug_Assassin_Spell
+  m_Name: VFX_Bug_ASSASSIN_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

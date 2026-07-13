@@ -67879,7 +67879,7 @@ GameObject:
   - component: {fileID: 5817418629556497172}
   - component: {fileID: 5817418629556497171}
   m_Layer: 0
-  m_Name: VFX_Bug_Magician_Spell
+  m_Name: VFX_Bug_MAGICIAN_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

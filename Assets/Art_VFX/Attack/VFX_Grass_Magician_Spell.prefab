@@ -223,7 +223,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 0.9496783, g: 0.9811321, b: 0.5322179, a: 1}
-      maxColor: {r: 0.5516495, g: 1, b: 0.43867922, a: 1}
+      maxColor: {r: 0.62352943, g: 1, b: 0.2971698, a: 1}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -9971,7 +9971,7 @@ ParticleSystem:
     startColor:
       serializedVersion: 2
       minMaxState: 2
-      minColor: {r: 0.6722143, g: 1, b: 0.5896226, a: 0.14901961}
+      minColor: {r: 0.9722915, g: 1, b: 0.3176471, a: 0.14901961}
       maxColor: {r: 1, g: 1, b: 1, a: 0.0627451}
       maxGradient:
         serializedVersion: 2
@@ -35425,16 +35425,16 @@ ParticleSystem:
       maxGradient:
         serializedVersion: 2
         key0: {r: 0.5176471, g: 0.99215686, b: 0.8197406, a: 1}
-        key1: {r: 0.18431371, g: 0.4916667, b: 1, a: 1}
-        key2: {r: 1, g: 0.3726415, b: 0.85317767, a: 0.26193827}
+        key1: {r: 0.7843984, g: 1, b: 0.7311321, a: 1}
+        key2: {r: 0.9529412, g: 0.5254902, b: 1, a: 0.26193827}
         key3: {r: 0.5515411, g: 0.3921569, b: 0.98039216, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
         key5: {r: 0, g: 0, b: 0, a: 0}
         key6: {r: 0, g: 0, b: 0, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 8288
-        ctime1: 24287
-        ctime2: 42212
+        ctime1: 24479
+        ctime2: 24287
         ctime3: 50115
         ctime4: 0
         ctime5: 0
@@ -35449,7 +35449,7 @@ ParticleSystem:
         atime6: 0
         atime7: 0
         m_Mode: 0
-        m_ColorSpace: -1
+        m_ColorSpace: 0
         m_NumColorKeys: 2
         m_NumAlphaKeys: 4
       minGradient:
@@ -39186,7 +39186,7 @@ ParticleSystem:
     startColor:
       serializedVersion: 2
       minMaxState: 2
-      minColor: {r: 1, g: 0.2437108, b: 0.1273585, a: 0.14901961}
+      minColor: {r: 0.7019608, g: 0.7372549, b: 0.11372549, a: 0.14901961}
       maxColor: {r: 1, g: 1, b: 1, a: 0.0627451}
       maxGradient:
         serializedVersion: 2
@@ -43927,7 +43927,7 @@ GameObject:
   - component: {fileID: 5637757207944978301}
   - component: {fileID: 5637757207944978290}
   m_Layer: 0
-  m_Name: VFX_Grass_Magician_Spell
+  m_Name: VFX_Grass_MAGICIAN_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

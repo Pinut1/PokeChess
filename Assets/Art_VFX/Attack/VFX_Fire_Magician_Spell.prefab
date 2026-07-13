@@ -48625,7 +48625,7 @@ GameObject:
   - component: {fileID: 7221003193399831675}
   - component: {fileID: 7221003193399831672}
   m_Layer: 0
-  m_Name: VFX_Fire_Magician_Spell
+  m_Name: VFX_Fire_MAGICIAN_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3726872150973383325}
   - component: {fileID: 8191094365169631909}
   m_Layer: 0
-  m_Name: VFX_Nomal_L
+  m_Name: VFX_Normal_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -1227,8 +1227,8 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0.20644824, g: 1, b: 0.109803915, a: 0}
-        key1: {r: 0.3037113, g: 0.990566, b: 0.51621604, a: 1}
+        key0: {r: 0.3647059, g: 0.7764706, b: 1, a: 0}
+        key1: {r: 0.7028302, g: 0.8954402, b: 1, a: 1}
         key2: {r: 0, g: 0, b: 0, a: 1}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -1252,7 +1252,7 @@ ParticleSystem:
         atime6: 0
         atime7: 0
         m_Mode: 0
-        m_ColorSpace: -1
+        m_ColorSpace: 0
         m_NumColorKeys: 2
         m_NumAlphaKeys: 4
       minGradient:
@@ -9600,7 +9600,7 @@ GameObject:
   - component: {fileID: 845722257096245155}
   - component: {fileID: 845722257096245154}
   m_Layer: 0
-  m_Name: VFX_Water_Supporter_Shield
+  m_Name: VFX_Water_SUPPORTER_SHIELD
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14657,7 +14657,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 0.2235294, g: 1, b: 0.32660627, a: 0.7294118}
+      maxColor: {r: 0.3647059, g: 0.7764706, b: 1, a: 0.7294118}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}

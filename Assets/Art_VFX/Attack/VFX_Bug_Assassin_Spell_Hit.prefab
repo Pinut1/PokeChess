@@ -9981,7 +9981,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 0.16100036, g: 0.509434, b: 0.18739681, a: 1}
+      maxColor: {r: 0.0764062, g: 0.9528302, b: 0.14708549, a: 1}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -14640,7 +14640,7 @@ GameObject:
   - component: {fileID: 6750108211637369367}
   - component: {fileID: 6750108211637369352}
   m_Layer: 0
-  m_Name: VFX_Bug_Assassin_Spell_Hit
+  m_Name: VFX_Bug_ASSASSIN_SPELL_Hit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

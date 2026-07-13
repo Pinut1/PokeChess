@@ -19826,9 +19826,9 @@ ParticleSystem:
       maxColor: {r: 0.41556376, g: 0.6431373, b: 0, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 1, g: 0.46725196, b: 0.033018887, a: 0.6392157}
-        key1: {r: 1, g: 0.8302624, b: 0, a: 1}
-        key2: {r: 0.2627451, g: 0.12156863, b: 0.03529412, a: 1}
+        key0: {r: 0.4528302, g: 0.2446815, b: 0.11747954, a: 0.6392157}
+        key1: {r: 1, g: 0.4759271, b: 0.15566039, a: 1}
+        key2: {r: 0.3962264, g: 0.190895, b: 0.06541473, a: 1}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
         key5: {r: 0, g: 0, b: 0, a: 0}
@@ -34309,7 +34309,7 @@ GameObject:
   - component: {fileID: 5966243932138495116}
   - component: {fileID: 5966243932138495115}
   m_Layer: 0
-  m_Name: VFX_Ground_Tanker_Shield
+  m_Name: VFX_Ground_TANKER_SHIELD
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

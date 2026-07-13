@@ -112,10 +112,10 @@ TrailRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 0.5613208, g: 1, b: 0.86237514, a: 0}
-      key1: {r: 0.15307939, g: 0.754717, b: 0.56336766, a: 1}
-      key2: {r: 0.11414204, g: 0.4245283, b: 0.37499857, a: 1}
-      key3: {r: 0.07843137, g: 0.24255632, b: 0.3019608, a: 0.23121214}
+      key0: {r: 0.7688679, g: 0.96322894, b: 1, a: 0}
+      key1: {r: 0.27189392, g: 0.7889676, b: 0.8867924, a: 1}
+      key2: {r: 0.08343716, g: 0.6082569, b: 0.7075472, a: 1}
+      key3: {r: 0.23589355, g: 0.7753072, b: 0.8773585, a: 0.23121214}
       key4: {r: 0, g: 0, b: 0, a: 0}
       key5: {r: 0, g: 0, b: 0, a: 0}
       key6: {r: 0, g: 0, b: 0, a: 0}
@@ -137,7 +137,7 @@ TrailRenderer:
       atime6: 65535
       atime7: 0
       m_Mode: 0
-      m_ColorSpace: -1
+      m_ColorSpace: 0
       m_NumColorKeys: 4
       m_NumAlphaKeys: 5
     numCornerVertices: 0
@@ -321,7 +321,7 @@ GameObject:
   - component: {fileID: 5083330694576680960}
   - component: {fileID: 5083330694576680961}
   m_Layer: 0
-  m_Name: VFX_Ice_Assassin_Spell
+  m_Name: VFX_Ice_ASSASSIN_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10368,7 +10368,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 0.504717, g: 0.93325025, b: 1, a: 1}
+      maxColor: {r: 0.8632076, g: 0.97823757, b: 1, a: 0.78039217}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -20082,7 +20082,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 0.11792451, g: 1, b: 0.9423313, a: 1}
+      maxColor: {r: 0.8160377, g: 0.9707333, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}

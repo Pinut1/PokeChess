@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2578156820738498058}
   - component: {fileID: 9218882756702315687}
   m_Layer: 0
-  m_Name: VFX_Steel_S
+  m_Name: VFX_Breaker_S
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
