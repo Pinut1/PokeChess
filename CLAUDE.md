@@ -73,6 +73,9 @@ Assets/_Project/Scripts/
 구글 시트 → JSON → `Assets/Resources/Data/` → `PokeChess/Import *` 메뉴 실행 → ScriptableObject 자동 생성  
 SO 저장 경로: `Assets/_Project/ScriptableObjects/`
 
+> 데이터 **원본은 구글 시트**이며 SO는 임포터 산출물(읽기 전용 캐시)임 — SO를 직접 수정하지 말 것.
+> 가변 런타임 상태는 `PokemonUnit`/`BattleUnit`에만 둔다. 라이브 서비스로 확장 시 JSON 직로드(+id→에셋 매핑)로 전환 고려.
+
 ## NetworkManager 사용법
 ```csharp
 // 연결
