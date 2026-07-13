@@ -827,6 +827,10 @@ public class BattleManager : MonoBehaviour
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
                               TAUNT_STAR_MULT[Mathf.Clamp(caster.starLevel, 1, 3)];
 
+        // 데미지 스킬(CastSkill 본문)과 달리 CC/지원은 여기서 로그 — 안 찍으면 시전 여부를 로그로 검증할 수 없다.
+        Debug.Log($"[Battle] {caster.team} 스킬 시전({caster.skillEffectType}) → 대상 {targets.Count}기" +
+                  (caster.skillEffectType == SkillEffectType.Taunt ? $" (도발 {tauntDuration:0.0}s)" : ""));
+
         foreach (var t in targets)
         {
             if (t == null || !t.IsAlive) continue;
