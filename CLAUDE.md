@@ -54,7 +54,7 @@ Assets/_Project/Scripts/
 
 **🟡 타 담당 영역**
 - 증강: `Augments/Implementations/*` `Apply()` 4종, `AugmentFactory` 미구현 — 황해인
-- `Managers/UIManager` 스텁, `ShopManager`의 `XpChanged` 이벤트화 — 태욱(상점)·해인(UI)
+- ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
 - `Managers/RewardManager` `AugmentChoice` 지급 — AugmentManager(해인) 연결 대기
 
 **🟢 영욱 영역 (Core/전투/보드/네트워크)**
@@ -64,10 +64,10 @@ Assets/_Project/Scripts/
 - 악 외 미구현 전투 메커니즘 없음(CC/지원/타겟팅은 메커니즘 완료, 수치만 🔴)
 
 ## 작업 분배 (태욱 — 상점/아이템/UI)
-레벨/XP 시스템(PR #13) 후속으로 태욱이 이어받을 작업:
-- **XP 변경 이벤트화**: 현재 HUD는 `ShopManager.CurrentXp`를 매 프레임 폴링 중. `GameEvents.XpChanged(CurrentXp, RequiredXp)` 추가 후 UI를 이벤트 구독으로 전환. (캡은 이미 `OnUnitCapChanged`로 이벤트화됨)
-- **밸런스 테이블 확정**: `ShopManager`의 `_requiredXpByLevel`, `_unitCapByLevel`, `_roundXpReward`, `_buyXpCostGold`, `_buyXpAmount`는 임시값 — 기획 확정 후 조정.
-- **XP 구매 UI 정식화**: `PrototypeHud`의 임시 IMGUI XP 구매 버튼을 정식 `UIManager` 연동으로 교체.
+레벨/XP 시스템(PR #13) 후속:
+- ✅ **XP 변경 이벤트화**: 완료(PR #39). `UIManager`가 `GameEvents.OnXpChanged` 등 구독, `PrototypeHud` 폴링 제거.
+- ✅ **XP 구매 UI 정식화**: 완료(PR #39). `PrototypeHud` 임시 버튼 → `UIManager` 진행 패널로 이관.
+- **밸런스 테이블 확정**: `ShopManager`의 `_requiredXpByLevel`, `_unitCapByLevel`, `_roundXpReward`, `_buyXpCostGold`, `_buyXpAmount`는 임시값 — 기획 확정 후 조정.(남음)
 
 ## 데이터 파이프라인
 구글 시트 → JSON → `Assets/Resources/Data/` → `PokeChess/Import *` 메뉴 실행 → ScriptableObject 자동 생성  
