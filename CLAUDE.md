@@ -42,7 +42,11 @@ Assets/_Project/Scripts/
 코드에 흩어진 미완/임시 항목을 한곳에 모음. 상태: 🔴 기획 수치 대기 / 🟡 타 담당 / 🟢 영욱 영역.
 
 **🔴 기획 수치 확정 대기 (메커니즘 구현됨, 값만 PLACEHOLDER)**
-- `BattleManager` CC 지속/감속(`STUN_DURATION`/`SLOW_*`/`TAUNT_DURATION`), 지원스킬 위력(`MANA_REGEN_BUFF_*`/`AS_BUFF_*`), role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
+- ~~마나 충전 모델~~ ✅ 확정(7/10): 초당 10 고정만(`MANA_PER_SECOND`). 평타/피격비례 제거됨
+- ~~TAUNT~~ ✅ 날따름 확정(7/10): 시전자 중심 반경, 지속 1.0×1.4×성급(1/1.8/2.8), 원래 타겟 스냅샷→복귀
+- ~~지원스킬 위력~~ ✅ 확정(7/10): spellPower×0.5(`SUPPORT_SPELLPOWER_COEF`, 임시 계수). 단 AsBuff "증가량"·ManaRegen "회복량" 해석(%(p) vs 즉시 마나)은 해인님 재확인 대기, `AS_BUFF_DURATION`은 여전히 PLACEHOLDER
+- 스킬용 STUN: 스코프 아웃(7/10, 증강 6종에 없음 — 메커니즘만 유지), SLOW: 보류(유닛/아이템 미구현)
+- `BattleManager` role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
 - `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
 - `Core/PokemonUnit` 특수진화체 별배율 ×1.5
 - `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`
@@ -55,7 +59,7 @@ Assets/_Project/Scripts/
 
 **🟢 영욱 영역 (Core/전투/보드/네트워크)**
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
-- ✅ 전적 기록 시스템 — 구현 완료(`MatchRecorder`가 `OnGameCleared`/`OnSessionEnded(reason)` 구독 → `MatchHistoryStore` jsonl 저장 + `OnMatchRecorded` 발행). 남은 것: GameScene 매니저 오브젝트에 `MatchRecorder` 컴포넌트 부착(씬 배선), 전적 창 UI(태욱·해인 — `MatchHistoryStore.LoadRecent()` pull + `OnMatchRecorded` 구독), 닉네임 입력(현재 랜덤 `Player_xxxx` — 검색 키 불가), matchId를 Room 속성 GUID로 교체(Phase 2).
+- ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`). 남은 것: 전적창의 서버 조회 연동(Phase 3, 현재 로컬만 표시).
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
 - 악 외 미구현 전투 메커니즘 없음(CC/지원/타겟팅은 메커니즘 완료, 수치만 🔴)
 

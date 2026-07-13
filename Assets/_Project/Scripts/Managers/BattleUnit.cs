@@ -54,9 +54,12 @@ public class BattleUnit
     public float slowRemaining;           // 슬로우 잔여 시간. 0 도달 시 slowMultiplier 1로 복원.
     public BattleUnit tauntedBy;          // null 아니면 이 유닛을 강제 타겟(시간 만료 또는 도발자 사망 시 해제).
     public float tauntRemaining;          // 도발 잔여 시간. 0 도달 시 tauntedBy 해제.
+    public BattleUnit lastTickTarget;     // 이번 틱에 실제로 노린 대상(도발 스냅샷용, 매틱 갱신).
+    public BattleUnit tauntReturnTarget;  // 도발 종료 후 복귀할 "원래 타겟"(기획 확정: 재계산 아님).
     public bool HasCcImmuneItem;          // ccImmune 아이템 보유 여부.
     public bool ccImmuneConsumed;         // ccImmune 최초 1회 소모 여부.
     public string role = "";              // PokemonData.role 스냅샷(타겟 우선순위용).
+    public int starLevel = 1;             // PokemonUnit.starLevel 스냅샷(날따름 지속시간 공식용).
 
     // ── 악(DARK) 시너지 — 첫 스킬 시전 시 대상 스턴(1회 소비) ──
     public bool darkFirstSkillPending;    // true면 다음 스킬 시전 시 대상에 스턴 부여 후 false로 소비.
@@ -65,11 +68,6 @@ public class BattleUnit
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
 
-    // ── 지원 스킬 버프(ManaRegen) — 시간제 충전속도 배수. manaGainMultiplier(정령 시너지 등
-    // 전투 내내 유지되는 가산 배수)와 별도 필드인 이유: 같은 필드를 쓰면 만료 복원 때 시너지 버프까지 지워짐.
-    public float manaRegenBuffMultiplier = 1f; // 1=정상, 1.5=충전속도 50% 증가.
-    public float manaRegenBuffRemaining;       // 버프 잔여 시간. 0 도달 시 1로 복원.
-
     public bool IsAlive => currentHp > 0f;
 
     // ─────────────────────────────────────────
@@ -77,7 +75,7 @@ public class BattleUnit
     // BattleManager(타겟 선정)가 대상을 고른 뒤 이 메서드들로 위임한다.
     // ─────────────────────────────────────────
 
-    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff/ManaRegen버프 잔여시간 차감 및 만료 복원, taunt 시간 만료·도발자 사망 시 해제.</summary>
+    /// <summary>매틱 호출 — 스턴/슬로우/AsBuff 잔여시간 차감 및 만료 복원, taunt 시간 만료·도발자 사망 시 해제.</summary>
     public void TickCcState(float deltaTime)
     {
         if (stunRemaining > 0f)
@@ -95,17 +93,13 @@ public class BattleUnit
             if (asBuffRemaining <= 0f) asBuffMultiplier = 1f;
         }
 
-        if (manaRegenBuffRemaining > 0f)
-        {
-            manaRegenBuffRemaining = Mathf.Max(0f, manaRegenBuffRemaining - deltaTime);
-            if (manaRegenBuffRemaining <= 0f) manaRegenBuffMultiplier = 1f;
-        }
-
         if (tauntedBy != null)
         {
             tauntRemaining = Mathf.Max(0f, tauntRemaining - deltaTime);
             if (tauntRemaining <= 0f || !tauntedBy.IsAlive)
             {
+                // 도발 종료 — 복귀 타겟(tauntReturnTarget)은 남겨둔다.
+                // 타겟 선정(BattleManager)이 "복귀 타겟 생존 시 그쪽 우선"으로 소비.
                 tauntedBy = null;
                 tauntRemaining = 0f;
             }
@@ -133,10 +127,16 @@ public class BattleUnit
         slowRemaining = Mathf.Max(slowRemaining, duration);
     }
 
-    /// <summary>duration 동안 강제 타겟(스킬 가이드 §3-2 시간제). 도발자가 먼저 죽으면 조기 해제.</summary>
+    /// <summary>
+    /// duration 동안 강제 타겟(날따름, 기획 확정 2026-07-10). 도발자가 먼저 죽으면 조기 해제.
+    /// 발동 시점의 원래 타겟을 스냅샷으로 저장 → 종료 시 재계산이 아니라 저장된 타겟으로 복귀.
+    /// 도발 중 재도발되면 최초 스냅샷을 유지한다(원래 타겟이 도발자로 오염되는 것 방지).
+    /// </summary>
     public void ApplyTaunt(BattleUnit caster, float duration)
     {
         if (TryConsumeCcImmunity()) return;
+        if (tauntedBy == null)
+            tauntReturnTarget = lastTickTarget; // 도발 직전에 노리던 대상
         tauntedBy = caster;
         tauntRemaining = Mathf.Max(tauntRemaining, duration);
     }
@@ -151,11 +151,5 @@ public class BattleUnit
     {
         asBuffMultiplier = Mathf.Max(asBuffMultiplier, multiplier);
         asBuffRemaining  = Mathf.Max(asBuffRemaining, duration);
-    }
-
-    public void ApplyManaRegenBuff(float multiplier, float duration)
-    {
-        manaRegenBuffMultiplier = Mathf.Max(manaRegenBuffMultiplier, multiplier);
-        manaRegenBuffRemaining  = Mathf.Max(manaRegenBuffRemaining, duration);
     }
 }
