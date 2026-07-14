@@ -28,6 +28,7 @@ public static class PokeChessImporter
     [Serializable] private class RewardJsonDb       { public List<RewardTableJson>  tables; }
     [Serializable] private class TrainerEntryJsonDb { public List<TrainerEntryJson> trainers; }
     [Serializable] private class TradeEvoDatabase   { public List<TradeEvoJson>     mappings; }
+    [Serializable] private class DeckJsonDb         { public List<DeckJson>         decks; }
 
     [Serializable]
     private class PokemonEntry
@@ -40,6 +41,7 @@ public static class PokeChessImporter
         public float spellPower;
         public int manaCost;
         public string skillId;          // Skill Table 참조 (없으면 평타만)
+        public string attackVfxId;      // 평타 VFX 키 (v11 신설)
         public List<string> synergies;  // synergy1, synergy2 합친 배열
         public string role;
         public string obtainBy;         // shop=상점풀 / evolution·stone·trade·synergy·wild=풀 제외
@@ -176,6 +178,25 @@ public static class PokeChessImporter
         public string targetPokemonEn, evolvedPokemonEn, note;
     }
 
+    [Serializable]
+    private class DeckJson
+    {
+        public int deckId;
+        public string deckName;
+        public int unitCount;
+        public List<string> activeSynergies;
+        public int totalGoldToBuild;
+        public List<DeckUnitJson> units;
+    }
+
+    [Serializable]
+    private class DeckUnitJson
+    {
+        public int pokemonId;
+        public int starLevel;
+        public int slot;
+    }
+
     // ──────────────────────────────────────────
     // 메뉴 항목
     // ──────────────────────────────────────────
@@ -212,6 +233,7 @@ public static class PokeChessImporter
             so.synergies     = e.synergies ?? new List<string>();
             so.role          = e.role ?? "";
             so.skillId       = e.skillId ?? "";
+            so.attackVfxId   = e.attackVfxId ?? "";
 
             // skillId로 Skill Table join → skill에 베이킹. 없으면 평타만(빈 스킬).
             so.skill = BuildSkill(e.skillId, skillMap);
@@ -597,6 +619,82 @@ public static class PokeChessImporter
         EditorUtility.SetDirty(so);
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");
+    }
+
+    [MenuItem("PokeChess/Import Deck JSON")]
+    public static void ImportDecks()
+    {
+        var json = Resources.Load<TextAsset>("Data/deck_data");
+        if (json == null) { Debug.LogError("[PokeChess] deck_data.json 없음"); return; }
+
+        var jsonDb = JsonUtility.FromJson<DeckJsonDb>(json.text);
+        if (jsonDb == null || jsonDb.decks == null)
+        {
+            Debug.LogError("[PokeChess] deck_data.json 파싱 실패");
+            return;
+        }
+
+        // pokemonId 존재 검증용 — PokemonDatabase가 아직 미임포트면 id 검증만 생략
+        var pokemonIds = LoadPokemonIdSet();
+
+        // 덱당 .asset을 만들지 않고, 단일 DeckDatabase.asset의 List를 통째로 교체. (RewardDatabase와 동일 패턴)
+        var decks = new List<DeckData>();
+        foreach (var d in jsonDb.decks)
+        {
+            var deck = new DeckData
+            {
+                deckId           = d.deckId,
+                deckName         = d.deckName ?? "",
+                unitCount        = d.unitCount,
+                activeSynergies  = d.activeSynergies ?? new List<string>(),
+                totalGoldToBuild = d.totalGoldToBuild,
+                units            = new List<DeckUnitEntry>()
+            };
+
+            if (d.units != null)
+                foreach (var u in d.units)
+                {
+                    if (pokemonIds.Count > 0 && !pokemonIds.Contains(u.pokemonId))
+                        Debug.LogWarning($"[PokeChess] 덱 {d.deckId} '{d.deckName}': pokemonId {u.pokemonId} 가 PokemonDatabase에 없음");
+
+                    deck.units.Add(new DeckUnitEntry
+                    {
+                        pokemonId = u.pokemonId,
+                        starLevel = u.starLevel <= 0 ? 1 : u.starLevel,
+                        slot      = u.slot
+                    });
+                }
+
+            if (deck.unitCount != deck.units.Count)
+                Debug.LogWarning($"[PokeChess] 덱 {d.deckId} '{d.deckName}': unitCount={deck.unitCount} vs 실제 유닛 {deck.units.Count}기");
+
+            decks.Add(deck);
+        }
+
+        const string resDir = "Assets/Resources";
+        EnsureDir(resDir);
+        var so = LoadOrCreate<DeckDatabase>($"{resDir}/DeckDatabase.asset");
+        so.decks = decks;
+        EditorUtility.SetDirty(so);
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[PokeChess] 견본덱 {decks.Count}개 Import 완료 (DeckDatabase 단일 에셋 갱신)");
+    }
+
+    /// <summary>PokemonDatabase에서 도감 id 집합 로드 (Deck pokemonId 검증용). 미임포트면 빈 집합.</summary>
+    private static HashSet<int> LoadPokemonIdSet()
+    {
+        var set = new HashSet<int>();
+        var db = AssetDatabase.LoadAssetAtPath<PokemonDatabase>("Assets/Resources/PokemonDatabase.asset");
+        if (db == null || db.all == null)
+        {
+            Debug.LogWarning("[PokeChess] PokemonDatabase.asset 없음 — Deck pokemonId 검증 생략");
+            return set;
+        }
+        foreach (var p in db.all)
+            if (p != null)
+                set.Add(p.id);
+        return set;
     }
 
     // ──────────────────────────────────────────
