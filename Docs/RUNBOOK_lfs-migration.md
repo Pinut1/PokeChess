@@ -19,6 +19,61 @@
 
 **결론**: 지금은 실행하지 않음. 아래 절차는 (1) 정말 원격이 비대해지거나 (2) 라이브 서비스 전환으로 히스토리 슬림화가 필요해질 때를 위해 보존. 재발 방지(11번 pre-commit hook)만 선택적으로 도입 가치 있음.
 
+## 🛑 실행 전 반드시 볼 주의사항 (2026-07-14 추가)
+
+배경: 아트팀(장한나·황해인)이 별도 작업순서표로 VFX 정리를 착수함. 그 표의 번호와 이 RUNBOOK 체크리스트 번호가 **다르니** 혼동 금지.
+
+1. **되돌릴 수 없는 절대선은 `force-push`(체크리스트 8번) 하나다.** 5·6·7(filter-repo·lfs migrate·gc)을 로컬에서 돌려도 force-push만 안 하면 원격·팀은 100% 안전 — 그 로컬 클론만 버리면 끝. 팀에는 **"force-push 금지"** 이 한 줄만 확실히 박아둔다.
+2. **5·6·7·8은 한 덩어리다.** 하나의 재작성으로 묶어 돌리는 절차라 "일부만 실행"하는 개념이 아니다. 보류면 이 블록 전체를 보류.
+3. **아트팀의 art/vfx Demo 삭제 → 커밋 → 푸시 → master 병합은 파괴적 작업이 아니다.** 평범한 파일 삭제+머지라 되돌릴 수 있고, 진행해도 된다. (단 워킹트리에서만 지워지는 것 — 과거 히스토리 blob은 그대로 남으니 이 RUNBOOK의 목적과는 별개.)
+4. **"VFX를 넣으려면 히스토리 재작성이 필요하다"는 오해다.** VFX의 master 병합은 위 3번만으로 끝난다. 새로 커밋되는 에셋은 이미 `.gitattributes`가 LFS로 잡고 있어(master HEAD 깨끗, 패턴 매칭 121개 전부 LFS 추적), 5~8번 없이도 정상적으로 LFS에 들어간다.
+5. **실행하려면 0~2번(팀 공지·전원 푸시 확인·미머지 브랜치 소유자 조율)을 먼저 밟는다.** 이 조율 없이 8번을 하면 태욱·해인·아트 브랜치의 미푸시 작업이 그대로 유실된다.
+
+---
+
+## ✅ 채택 방안 — `--no-rewrite` art/vfx LFS 전환 (2026-07-14, force-push 없음)
+
+위 5~8번(히스토리 재작성) 대신 **채택한 실행안**. 팀 합의: force-push는 하지 않고, art/vfx 대용량만 LFS로 전환.
+
+### 배경 (origin/art/vfx 실측)
+
+LFS 없이 일반 blob으로 커밋된 대용량의 정체는 **텍스처가 아니라 프리팹/asset**이었다:
+
+| 확장자 | 개수 | 용량 | 비고 |
+|---|---|---|---|
+| `.prefab` | 143개 | **109.5MB** | 128개(101MB)가 `Assets/Art_VFX/Lana Studio` (서드파티 VFX 팩) |
+| `.asset` | 81개 | 43MB | 파티클/메시 데이터 임베드 |
+| `.unity` | 11개 | 9MB | 텍스트라 LFS 제외 유지(정상) |
+
+- `.png`/`.fbx` 등은 이미 `.gitattributes`로 LFS 처리 중 — **범인 아님**.
+- `.prefab`/`.asset`은 원래 "텍스트라 LFS 제외" 정책이지만, **서드파티 에셋팩(Art_VFX 하위)은 팀이 머지할 일이 없어** LFS로 넣어도 안전. 게임 로직 프리팹은 텍스트 유지해야 하므로 **경로 한정**이 필수.
+
+### 원리 — 왜 force-push가 필요 없나
+
+`git lfs migrate import --no-rewrite`는 히스토리를 재작성하지 않고, **현재 HEAD에 새 커밋 하나**를 얹어 지정 파일을 LFS 포인터로 바꾼다. 기존 커밋은 그대로 → 일반 `git push`로 나감 → **팀은 평소처럼 `git pull`**(재클론 불필요).
+
+### 절차
+
+1. **선행: 아트팀 art/vfx → master 병합 완료 확인** (병합 후 master에서 실행 — art/vfx 브랜치 직접 수정 금지, 아트 작업과 충돌).
+2. `.gitattributes`에 **경로 한정** 패턴 추가 (전역 `*.prefab` 금지):
+   ```gitattributes
+   Assets/Art_VFX/**/*.prefab filter=lfs diff=lfs merge=lfs -text
+   Assets/Art_VFX/**/*.asset  filter=lfs diff=lfs merge=lfs -text
+   ```
+3. 현재 파일을 LFS로 전환하는 새 커밋 생성:
+   ```bash
+   git lfs migrate import --no-rewrite \
+     --include="Assets/Art_VFX/**/*.prefab,Assets/Art_VFX/**/*.asset"
+   ```
+4. `.gitattributes` 커밋 + 일반 push (`git push` — **force 아님**).
+5. 팀 안내: 재클론 불필요, `git pull`만.
+
+### 효과 / 한계 (정직하게)
+
+- ✅ 앞으로 Art_VFX 프리팹 수정 시 LFS 관리 (diff 노이즈↓, master 향후 성장 억제)
+- ✅ 병합으로 master가 물려받는 101MB 이후 성장 차단
+- ❌ **이미 쌓인 과거 blob(101MB)은 안 줄어듦** — 그건 force-push(재작성) 영역이라 이번 범위 밖. RUNBOOK 결론(실익 대비 비용)상 여전히 보류.
+
 ---
 
 ## (이하) 실행 절차 — 보류 중, 필요 시 사용
