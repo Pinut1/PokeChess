@@ -685,6 +685,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoundPhaseManager
   _shoppingDuration: 30
   _resultDuration: 3
+  _autoStartBattleOnTimeout: 1
 --- !u!114 &1481026852
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -702,6 +703,7 @@ MonoBehaviour:
   _boardManager: {fileID: 0}
   _battleManager: {fileID: 0}
   _shopManager: {fileID: 0}
+  _rewardManager: {fileID: 0}
   _synergyManager: {fileID: 0}
   _itemManager: {fileID: 0}
   _augmentManager: {fileID: 0}

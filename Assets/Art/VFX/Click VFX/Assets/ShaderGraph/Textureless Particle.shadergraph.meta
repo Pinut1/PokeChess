@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 788676ace93b15b4ea462c43fddee554
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 233969
+  packageName: Click Effects & Ground Indicators | VFX Essentials
+  packageVersion: 1.1.0
+  assetPath: Assets/Click VFX/Assets/ShaderGraph/Textureless Particle.shadergraph
+  uploadId: 592060
