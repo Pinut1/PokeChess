@@ -1,9 +1,9 @@
 ﻿<Solution>
-  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Boxophobic.Utils.Editor.csproj" />
   <Project Path="PhotonRealtime.csproj" />
   <Project Path="PhotonUnityNetworking.Editor.csproj" />
   <Project Path="PhotonUnityNetworking.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Boxophobic.PolyverseSkies.Editor.csproj" />
   <Project Path="PhotonUnityNetworking.Demos.csproj" />
   <Project Path="Boxophobic.Utils.Scripts.csproj" />
