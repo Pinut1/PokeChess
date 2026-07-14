@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Ground_Tanker
+  attackVfxId: Ground_S
   evolvesIntoEn: Dugtrio
   shopBuyable: 1
   modelPrefab: {fileID: 0}

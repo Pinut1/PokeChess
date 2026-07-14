@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Water_Magician
+  attackVfxId: Water_L
   evolvesIntoEn: Croconaw
   shopBuyable: 1
   modelPrefab: {fileID: 0}

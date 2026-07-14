@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 2
     lineLength: 4
     vfxId: VFX_Grass_Supporter
+  attackVfxId: Grass_L
   evolvesIntoEn: Sunflora
   shopBuyable: 1
   modelPrefab: {fileID: 0}

@@ -1,0 +1,400 @@
+{
+  "decks": [
+    {
+      "deckId": 1,
+      "deckName": "[하이퍼 티켓] 독 핫삼",
+      "unitCount": 7,
+      "activeSynergies": [
+        "Bug(4/4)",
+        "Poison(5/9)",
+        "Breaker(2/4)",
+        "Electric(1/4)"
+      ],
+      "totalGoldToBuild": 84,
+      "units": [
+        {
+          "pokemonId": 212,
+          "starLevel": 3,
+          "slot": 1
+        },
+        {
+          "pokemonId": 94,
+          "starLevel": 3,
+          "slot": 2
+        },
+        {
+          "pokemonId": 110,
+          "starLevel": 3,
+          "slot": 3
+        },
+        {
+          "pokemonId": 168,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 14,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 49,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 82,
+          "starLevel": 2,
+          "slot": 7
+        }
+      ]
+    },
+    {
+      "deckId": 2,
+      "deckName": "[기술머신:날따름] 전기 파치리스",
+      "unitCount": 8,
+      "activeSynergies": [
+        "Flying(4/6)",
+        "Normal(4/6)",
+        "Electric(2/4)",
+        "Grass(1/9)",
+        "Poison(1/9)",
+        "Ethereal(1/6)",
+        "Breaker(1/4)"
+      ],
+      "totalGoldToBuild": 84,
+      "units": [
+        {
+          "pokemonId": 12,
+          "starLevel": 3,
+          "slot": 1
+        },
+        {
+          "pokemonId": 417,
+          "starLevel": 3,
+          "slot": 2
+        },
+        {
+          "pokemonId": 18,
+          "starLevel": 3,
+          "slot": 3
+        },
+        {
+          "pokemonId": 85,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 241,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 40,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 82,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 169,
+          "starLevel": 3,
+          "slot": 8
+        }
+      ]
+    },
+    {
+      "deckId": 3,
+      "deckName": "[하이퍼 티켓] 불꽃 한카리아스",
+      "unitCount": 8,
+      "activeSynergies": [
+        "Ground(4/4)",
+        "Fire(4/6)",
+        "Flying(1/6)",
+        "Dragon(1/4)"
+      ],
+      "totalGoldToBuild": 147,
+      "units": [
+        {
+          "pokemonId": 142,
+          "starLevel": 2,
+          "slot": 1
+        },
+        {
+          "pokemonId": 6,
+          "starLevel": 3,
+          "slot": 2
+        },
+        {
+          "pokemonId": 77,
+          "starLevel": 3,
+          "slot": 3
+        },
+        {
+          "pokemonId": 445,
+          "starLevel": 3,
+          "slot": 4
+        },
+        {
+          "pokemonId": 257,
+          "starLevel": 3,
+          "slot": 5
+        },
+        {
+          "pokemonId": 51,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 59,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 95,
+          "starLevel": 2,
+          "slot": 8
+        }
+      ]
+    },
+    {
+      "deckId": 4,
+      "deckName": "[기술머신:나인이볼부스트] 물 이브이",
+      "unitCount": 9,
+      "activeSynergies": [
+        "Water(7/9)",
+        "Ethereal(2/6)",
+        "Mutant(1/5)"
+      ],
+      "totalGoldToBuild": 129,
+      "units": [
+        {
+          "pokemonId": 133,
+          "starLevel": 3,
+          "slot": 1
+        },
+        {
+          "pokemonId": 9,
+          "starLevel": 3,
+          "slot": 2
+        },
+        {
+          "pokemonId": 160,
+          "starLevel": 3,
+          "slot": 3
+        },
+        {
+          "pokemonId": 64,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 131,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 80,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 120,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 87,
+          "starLevel": 2,
+          "slot": 8
+        },
+        {
+          "pokemonId": 55,
+          "starLevel": 2,
+          "slot": 9
+        }
+      ]
+    },
+    {
+      "deckId": 5,
+      "deckName": "[골드를 획득했다!] 정령 깜까미",
+      "unitCount": 9,
+      "activeSynergies": [
+        "Ice(1/1)",
+        "Dark(1/1)",
+        "Ethereal(4/6)",
+        "Water(3/9)",
+        "Ground(2/4)",
+        "Flying(1/6)"
+      ],
+      "totalGoldToBuild": 117,
+      "units": [
+        {
+          "pokemonId": 121,
+          "starLevel": 2,
+          "slot": 1
+        },
+        {
+          "pokemonId": 142,
+          "starLevel": 2,
+          "slot": 2
+        },
+        {
+          "pokemonId": 302,
+          "starLevel": 2,
+          "slot": 3
+        },
+        {
+          "pokemonId": 131,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 461,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 439,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 95,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 64,
+          "starLevel": 2,
+          "slot": 8
+        },
+        {
+          "pokemonId": 80,
+          "starLevel": 2,
+          "slot": 9
+        }
+      ]
+    },
+    {
+      "deckId": 6,
+      "deckName": "[구독서비스] 물 별가사리",
+      "unitCount": 9,
+      "activeSynergies": [
+        "Water(9/9)",
+        "Ethereal(1/6)"
+      ],
+      "totalGoldToBuild": 81,
+      "units": [
+        {
+          "pokemonId": 55,
+          "starLevel": 2,
+          "slot": 1
+        },
+        {
+          "pokemonId": 87,
+          "starLevel": 2,
+          "slot": 2
+        },
+        {
+          "pokemonId": 131,
+          "starLevel": 2,
+          "slot": 3
+        },
+        {
+          "pokemonId": 120,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 8,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 61,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 159,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 259,
+          "starLevel": 2,
+          "slot": 8
+        },
+        {
+          "pokemonId": 80,
+          "starLevel": 2,
+          "slot": 9
+        }
+      ]
+    },
+    {
+      "deckId": 7,
+      "deckName": "[진화 스페셜리스트] 전기 풀 라이츄",
+      "unitCount": 9,
+      "activeSynergies": [
+        "Cheerleader(1/1)",
+        "Electric(4/4)",
+        "Grass(5/9)",
+        "Poison(3/9)",
+        "Breaker(1/4)"
+      ],
+      "totalGoldToBuild": 81,
+      "units": [
+        {
+          "pokemonId": 26,
+          "starLevel": 2,
+          "slot": 1
+        },
+        {
+          "pokemonId": 462,
+          "starLevel": 2,
+          "slot": 2
+        },
+        {
+          "pokemonId": 45,
+          "starLevel": 2,
+          "slot": 3
+        },
+        {
+          "pokemonId": 71,
+          "starLevel": 2,
+          "slot": 4
+        },
+        {
+          "pokemonId": 2,
+          "starLevel": 2,
+          "slot": 5
+        },
+        {
+          "pokemonId": 417,
+          "starLevel": 2,
+          "slot": 6
+        },
+        {
+          "pokemonId": 311,
+          "starLevel": 2,
+          "slot": 7
+        },
+        {
+          "pokemonId": 192,
+          "starLevel": 2,
+          "slot": 8
+        },
+        {
+          "pokemonId": 153,
+          "starLevel": 2,
+          "slot": 9
+        }
+      ]
+    }
+  ]
+}

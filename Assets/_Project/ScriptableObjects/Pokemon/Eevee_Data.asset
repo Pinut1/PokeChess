@@ -26,17 +26,17 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Supporter
-  skillId: MUTANT_SUPPORTER
+  skillId: NORMAL_SUPPORTER
   skill:
-    skillId: MUTANT_SUPPORTER
-    skillName: "\uC801\uC751"
-    description: "\uB2E8\uC77C \uC544\uAD70 \uACF5\uACA9\uC18D\uB3C4 \uB300\uD3ED
-      \uC99D\uAC00"
-    effectType: 5
-    targetType: 2
-    areaRadius: 3
+    skillId: NORMAL_SUPPORTER
+    skillName: "\uCE58\uC720\uBC29\uC6B8"
+    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5"
+    effectType: 2
+    targetType: 1
+    areaRadius: 0
     lineLength: 4
-    vfxId: VFX_Mutant_Supporter
+    vfxId: VFX_Normal_Supporter
+  attackVfxId: Normal_L
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

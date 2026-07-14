@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Bug_Magician
+  attackVfxId: Bug_L
   evolvesIntoEn: Venomoth
   shopBuyable: 1
   modelPrefab: {fileID: 0}

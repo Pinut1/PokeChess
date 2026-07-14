@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Normal_Warrior
+  attackVfxId: Normal_S
   evolvesIntoEn: Dodrio
   shopBuyable: 1
   modelPrefab: {fileID: 0}

@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 4
     vfxId: VFX_Normal_Archer
+  attackVfxId: Normal_L
   evolvesIntoEn: Pidgeotto
   shopBuyable: 1
   modelPrefab: {fileID: 0}

@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Dragon_Assassin
+  attackVfxId: Dragon_S
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

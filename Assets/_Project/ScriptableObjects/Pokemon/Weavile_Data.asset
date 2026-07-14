@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Ice_Assassin
+  attackVfxId: Ice_S
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}
