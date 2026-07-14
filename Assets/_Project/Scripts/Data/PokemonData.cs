@@ -28,6 +28,8 @@ public class PokemonData : ScriptableObject
     [Header("스킬")]
     public string skillId;          // Skill Table 참조 키 (임포터가 join해 skill에 베이킹)
     public PokemonSkillData skill;
+    /// <summary>평타 VFX 키 (v11 신설, VfxDatabase 룩업용). 재생 연동 전까지 데이터만 보유.</summary>
+    public string attackVfxId;
 
     [Header("진화")]
     /// <summary>3마리 모았을 때 변환될 포켓몬 영문명. 최종 진화형은 비워둠.</summary>
