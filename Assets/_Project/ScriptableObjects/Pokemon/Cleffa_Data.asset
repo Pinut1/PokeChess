@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Ethereal
   role: Assassin
-  skillId: 
+  skillId: ETHEREAL_ASSASSIN
   skill:
-    skillId: 
-    skillName: 
-    description: 
-    effectType: 0
-    targetType: 0
+    skillId: ETHEREAL_ASSASSIN
+    skillName: "\uC0AC\uC774\uCF54\uCEE4\uD130"
+    description: "\uC090, \uCE90\uC774\uC2DC, \uC5D0\uBE0C\uC774(\uBD07)"
+    effectType: 1
+    targetType: 3
     areaRadius: 0
-    lineLength: 0
-    vfxId: 
+    lineLength: 1
+    vfxId: VFX_Ethereal_Assassin_SPELL
+  attackVfxId: Ethereal_S
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

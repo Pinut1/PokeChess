@@ -32,10 +32,11 @@ MonoBehaviour:
     skillName: "\uBC29\uC804"
     description: "\uC8FC\uBCC0 \uC544\uAD70 \uB9C8\uB098 \uD68C\uBCF5"
     effectType: 4
-    targetType: 2
-    areaRadius: 3
+    targetType: 1
+    areaRadius: 2
     lineLength: 4
     vfxId: VFX_Electric_Supporter
+  attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

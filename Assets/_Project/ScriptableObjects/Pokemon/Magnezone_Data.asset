@@ -27,16 +27,17 @@ MonoBehaviour:
   - Electric
   - Breaker
   role: Tanker
-  skillId: ELECTRIC_TANKER
+  skillId: STEEL_TANKER
   skill:
-    skillId: ELECTRIC_TANKER
-    skillName: "\uC790\uAE30\uC7A5"
-    description: "\uC8FC\uBCC0 \uC801 \uACF5\uACA9\uC18D\uB3C4 \uAC10\uC18C"
-    effectType: 6
-    targetType: 4
-    areaRadius: 1
+    skillId: STEEL_TANKER
+    skillName: "\uCCA0\uC758\uC694\uC0C8"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    effectType: 3
+    targetType: 0
+    areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Electric_Tanker
+    vfxId: VFX_Steel_Tanker
+  attackVfxId: Electric_S
   evolvesIntoEn: Tangrowth
   shopBuyable: 0
   modelPrefab: {fileID: 0}

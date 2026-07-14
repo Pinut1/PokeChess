@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Fire_Warrior
+  attackVfxId: Fire_S
   evolvesIntoEn: Quilava
   shopBuyable: 1
   modelPrefab: {fileID: 0}

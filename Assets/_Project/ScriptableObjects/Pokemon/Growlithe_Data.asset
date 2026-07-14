@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Fire_Warrior
+  attackVfxId: Fire_S
   evolvesIntoEn: Arcanine
   shopBuyable: 1
   modelPrefab: {fileID: 0}

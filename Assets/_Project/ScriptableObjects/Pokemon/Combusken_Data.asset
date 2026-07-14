@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Fire_Warrior
+  attackVfxId: Fire_S
   evolvesIntoEn: Blaziken
   shopBuyable: 0
   modelPrefab: {fileID: 0}

@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Warrior
-  skillId: MUTANT_WARRIOR
+  skillId: DARK_WARRIOR
   skill:
-    skillId: MUTANT_WARRIOR
-    skillName: "\uB3CC\uC9C4"
-    description: "\uADFC\uC811 \uB3CC\uC5F0\uBCC0\uC774 \uC18D\uC131 \uB370\uBBF8\uC9C0"
+    skillId: DARK_WARRIOR
+    skillName: "\uC554\uD751\uACA9\uD30C"
+    description: "\uADFC\uC811 \uC545 \uC18D\uC131 \uB370\uBBF8\uC9C0"
     effectType: 0
     targetType: 3
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Mutant_Warrior
+    vfxId: VFX_Dark_Warrior
+  attackVfxId: Dark_S
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

@@ -27,16 +27,17 @@ MonoBehaviour:
   - Cheerleader
   - Electric
   role: Supporter
-  skillId: 
+  skillId: CHEER_SUPPORTER
   skill:
-    skillId: 
-    skillName: 
-    description: 
-    effectType: 0
-    targetType: 0
-    areaRadius: 0
-    lineLength: 0
-    vfxId: 
+    skillId: CHEER_SUPPORTER
+    skillName: "\uC751\uC6D0"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uACA9\uC18D\uB3C4 \uC99D\uAC00"
+    effectType: 5
+    targetType: 2
+    areaRadius: 2
+    lineLength: 4
+    vfxId: VFX_Cheer_Supporter
+  attackVfxId: Cheerleader_L
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

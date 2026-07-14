@@ -32,10 +32,11 @@ MonoBehaviour:
     skillName: "\uC6A9\uC131\uAD70"
     description: "\uAD11\uC5ED \uB4DC\uB798\uACE4 \uACE0\uB370\uBBF8\uC9C0"
     effectType: 1
-    targetType: 4
+    targetType: 5
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Dragon_Magician
+  attackVfxId: Dragon_L
   evolvesIntoEn: Dragonite
   shopBuyable: 0
   modelPrefab: {fileID: 0}

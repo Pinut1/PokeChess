@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Electric_Magician
+  attackVfxId: Electric_L
   evolvesIntoEn: Clefairy
   shopBuyable: 0
   modelPrefab: {fileID: 0}

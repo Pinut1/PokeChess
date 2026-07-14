@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Bug_Assassin
+  attackVfxId: Bug_S
   evolvesIntoEn: Beedrill
   shopBuyable: 0
   modelPrefab: {fileID: 0}

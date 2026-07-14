@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Grass_Assassin
+  attackVfxId: Grass_S
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}
