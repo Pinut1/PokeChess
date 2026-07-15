@@ -40,6 +40,20 @@ public class UIManager : MonoBehaviour
     private Rect _matchHistoryWindowRect = new Rect(260f, 80f, 980f, 650f);
 
     // ──────────────────────────────────────────
+    // 견본덱 데이터 및 견본덱창 상태
+    // ──────────────────────────────────────────
+
+    private readonly List<DeckData> _sampleDecks = new List<DeckData>();
+
+    private bool _showSampleDeck;
+    private int _selectedSampleDeckIndex;
+
+    private Vector2 _sampleDeckListScroll;
+    private Vector2 _sampleDeckDetailScroll;
+
+    private Rect _sampleDeckWindowRect = new Rect(180f, 70f, 1100f, 680f);
+
+    // ──────────────────────────────────────────
     // 플레이어 진행 상태 캐시
     // ──────────────────────────────────────────
     // 아래 값은 GameEvents를 통해 갱신한다.
@@ -97,6 +111,7 @@ public class UIManager : MonoBehaviour
     private void Start()
     {
         RefreshMatchHistory();
+        RefreshSampleDecks();
         SyncProgressState();
     }
 
@@ -157,10 +172,14 @@ public class UIManager : MonoBehaviour
         EnsureStyles();
 
         DrawOpenButton();
+        DrawSampleDeckOpenButton();
         DrawProgressPanel();
 
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
+
+        if (_showSampleDeck)
+            DrawSampleDeckWindow();
     }
 
 
@@ -944,5 +963,442 @@ public class UIManager : MonoBehaviour
                reason.Contains("lost") ||
                reason.Contains("연결") ||
                reason.Contains("끊김");
+    }
+
+    // ──────────────────────────────────────────
+    // 견본덱 UI
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 화면 상단에 견본덱 열기/닫기 버튼을 표시한다.
+    /// 견본덱을 열면 전적창은 닫아 두 창이 겹치지 않게 한다.
+    /// </summary>
+    private void DrawSampleDeckOpenButton()
+    {
+        const float width = 160f;
+        const float height = 40f;
+
+        float x = (Screen.width - width) * 0.5f + 175f;
+        float y = 20f;
+
+        string label = _showSampleDeck ? "견본덱 닫기" : "견본덱 열기";
+
+        if (GUI.Button(new Rect(x, y, width, height), label))
+        {
+            _showSampleDeck = !_showSampleDeck;
+
+            if (_showSampleDeck)
+            {
+                _showMatchHistory = false;
+                RefreshSampleDecks();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 이동 가능한 견본덱 창을 생성한다.
+    /// </summary>
+    private void DrawSampleDeckWindow()
+    {
+        _sampleDeckWindowRect.x = Mathf.Clamp(
+            _sampleDeckWindowRect.x,
+            0f,
+            Screen.width - 160f
+        );
+
+        _sampleDeckWindowRect.y = Mathf.Clamp(
+            _sampleDeckWindowRect.y,
+            0f,
+            Screen.height - 120f
+        );
+
+        _sampleDeckWindowRect = GUI.Window(
+            1002,
+            _sampleDeckWindowRect,
+            DrawSampleDeckWindowContent,
+            "견본덱"
+        );
+    }
+
+    /// <summary>
+    /// 왼쪽에는 전체 견본덱 목록,
+    /// 오른쪽에는 선택한 견본덱 상세 정보를 표시한다.
+    /// </summary>
+    private void DrawSampleDeckWindowContent(int windowId)
+    {
+        float width = _sampleDeckWindowRect.width;
+        float height = _sampleDeckWindowRect.height;
+
+        GUI.Label(
+            new Rect(24f, 32f, 240f, 36f),
+            "견본덱",
+            _titleStyle
+        );
+
+        GUI.Label(
+            new Rect(24f, 67f, 520f, 24f),
+            "덱을 선택하면 목표 유닛·성급·시너지 정보를 확인할 수 있습니다.",
+            _mutedStyle
+        );
+
+        GUI.Label(
+            new Rect(width - 210f, 34f, 70f, 24f),
+            _sampleDecks.Count.ToString(),
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(width - 205f, 60f, 100f, 20f),
+            "등록 덱",
+            _mutedStyle
+        );
+
+        if (GUI.Button(new Rect(width - 180f, 84f, 70f, 28f), "새로고침"))
+            RefreshSampleDecks();
+
+        if (GUI.Button(new Rect(width - 100f, 84f, 70f, 28f), "닫기"))
+            _showSampleDeck = false;
+
+        if (_sampleDecks.Count == 0)
+        {
+            GUI.Label(
+                new Rect(28f, 125f, 700f, 30f),
+                "견본덱 데이터를 불러오지 못했습니다. DeckDatabase Import 상태를 확인하세요.",
+                _labelStyle
+            );
+
+            GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+            return;
+        }
+
+        _selectedSampleDeckIndex = Mathf.Clamp(
+            _selectedSampleDeckIndex,
+            0,
+            _sampleDecks.Count - 1
+        );
+
+        DrawSampleDeckList(
+            new Rect(24f, 120f, 320f, height - 145f)
+        );
+
+        DrawSampleDeckDetail(
+            new Rect(360f, 120f, width - 385f, height - 145f),
+            _sampleDecks[_selectedSampleDeckIndex]
+        );
+
+        GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+    }
+
+    /// <summary>
+    /// 등록된 견본덱 목록을 선택 가능한 카드로 표시한다.
+    /// </summary>
+    private void DrawSampleDeckList(Rect rect)
+    {
+        GUI.Box(rect, "");
+
+        float contentHeight = Mathf.Max(
+            rect.height - 20f,
+            _sampleDecks.Count * 76f + 10f
+        );
+
+        _sampleDeckListScroll = GUI.BeginScrollView(
+            rect,
+            _sampleDeckListScroll,
+            new Rect(0f, 0f, rect.width - 20f, contentHeight)
+        );
+
+        for (int i = 0; i < _sampleDecks.Count; i++)
+        {
+            DeckData deck = _sampleDecks[i];
+
+            Rect cardRect = new Rect(
+                8f,
+                8f + i * 76f,
+                rect.width - 36f,
+                66f
+            );
+
+            bool selected = i == _selectedSampleDeckIndex;
+
+            GUI.Box(
+                cardRect,
+                "",
+                selected ? _selectedListCardStyle : _normalListCardStyle
+            );
+
+            if (GUI.Button(cardRect, GUIContent.none, GUIStyle.none))
+            {
+                _selectedSampleDeckIndex = i;
+                _sampleDeckDetailScroll = Vector2.zero;
+            }
+
+            string deckName = string.IsNullOrWhiteSpace(deck.deckName)
+                ? $"덱 {deck.deckId}"
+                : deck.deckName;
+
+            GUI.Label(
+                new Rect(cardRect.x + 12f, cardRect.y + 9f, cardRect.width - 24f, 24f),
+                deckName,
+                _sectionTitleStyle
+            );
+
+            GUI.Label(
+                new Rect(cardRect.x + 12f, cardRect.y + 38f, cardRect.width - 24f, 20f),
+                $"덱 ID {deck.deckId} · 유닛 {deck.unitCount}기 · {deck.totalGoldToBuild}G",
+                _mutedStyle
+            );
+        }
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// 선택된 견본덱의 덱 이름, 유닛, 목표 성급,
+    /// 활성 시너지와 총 필요 골드를 표시한다.
+    /// </summary>
+    private void DrawSampleDeckDetail(Rect rect, DeckData deck)
+    {
+        GUI.Box(rect, "");
+
+        if (deck == null)
+            return;
+
+        string deckName = string.IsNullOrWhiteSpace(deck.deckName)
+            ? $"덱 {deck.deckId}"
+            : deck.deckName;
+
+        GUI.Label(
+            new Rect(rect.x + 22f, rect.y + 18f, rect.width - 250f, 32f),
+            deckName,
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + rect.width - 210f, rect.y + 18f, 180f, 24f),
+            $"완성 비용 {deck.totalGoldToBuild}G",
+            _winStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + 22f, rect.y + 52f, 300f, 22f),
+            $"덱 ID {deck.deckId} · 목표 유닛 {deck.unitCount}기",
+            _mutedStyle
+        );
+
+        GUI.Box(
+            new Rect(rect.x, rect.y + 84f, rect.width, 1f),
+            ""
+        );
+
+        Rect scrollRect = new Rect(
+            rect.x + 18f,
+            rect.y + 100f,
+            rect.width - 36f,
+            rect.height - 120f
+        );
+
+        float contentHeight = 520f;
+
+        if (deck.units != null)
+        {
+            int rows = Mathf.CeilToInt(deck.units.Count / 4f);
+            contentHeight += rows * 98f;
+        }
+
+        Rect contentRect = new Rect(
+            0f,
+            0f,
+            scrollRect.width - 20f,
+            contentHeight
+        );
+
+        _sampleDeckDetailScroll = GUI.BeginScrollView(
+            scrollRect,
+            _sampleDeckDetailScroll,
+            contentRect
+        );
+
+        float y = 0f;
+
+        GUI.Label(
+            new Rect(0f, y, 160f, 24f),
+            "목표 유닛",
+            _sectionTitleStyle
+        );
+
+        y += 34f;
+        y = DrawSampleDeckUnits(deck.units, y);
+
+        y += 20f;
+
+        GUI.Label(
+            new Rect(0f, y, 160f, 24f),
+            "활성 시너지",
+            _sectionTitleStyle
+        );
+
+        y += 32f;
+
+        string[] synergies = deck.activeSynergies != null
+            ? deck.activeSynergies.ToArray()
+            : Array.Empty<string>();
+
+        y = DrawTextBadges(
+            synergies,
+            "활성 시너지 없음",
+            y
+        );
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// 견본덱의 유닛을 한 줄에 최대 4개씩 카드로 표시한다.
+    /// </summary>
+    private float DrawSampleDeckUnits(List<DeckUnitEntry> units, float y)
+    {
+        if (units == null || units.Count == 0)
+        {
+            GUI.Box(new Rect(0f, y, 520f, 42f), "");
+
+            GUI.Label(
+                new Rect(12f, y + 11f, 420f, 20f),
+                "등록된 목표 유닛이 없습니다.",
+                _mutedStyle
+            );
+
+            return y + 52f;
+        }
+
+        const float cardWidth = 150f;
+        const float cardHeight = 86f;
+        const float gap = 10f;
+        const int cardsPerRow = 4;
+
+        var sortedUnits = new List<DeckUnitEntry>(units);
+
+        sortedUnits.Sort((a, b) =>
+        {
+            int aSlot = a != null ? a.slot : int.MaxValue;
+            int bSlot = b != null ? b.slot : int.MaxValue;
+            return aSlot.CompareTo(bSlot);
+        });
+
+        for (int i = 0; i < sortedUnits.Count; i++)
+        {
+            DeckUnitEntry entry = sortedUnits[i];
+            if (entry == null)
+                continue;
+
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+
+            Rect cardRect = new Rect(
+                col * (cardWidth + gap),
+                y + row * (cardHeight + gap),
+                cardWidth,
+                cardHeight
+            );
+
+            DrawSampleDeckUnitCard(entry, cardRect);
+        }
+
+        int rowCount = Mathf.CeilToInt(sortedUnits.Count / (float)cardsPerRow);
+
+        return y + rowCount * (cardHeight + gap);
+    }
+
+    /// <summary>
+    /// 견본덱 유닛 한 마리의 이름, ID, 코스트와 목표 성급을 표시한다.
+    /// </summary>
+    private void DrawSampleDeckUnitCard(DeckUnitEntry entry, Rect rect)
+    {
+        GUI.Box(rect, "", _unitCardStyle);
+
+        PokemonData pokemon = FindPokemonById(entry.pokemonId);
+
+        string pokemonName = pokemon != null &&
+                             !string.IsNullOrWhiteSpace(pokemon.pokemonName)
+            ? pokemon.pokemonName
+            : $"Pokemon ID {entry.pokemonId}";
+
+        string costText = pokemon != null
+            ? $"{pokemon.cost}코스트"
+            : "코스트 확인 불가";
+
+        GUI.Label(
+            new Rect(rect.x + 8f, rect.y + 8f, rect.width - 16f, 22f),
+            pokemonName,
+            _smallStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + 8f, rect.y + 33f, rect.width - 16f, 18f),
+            $"목표 {FormatStars(entry.starLevel)}",
+            _winStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + 8f, rect.y + 58f, rect.width - 16f, 18f),
+            $"ID {entry.pokemonId} · {costText}",
+            _mutedStyle
+        );
+    }
+
+    /// <summary>
+    /// 중앙 DeckDatabase에서 전체 견본덱 목록을 다시 가져온다.
+    /// </summary>
+    private void RefreshSampleDecks()
+    {
+        _sampleDecks.Clear();
+
+        DeckDatabase db = DeckDatabase.Instance;
+
+        if (db == null || db.decks == null)
+        {
+            _selectedSampleDeckIndex = 0;
+            return;
+        }
+
+        for (int i = 0; i < db.decks.Count; i++)
+        {
+            DeckData deck = db.decks[i];
+
+            if (deck != null)
+                _sampleDecks.Add(deck);
+        }
+
+        _sampleDecks.Sort((a, b) => a.deckId.CompareTo(b.deckId));
+
+        if (_sampleDecks.Count == 0)
+            _selectedSampleDeckIndex = 0;
+        else
+            _selectedSampleDeckIndex = Mathf.Clamp(
+                _selectedSampleDeckIndex,
+                0,
+                _sampleDecks.Count - 1
+            );
+    }
+
+    /// <summary>
+    /// PokemonDatabase의 전체 목록에서 도감 ID가 일치하는 포켓몬을 찾는다.
+    /// 별도 조회 메서드 이름에 의존하지 않도록 현재 all 목록을 직접 검사한다.
+    /// </summary>
+    private static PokemonData FindPokemonById(int pokemonId)
+    {
+        PokemonDatabase db = PokemonDatabase.Instance;
+
+        if (db == null || db.all == null)
+            return null;
+
+        for (int i = 0; i < db.all.Count; i++)
+        {
+            PokemonData pokemon = db.all[i];
+
+            if (pokemon != null && pokemon.id == pokemonId)
+                return pokemon;
+        }
+
+        return null;
     }
 }
