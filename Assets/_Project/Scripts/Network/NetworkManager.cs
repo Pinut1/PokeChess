@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 #if PHOTON_UNITY_NETWORKING
 using ExitGames.Client.Photon;
@@ -31,6 +32,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>플레이어 골드를 Player CustomProperties에 저장할 때 쓰는 키(파트너 표시용).</summary>
     private const string GOLD_PROP_KEY = "Gold";
 
+    /// <summary>플레이어 상점 레벨을 Player CustomProperties에 저장할 때 쓰는 키.</summary>
+    private const string SHOP_LEVEL_PROP_KEY = "ShopLevel";
+
+    /// <summary>공용 포켓몬 풀의 남은 수량 스냅샷.</summary>
+    private const string SHARED_POOL_PROP_KEY = "SharedPool";
+
+    /// <summary>플레이어별 현재 상점 예약 슬롯 스냅샷.</summary>
+    private const string SHARED_SHOP_RESERVATIONS_PROP_KEY = "SharedShopReservations";
+
     /// <summary>팀 공통 HP를 Room CustomProperties에 저장할 때 쓰는 키(GDD: 팀 공통 체력).</summary>
     private const string TEAM_HP_PROP_KEY = "TeamHP";
 
@@ -59,6 +69,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>JoinRandomRoom 실패(빈 방 없음) 시 생성/입장할 고정 방 이름. 양쪽 클라이언트가 같은 이름을 써야 서로 만날 수 있음.</summary>
     private const string FALLBACK_ROOM_NAME = "PokeChessRoom";
 
+    
+
     // ─────────────────────────────────────────
     // 상태 프로퍼티 (읽기 전용)
     // ─────────────────────────────────────────
@@ -68,9 +80,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool IsMasterClient => _soloMode || PhotonNetwork.IsMasterClient;
     public int  PlayerCount   => _soloMode ? 1 : PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
 
+    public bool IsSoloMode => _soloMode;
+
+    /// <summary>2인 Photon 방에서 공용 상점풀을 사용하는지.</summary>
+    public bool UsesSharedShopPool =>
+        !_soloMode &&
+        PhotonNetwork.InRoom &&
+        PhotonNetwork.CurrentRoom != null &&
+        PhotonNetwork.CurrentRoom.PlayerCount == MAX_PLAYERS;
+
     // 전적 기록(MatchRecorder) 등이 Photon 타입에 직접 의존하지 않도록 문자열로 노출.
     public string RoomName       => _soloMode ? "solo" : PhotonNetwork.CurrentRoom?.Name ?? "";
     public string LocalNickname  => _soloMode ? "SoloPlayer" : PhotonNetwork.NickName;
+
+
 
     /// <summary>
     /// 현재 판의 고유 ID(GUID). 협동에선 MasterClient가 방 잠금 시점에 Room 커스텀 속성으로
@@ -301,7 +324,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 솔로 모드: 1인 = 전원 준비 완료
         if (_soloMode) { GameEvents.AllPlayersReady(); return; }
 
-        var props = new Hashtable { { READY_PROP_KEY, true } };
+        var props = new Hashtable 
+        { 
+            { READY_PROP_KEY, true } 
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
@@ -497,6 +523,463 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
+    // 2인 공용 상점풀
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// MasterClient가 관리하는 플레이어별 현재 상점 예약 슬롯.
+    /// key = Photon ActorNumber, value = 포켓몬 id 배열.
+    /// -1은 빈 슬롯 또는 구매 완료 슬롯.
+    /// </summary>
+    private readonly Dictionary<int, int[]> _sharedShopSlotsByActor = new();
+
+    /// <summary>
+    /// 내 현재 상점 레벨을 Photon Player CustomProperties에 기록.
+    /// MasterClient가 양쪽 상점을 각 플레이어 레벨 확률로 생성할 때 사용한다.
+    /// </summary>
+    public void SyncLocalShopLevel(int level)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return;
+
+        var props = new Hashtable
+    {
+        { SHOP_LEVEL_PROP_KEY, Mathf.Max(1, level) }
+    };
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 라운드 자동 갱신용.
+    /// MasterClient가 기존 양쪽 상점의 미구매 유닛을 반환한 뒤,
+    /// 방장 상점 1~5 → 파트너 상점 1~5 순서로 새 상점을 생성한다.
+    /// </summary>
+    public void RefreshAllSharedShops()
+    {
+        if (!UsesSharedShopPool || !IsMasterClient) return;
+
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (shop == null) return;
+
+        // 이전 상점에서 구매되지 않은 예약 유닛을 전부 풀에 반환
+        foreach (var slots in _sharedShopSlotsByActor.Values)
+            shop.ReturnReservedSharedShop(slots);
+
+        _sharedShopSlotsByActor.Clear();
+
+        // 상점 시뮬레이터의 순차 소진 규칙을 적용한다.
+        // 현재 MasterClient의 상점 1~5를 먼저 뽑고,
+        // 이후 남은 공용 풀에서 파트너 상점 1~5를 뽑는다.
+        //
+        // 방장 이탈로 MasterClient가 이관되면,
+        // 이관받은 현재 MasterClient가 다음 상점 갱신의 선처리 플레이어가 된다.
+        Player masterPlayer = PhotonNetwork.MasterClient;
+
+        GenerateAndSendSharedShop(
+            masterPlayer,
+            GetPlayerShopLevel(masterPlayer),
+            shop);
+
+        // 현재 MasterClient를 제외한 다른 플레이어가 파트너다.
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player.ActorNumber == masterPlayer.ActorNumber)
+                continue;
+
+            GenerateAndSendSharedShop(
+                player,
+                GetPlayerShopLevel(player),
+                shop);
+
+            break;
+        }
+
+        // 풀 잔여 수량과 양쪽 예약 상점을 Room 속성에 저장.
+        // MasterClient가 이관돼도 새 MasterClient가 이 상태를 복구할 수 있다.
+        PublishSharedShopState();
+    }
+
+    /// <summary>수동 리롤 요청.</summary>
+    public void RequestSharedShopReroll(int level)
+    {
+        if (!UsesSharedShopPool) return;
+
+        if (IsMasterClient)
+        {
+            ProcessSharedShopReroll(PhotonNetwork.LocalPlayer, level);
+            return;
+        }
+
+        photonView.RPC(
+            nameof(RPC_RequestSharedShopReroll),
+            RpcTarget.MasterClient,
+            Mathf.Max(1, level));
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopReroll(int level, PhotonMessageInfo info)
+    {
+        if (!IsMasterClient) return;
+
+        ProcessSharedShopReroll(info.Sender, level);
+    }
+
+    private void ProcessSharedShopReroll(
+    Player player,
+    int requestedLevel)
+    {
+        if (player == null) return;
+
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
+
+        if (shop == null) return;
+
+        // 요청한 플레이어의 기존 상점에서 구매하지 않은 예약 유닛을
+        // 먼저 공용 풀에 반환한 뒤 새 상점을 생성한다.
+        if (_sharedShopSlotsByActor.TryGetValue(
+                player.ActorNumber,
+                out int[] oldSlots))
+        {
+            shop.ReturnReservedSharedShop(oldSlots);
+        }
+
+        // 클라이언트가 RPC로 보낸 값을 그대로 사용하지 않고,
+        // Photon Player CustomProperties에 동기화된 레벨을 권위값으로 사용한다.
+        int authoritativeLevel = GetPlayerShopLevel(player);
+        int safeRequestedLevel = Mathf.Max(1, requestedLevel);
+
+        if (authoritativeLevel != safeRequestedLevel)
+        {
+            Debug.LogWarning(
+                $"[SharedShop] 리롤 레벨 불일치 — " +
+                $"요청 {safeRequestedLevel}, 동기화 {authoritativeLevel}. " +
+                $"동기화 레벨을 사용합니다.");
+        }
+
+        GenerateAndSendSharedShop(
+            player,
+            authoritativeLevel,
+            shop);
+
+        // 리롤로 공용 풀과 예약 슬롯이 바뀌었으므로 최신 상태를 저장한다.
+        PublishSharedShopState();
+    }
+
+    /// <summary>
+    /// 상점 슬롯 구매 승인 요청.
+    /// 상점에 등장할 때 이미 풀에서 임시 차감됐으므로,
+    /// 구매 승인 시 예약 슬롯만 비우고 풀은 추가 차감하지 않는다.
+    /// </summary>
+    public void RequestSharedShopPurchase(int slot, int pokemonId)
+    {
+        if (!UsesSharedShopPool) return;
+
+        if (IsMasterClient)
+        {
+            ProcessSharedShopPurchase(
+                PhotonNetwork.LocalPlayer,
+                slot,
+                pokemonId);
+            return;
+        }
+
+        photonView.RPC(
+            nameof(RPC_RequestSharedShopPurchase),
+            RpcTarget.MasterClient,
+            slot,
+            pokemonId);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopPurchase(
+        int slot,
+        int pokemonId,
+        PhotonMessageInfo info)
+    {
+        if (!IsMasterClient) return;
+
+        ProcessSharedShopPurchase(info.Sender, slot, pokemonId);
+    }
+
+    private void ProcessSharedShopPurchase(
+        Player player,
+        int slot,
+        int pokemonId)
+    {
+        bool approved = false;
+
+        if (player != null &&
+            _sharedShopSlotsByActor.TryGetValue(player.ActorNumber, out int[] slots) &&
+            slots != null &&
+            slot >= 0 &&
+            slot < slots.Length &&
+            slots[slot] == pokemonId)
+        {
+            // 구매 확정: 해당 예약 슬롯은 이후 리롤 때 반환하지 않음
+            slots[slot] = -1;
+            approved = true;
+        }
+
+        if (player != null)
+        {
+            photonView.RPC(
+                nameof(RPC_SharedShopPurchaseResult),
+                player,
+                slot,
+                pokemonId,
+                approved);
+        }
+
+        if (approved)
+            PublishSharedShopState();
+    }
+
+    /// <summary>
+    /// 판매 또는 구매 실패 보정으로 공용 풀에 유닛 수량을 반환한다.
+    /// </summary>
+    public void ReturnSharedPoolCopies(int pokemonId, int amount)
+    {
+        if (!UsesSharedShopPool || amount <= 0) return;
+
+        int safeAmount = Mathf.Clamp(amount, 1, 9);
+
+        if (IsMasterClient)
+        {
+            ApplySharedPoolCopies(pokemonId, safeAmount);
+            return;
+        }
+
+        photonView.RPC(
+            nameof(RPC_ReturnSharedPoolCopies),
+            RpcTarget.MasterClient,
+            pokemonId,
+            safeAmount);
+    }
+
+    [PunRPC]
+    private void RPC_ReturnSharedPoolCopies(
+        int pokemonId,
+        int amount,
+        PhotonMessageInfo info)
+    {
+        if (!IsMasterClient) return;
+
+        ApplySharedPoolCopies(
+            pokemonId,
+            Mathf.Clamp(amount, 1, 9));
+    }
+
+    private void ApplySharedPoolCopies(int pokemonId, int amount)
+    {
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
+
+        if (shop == null) return;
+
+        shop.AddCopiesToSharedPool(pokemonId, amount);
+        PublishSharedShopState();
+    }
+
+    private void GenerateAndSendSharedShop(Player player, int level, ShopManager shop)
+    {
+        if (player == null || shop == null) return;
+
+        int[] ids = shop.CreateReservedSharedShop(level);
+        _sharedShopSlotsByActor[player.ActorNumber] = ids;
+
+        // 어떤 플레이어의 상점이 먼저 생성됐는지 확인하기 위한 테스트 로그.
+        // 공용 풀 검증이 끝난 뒤에도 유지해도 되는 상태 확인용 로그다.
+        Debug.Log(
+            $"[SharedShop] 상점 생성 → " +
+            $"{player.NickName} / Actor {player.ActorNumber} / " +
+            $"Lv.{level} / [{string.Join(", ", ids)}]");
+
+        photonView.RPC(
+            nameof(RPC_ApplySharedShop),
+            player,
+            ids);
+    }
+
+    private int GetPlayerShopLevel(Player player)
+    {
+        if (player == null) return 1;
+
+        if (player.CustomProperties.TryGetValue(
+                SHOP_LEVEL_PROP_KEY,
+                out object levelValue))
+        {
+            return Mathf.Max(1, (int)levelValue);
+        }
+
+        // 로컬 방장은 아직 CustomProperty 반영 전이어도 현재 값을 직접 사용
+        if (player == PhotonNetwork.LocalPlayer &&
+            GameManager.Instance != null &&
+            GameManager.Instance.Shop != null)
+        {
+            return GameManager.Instance.Shop.CurrentLevel;
+        }
+
+        return 1;
+    }
+
+    [PunRPC]
+    private void RPC_ApplySharedShop(int[] pokemonIds)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        shop?.ApplySharedShop(pokemonIds);
+    }
+
+    [PunRPC]
+    private void RPC_SharedShopPurchaseResult(
+        int slot,
+        int pokemonId,
+        bool approved)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        shop?.HandleSharedPurchaseResult(slot, pokemonId, approved);
+    }
+
+    /// <summary>
+    /// 현재 MasterClient가 공용 풀과 플레이어별 예약 상점을
+    /// Room CustomProperties에 저장한다.
+    ///
+    /// MasterClient가 이관되더라도 새 MasterClient가 동일한 상태를
+    /// Room 속성에서 복구할 수 있다.
+    /// </summary>
+    private void PublishSharedShopState()
+    {
+        if (!UsesSharedShopPool || !IsMasterClient) return;
+
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
+
+        if (shop == null) return;
+
+        var props = new Hashtable
+    {
+        { SHARED_POOL_PROP_KEY, shop.ExportSharedPoolSnapshot() },
+        { SHARED_SHOP_RESERVATIONS_PROP_KEY, EncodeSharedShopReservations() }
+    };
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 플레이어별 예약 슬롯을 하나의 int 배열로 직렬화.
+    /// 구조: ActorNumber, 슬롯 수, 슬롯 데이터... 반복.
+    /// </summary>
+    private int[] EncodeSharedShopReservations()
+    {
+        var encoded = new List<int>();
+        var actorNumbers = new List<int>(_sharedShopSlotsByActor.Keys);
+
+        actorNumbers.Sort();
+
+        foreach (int actorNumber in actorNumbers)
+        {
+            int[] slots = _sharedShopSlotsByActor[actorNumber];
+            int slotCount = slots?.Length ?? 0;
+
+            encoded.Add(actorNumber);
+            encoded.Add(slotCount);
+
+            for (int i = 0; i < slotCount; i++)
+                encoded.Add(slots[i]);
+        }
+
+        return encoded.ToArray();
+    }
+
+    /// <summary>Room 속성에서 받은 예약 슬롯 데이터를 복원.</summary>
+    private void DecodeSharedShopReservations(int[] encoded)
+    {
+        _sharedShopSlotsByActor.Clear();
+
+        if (encoded == null || encoded.Length == 0)
+            return;
+
+        int index = 0;
+
+        while (index + 1 < encoded.Length)
+        {
+            int actorNumber = encoded[index++];
+            int slotCount = encoded[index++];
+
+            if (slotCount < 0 || index + slotCount > encoded.Length)
+            {
+                Debug.LogWarning("[SharedShop] 예약 슬롯 스냅샷 형식 오류");
+                _sharedShopSlotsByActor.Clear();
+                return;
+            }
+
+            var slots = new int[slotCount];
+
+            for (int i = 0; i < slotCount; i++)
+                slots[i] = encoded[index++];
+
+            _sharedShopSlotsByActor[actorNumber] = slots;
+        }
+
+        // 상점 정보를 모두 읽은 뒤에도 값이 남아 있으면
+        // 저장 형식이 잘못된 것으로 판단하고 초기화한다.
+        if (index != encoded.Length)
+        {
+            Debug.LogWarning(
+                "[SharedShop] 저장된 상점 정보가 올바르지 않아 초기화합니다.");
+
+            _sharedShopSlotsByActor.Clear();
+        }
+    }
+
+    /// <summary>
+    /// 현재 Room CustomProperties에 저장된 공용 상점 상태를 복구.
+    /// applyLocalShop=true면 내 예약 슬롯을 실제 상점 UI에도 다시 적용한다.
+    /// </summary>
+    private void RestoreSharedShopStateFromRoomProperties(bool applyLocalShop)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return;
+
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
+
+        if (shop == null) return;
+
+        Hashtable roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
+
+        if (roomProps.TryGetValue(
+                SHARED_POOL_PROP_KEY,
+                out object poolValue) &&
+            poolValue is int[] poolSnapshot)
+        {
+            shop.ImportSharedPoolSnapshot(poolSnapshot);
+        }
+
+        if (roomProps.TryGetValue(
+                SHARED_SHOP_RESERVATIONS_PROP_KEY,
+                out object reservationValue) &&
+            reservationValue is int[] reservationSnapshot)
+        {
+            DecodeSharedShopReservations(reservationSnapshot);
+        }
+
+        if (!applyLocalShop) return;
+
+        int localActorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+
+        if (_sharedShopSlotsByActor.TryGetValue(
+                localActorNumber,
+                out int[] localSlots))
+        {
+            shop.ApplySharedShop((int[])localSlots.Clone());
+        }
+    }
+
+    // ─────────────────────────────────────────
     // 상태 동기화 (보드 미러 / 골드 / 팀 HP)
     // ─────────────────────────────────────────
 
@@ -535,7 +1018,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         if (_soloMode) { BroadcastRoundStart(1); return; }
         if (!PhotonNetwork.InRoom) return;
-        var props = new Hashtable { { SCENE_READY_PROP_KEY, true } };
+        var props = new Hashtable
+        { 
+            { SCENE_READY_PROP_KEY, true } 
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
@@ -731,8 +1217,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             GameEvents.OpponentReconnected();
         }
 
-        if (PlayerCount == MAX_PLAYERS)
+        bool isRunningSession =
+            PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(MATCH_GUID_ROOM_KEY);
+
+        if (PlayerCount == MAX_PLAYERS && !isRunningSession)
+        {
+            // 최초 2인 입장일 때만 게임 시작과 씬 로드를 수정한다.
             OnRoomFull();
+        }
+        else if (isRunningSession)
+        {
+            //재접속으로 다시 2인이 된 경우에는 기존 게임 씬을 유지한다.
+            Debug.Log(
+                "[Network] 진행 중인 세션 재합류 — 게임 씬 재로드 생략");
+        }
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
@@ -766,6 +1264,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void OnRoomFull()
     {
+        if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(
+        MATCH_GUID_ROOM_KEY))
+        {
+            Debug.Log(
+                "[Network] 이미 시작된 세션 — OnRoomFull 중복 처리 생략");
+            return;
+        }
+
         // 2인 모두 입장 → 방 닫고 게임 시작
         Debug.Log("[Network] 2인 모두 입장 — 게임 시작");
 
@@ -866,22 +1372,88 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>팀 공통 HP(Room 속성) 변경 수신 → 모든 클라가 UI 갱신, 0 이하면 세션 종료.</summary>
-    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    public override void OnRoomPropertiesUpdate(
+    Hashtable propertiesThatChanged)
     {
-        if (!propertiesThatChanged.TryGetValue(TEAM_HP_PROP_KEY, out object hp)) return;
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
 
-        int health = (int)hp;
-        GameEvents.HealthChanged(health);
-        if (health <= 0)
+        // 현재 MasterClient는 공용 풀의 원본을 직접 관리한다.
+        // 자신이 발행한 Room 속성 콜백으로 로컬 원본을 다시 덮어쓰지 않는다.
+        //
+        // 비MasterClient만 Room 속성에서 복사본을 갱신하며,
+        // 이후 MasterClient로 이관될 경우 이 복사본을 관리 원본으로 이어받는다.
+        if (!IsMasterClient)
         {
-            Debug.LogWarning("[Network] 팀 공통 HP 0 — 세션 종료(게임오버)");
-            GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
+            // 공용 풀 잔여 수량 스냅샷 수신
+            if (shop != null &&
+                propertiesThatChanged.TryGetValue(
+                    SHARED_POOL_PROP_KEY,
+                    out object poolValue) &&
+                poolValue is int[] poolSnapshot)
+            {
+                shop.ImportSharedPoolSnapshot(poolSnapshot);
+            }
+
+            // 플레이어별 현재 상점 예약 슬롯 스냅샷 수신
+            if (propertiesThatChanged.TryGetValue(
+                    SHARED_SHOP_RESERVATIONS_PROP_KEY,
+                    out object reservationValue) &&
+                reservationValue is int[] reservationSnapshot)
+            {
+                DecodeSharedShopReservations(reservationSnapshot);
+            }
+        }
+
+        // 팀 공통 HP는 권위 여부와 무관하게 양쪽 클라이언트가 반영한다.
+        if (propertiesThatChanged.TryGetValue(
+                TEAM_HP_PROP_KEY,
+                out object hpValue))
+        {
+            int health = (int)hpValue;
+
+            GameEvents.HealthChanged(health);
+
+            if (health <= 0)
+            {
+                Debug.LogWarning(
+                    "[Network] 팀 공통 HP 0 — 세션 종료(게임오버)");
+
+                GameEvents.SessionEnded(
+                    SessionEndReason.TeamHpZero);
+            }
         }
     }
 
-    public override void OnMasterClientSwitched(Player newMasterClient)
+    public override void OnMasterClientSwitched(
+    Player newMasterClient)
     {
-        Debug.Log($"[Network] 마스터 클라이언트 변경 → {newMasterClient.NickName}");
+        Debug.Log(
+            $"[Network] MasterClient 이관 → {newMasterClient.NickName}");
+
+        // 이 클라이언트가 새 MasterClient가 아니라면
+        // 권위 상태 복구를 수행하지 않는다.
+        if (newMasterClient != PhotonNetwork.LocalPlayer)
+            return;
+
+        // MatchGuid가 존재하면 이미 시작된 게임이다.
+        // 새 MasterClient의 로컬 _gameStarted가 false여도
+        // 라운드 1을 다시 시작하지 않도록 상태를 복구한다.
+        _gameStarted =
+            PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(
+                MATCH_GUID_ROOM_KEY);
+
+        // Room CustomProperties에 저장된 최신 공용 풀과
+        // 플레이어별 예약 상점을 새 관리 원본으로 복구한다.
+        //
+        // 현재 플레이어의 화면 상점은 이미 유지되고 있으므로
+        // applyLocalShop은 false로 지정한다.
+        RestoreSharedShopStateFromRoomProperties(false);
+
+        Debug.Log(
+            "[SharedShop] 공용 풀 관리 권위 인계 완료 — " +
+            "현재 MasterClient가 기존 상태를 이어서 관리합니다.");
     }
 
     public override void OnDisconnected(DisconnectCause cause)
@@ -908,6 +1480,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             if (PhotonNetwork.InRoom)
             {
                 Debug.Log("[Network] 재접속 성공");
+
+                RestoreSharedShopStateFromRoomProperties(true);
+
                 _selfReconnectRoutine = null;
                 yield break;
             }
@@ -934,6 +1509,15 @@ public class NetworkManager : MonoBehaviour
     public bool IsInRoom       => false;
     public bool IsMasterClient => true;   // 오프라인에서는 항상 호스트 취급
     public int  PlayerCount    => 1;
+
+    public bool IsSoloMode => true;
+    public bool UsesSharedShopPool => false;
+
+    public void SyncLocalShopLevel(int level) { }
+    public void RefreshAllSharedShops() { }
+    public void RequestSharedShopReroll(int level) { }
+    public void RequestSharedShopPurchase(int slot, int pokemonId) { }
+    public void ReturnSharedPoolCopies(int pokemonId, int amount) { }
 
     // 실구현과 동일한 표면(전적 기록 등에서 사용).
     public string RoomName        => "offline";

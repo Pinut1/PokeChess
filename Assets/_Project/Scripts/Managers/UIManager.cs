@@ -175,32 +175,44 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void DrawProgressPanel()
     {
-        const float width = 250f;
+        // 인벤토리와 유닛 상점 사이의 좁은 공간에 맞춘 축소 크기.
+        const float width = 150f;
         const float height = 145f;
 
-        // PrototypeHud의 유닛 상점 배치값과 동일하게 계산한다.
+        // PrototypeHud의 현재 유닛 상점 배치값과 동일하게 맞춘다.
         const int shopSlotCount = 5;
-        const float shopSlotWidth = 110f;
+        const float shopSlotWidth = 145f;
         const float shopSlotGap = 6f;
 
-        float shopTotalWidth = shopSlotCount * (shopSlotWidth + shopSlotGap);
-        float shopStartX = (Screen.width - shopTotalWidth) / 2f;
+        float shopTotalWidth =
+            shopSlotCount * shopSlotWidth +
+            (shopSlotCount - 1) * shopSlotGap;
 
-        // 유닛 상점 왼쪽에 패널 배치.
-        // 작은 해상도에서는 화면 밖으로 나가지 않도록 최소 10px을 보장한다.
-        float x = Mathf.Max(10f, shopStartX - width - 20f);
+        float shopStartX =
+            (Screen.width - shopTotalWidth) / 2f;
+
+        // 유닛 상점 바로 왼쪽에 4px 간격을 두고 배치한다.
+        // 창 폭을 줄여 왼쪽 인벤토리와도 겹치지 않게 한다.
+        float x = Mathf.Max(
+            10f,
+            shopStartX - width - 4f
+        );
+
         float y = Screen.height - 190f;
 
-        GUI.Box(new Rect(x, y, width, height), "플레이어 정보");
+        GUI.Box(
+            new Rect(x, y, width, height),
+            "플레이어 정보"
+        );
 
         GUI.Label(
-            new Rect(x + 15f, y + 28f, 220f, 22f),
+            new Rect(x + 10f, y + 28f, width - 20f, 22f),
             $"골드: {_gold} G"
         );
 
         GUI.Label(
-            new Rect(x + 15f, y + 50f, 220f, 22f),
-            $"레벨: {_currentLevel} · 배치 가능: {_unitCap}"
+            new Rect(x + 10f, y + 50f, width - 20f, 22f),
+            $"레벨: {_currentLevel} · 배치: {_unitCap}"
         );
 
         string xpText = _requiredXp > 0
@@ -208,11 +220,13 @@ public class UIManager : MonoBehaviour
             : "XP: MAX";
 
         GUI.Label(
-            new Rect(x + 15f, y + 72f, 220f, 22f),
+            new Rect(x + 10f, y + 72f, width - 20f, 22f),
             xpText
         );
 
-        bool hasPurchaseConfig = _buyXpCostGold > 0 && _buyXpAmount > 0;
+        bool hasPurchaseConfig =
+            _buyXpCostGold > 0 &&
+            _buyXpAmount > 0;
 
         bool canBuyXp =
             hasPurchaseConfig &&
@@ -222,12 +236,24 @@ public class UIManager : MonoBehaviour
         GUI.enabled = canBuyXp;
 
         string buttonLabel = hasPurchaseConfig
-            ? $"XP 구매 ({_buyXpCostGold}G → +{_buyXpAmount}XP)"
+            ? $"XP 구매\n{_buyXpCostGold}G → +{_buyXpAmount}XP"
             : "XP 구매 준비 중";
 
+        var buttonStyle = new GUIStyle(GUI.skin.button)
+        {
+            fontSize = 11,
+            alignment = TextAnchor.MiddleCenter
+        };
+
         if (GUI.Button(
-            new Rect(x + 15f, y + 100f, 220f, 32f),
-            buttonLabel
+            new Rect(
+                x + 10f,
+                y + 98f,
+                width - 20f,
+                38f
+            ),
+            buttonLabel,
+            buttonStyle
         ))
         {
             var gm = GameManager.Instance;
