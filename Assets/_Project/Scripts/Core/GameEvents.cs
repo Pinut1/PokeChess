@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -81,6 +82,12 @@ public static class GameEvents
     // ──────────────────────────────────────────
     // 증강
     // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 증강 3택1 선택지가 준비됨. 인자 = 제시된 증강 목록(보통 3개).
+    /// AugmentManager가 발행 → 선택 UI가 표시하고, 플레이어 선택 시 AugmentManager.SelectAugment 호출.
+    /// </summary>
+    public static event Action<IReadOnlyList<AugmentData>> OnAugmentOfferReady;
 
     /// <summary>증강 선택 완료</summary>
     public static event Action<AugmentData> OnAugmentSelected;
@@ -208,6 +215,7 @@ public static class GameEvents
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
     // ──────────────────────────────────────────
 
+    public static void AugmentOfferReady(IReadOnlyList<AugmentData> offer) => OnAugmentOfferReady?.Invoke(offer);
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);

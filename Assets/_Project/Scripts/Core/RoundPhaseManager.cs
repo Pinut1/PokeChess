@@ -109,7 +109,8 @@ public class RoundPhaseManager : MonoBehaviour
 
         // TODO(기획 확정 후, 담당자 분배): 전투 전 이벤트 분기. 여기엔 로직을 하드코딩하지 않고
         // OnStageEntered 구독으로 각 파트가 처리한다(증강 풀/보상 수치/연출 모두 기획 미확정).
-        //  - preReward(증강 3택1 / 아이템 / 컴패니언): 샵·증강 담당이 처리. Ready 전 강제(블로킹) 여부 기획 확정 필요.
+        //  - preReward 증강 3택1: RewardManager가 OnStageEntered에서 처리(연결 완료, 2026-07-16). 아이템/컴패니언은 기획 미확정.
+        //    Ready 전 강제(블로킹) 여부 기획 확정 필요 — 현재는 선택 안 해도 라운드 진행 가능.
         //  - trainerName 존재 시 트레이너 등장 연출 + 전용 BGM/배경(UI 담당).
         // 전투 승리 보상은 RewardManager가 OnBattleEnd(true)에서 CurrentStage.rewardTableId로 지급(연결 완료, 골드만 — 수치는 역기획서 대기).
     }
