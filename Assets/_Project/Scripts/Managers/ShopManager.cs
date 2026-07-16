@@ -112,6 +112,11 @@ public class ShopManager : MonoBehaviour
     public int UnitCap => GetUnitCap(_currentLevel);
     public int BuyXpCostGold => _buyXpCostGold;
     public int BuyXpAmount => _buyXpAmount;
+    /// <summary>
+    /// 이 플레이어가 4코 상점 오픈 증강을 보유하고 있는지.
+    /// MasterClient가 플레이어별 상점 확률을 계산할 때 사용한다.
+    /// </summary>
+    public bool IsCost4ForceOpen => _cost4ForceOpen;
 
     public int ShopSize => _shopSize;
     public int ItemShopSize => _itemShopSize;
@@ -226,6 +231,8 @@ public class ShopManager : MonoBehaviour
         // MasterClient가 각 플레이어의 레벨별 상점 확률을 계산할 수 있도록
         // 현재 레벨을 Photon Player CustomProperties에 기록한다.
         Network?.SyncLocalShopLevel(_currentLevel);
+        // 플레이어별 4코 상점 오픈 상태를 Photon Player 속성에 기록한다.
+        Network?.SyncLocalCostFourForceOpen(_cost4ForceOpen);
 
         if (UsesSharedShopPool)
         {
@@ -592,15 +599,46 @@ public class ShopManager : MonoBehaviour
     /// 4코 상점 강제 오픈(증강 seam): 즉시 상점을 4코스트 5마리로 무료 갱신하고("5마리 즉시"),
     /// 이후 레벨과 무관하게 4코가 확률표에 등장한다. ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
     /// </summary>
+    /// <summary>
+    /// 4코 상점 강제 오픈 증강.
+    ///
+    /// 선택 즉시:
+    /// - 솔로: 로컬 상점 5칸을 4코로 갱신
+    /// - 2인: MasterClient에게 요청하여 공용 풀에서 4코 5장을 예약 차감
+    ///
+    /// 이후:
+    /// - 이 플레이어의 일반 상점에 4코 등장 가중치가 계속 적용된다.
+    /// </summary>
     public void ForceOpenCostFour()
     {
         _cost4ForceOpen = true;
 
+        // MasterClient가 플레이어별 증강 적용 여부를 알 수 있도록 동기화한다.
+        Network?.SyncLocalCostFourForceOpen(true);
+
+        if (UsesSharedShopPool)
+        {
+            // 기존 상점 반환과 4코 5장 예약 차감은
+            // 공용 풀 권위자인 MasterClient가 처리한다.
+            Network.RequestForceOpenCostFourShop();
+
+            Debug.Log(
+                "[Shop] 4코 상점 강제 오픈 요청 — " +
+                "MasterClient 공용 풀에서 4코 5슬롯 생성");
+
+            return;
+        }
+
+        // 솔로와 오프라인 테스트는 기존 로컬 방식으로 처리한다.
         for (int i = 0; i < _slots.Length; i++)
             _slots[i] = RollOnePokemonOfCost(4);
 
         GameEvents.ShopRerolled();
-        Debug.Log($"[Shop] 4코 상점 강제 오픈 — 즉시 4코 {_slots.Length}슬롯 갱신, 이후 등장률 {COST4_FORCE_OPEN_RATE}%");
+
+        Debug.Log(
+            $"[Shop] 4코 상점 강제 오픈 — " +
+            $"즉시 4코 {_slots.Length}슬롯 갱신, " +
+            $"이후 등장 가중치 {COST4_FORCE_OPEN_RATE}");
     }
 
     /// <summary>특정 코스트만 굴림(4코 강제 오픈용). 해당 코스트 풀이 비면 일반 굴림으로 폴백.</summary>
@@ -648,24 +686,34 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 2인 공용 풀에서 상점 슬롯을 생성한다.
-    ///
-    /// 같은 코스트 안에서는 포켓몬 종류를 같은 확률로 고르는 것이 아니라,
-    /// 실제 남아 있는 카피 수에 비례해서 뽑는다.
-    ///
-    /// 예:
-    /// 피카츄 1장, 꼬마돌 30장이 남았다면
-    /// 피카츄 1/31, 꼬마돌 30/31 확률로 선택된다.
-    ///
-    /// 뽑힌 포켓몬은 상점에 등장하는 즉시 공용 풀에서 예약 차감된다.
+    /// 기존 호출 호환용.
+    /// 로컬 플레이어의 4코 오픈 상태를 적용한다.
     /// </summary>
     public int[] CreateReservedSharedShop(int level)
+    {
+        return CreateReservedSharedShop(
+            level,
+            _cost4ForceOpen);
+    }
+
+    /// <summary>
+    /// 2인 공용 풀에서 지정 플레이어의 상점 슬롯을 생성한다.
+    ///
+    /// cost4ForceOpen은 상점을 받는 플레이어의 증강 보유 상태다.
+    /// MasterClient 자신의 상태가 아니라 대상 플레이어별 상태를 전달받아야 한다.
+    /// </summary>
+    public int[] CreateReservedSharedShop(
+        int level,
+        bool cost4ForceOpen)
     {
         var pokemonIds = new int[_shopSize];
 
         for (int slot = 0; slot < pokemonIds.Length; slot++)
         {
-            PokemonData data = RollOnePokemonByRemainingCopies(level);
+            PokemonData data =
+                RollOnePokemonByRemainingCopies(
+                    level,
+                    cost4ForceOpen);
 
             if (data == null)
             {
@@ -673,7 +721,7 @@ public class ShopManager : MonoBehaviour
                 continue;
             }
 
-            // 구매할 때가 아니라 상점에 등장하는 시점에 풀에서 한 장 예약한다.
+            // 구매할 때가 아니라 상점에 등장하는 순간 예약 차감한다.
             DecreaseChampionPool(data, 1);
             pokemonIds[slot] = data.id;
         }
@@ -682,23 +730,55 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정한 레벨의 코스트 확률을 먼저 적용한 뒤,
+    /// 특정 코스트만 사용해 공용 상점 5칸을 생성한다.
+    ///
+    /// 4코 상점 오픈의 즉시 효과에 사용하며,
+    /// 같은 4코 안에서도 남은 카피 수에 비례해 추첨한다.
+    /// </summary>
+    public int[] CreateReservedSharedShopOfCost(int cost)
+    {
+        var pokemonIds = new int[_shopSize];
+
+        for (int slot = 0; slot < pokemonIds.Length; slot++)
+        {
+            PokemonData data = PickByRemainingCopies(cost);
+
+            if (data == null)
+            {
+                pokemonIds[slot] = -1;
+                continue;
+            }
+
+            DecreaseChampionPool(data, 1);
+            pokemonIds[slot] = data.id;
+        }
+
+        return pokemonIds;
+    }
+
+    /// <summary>
+    /// 지정 플레이어의 레벨 확률과 4코 증강 상태를 적용한 뒤,
     /// 선택된 코스트 안에서 남은 카피 수에 비례해 한 종을 뽑는다.
     /// </summary>
-    private PokemonData RollOnePokemonByRemainingCopies(int level)
+    private PokemonData RollOnePokemonByRemainingCopies(
+        int level,
+        bool cost4ForceOpen)
     {
-        // 선택된 코스트가 이미 전부 소진됐을 수 있으므로 여러 번 다시 시도한다.
         for (int attempt = 0; attempt < 10; attempt++)
         {
-            int cost = RollCostByLevel(level);
-            PokemonData selected = PickByRemainingCopies(cost);
+            int cost = RollCostByLevel(
+                level,
+                cost4ForceOpen);
+
+            PokemonData selected =
+                PickByRemainingCopies(cost);
 
             if (selected != null)
                 return selected;
         }
 
-        // 여러 번 시도해도 선택하지 못하면
-        // 코스트와 관계없이 현재 남아 있는 모든 카피 중에서 한 장을 뽑는다.
+        // 선택된 코스트가 모두 고갈된 경우
+        // 현재 남아 있는 전체 공용 풀에서 가중 추첨한다.
         return PickByRemainingCopies(0);
     }
 
@@ -924,19 +1004,32 @@ public class ShopManager : MonoBehaviour
         Debug.Log("[SharedShop] 공용 풀 상태 동기화 완료");
     }
 
+    /// <summary>
+    /// 로컬 플레이어의 증강 상태를 적용하는 기존 상점용 오버로드.
+    /// </summary>
     private int RollCostByLevel(int level)
     {
-        int[] rates = GetCostRates(level);
+        return RollCostByLevel(
+            level,
+            _cost4ForceOpen);
+    }
 
-        // 4코 상점 오픈 증강: 확률표에 4코가 없는 저레벨에도 4코 등장을 강제 주입.
-        // (총합이 100을 넘어도 가중치 방식이라 비율로만 동작.)
-        if (_cost4ForceOpen && rates[3] <= 0)
-            rates[3] = COST4_FORCE_OPEN_RATE;
+    /// <summary>
+    /// 지정 플레이어의 4코 오픈 상태를 적용해 코스트를 추첨한다.
+    /// </summary>
+    private int RollCostByLevel(
+        int level,
+        bool cost4ForceOpen)
+    {
+        int[] rates =
+            GetEffectiveCostRates(
+                level,
+                cost4ForceOpen);
 
         int total = 0;
 
         for (int i = 0; i < rates.Length; i++)
-            total += rates[i];
+            total += Mathf.Max(0, rates[i]);
 
         if (total <= 0)
             return 1;
@@ -946,12 +1039,37 @@ public class ShopManager : MonoBehaviour
 
         for (int i = 0; i < rates.Length; i++)
         {
-            cumulative += rates[i];
+            cumulative += Mathf.Max(0, rates[i]);
+
             if (roll < cumulative)
-                return i + 1; // index 0 = 1코스트
+                return i + 1;
         }
 
         return 1;
+    }
+
+    /// <summary>
+    /// 기본 레벨 확률표에 플레이어별 4코 증강 효과를 적용한다.
+    ///
+    /// 현재 15는 정확한 15%가 아니라 가중치다.
+    /// 예를 들어 Lv1은 1코 100 + 4코 15이므로
+    /// 실제 표시 확률은 약 13.04%가 된다.
+    /// </summary>
+    private int[] GetEffectiveCostRates(
+        int level,
+        bool cost4ForceOpen)
+    {
+        int[] rates = GetCostRates(level);
+
+        if (cost4ForceOpen)
+        {
+            // 원래 4코 확률이 15보다 낮으면 최소 15 가중치를 보장한다.
+            rates[3] = Mathf.Max(
+                rates[3],
+                COST4_FORCE_OPEN_RATE);
+        }
+
+        return rates;
     }
 
     /// <summary>
@@ -987,7 +1105,9 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public int[] GetCurrentCostRatesForDebug()
     {
-        return GetCostRates(_currentLevel);
+        return GetEffectiveCostRates(
+            _currentLevel,
+            _cost4ForceOpen);
     }
 
     /// <summary>
@@ -1038,7 +1158,7 @@ public class ShopManager : MonoBehaviour
             sameCostRemaining += Mathf.Max(0, pair.Value);
         }
 
-        int[] rates = GetCostRates(_currentLevel);
+        int[] rates = GetEffectiveCostRates(_currentLevel, _cost4ForceOpen);
 
         int totalRateWeight = 0;
 

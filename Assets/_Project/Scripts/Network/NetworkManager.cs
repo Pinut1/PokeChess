@@ -35,6 +35,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>플레이어 상점 레벨을 Player CustomProperties에 저장할 때 쓰는 키.</summary>
     private const string SHOP_LEVEL_PROP_KEY = "ShopLevel";
 
+    /// <summary>
+    /// 플레이어별 4코 상점 오픈 증강 보유 여부.
+    /// </summary>
+    private const string COST4_FORCE_OPEN_PROP_KEY = "Cost4ForceOpen";
+
     /// <summary>공용 포켓몬 풀의 남은 수량 스냅샷.</summary>
     private const string SHARED_POOL_PROP_KEY = "SharedPool";
 
@@ -534,6 +539,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private readonly Dictionary<int, int[]> _sharedShopSlotsByActor = new();
 
     /// <summary>
+    /// 현재 MasterClient가 즉시 확인할 수 있는
+    /// 4코 상점 오픈 보유 플레이어 ActorNumber 집합.
+    ///
+    /// Player CustomProperties가 네트워크로 도착하기 전이라도
+    /// 증강 선택 직후 리롤에 효과가 빠지지 않도록 보조한다.
+    /// </summary>
+    private readonly HashSet<int> _cost4ForceOpenActors = new();
+
+    /// <summary>
     /// 내 현재 상점 레벨을 Photon Player CustomProperties에 기록.
     /// MasterClient가 양쪽 상점을 각 플레이어 레벨 확률로 생성할 때 사용한다.
     /// </summary>
@@ -542,11 +556,108 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode || !PhotonNetwork.InRoom) return;
 
         var props = new Hashtable
-    {
-        { SHOP_LEVEL_PROP_KEY, Mathf.Max(1, level) }
-    };
+        {
+            { SHOP_LEVEL_PROP_KEY, Mathf.Max(1, level) }
+        };
 
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 내 4코 상점 오픈 증강 보유 상태를
+    /// Photon Player CustomProperties에 기록한다.
+    /// </summary>
+    public void SyncLocalCostFourForceOpen(bool enabled)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom)
+            return;
+
+        var props = new Hashtable
+        {
+            {COST4_FORCE_OPEN_PROP_KEY, enabled}
+        };
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 4코 상점 오픈 증강의 즉시 5슬롯 갱신 요청.
+    /// 실제 공용 풀 수정은 현재 MasterClient가 담당한다.
+    /// </summary>
+    public void RequestForceOpenCostFourShop()
+    {
+        if (!UsesSharedShopPool)
+            return;
+
+        if (IsMasterClient)
+        {
+            ProcessForceOpenCostFourShop(
+                PhotonNetwork.LocalPlayer);
+
+            return;
+        }
+
+        photonView.RPC(
+            nameof(RPC_RequestForceOpenCostFourShop),
+            RpcTarget.MasterClient);
+    }
+
+    [PunRPC]
+    private void RPC_RequestForceOpenCostFourShop(
+        PhotonMessageInfo info)
+    {
+        if (!IsMasterClient)
+            return;
+
+        ProcessForceOpenCostFourShop(info.Sender);
+    }
+
+    /// <summary>
+    /// 대상 플레이어의 기존 미구매 상점을 반환한 뒤,
+    /// 공용 풀에서 4코 5장을 예약 차감하여 대상에게 전송한다.
+    /// </summary>
+    private void ProcessForceOpenCostFourShop(Player player)
+    {
+        if (player == null)
+            return;
+
+        var shop = GameManager.Instance != null
+            ? GameManager.Instance.Shop
+            : null;
+
+        if (shop == null)
+            return;
+
+        // CustomProperties 반영 전에 다음 리롤이 들어와도
+        // 대상 플레이어의 증강 상태를 즉시 인식한다.
+        _cost4ForceOpenActors.Add(player.ActorNumber);
+
+        // 현재 상점의 미구매 예약 유닛 반환.
+        if (_sharedShopSlotsByActor.TryGetValue(
+                player.ActorNumber,
+                out int[] oldSlots))
+        {
+            shop.ReturnReservedSharedShop(oldSlots);
+        }
+
+        // 같은 4코 내에서도 남은 카피 수 비례로 5장을 뽑고
+        // 상점 등장 시점에 공용 풀에서 예약 차감한다.
+        int[] ids =
+            shop.CreateReservedSharedShopOfCost(4);
+
+        _sharedShopSlotsByActor[player.ActorNumber] = ids;
+
+        Debug.Log(
+            $"[SharedShop] 4코 상점 강제 오픈 → " +
+            $"{player.NickName} / Actor {player.ActorNumber} / " +
+            $"[{string.Join(", ", ids)}]");
+
+        photonView.RPC(
+            nameof(RPC_ApplySharedShop),
+            player,
+            ids);
+
+        PublishSharedShopState();
     }
 
     /// <summary>
@@ -785,17 +896,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void GenerateAndSendSharedShop(Player player, int level, ShopManager shop)
     {
-        if (player == null || shop == null) return;
+        if (player == null || shop == null)
+            return;
 
-        int[] ids = shop.CreateReservedSharedShop(level);
+        // MasterClient 자신의 증강 상태가 아니라
+        // 상점을 받는 대상 플레이어의 상태를 적용한다.
+        bool cost4ForceOpen =
+            GetPlayerCostFourForceOpen(player);
+
+        int[] ids =
+            shop.CreateReservedSharedShop(
+                level,
+                cost4ForceOpen);
+
         _sharedShopSlotsByActor[player.ActorNumber] = ids;
 
-        // 어떤 플레이어의 상점이 먼저 생성됐는지 확인하기 위한 테스트 로그.
-        // 공용 풀 검증이 끝난 뒤에도 유지해도 되는 상태 확인용 로그다.
         Debug.Log(
             $"[SharedShop] 상점 생성 → " +
             $"{player.NickName} / Actor {player.ActorNumber} / " +
-            $"Lv.{level} / [{string.Join(", ", ids)}]");
+            $"Lv.{level} / 4코오픈:{cost4ForceOpen} / " +
+            $"[{string.Join(", ", ids)}]");
 
         photonView.RPC(
             nameof(RPC_ApplySharedShop),
@@ -823,6 +943,46 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         return 1;
+    }
+
+    /// <summary>
+    /// 지정 플레이어가 4코 상점 오픈 증강을 보유했는지 확인한다.
+    /// </summary>
+    private bool GetPlayerCostFourForceOpen(Player player)
+    {
+        if (player == null)
+            return false;
+
+        // 증강 선택 직후 CustomProperties 전파 전 상태 보조.
+        if (_cost4ForceOpenActors.Contains(
+                player.ActorNumber))
+        {
+            return true;
+        }
+
+        if (player.CustomProperties.TryGetValue(
+                COST4_FORCE_OPEN_PROP_KEY,
+                out object enabledValue) &&
+            enabledValue is bool enabled &&
+            enabled)
+        {
+            _cost4ForceOpenActors.Add(
+                player.ActorNumber);
+
+            return true;
+        }
+
+        // 로컬 플레이어의 Player Property가 아직 반영 전이면
+        // 현재 ShopManager 상태를 직접 사용한다.
+        if (player == PhotonNetwork.LocalPlayer &&
+            GameManager.Instance != null &&
+            GameManager.Instance.Shop != null)
+        {
+            return GameManager.Instance.Shop
+                .IsCost4ForceOpen;
+        }
+
+        return false;
     }
 
     [PunRPC]
@@ -1514,7 +1674,11 @@ public class NetworkManager : MonoBehaviour
     public bool UsesSharedShopPool => false;
 
     public void SyncLocalShopLevel(int level) { }
+    public void SyncLocalCostFourForceOpen(bool enabled) { }
+    
     public void RefreshAllSharedShops() { }
+    public void RequestForceOpenCostFourShop() { }
+
     public void RequestSharedShopReroll(int level) { }
     public void RequestSharedShopPurchase(int slot, int pokemonId) { }
     public void ReturnSharedPoolCopies(int pokemonId, int amount) { }
