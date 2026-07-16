@@ -25,17 +25,18 @@ MonoBehaviour:
   manaCost: 60
   synergies:
   - Fire
-  role: Archer
-  skillId: FIRE_ARCHER
+  role: Magician
+  skillId: FIRE_MAGICIAN
   skill:
-    skillId: FIRE_ARCHER
-    skillName: "\uBD88\uAF43\uD0C4"
-    description: "\uB2E8\uC77C \uC801 \uBD88\uAF43 \uB370\uBBF8\uC9C0"
-    effectType: 0
-    targetType: 3
-    areaRadius: 0
+    skillId: FIRE_MAGICIAN
+    skillName: "\uD654\uC5FC\uBC29\uC0AC"
+    description: "\uC9C1\uC120 \uBC94\uC704 \uBD88\uAF43 \uB370\uBBF8\uC9C0"
+    effectType: 1
+    targetType: 5
+    areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Fire_Archer
+    vfxId: VFX_Fire_Magician
+  attackVfxId: Fire_L
   evolvesIntoEn: Jigglypuff
   shopBuyable: 0
   modelPrefab: {fileID: 0}

@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Assassin
-  skillId: MUTANT_ASSASSIN
+  skillId: ETHEREAL_ASSASSIN
   skill:
-    skillId: MUTANT_ASSASSIN
-    skillName: "\uAE30\uC2B5"
-    description: "\uB2E8\uC77C \uC801 \uCD08\uACE0\uB370\uBBF8\uC9C0"
+    skillId: ETHEREAL_ASSASSIN
+    skillName: "\uC0AC\uC774\uCF54\uCEE4\uD130"
+    description: "\uC090, \uCE90\uC774\uC2DC, \uC5D0\uBE0C\uC774(\uBD07)"
     effectType: 1
     targetType: 3
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Mutant_Assassin
+    vfxId: VFX_Ethereal_Assassin_SPELL
+  attackVfxId: Ethereal_S
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

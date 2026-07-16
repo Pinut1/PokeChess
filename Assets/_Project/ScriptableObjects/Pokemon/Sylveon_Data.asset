@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Magician
-  skillId: MUTANT_MAGICIAN
+  skillId: ETHEREAL_MAGICIAN
   skill:
-    skillId: MUTANT_MAGICIAN
-    skillName: "\uBCC0\uC2E0"
-    description: "\uB2E8\uC77C \uC801 \uACE0\uB370\uBBF8\uC9C0"
+    skillId: ETHEREAL_MAGICIAN
+    skillName: "\uBB38\uD3EC\uC2A4"
+    description: "\uAD11\uC5ED \uC815\uB839 \uB370\uBBF8\uC9C0"
     effectType: 1
-    targetType: 3
-    areaRadius: 0
+    targetType: 4
+    areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Mutant_Magician
+    vfxId: VFX_Ethereal_Magician
+  attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

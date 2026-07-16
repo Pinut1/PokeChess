@@ -12,6 +12,7 @@
       "atkSpeed": 0.6,
       "spellPower": 50,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass",
@@ -33,6 +34,7 @@
       "atkSpeed": 0.6,
       "spellPower": 50,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass",
@@ -54,6 +56,7 @@
       "atkSpeed": 0.6,
       "spellPower": 50,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass",
@@ -75,6 +78,7 @@
       "atkSpeed": 0.4,
       "spellPower": 180,
       "manaCost": 55,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
@@ -95,6 +99,7 @@
       "atkSpeed": 0.4,
       "spellPower": 180,
       "manaCost": 55,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
@@ -115,6 +120,7 @@
       "atkSpeed": 0.4,
       "spellPower": 180,
       "manaCost": 55,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
@@ -135,6 +141,7 @@
       "atkSpeed": 0.5,
       "spellPower": 130,
       "manaCost": 65,
+      "attackVfxId": "Fire_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -155,6 +162,7 @@
       "atkSpeed": 0.5,
       "spellPower": 130,
       "manaCost": 65,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -175,6 +183,7 @@
       "atkSpeed": 0.5,
       "spellPower": 130,
       "manaCost": 65,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -195,6 +204,7 @@
       "atkSpeed": 0.6,
       "spellPower": 32,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass"
@@ -215,6 +225,7 @@
       "atkSpeed": 0.6,
       "spellPower": 32,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass"
@@ -235,6 +246,7 @@
       "atkSpeed": 0.6,
       "spellPower": 32,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass",
@@ -256,6 +268,7 @@
       "atkSpeed": 0.4,
       "spellPower": 150,
       "manaCost": 84,
+      "attackVfxId": "Bug_S",
       "skillId": "BUG_ASSASSIN",
       "synergies": [
         "Bug",
@@ -277,6 +290,7 @@
       "atkSpeed": 0.4,
       "spellPower": 150,
       "manaCost": 84,
+      "attackVfxId": "Bug_S",
       "skillId": "BUG_ASSASSIN",
       "synergies": [
         "Bug",
@@ -298,6 +312,7 @@
       "atkSpeed": 0.4,
       "spellPower": 150,
       "manaCost": 84,
+      "attackVfxId": "Bug_S",
       "skillId": "BUG_ASSASSIN",
       "synergies": [
         "Bug",
@@ -319,6 +334,7 @@
       "atkSpeed": 0.5,
       "spellPower": 45,
       "manaCost": 75,
+      "attackVfxId": "Normal_L",
       "skillId": "NORMAL_ARCHER",
       "synergies": [
         "Normal",
@@ -340,6 +356,7 @@
       "atkSpeed": 0.5,
       "spellPower": 45,
       "manaCost": 75,
+      "attackVfxId": "Normal_L",
       "skillId": "NORMAL_ARCHER",
       "synergies": [
         "Normal",
@@ -361,6 +378,7 @@
       "atkSpeed": 0.5,
       "spellPower": 45,
       "manaCost": 75,
+      "attackVfxId": "Normal_L",
       "skillId": "NORMAL_ARCHER",
       "synergies": [
         "Normal",
@@ -369,6 +387,27 @@
       "role": "Archer",
       "obtainBy": "evolution",
       "evolvesInto": "Pikachu"
+    },
+    {
+      "id": 172,
+      "name": "피츄",
+      "nameEn": "Pichu",
+      "cost": 5,
+      "range": 1,
+      "hp": 900,
+      "attack": 30,
+      "defense": 20,
+      "atkSpeed": 0.7,
+      "spellPower": 400,
+      "manaCost": 45,
+      "attackVfxId": "Electric_L",
+      "skillId": "ELECTRIC_MAGICIAN",
+      "synergies": [
+        "Electric"
+      ],
+      "role": "Magician",
+      "obtainBy": "shop",
+      "evolvesInto": ""
     },
     {
       "id": 25,
@@ -382,6 +421,7 @@
       "atkSpeed": 0.7,
       "spellPower": 400,
       "manaCost": 45,
+      "attackVfxId": "Electric_L",
       "skillId": "ELECTRIC_MAGICIAN",
       "synergies": [
         "Electric"
@@ -402,6 +442,7 @@
       "atkSpeed": 0.7,
       "spellPower": 400,
       "manaCost": 45,
+      "attackVfxId": "Electric_L",
       "skillId": "ELECTRIC_MAGICIAN",
       "synergies": [
         "Electric"
@@ -409,6 +450,27 @@
       "role": "Magician",
       "obtainBy": "evolution",
       "evolvesInto": "Clefairy"
+    },
+    {
+      "id": 173,
+      "name": "삐",
+      "nameEn": "Cleffa",
+      "cost": 2,
+      "range": 1,
+      "hp": 700,
+      "attack": 35,
+      "defense": 40,
+      "atkSpeed": 0.4,
+      "spellPower": 150,
+      "manaCost": 77,
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
+      "synergies": [
+        "Ethereal"
+      ],
+      "role": "Assassin",
+      "obtainBy": "shop",
+      "evolvesInto": ""
     },
     {
       "id": 35,
@@ -422,7 +484,8 @@
       "atkSpeed": 0.4,
       "spellPower": 150,
       "manaCost": 80,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
       "synergies": [
         "Ethereal"
       ],
@@ -442,7 +505,8 @@
       "atkSpeed": 0.4,
       "spellPower": 150,
       "manaCost": 80,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
       "synergies": [
         "Ethereal"
       ],
@@ -462,6 +526,7 @@
       "atkSpeed": 0.8,
       "spellPower": 80,
       "manaCost": 60,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_ARCHER",
       "synergies": [
         "Fire"
@@ -482,13 +547,36 @@
       "atkSpeed": 0.8,
       "spellPower": 80,
       "manaCost": 60,
-      "skillId": "FIRE_ARCHER",
+      "attackVfxId": "Fire_L",
+      "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
       ],
-      "role": "Archer",
+      "role": "Magician",
       "obtainBy": "stone",
       "evolvesInto": "Jigglypuff"
+    },
+    {
+      "id": 174,
+      "name": "푸푸린",
+      "nameEn": "Igglybuff",
+      "cost": 2,
+      "range": 1,
+      "hp": 550,
+      "attack": 25,
+      "defense": 20,
+      "atkSpeed": 0.5,
+      "spellPower": 125,
+      "manaCost": 60,
+      "attackVfxId": "Normal_L",
+      "skillId": "NORMAL_SUPPORTER",
+      "synergies": [
+        "Normal",
+        "Ethereal"
+      ],
+      "role": "Supporter",
+      "obtainBy": "shop",
+      "evolvesInto": ""
     },
     {
       "id": 39,
@@ -502,6 +590,7 @@
       "atkSpeed": 0.5,
       "spellPower": 125,
       "manaCost": 60,
+      "attackVfxId": "Normal_L",
       "skillId": "NORMAL_SUPPORTER",
       "synergies": [
         "Normal",
@@ -523,6 +612,7 @@
       "atkSpeed": 0.5,
       "spellPower": 125,
       "manaCost": 60,
+      "attackVfxId": "Normal_L",
       "skillId": "NORMAL_SUPPORTER",
       "synergies": [
         "Normal",
@@ -544,6 +634,7 @@
       "atkSpeed": 0.5,
       "spellPower": 30,
       "manaCost": 75,
+      "attackVfxId": "Poison_L",
       "skillId": "POISON_ARCHER",
       "synergies": [
         "Poison",
@@ -565,6 +656,7 @@
       "atkSpeed": 0.5,
       "spellPower": 30,
       "manaCost": 75,
+      "attackVfxId": "Poison_L",
       "skillId": "POISON_ARCHER",
       "synergies": [
         "Poison",
@@ -572,6 +664,28 @@
       ],
       "role": "Archer",
       "obtainBy": "evolution",
+      "evolvesInto": ""
+    },
+    {
+      "id": 169,
+      "name": "크로뱃",
+      "nameEn": "Crobat",
+      "cost": 1,
+      "range": 2,
+      "hp": 450,
+      "attack": 45,
+      "defense": 15,
+      "atkSpeed": 0.5,
+      "spellPower": 30,
+      "manaCost": 75,
+      "attackVfxId": "Poison_L",
+      "skillId": "POISON_ARCHER",
+      "synergies": [
+        "Poison",
+        "Flying"
+      ],
+      "role": "Archer",
+      "obtainBy": "trade",
       "evolvesInto": ""
     },
     {
@@ -586,6 +700,7 @@
       "atkSpeed": 0.7,
       "spellPower": 175,
       "manaCost": 55,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_SUPPORTER",
       "synergies": [
         "Grass",
@@ -607,6 +722,7 @@
       "atkSpeed": 0.7,
       "spellPower": 175,
       "manaCost": 55,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_SUPPORTER",
       "synergies": [
         "Grass",
@@ -628,12 +744,35 @@
       "atkSpeed": 0.5,
       "spellPower": 180,
       "manaCost": 50,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_MAGICIAN",
       "synergies": [
         "Grass",
         "Poison"
       ],
       "role": "Magician",
+      "obtainBy": "stone",
+      "evolvesInto": ""
+    },
+    {
+      "id": 182,
+      "name": "아르코",
+      "nameEn": "Bellossom",
+      "cost": 4,
+      "range": 2,
+      "hp": 850,
+      "attack": 50,
+      "defense": 30,
+      "atkSpeed": 0.7,
+      "spellPower": 175,
+      "manaCost": 55,
+      "attackVfxId": "Grass_L",
+      "skillId": "GRASS_SUPPORTER",
+      "synergies": [
+        "Grass",
+        "Poison"
+      ],
+      "role": "Supporter",
       "obtainBy": "stone",
       "evolvesInto": ""
     },
@@ -649,6 +788,7 @@
       "atkSpeed": 0.4,
       "spellPower": 100,
       "manaCost": 50,
+      "attackVfxId": "Bug_L",
       "skillId": "BUG_MAGICIAN",
       "synergies": [
         "Bug",
@@ -670,6 +810,7 @@
       "atkSpeed": 0.4,
       "spellPower": 100,
       "manaCost": 50,
+      "attackVfxId": "Bug_L",
       "skillId": "BUG_MAGICIAN",
       "synergies": [
         "Bug",
@@ -691,6 +832,7 @@
       "atkSpeed": 0.4,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_TANKER",
       "synergies": [
         "Ground"
@@ -711,6 +853,7 @@
       "atkSpeed": 0.4,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_TANKER",
       "synergies": [
         "Ground"
@@ -731,6 +874,7 @@
       "atkSpeed": 0.7,
       "spellPower": 400,
       "manaCost": 60,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_ASSASSIN",
       "synergies": [
         "Normal"
@@ -751,6 +895,7 @@
       "atkSpeed": 0.7,
       "spellPower": 400,
       "manaCost": 60,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_ASSASSIN",
       "synergies": [
         "Normal"
@@ -771,6 +916,7 @@
       "atkSpeed": 0.5,
       "spellPower": 85,
       "manaCost": 80,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_WARRIOR",
       "synergies": [
         "Water"
@@ -791,6 +937,7 @@
       "atkSpeed": 0.5,
       "spellPower": 85,
       "manaCost": 80,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_WARRIOR",
       "synergies": [
         "Water"
@@ -811,6 +958,7 @@
       "atkSpeed": 0.4,
       "spellPower": 70,
       "manaCost": 90,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -831,6 +979,7 @@
       "atkSpeed": 0.4,
       "spellPower": 70,
       "manaCost": 90,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -851,6 +1000,7 @@
       "atkSpeed": 0.45,
       "spellPower": 60,
       "manaCost": 85,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_WARRIOR",
       "synergies": [
         "Water"
@@ -871,6 +1021,7 @@
       "atkSpeed": 0.45,
       "spellPower": 60,
       "manaCost": 85,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_WARRIOR",
       "synergies": [
         "Water"
@@ -891,6 +1042,7 @@
       "atkSpeed": 0.45,
       "spellPower": 60,
       "manaCost": 85,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_WARRIOR",
       "synergies": [
         "Water"
@@ -911,7 +1063,8 @@
       "atkSpeed": 0.45,
       "spellPower": 200,
       "manaCost": 70,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
       "synergies": [
         "Ethereal"
       ],
@@ -931,7 +1084,8 @@
       "atkSpeed": 0.45,
       "spellPower": 200,
       "manaCost": 70,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
       "synergies": [
         "Ethereal"
       ],
@@ -951,7 +1105,8 @@
       "atkSpeed": 0.45,
       "spellPower": 200,
       "manaCost": 70,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
       "synergies": [
         "Ethereal"
       ],
@@ -971,6 +1126,7 @@
       "atkSpeed": 0.5,
       "spellPower": 90,
       "manaCost": 75,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_TANKER",
       "synergies": [
         "Grass",
@@ -992,6 +1148,7 @@
       "atkSpeed": 0.5,
       "spellPower": 90,
       "manaCost": 75,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_TANKER",
       "synergies": [
         "Grass",
@@ -1013,6 +1170,7 @@
       "atkSpeed": 0.5,
       "spellPower": 90,
       "manaCost": 75,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_TANKER",
       "synergies": [
         "Grass",
@@ -1034,6 +1192,7 @@
       "atkSpeed": 0.4,
       "spellPower": 50,
       "manaCost": 95,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_WARRIOR",
       "synergies": [
         "Ground"
@@ -1054,6 +1213,7 @@
       "atkSpeed": 0.4,
       "spellPower": 50,
       "manaCost": 95,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_WARRIOR",
       "synergies": [
         "Ground"
@@ -1074,6 +1234,7 @@
       "atkSpeed": 0.5,
       "spellPower": 90,
       "manaCost": 70,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_TANKER",
       "synergies": [
         "Ground"
@@ -1094,6 +1255,7 @@
       "atkSpeed": 0.6,
       "spellPower": 150,
       "manaCost": 50,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
@@ -1114,6 +1276,7 @@
       "atkSpeed": 0.6,
       "spellPower": 150,
       "manaCost": 50,
+      "attackVfxId": "Fire_L",
       "skillId": "FIRE_MAGICIAN",
       "synergies": [
         "Fire"
@@ -1134,6 +1297,7 @@
       "atkSpeed": 0.65,
       "spellPower": 180,
       "manaCost": 50,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water",
@@ -1155,6 +1319,7 @@
       "atkSpeed": 0.65,
       "spellPower": 180,
       "manaCost": 50,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water",
@@ -1163,6 +1328,28 @@
       "role": "Tanker",
       "obtainBy": "evolution",
       "evolvesInto": ""
+    },
+    {
+      "id": 199,
+      "name": "야도킹",
+      "nameEn": "Slowking",
+      "cost": 4,
+      "range": 2,
+      "hp": 900,
+      "attack": 35,
+      "defense": 35,
+      "atkSpeed": 0.6,
+      "spellPower": 180,
+      "manaCost": 50,
+      "attackVfxId": "Water_S",
+      "skillId": "WATER_MAGICIAN",
+      "synergies": [
+        "Water",
+        "Ethereal"
+      ],
+      "role": "Magician",
+      "obtainBy": "trade",
+      "evolvesInto": "Wobbuffet"
     },
     {
       "id": 81,
@@ -1176,7 +1363,8 @@
       "atkSpeed": 0.6,
       "spellPower": 220,
       "manaCost": 65,
-      "skillId": "ELECTRIC_ASSASSIN",
+      "attackVfxId": "Electric_S",
+      "skillId": "STEEL_ASSASSIN",
       "synergies": [
         "Electric",
         "Breaker"
@@ -1197,7 +1385,8 @@
       "atkSpeed": 0.6,
       "spellPower": 220,
       "manaCost": 65,
-      "skillId": "ELECTRIC_ASSASSIN",
+      "attackVfxId": "Electric_S",
+      "skillId": "STEEL_ASSASSIN",
       "synergies": [
         "Electric",
         "Breaker"
@@ -1205,6 +1394,28 @@
       "role": "Assassin",
       "obtainBy": "evolution",
       "evolvesInto": ""
+    },
+    {
+      "id": 462,
+      "name": "자포코일",
+      "nameEn": "Magnezone",
+      "cost": 4,
+      "range": 2,
+      "hp": 1200,
+      "attack": 35,
+      "defense": 55,
+      "atkSpeed": 0.55,
+      "spellPower": 180,
+      "manaCost": 55,
+      "attackVfxId": "Electric_S",
+      "skillId": "STEEL_TANKER",
+      "synergies": [
+        "Electric",
+        "Breaker"
+      ],
+      "role": "Tanker",
+      "obtainBy": "stone",
+      "evolvesInto": "Tangrowth"
     },
     {
       "id": 84,
@@ -1218,6 +1429,7 @@
       "atkSpeed": 0.4,
       "spellPower": 45,
       "manaCost": 100,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_WARRIOR",
       "synergies": [
         "Normal",
@@ -1239,6 +1451,7 @@
       "atkSpeed": 0.4,
       "spellPower": 45,
       "manaCost": 100,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_WARRIOR",
       "synergies": [
         "Normal",
@@ -1260,6 +1473,7 @@
       "atkSpeed": 0.7,
       "spellPower": 200,
       "manaCost": 40,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water"
@@ -1280,6 +1494,7 @@
       "atkSpeed": 0.7,
       "spellPower": 200,
       "manaCost": 40,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water"
@@ -1300,6 +1515,7 @@
       "atkSpeed": 0.5,
       "spellPower": 150,
       "manaCost": 60,
+      "attackVfxId": "Poison_S",
       "skillId": "POISON_TANKER",
       "synergies": [
         "Poison"
@@ -1320,6 +1536,7 @@
       "atkSpeed": 0.5,
       "spellPower": 150,
       "manaCost": 60,
+      "attackVfxId": "Poison_S",
       "skillId": "POISON_TANKER",
       "synergies": [
         "Poison"
@@ -1340,6 +1557,7 @@
       "atkSpeed": 0.5,
       "spellPower": 130,
       "manaCost": 55,
+      "attackVfxId": "Poison_L",
       "skillId": "POISON_MAGICIAN",
       "synergies": [
         "Poison"
@@ -1360,6 +1578,7 @@
       "atkSpeed": 0.5,
       "spellPower": 130,
       "manaCost": 55,
+      "attackVfxId": "Poison_L",
       "skillId": "POISON_MAGICIAN",
       "synergies": [
         "Poison"
@@ -1380,6 +1599,7 @@
       "atkSpeed": 0.7,
       "spellPower": 130,
       "manaCost": 60,
+      "attackVfxId": "Poison_S",
       "skillId": "POISON_TANKER",
       "synergies": [
         "Poison"
@@ -1400,12 +1620,35 @@
       "atkSpeed": 0.65,
       "spellPower": 150,
       "manaCost": 55,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_TANKER",
       "synergies": [
         "Ground"
       ],
       "role": "Tanker",
       "obtainBy": "shop",
+      "evolvesInto": ""
+    },
+    {
+      "id": 208,
+      "name": "강철톤",
+      "nameEn": "Steelix",
+      "cost": 4,
+      "range": 1,
+      "hp": 1300,
+      "attack": 60,
+      "defense": 55,
+      "atkSpeed": 0.65,
+      "spellPower": 80,
+      "manaCost": 80,
+      "attackVfxId": "Ground_S",
+      "skillId": "GROUND_WARRIOR",
+      "synergies": [
+        "Ground",
+        "Breaker"
+      ],
+      "role": "Warrior",
+      "obtainBy": "trade",
       "evolvesInto": ""
     },
     {
@@ -1420,6 +1663,7 @@
       "atkSpeed": 0.6,
       "spellPower": 130,
       "manaCost": 60,
+      "attackVfxId": "Poison_S",
       "skillId": "POISON_TANKER",
       "synergies": [
         "Poison"
@@ -1440,6 +1684,7 @@
       "atkSpeed": 0.6,
       "spellPower": 130,
       "manaCost": 60,
+      "attackVfxId": "Poison_S",
       "skillId": "POISON_TANKER",
       "synergies": [
         "Poison"
@@ -1460,12 +1705,34 @@
       "atkSpeed": 0.4,
       "spellPower": 130,
       "manaCost": 84,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_ASSASSIN",
       "synergies": [
         "Grass"
       ],
       "role": "Assassin",
       "obtainBy": "shop",
+      "evolvesInto": ""
+    },
+    {
+      "id": 465,
+      "name": "덩쿠림보",
+      "nameEn": "Tangrowth",
+      "cost": 1,
+      "range": 1,
+      "hp": 650,
+      "attack": 30,
+      "defense": 35,
+      "atkSpeed": 0.4,
+      "spellPower": 130,
+      "manaCost": 84,
+      "attackVfxId": "Grass_S",
+      "skillId": "GRASS_ASSASSIN",
+      "synergies": [
+        "Grass"
+      ],
+      "role": "Assassin",
+      "obtainBy": "evolution",
       "evolvesInto": ""
     },
     {
@@ -1480,6 +1747,7 @@
       "atkSpeed": 0.7,
       "spellPower": 200,
       "manaCost": 45,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -1500,6 +1768,7 @@
       "atkSpeed": 0.5,
       "spellPower": 350,
       "manaCost": 40,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water",
@@ -1508,6 +1777,27 @@
       "role": "Magician",
       "obtainBy": "evolution",
       "evolvesInto": "Mr. Mime"
+    },
+    {
+      "id": 439,
+      "name": "흉내내",
+      "nameEn": "Mime Jr.",
+      "cost": 3,
+      "range": 1,
+      "hp": 650,
+      "attack": 40,
+      "defense": 25,
+      "atkSpeed": 0.7,
+      "spellPower": 145,
+      "manaCost": 60,
+      "attackVfxId": "Ethereal_L",
+      "skillId": "ETHEREAL_SUPPORTER",
+      "synergies": [
+        "Ethereal"
+      ],
+      "role": "Supporter",
+      "obtainBy": "shop",
+      "evolvesInto": ""
     },
     {
       "id": 122,
@@ -1521,7 +1811,8 @@
       "atkSpeed": 0.7,
       "spellPower": 145,
       "manaCost": 60,
-      "skillId": "",
+      "attackVfxId": "Ethereal_L",
+      "skillId": "ETHEREAL_SUPPORTER",
       "synergies": [
         "Ethereal"
       ],
@@ -1541,6 +1832,7 @@
       "atkSpeed": 0.45,
       "spellPower": 150,
       "manaCost": 75,
+      "attackVfxId": "Bug_S",
       "skillId": "BUG_ASSASSIN",
       "synergies": [
         "Bug",
@@ -1551,23 +1843,25 @@
       "evolvesInto": ""
     },
     {
-      "id": 129,
-      "name": "잉어킹",
-      "nameEn": "Magikarp",
-      "cost": 1,
+      "id": 212,
+      "name": "핫삼",
+      "nameEn": "Scizor",
+      "cost": 2,
       "range": 1,
-      "hp": 300,
-      "attack": 20,
-      "defense": 10,
+      "hp": 700,
+      "attack": 50,
+      "defense": 50,
       "atkSpeed": 0.5,
-      "spellPower": 60,
-      "manaCost": 60,
-      "skillId": "WATER_TANKER",
+      "spellPower": 65,
+      "manaCost": 90,
+      "attackVfxId": "Bug_S",
+      "skillId": "BUG_WARRIOR",
       "synergies": [
-        "Water"
+        "Bug",
+        "Breaker"
       ],
-      "role": "Tanker",
-      "obtainBy": "wild",
+      "role": "Warrior",
+      "obtainBy": "trade",
       "evolvesInto": ""
     },
     {
@@ -1582,6 +1876,7 @@
       "atkSpeed": 0.8,
       "spellPower": 175,
       "manaCost": 50,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_SUPPORTER",
       "synergies": [
         "Water"
@@ -1602,7 +1897,8 @@
       "atkSpeed": 0.7,
       "spellPower": 145,
       "manaCost": 60,
-      "skillId": "MUTANT_SUPPORTER",
+      "attackVfxId": "Normal_L",
+      "skillId": "NORMAL_SUPPORTER",
       "synergies": [
         "Mutant"
       ],
@@ -1622,7 +1918,8 @@
       "atkSpeed": 0.6,
       "spellPower": 130,
       "manaCost": 50,
-      "skillId": "MUTANT_MAGICIAN",
+      "attackVfxId": "Water_L",
+      "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Mutant"
       ],
@@ -1642,7 +1939,8 @@
       "atkSpeed": 0.6,
       "spellPower": 150,
       "manaCost": 70,
-      "skillId": "MUTANT_ASSASSIN",
+      "attackVfxId": "Electric_S",
+      "skillId": "ELECTRIC_ASSASSIN",
       "synergies": [
         "Mutant"
       ],
@@ -1662,12 +1960,118 @@
       "atkSpeed": 0.5,
       "spellPower": 70,
       "manaCost": 90,
-      "skillId": "MUTANT_WARRIOR",
+      "attackVfxId": "Fire_S",
+      "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Mutant"
       ],
       "role": "Warrior",
       "obtainBy": "stone",
+      "evolvesInto": ""
+    },
+    {
+      "id": 470,
+      "name": "리피아",
+      "nameEn": "Leafeon",
+      "cost": 3,
+      "range": 1,
+      "hp": 750,
+      "attack": 65,
+      "defense": 35,
+      "atkSpeed": 0.6,
+      "spellPower": 60,
+      "manaCost": 70,
+      "attackVfxId": "Grass_L",
+      "skillId": "GRASS_ARCHER",
+      "synergies": [
+        "Mutant"
+      ],
+      "role": "Archer",
+      "obtainBy": "stone",
+      "evolvesInto": ""
+    },
+    {
+      "id": 196,
+      "name": "에브이",
+      "nameEn": "Espeon",
+      "cost": 3,
+      "range": 1,
+      "hp": 750,
+      "attack": 52,
+      "defense": 50,
+      "atkSpeed": 0.5,
+      "spellPower": 180,
+      "manaCost": 75,
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_ASSASSIN",
+      "synergies": [
+        "Mutant"
+      ],
+      "role": "Assassin",
+      "obtainBy": "synergy",
+      "evolvesInto": ""
+    },
+    {
+      "id": 197,
+      "name": "브래키",
+      "nameEn": "Umbreon",
+      "cost": 4,
+      "range": 1,
+      "hp": 1100,
+      "attack": 72,
+      "defense": 60,
+      "atkSpeed": 0.6,
+      "spellPower": 85,
+      "manaCost": 85,
+      "attackVfxId": "Dark_S",
+      "skillId": "DARK_WARRIOR",
+      "synergies": [
+        "Mutant"
+      ],
+      "role": "Warrior",
+      "obtainBy": "synergy",
+      "evolvesInto": ""
+    },
+    {
+      "id": 471,
+      "name": "글레이시아",
+      "nameEn": "Glaceon",
+      "cost": 4,
+      "range": 2,
+      "hp": 1400,
+      "attack": 55,
+      "defense": 60,
+      "atkSpeed": 0.65,
+      "spellPower": 200,
+      "manaCost": 50,
+      "attackVfxId": "Ice_S",
+      "skillId": "ICE_TANKER",
+      "synergies": [
+        "Mutant"
+      ],
+      "role": "Tanker",
+      "obtainBy": "synergy",
+      "evolvesInto": ""
+    },
+    {
+      "id": 700,
+      "name": "님피아",
+      "nameEn": "Sylveon",
+      "cost": 5,
+      "range": 1,
+      "hp": 900,
+      "attack": 30,
+      "defense": 15,
+      "atkSpeed": 0.6,
+      "spellPower": 350,
+      "manaCost": 40,
+      "attackVfxId": "Electric_L",
+      "skillId": "ETHEREAL_MAGICIAN",
+      "synergies": [
+        "Mutant"
+      ],
+      "role": "Magician",
+      "obtainBy": "synergy",
       "evolvesInto": ""
     },
     {
@@ -1682,6 +2086,7 @@
       "atkSpeed": 0.6,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Ground_S",
       "skillId": "GROUND_WARRIOR",
       "synergies": [
         "Ground",
@@ -1703,6 +2108,7 @@
       "atkSpeed": 0.6,
       "spellPower": 250,
       "manaCost": 45,
+      "attackVfxId": "Dragon_L",
       "skillId": "DRAGON_MAGICIAN",
       "synergies": [
         "Dragon"
@@ -1723,6 +2129,7 @@
       "atkSpeed": 0.6,
       "spellPower": 250,
       "manaCost": 45,
+      "attackVfxId": "Dragon_L",
       "skillId": "DRAGON_MAGICIAN",
       "synergies": [
         "Dragon"
@@ -1743,6 +2150,7 @@
       "atkSpeed": 0.6,
       "spellPower": 250,
       "manaCost": 45,
+      "attackVfxId": "Dragon_L",
       "skillId": "DRAGON_MAGICIAN",
       "synergies": [
         "Dragon"
@@ -1763,6 +2171,7 @@
       "atkSpeed": 0.7,
       "spellPower": 60,
       "manaCost": 70,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass"
@@ -1783,6 +2192,7 @@
       "atkSpeed": 0.7,
       "spellPower": 70,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass"
@@ -1803,6 +2213,7 @@
       "atkSpeed": 0.7,
       "spellPower": 70,
       "manaCost": 80,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_ARCHER",
       "synergies": [
         "Grass"
@@ -1823,6 +2234,7 @@
       "atkSpeed": 0.45,
       "spellPower": 70,
       "manaCost": 95,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -1843,6 +2255,7 @@
       "atkSpeed": 0.45,
       "spellPower": 70,
       "manaCost": 95,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -1863,6 +2276,7 @@
       "atkSpeed": 0.45,
       "spellPower": 70,
       "manaCost": 95,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -1883,6 +2297,7 @@
       "atkSpeed": 0.3,
       "spellPower": 150,
       "manaCost": 65,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water"
@@ -1903,6 +2318,7 @@
       "atkSpeed": 0.3,
       "spellPower": 150,
       "manaCost": 65,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water"
@@ -1923,6 +2339,7 @@
       "atkSpeed": 0.3,
       "spellPower": 150,
       "manaCost": 65,
+      "attackVfxId": "Water_L",
       "skillId": "WATER_MAGICIAN",
       "synergies": [
         "Water"
@@ -1943,6 +2360,7 @@
       "atkSpeed": 0.7,
       "spellPower": 80,
       "manaCost": 60,
+      "attackVfxId": "Bug_L",
       "skillId": "BUG_ARCHER",
       "synergies": [
         "Bug",
@@ -1964,6 +2382,7 @@
       "atkSpeed": 0.7,
       "spellPower": 80,
       "manaCost": 60,
+      "attackVfxId": "Bug_L",
       "skillId": "BUG_ARCHER",
       "synergies": [
         "Bug",
@@ -1971,109 +2390,6 @@
       ],
       "role": "Archer",
       "obtainBy": "evolution",
-      "evolvesInto": ""
-    },
-    {
-      "id": 169,
-      "name": "크로뱃",
-      "nameEn": "Crobat",
-      "cost": 1,
-      "range": 2,
-      "hp": 450,
-      "attack": 45,
-      "defense": 15,
-      "atkSpeed": 0.5,
-      "spellPower": 30,
-      "manaCost": 75,
-      "skillId": "POISON_ARCHER",
-      "synergies": [
-        "Poison",
-        "Flying"
-      ],
-      "role": "Archer",
-      "obtainBy": "trade",
-      "evolvesInto": ""
-    },
-    {
-      "id": 172,
-      "name": "피츄",
-      "nameEn": "Pichu",
-      "cost": 5,
-      "range": 1,
-      "hp": 900,
-      "attack": 30,
-      "defense": 20,
-      "atkSpeed": 0.7,
-      "spellPower": 400,
-      "manaCost": 45,
-      "skillId": "ELECTRIC_MAGICIAN",
-      "synergies": [
-        "Electric"
-      ],
-      "role": "Magician",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 173,
-      "name": "삐",
-      "nameEn": "Cleffa",
-      "cost": 2,
-      "range": 1,
-      "hp": 700,
-      "attack": 35,
-      "defense": 40,
-      "atkSpeed": 0.4,
-      "spellPower": 150,
-      "manaCost": 77,
-      "skillId": "",
-      "synergies": [
-        "Ethereal"
-      ],
-      "role": "Assassin",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 174,
-      "name": "푸푸린",
-      "nameEn": "Igglybuff",
-      "cost": 2,
-      "range": 1,
-      "hp": 550,
-      "attack": 25,
-      "defense": 20,
-      "atkSpeed": 0.5,
-      "spellPower": 125,
-      "manaCost": 60,
-      "skillId": "NORMAL_SUPPORTER",
-      "synergies": [
-        "Normal",
-        "Ethereal"
-      ],
-      "role": "Supporter",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 182,
-      "name": "아르코",
-      "nameEn": "Bellossom",
-      "cost": 4,
-      "range": 2,
-      "hp": 850,
-      "attack": 50,
-      "defense": 30,
-      "atkSpeed": 0.7,
-      "spellPower": 175,
-      "manaCost": 55,
-      "skillId": "GRASS_SUPPORTER",
-      "synergies": [
-        "Grass",
-        "Poison"
-      ],
-      "role": "Supporter",
-      "obtainBy": "stone",
       "evolvesInto": ""
     },
     {
@@ -2088,6 +2404,7 @@
       "atkSpeed": 0.5,
       "spellPower": 90,
       "manaCost": 70,
+      "attackVfxId": "Grass_L",
       "skillId": "GRASS_SUPPORTER",
       "synergies": [
         "Grass"
@@ -2108,6 +2425,7 @@
       "atkSpeed": 0.3,
       "spellPower": 50,
       "manaCost": 90,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_WARRIOR",
       "synergies": [
         "Grass"
@@ -2117,65 +2435,25 @@
       "evolvesInto": ""
     },
     {
-      "id": 196,
-      "name": "에브이",
-      "nameEn": "Espeon",
-      "cost": 3,
+      "id": 360,
+      "name": "마자",
+      "nameEn": "Wynaut",
+      "cost": 2,
       "range": 1,
-      "hp": 750,
-      "attack": 52,
-      "defense": 50,
-      "atkSpeed": 0.5,
-      "spellPower": 180,
-      "manaCost": 75,
-      "skillId": "MUTANT_ASSASSIN",
-      "synergies": [
-        "Mutant"
-      ],
-      "role": "Assassin",
-      "obtainBy": "synergy",
-      "evolvesInto": ""
-    },
-    {
-      "id": 197,
-      "name": "브래키",
-      "nameEn": "Umbreon",
-      "cost": 4,
-      "range": 1,
-      "hp": 1100,
-      "attack": 72,
-      "defense": 60,
-      "atkSpeed": 0.6,
-      "spellPower": 85,
-      "manaCost": 85,
-      "skillId": "MUTANT_WARRIOR",
-      "synergies": [
-        "Mutant"
-      ],
-      "role": "Warrior",
-      "obtainBy": "synergy",
-      "evolvesInto": ""
-    },
-    {
-      "id": 199,
-      "name": "야도킹",
-      "nameEn": "Slowking",
-      "cost": 4,
-      "range": 2,
-      "hp": 900,
+      "hp": 950,
       "attack": 35,
-      "defense": 35,
+      "defense": 45,
       "atkSpeed": 0.6,
-      "spellPower": 180,
-      "manaCost": 50,
-      "skillId": "WATER_MAGICIAN",
+      "spellPower": 140,
+      "manaCost": 65,
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_TANKER",
       "synergies": [
-        "Water",
         "Ethereal"
       ],
-      "role": "Magician",
-      "obtainBy": "trade",
-      "evolvesInto": "Wobbuffet"
+      "role": "Tanker",
+      "obtainBy": "shop",
+      "evolvesInto": ""
     },
     {
       "id": 202,
@@ -2189,7 +2467,8 @@
       "atkSpeed": 0.6,
       "spellPower": 140,
       "manaCost": 65,
-      "skillId": "",
+      "attackVfxId": "Ethereal_S",
+      "skillId": "ETHEREAL_TANKER",
       "synergies": [
         "Ethereal"
       ],
@@ -2198,45 +2477,24 @@
       "evolvesInto": ""
     },
     {
-      "id": 208,
-      "name": "강철톤",
-      "nameEn": "Steelix",
-      "cost": 4,
-      "range": 1,
-      "hp": 1300,
-      "attack": 60,
-      "defense": 55,
-      "atkSpeed": 0.65,
-      "spellPower": 80,
-      "manaCost": 80,
-      "skillId": "GROUND_WARRIOR",
-      "synergies": [
-        "Ground",
-        "Breaker"
-      ],
-      "role": "Warrior",
-      "obtainBy": "trade",
-      "evolvesInto": ""
-    },
-    {
-      "id": 212,
-      "name": "핫삼",
-      "nameEn": "Scizor",
+      "id": 417,
+      "name": "파치리스",
+      "nameEn": "Pachirisu",
       "cost": 2,
       "range": 1,
-      "hp": 700,
-      "attack": 50,
-      "defense": 50,
-      "atkSpeed": 0.5,
-      "spellPower": 65,
-      "manaCost": 90,
-      "skillId": "BUG_WARRIOR",
+      "hp": 600,
+      "attack": 30,
+      "defense": 25,
+      "atkSpeed": 0.6,
+      "spellPower": 120,
+      "manaCost": 70,
+      "attackVfxId": "Electric_L",
+      "skillId": "ELECTRIC_SUPPORTER",
       "synergies": [
-        "Bug",
-        "Breaker"
+        "Electric"
       ],
-      "role": "Warrior",
-      "obtainBy": "trade",
+      "role": "Supporter",
+      "obtainBy": "shop",
       "evolvesInto": ""
     },
     {
@@ -2251,12 +2509,34 @@
       "atkSpeed": 0.9,
       "spellPower": 350,
       "manaCost": 50,
+      "attackVfxId": "Ice_S",
       "skillId": "ICE_ASSASSIN",
       "synergies": [
         "Ice"
       ],
       "role": "Assassin",
       "obtainBy": "shop",
+      "evolvesInto": ""
+    },
+    {
+      "id": 461,
+      "name": "포푸니라",
+      "nameEn": "Weavile",
+      "cost": 5,
+      "range": 1,
+      "hp": 1300,
+      "attack": 70,
+      "defense": 55,
+      "atkSpeed": 0.9,
+      "spellPower": 350,
+      "manaCost": 50,
+      "attackVfxId": "Ice_S",
+      "skillId": "ICE_ASSASSIN",
+      "synergies": [
+        "Ice"
+      ],
+      "role": "Assassin",
+      "obtainBy": "evolution",
       "evolvesInto": ""
     },
     {
@@ -2271,6 +2551,7 @@
       "atkSpeed": 0.6,
       "spellPower": 180,
       "manaCost": 65,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_TANKER",
       "synergies": [
         "Normal"
@@ -2291,6 +2572,7 @@
       "atkSpeed": 0.5,
       "spellPower": 150,
       "manaCost": 70,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_ASSASSIN",
       "synergies": [
         "Grass"
@@ -2311,6 +2593,7 @@
       "atkSpeed": 0.5,
       "spellPower": 150,
       "manaCost": 70,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_ASSASSIN",
       "synergies": [
         "Grass"
@@ -2331,6 +2614,7 @@
       "atkSpeed": 0.5,
       "spellPower": 150,
       "manaCost": 70,
+      "attackVfxId": "Grass_S",
       "skillId": "GRASS_ASSASSIN",
       "synergies": [
         "Grass"
@@ -2351,6 +2635,7 @@
       "atkSpeed": 0.5,
       "spellPower": 70,
       "manaCost": 90,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -2371,6 +2656,7 @@
       "atkSpeed": 0.5,
       "spellPower": 70,
       "manaCost": 90,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -2391,6 +2677,7 @@
       "atkSpeed": 0.5,
       "spellPower": 70,
       "manaCost": 90,
+      "attackVfxId": "Fire_S",
       "skillId": "FIRE_WARRIOR",
       "synergies": [
         "Fire"
@@ -2411,6 +2698,7 @@
       "atkSpeed": 0.5,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -2431,6 +2719,7 @@
       "atkSpeed": 0.5,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -2451,6 +2740,7 @@
       "atkSpeed": 0.5,
       "spellPower": 100,
       "manaCost": 70,
+      "attackVfxId": "Water_S",
       "skillId": "WATER_TANKER",
       "synergies": [
         "Water"
@@ -2471,6 +2761,7 @@
       "atkSpeed": 0.6,
       "spellPower": 85,
       "manaCost": 80,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_WARRIOR",
       "synergies": [
         "Normal"
@@ -2491,6 +2782,7 @@
       "atkSpeed": 0.6,
       "spellPower": 85,
       "manaCost": 80,
+      "attackVfxId": "Normal_S",
       "skillId": "NORMAL_WARRIOR",
       "synergies": [
         "Normal"
@@ -2511,6 +2803,7 @@
       "atkSpeed": 0.9,
       "spellPower": 120,
       "manaCost": 60,
+      "attackVfxId": "Dark_L",
       "skillId": "DARK_ARCHER",
       "synergies": [
         "Dark"
@@ -2531,70 +2824,11 @@
       "atkSpeed": 0.8,
       "spellPower": 205,
       "manaCost": 45,
-      "skillId": "",
+      "attackVfxId": "Cheerleader_L",
+      "skillId": "CHEER_SUPPORTER",
       "synergies": [
         "Cheerleader",
         "Electric"
-      ],
-      "role": "Supporter",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 360,
-      "name": "마자",
-      "nameEn": "Wynaut",
-      "cost": 2,
-      "range": 1,
-      "hp": 950,
-      "attack": 35,
-      "defense": 45,
-      "atkSpeed": 0.6,
-      "spellPower": 140,
-      "manaCost": 65,
-      "skillId": "",
-      "synergies": [
-        "Ethereal"
-      ],
-      "role": "Tanker",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 417,
-      "name": "파치리스",
-      "nameEn": "Pachirisu",
-      "cost": 2,
-      "range": 1,
-      "hp": 600,
-      "attack": 30,
-      "defense": 25,
-      "atkSpeed": 0.6,
-      "spellPower": 120,
-      "manaCost": 70,
-      "skillId": "ELECTRIC_SUPPORTER",
-      "synergies": [
-        "Electric"
-      ],
-      "role": "Supporter",
-      "obtainBy": "shop",
-      "evolvesInto": ""
-    },
-    {
-      "id": 439,
-      "name": "흉내내",
-      "nameEn": "Mime Jr.",
-      "cost": 3,
-      "range": 1,
-      "hp": 650,
-      "attack": 40,
-      "defense": 25,
-      "atkSpeed": 0.7,
-      "spellPower": 145,
-      "manaCost": 60,
-      "skillId": "",
-      "synergies": [
-        "Ethereal"
       ],
       "role": "Supporter",
       "obtainBy": "shop",
@@ -2612,6 +2846,7 @@
       "atkSpeed": 0.6,
       "spellPower": 180,
       "manaCost": 65,
+      "attackVfxId": "Dragon_S",
       "skillId": "DRAGON_ASSASSIN",
       "synergies": [
         "Dragon",
@@ -2633,6 +2868,7 @@
       "atkSpeed": 0.6,
       "spellPower": 180,
       "manaCost": 65,
+      "attackVfxId": "Dragon_S",
       "skillId": "DRAGON_ASSASSIN",
       "synergies": [
         "Dragon",
@@ -2654,6 +2890,7 @@
       "atkSpeed": 0.6,
       "spellPower": 180,
       "manaCost": 65,
+      "attackVfxId": "Dragon_S",
       "skillId": "DRAGON_ASSASSIN",
       "synergies": [
         "Dragon",
@@ -2675,7 +2912,8 @@
       "atkSpeed": 0.7,
       "spellPower": 110,
       "manaCost": 75,
-      "skillId": "",
+      "attackVfxId": "Breaker_S",
+      "skillId": "BREAKER_WARRIOR",
       "synergies": [
         "Breaker"
       ],
@@ -2695,7 +2933,8 @@
       "atkSpeed": 0.7,
       "spellPower": 110,
       "manaCost": 75,
-      "skillId": "",
+      "attackVfxId": "Breaker_S",
+      "skillId": "BREAKER_WARRIOR",
       "synergies": [
         "Breaker"
       ],
@@ -2704,124 +2943,24 @@
       "evolvesInto": "Weavile"
     },
     {
-      "id": 461,
-      "name": "포푸니라",
-      "nameEn": "Weavile",
-      "cost": 5,
-      "range": 1,
-      "hp": 1300,
-      "attack": 70,
-      "defense": 55,
-      "atkSpeed": 0.9,
-      "spellPower": 350,
-      "manaCost": 50,
-      "skillId": "ICE_ASSASSIN",
-      "synergies": [
-        "Ice"
-      ],
-      "role": "Assassin",
-      "obtainBy": "evolution",
-      "evolvesInto": ""
-    },
-    {
-      "id": 462,
-      "name": "자포코일",
-      "nameEn": "Magnezone",
-      "cost": 4,
-      "range": 2,
-      "hp": 1200,
-      "attack": 35,
-      "defense": 55,
-      "atkSpeed": 0.55,
-      "spellPower": 180,
-      "manaCost": 55,
-      "skillId": "ELECTRIC_TANKER",
-      "synergies": [
-        "Electric",
-        "Breaker"
-      ],
-      "role": "Tanker",
-      "obtainBy": "stone",
-      "evolvesInto": "Tangrowth"
-    },
-    {
-      "id": 465,
-      "name": "덩쿠림보",
-      "nameEn": "Tangrowth",
+      "id": 129,
+      "name": "잉어킹",
+      "nameEn": "Magikarp",
       "cost": 1,
       "range": 1,
-      "hp": 650,
-      "attack": 30,
-      "defense": 35,
-      "atkSpeed": 0.4,
-      "spellPower": 130,
-      "manaCost": 84,
-      "skillId": "GRASS_ASSASSIN",
-      "synergies": [
-        "Grass"
-      ],
-      "role": "Assassin",
-      "obtainBy": "evolution",
-      "evolvesInto": ""
-    },
-    {
-      "id": 470,
-      "name": "리피아",
-      "nameEn": "Leafeon",
-      "cost": 3,
-      "range": 1,
-      "hp": 750,
-      "attack": 65,
-      "defense": 35,
-      "atkSpeed": 0.6,
+      "hp": 300,
+      "attack": 20,
+      "defense": 10,
+      "atkSpeed": 0.5,
       "spellPower": 60,
-      "manaCost": 70,
-      "skillId": "MUTANT_ARCHER",
+      "manaCost": 60,
+      "attackVfxId": "Water_S",
+      "skillId": "WATER_TANKER",
       "synergies": [
-        "Mutant"
-      ],
-      "role": "Archer",
-      "obtainBy": "stone",
-      "evolvesInto": ""
-    },
-    {
-      "id": 471,
-      "name": "글레이시아",
-      "nameEn": "Glaceon",
-      "cost": 4,
-      "range": 2,
-      "hp": 1400,
-      "attack": 55,
-      "defense": 60,
-      "atkSpeed": 0.65,
-      "spellPower": 200,
-      "manaCost": 50,
-      "skillId": "MUTANT_TANKER",
-      "synergies": [
-        "Mutant"
+        "Water"
       ],
       "role": "Tanker",
-      "obtainBy": "synergy",
-      "evolvesInto": ""
-    },
-    {
-      "id": 700,
-      "name": "님피아",
-      "nameEn": "Sylveon",
-      "cost": 5,
-      "range": 1,
-      "hp": 900,
-      "attack": 30,
-      "defense": 15,
-      "atkSpeed": 0.6,
-      "spellPower": 350,
-      "manaCost": 40,
-      "skillId": "MUTANT_MAGICIAN",
-      "synergies": [
-        "Mutant"
-      ],
-      "role": "Magician",
-      "obtainBy": "synergy",
+      "obtainBy": "wild",
       "evolvesInto": ""
     }
   ]

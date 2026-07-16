@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 1
     vfxId: VFX_Water_Warrior
+  attackVfxId: Water_S
   evolvesIntoEn: Poliwhirl
   shopBuyable: 1
   modelPrefab: {fileID: 0}

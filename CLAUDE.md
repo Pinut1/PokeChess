@@ -53,9 +53,9 @@ Assets/_Project/Scripts/
 - `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
 
 **🟡 타 담당 영역**
-- 증강: `Augments/Implementations/*` `Apply()` 4종, `AugmentFactory` 미구현 — 황해인
+- ✅ 증강 시스템 — 확정 7종 + 3택1 오퍼 흐름 전부 구현(7/16, 영욱이 해인 파트 대행). `AugmentCatalog`(7종 정의)·`AugmentFactory`·`AugmentManager.OfferChoice`·R2 preReward 연결·임시 `AugmentOfferHud`·전적 기록(augments) 포함. 상세/잔여 PLACEHOLDER는 `Assets/_Project/Docs/AugmentSystem.md`. 남은 것: 선택 UI 정식화(태욱), 수치 확정(해인 — 레벨할인폭/4코 등장률/전용리롤 해석/티어)
 - ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
-- `Managers/RewardManager` `AugmentChoice` 지급 — AugmentManager(해인) 연결 대기
+- ✅ `Managers/RewardManager` `AugmentChoice` 지급 — 연결 완료(7/16). preReward(StageData)와 RewardKind 두 경로 모두 지원
 
 **🟢 영욱 영역 (Core/전투/보드/네트워크)**
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
@@ -73,8 +73,16 @@ Assets/_Project/Scripts/
 구글 시트 → JSON → `Assets/Resources/Data/` → `PokeChess/Import *` 메뉴 실행 → ScriptableObject 자동 생성  
 SO 저장 경로: `Assets/_Project/ScriptableObjects/`
 
+임포트 대상: Pokemon / Item / Consumable / EvolutionStone / Synergy / Reward / Stage / TradeEvolution / **Deck(견본덱, 7/14 신설)**. Deck은 `deck_data.json` → 단일 `Resources/DeckDatabase.asset`(플레이어 가이드용, pokemonId·unitCount 임포트 검증). skill_table은 Pokemon 임포트 시 skillId로 조인 베이킹.
+
 > 데이터 **원본은 구글 시트**이며 SO는 임포터 산출물(읽기 전용 캐시)임 — SO를 직접 수정하지 말 것.
 > 가변 런타임 상태는 `PokemonUnit`/`BattleUnit`에만 둔다. 라이브 서비스로 확장 시 JSON 직로드(+id→에셋 매핑)로 전환 고려.
+
+### skillId 규약 (v11, 2026-07-14 확정)
+- 형식: `{타입}_{역할군}` 대문자 스네이크. **한 타입+역할에 스킬 2개면** effectType을 붙임 → `{타입}_{역할군}_{효과}` (예: `WATER_TANKER_SHIELD`/`WATER_TANKER_HP_REGEN`).
+- 타입명은 `CHEER`·`ETHEREAL` 사용(과거 `CHEERLEADER`·`FAIRY`는 폐기 별칭 — 시트에 섞여 오면 정규화).
+- 🔴 기획 대기: 탱커 4종(Water/Poison/Ground/Cheer)이 현재 **전 포켓몬 SHIELD(또는 AS_BUFF) 일괄 배정** — 포켓몬별 세분은 밸런스 확정 후. `BREAKER_WARRIOR`(리오르·루카리오)는 스킬 정의 없어 **평타만**. vfxId 22건 네이밍(`_EFFECT` 접미) 미적용(아트 조율 대기).
+- 변환 스크립트(세션 스크래치패드 `convert_v11.mjs`, Node)는 시트 CSV→JSON 변환 시 위 규칙·orphan 검증을 자동 적용. 재수신 시 재사용(휘발성 주의).
 
 ## NetworkManager 사용법
 ```csharp

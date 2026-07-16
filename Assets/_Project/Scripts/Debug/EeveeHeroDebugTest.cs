@@ -12,10 +12,6 @@ using UnityEngine;
 /// </summary>
 public class EeveeHeroDebugTest : MonoBehaviour
 {
-    // 날따름 마나비용 — PLACEHOLDER(기획 미확정). 스킬 스펙 자체는 기획 확정(2026-07-10): ENEMY_AREA r4.
-    // 검증 편의상 30(전투 시작 ~3초 시전). 기획 확정 시 교체.
-    private const int PACHIRISU_TAUNT_MANA_COST = 30;
-
     private string _lastResult = "";
     private PokemonData _eeveeData;
     private PokemonData _pachirisuData;
@@ -135,7 +131,8 @@ public class EeveeHeroDebugTest : MonoBehaviour
             if (!IsSpecies(unit, "Pachirisu")) continue;
             seen++;
             if (unit.HasGrantedSkill) { already++; continue; }
-            unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), PACHIRISU_TAUNT_MANA_COST);
+            unit.ApplyParichisuHeroAugment(PokemonRole.Tanker,
+                PachirisuHeroAugment.CreateTauntSkill(), PachirisuHeroAugment.TAUNT_MANA_COST);
             applied++;
         }
         string msg = $"도발 증강 — 파치리스 {seen}마리 발견, 신규 적용 {applied}, 기적용 {already}";
@@ -158,17 +155,6 @@ public class EeveeHeroDebugTest : MonoBehaviour
         }
         return $"유닛 {count}개 상태를 콘솔에 출력함";
     }
-
-    /// <summary>날따름 스킬 정의(기획 확정 2026-07-10: ENEMY_AREA r4, 시전자 중심). 증강 시스템(해인) 연결 전 임시 인라인.</summary>
-    private static PokemonSkillData CreateTauntSkill() => new PokemonSkillData
-    {
-        skillId    = "PACHIRISU_TAUNT",
-        skillName  = "날따름",
-        effectType = SkillEffectType.Taunt,
-        targetType = SkillTargetType.EnemyArea,
-        areaRadius = 4,
-        vfxId      = ""
-    };
 
     private static System.Collections.Generic.IEnumerable<PokemonUnit> AllOwnedUnits(GameManager gm)
     {

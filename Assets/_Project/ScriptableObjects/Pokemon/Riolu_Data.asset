@@ -26,7 +26,7 @@ MonoBehaviour:
   synergies:
   - Breaker
   role: Warrior
-  skillId: 
+  skillId: BREAKER_WARRIOR
   skill:
     skillId: 
     skillName: 
@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 0
     vfxId: 
+  attackVfxId: Breaker_S
   evolvesIntoEn: Lucario
   shopBuyable: 1
   modelPrefab: {fileID: 0}

@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 4
     vfxId: VFX_Fire_Archer
+  attackVfxId: Fire_L
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

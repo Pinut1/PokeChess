@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Ethereal
   role: Supporter
-  skillId: 
+  skillId: ETHEREAL_SUPPORTER
   skill:
-    skillId: 
-    skillName: 
-    description: 
-    effectType: 0
-    targetType: 0
-    areaRadius: 0
-    lineLength: 0
-    vfxId: 
+    skillId: ETHEREAL_SUPPORTER
+    skillName: "\uB9E4\uC9C1\uCF54\uD2B8"
+    description: "\uC804\uCCB4 \uC544\uAD70 \uBCF4\uD638\uB9C9 / \uD749\uB0B4\uB0B4"
+    effectType: 3
+    targetType: 2
+    areaRadius: 4
+    lineLength: 4
+    vfxId: VFX_Ethereal_Supporter_SHIELD
+  attackVfxId: Ethereal_L
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 0}

@@ -1,18 +1,31 @@
-// MOCKUP: 수치/효과 기획 확정 전. 패턴 예시용.
 using UnityEngine;
 
-/// <summary>[Silver] 라운드 시작마다 보유 골드의 10% 추가 지급 (최대 5골드)</summary>
+/// <summary>
+/// 이자 증강: 10골드당 이자 +1(기본 1 → 2, 최대 이자 5 → 10) + 즉시 50골드 지급.
+/// 이자 계산/지급 본체는 ShopManager(§7.5) — 여기선 이자율 가산 seam만 호출.
+/// </summary>
 public class GoldInterestAugment : Augment
 {
-    private const float RATE    = 0.1f;
-    private const int   MAX_INT = 5;
+    private const int INTEREST_DELTA   = 1;
+    private const int IMMEDIATE_GOLD   = 50;
 
-    public override void OnRoundChanged(int round)
+    public override void Apply()
     {
-        // TODO: ShopManager에서 현재 골드 읽어서 계산
-        // int current = GameManager.Instance.Shop.Gold;
-        // int interest = Mathf.Min(Mathf.FloorToInt(current * RATE), MAX_INT);
-        // GameEvents.GoldChanged(current + interest);
-        Debug.Log($"[Augment] 이자 지급 (라운드 {round})");
+        var shop = GameManager.Instance.Shop;
+        if (shop == null)
+        {
+            Debug.LogWarning("[Augment] ShopManager 없음 — 이자 증강 적용 실패");
+            return;
+        }
+
+        shop.AddInterestPerTenGold(INTEREST_DELTA);
+        shop.AddGold(IMMEDIATE_GOLD);
+        Debug.Log($"[Augment] 이자 증강: 이자율 +{INTEREST_DELTA}, 즉시 +{IMMEDIATE_GOLD}G");
+    }
+
+    public override void Remove()
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        shop?.AddInterestPerTenGold(-INTEREST_DELTA); // 즉시지급 골드는 회수하지 않음
     }
 }

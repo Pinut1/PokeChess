@@ -103,3 +103,10 @@ public class TradeEvolutionDataEditor : ImporterOutputEditor
     protected override string ImportMenu => "PokeChess/Import TradeEvolution JSON";
     protected override string JsonPath   => "Assets/Resources/Data/trade_evolution_data.json";
 }
+
+[CustomEditor(typeof(DeckDatabase)), CanEditMultipleObjects]
+public class DeckDatabaseEditor : ImporterOutputEditor
+{
+    protected override string ImportMenu => "PokeChess/Import Deck JSON";
+    protected override string JsonPath   => "Assets/Resources/Data/deck_data.json";
+}

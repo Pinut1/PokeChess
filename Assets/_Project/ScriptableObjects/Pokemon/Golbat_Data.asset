@@ -37,6 +37,7 @@ MonoBehaviour:
     areaRadius: 0
     lineLength: 4
     vfxId: VFX_Poison_Archer
+  attackVfxId: Poison_L
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

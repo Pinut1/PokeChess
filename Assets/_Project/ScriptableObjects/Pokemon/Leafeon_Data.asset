@@ -26,16 +26,17 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Archer
-  skillId: MUTANT_ARCHER
+  skillId: GRASS_ARCHER
   skill:
-    skillId: MUTANT_ARCHER
-    skillName: "\uC2A4\uC704\uCE58\uC544\uC6C3"
-    description: "\uB2E8\uC77C \uC801 \uB3CC\uC5F0\uBCC0\uC774 \uB370\uBBF8\uC9C0"
+    skillId: GRASS_ARCHER
+    skillName: "\uC5D0\uB108\uC9C0\uBCFC"
+    description: "\uB2E8\uC77C \uC801 \uD480 \uC18D\uC131 \uB370\uBBF8\uC9C0"
     effectType: 0
     targetType: 3
     areaRadius: 0
     lineLength: 4
-    vfxId: VFX_Mutant_Archer
+    vfxId: VFX_Grass_Archer
+  attackVfxId: Grass_L
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}

@@ -389,6 +389,16 @@ public class ShopManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     /// <summary>
+    /// XP 구매 골드 비용 할인(레벨 할인 증강 seam). 음수 delta로 원복.
+    /// 최소 1G 보장(무료 XP 구매로 무한 레벨업 방지). ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
+    /// </summary>
+    public void AddBuyXpCostDiscount(int discount)
+    {
+        _buyXpCostGold = Mathf.Max(1, _buyXpCostGold - discount);
+        Debug.Log($"[Shop] XP 구매 비용 할인 {(discount >= 0 ? "-" : "+")}{Mathf.Abs(discount)}G => {_buyXpCostGold}G");
+    }
+
+    /// <summary>
     /// 팀 라운드 결과 확정 후 기본 XP 지급.
     /// 현재는 승패와 관계없이 라운드 종료 XP를 지급한다.
     /// TODO: 기획 확정 시 outcome에 따라 XP 지급 여부/배율을 다르게 처리할 수 있음.
@@ -570,6 +580,43 @@ public class ShopManager : MonoBehaviour
             _slots[i] = RollOnePokemon();
 
         GameEvents.ShopRerolled();
+    }
+
+    /// <summary>4코 상점 오픈 증강 활성 여부. 켜지면 레벨 확률표에 4코 등장 확률이 강제 주입된다.</summary>
+    private bool _cost4ForceOpen;
+
+    /// <summary>4코 강제 오픈 시 주입되는 4코 등장 확률(%) — 기획 미확정 PLACEHOLDER.</summary>
+    private const int COST4_FORCE_OPEN_RATE = 15;
+
+    /// <summary>
+    /// 4코 상점 강제 오픈(증강 seam): 즉시 상점을 4코스트 5마리로 무료 갱신하고("5마리 즉시"),
+    /// 이후 레벨과 무관하게 4코가 확률표에 등장한다. ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
+    /// </summary>
+    public void ForceOpenCostFour()
+    {
+        _cost4ForceOpen = true;
+
+        for (int i = 0; i < _slots.Length; i++)
+            _slots[i] = RollOnePokemonOfCost(4);
+
+        GameEvents.ShopRerolled();
+        Debug.Log($"[Shop] 4코 상점 강제 오픈 — 즉시 4코 {_slots.Length}슬롯 갱신, 이후 등장률 {COST4_FORCE_OPEN_RATE}%");
+    }
+
+    /// <summary>특정 코스트만 굴림(4코 강제 오픈용). 해당 코스트 풀이 비면 일반 굴림으로 폴백.</summary>
+    private PokemonData RollOnePokemonOfCost(int cost)
+    {
+        var candidates = _pool.FindAll(p =>
+            p != null &&
+            p.cost == cost &&
+            _remainingPool.TryGetValue(p, out int remain) &&
+            remain > 0);
+
+        if (candidates.Count > 0)
+            return candidates[Random.Range(0, candidates.Count)];
+
+        Debug.LogWarning($"[Shop] {cost}코스트 남은 풀 없음 — 일반 굴림으로 폴백");
+        return RollOnePokemon();
     }
 
     private PokemonData RollOnePokemon()
@@ -880,6 +927,12 @@ public class ShopManager : MonoBehaviour
     private int RollCostByLevel(int level)
     {
         int[] rates = GetCostRates(level);
+
+        // 4코 상점 오픈 증강: 확률표에 4코가 없는 저레벨에도 4코 등장을 강제 주입.
+        // (총합이 100을 넘어도 가중치 방식이라 비율로만 동작.)
+        if (_cost4ForceOpen && rates[3] <= 0)
+            rates[3] = COST4_FORCE_OPEN_RATE;
+
         int total = 0;
 
         for (int i = 0; i < rates.Length; i++)

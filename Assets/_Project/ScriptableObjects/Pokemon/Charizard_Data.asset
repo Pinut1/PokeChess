@@ -36,6 +36,7 @@ MonoBehaviour:
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Fire_Magician
+  attackVfxId: Fire_L
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}
