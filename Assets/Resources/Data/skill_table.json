@@ -230,7 +230,7 @@
     },
     {
       "skillId": "ELECTRIC_SUPPORTER",
-      "skillName": "방전",
+      "skillName": "볼부비부비",
       "skillType": "전기",
       "role": "SUPPORTER",
       "effectType": "MANA_REGEN",
@@ -1134,8 +1134,8 @@
       "skillType": "Ethereal",
       "role": "SUPPORTER",
       "effectType": "SHIELD",
-      "targetType": "ALLY_SINGLE",
-      "areaRadius": 0,
+      "targetType": "ALLY_AREA",
+      "areaRadius": 4,
       "lineLength": 4,
       "vfxId": "VFX_Ethereal_Supporter_SHIELD",
       "description": "전체 아군 보호막 / 흉내내"
