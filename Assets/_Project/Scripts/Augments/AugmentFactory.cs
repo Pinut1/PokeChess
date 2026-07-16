@@ -8,13 +8,12 @@ public static class AugmentFactory
     {
         Augment augment = data.augmentId switch
         {
-            AugmentId.GoldInterest     => new GoldInterestAugment(),
-            AugmentId.LevelDiscount    => new LevelDiscountAugment(),
-            AugmentId.RerollRefund     => new RerollRefundAugment(),
-            AugmentId.PachirisuHero    => new PachirisuHeroAugment(),
-            AugmentId.EeveeHero        => new EeveeHeroAugment(),
-            AugmentId.FourCostShopOpen => new FourCostShopOpenAugment(),
-            AugmentId.Quarry           => new QuarryAugment(),
+            AugmentId.EconomyGold   => new EconomyGoldAugment(),
+            AugmentId.EconomyShop   => new EconomyShopAugment(),
+            AugmentId.HeroPachirisu => new HeroPachirisuAugment(),
+            AugmentId.HeroEevee     => new HeroEeveeAugment(),
+            AugmentId.RerollTicket  => new RerollTicketAugment(),
+            AugmentId.GambleStone   => new GambleStoneAugment(),
             _ => throw new System.NotImplementedException(
                      $"[AugmentFactory] {data.augmentId} 미구현 — Augment 클래스 추가 필요")
         };

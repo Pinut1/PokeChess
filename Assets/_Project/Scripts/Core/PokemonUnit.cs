@@ -72,21 +72,27 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>EffectiveSkill에 대응하는 마나비용.</summary>
     public int EffectiveManaCost => HasGrantedSkill && grantedSkillManaCost > 0 ? grantedSkillManaCost : ManaCost;
 
-    /// <summary>이브이 영웅증강 적용(진화잠금 + 스탯 배수). 증강 시스템 연결 시 이 API로 호출.</summary>
-    public void ApplyEeveeHeroAugment(float statMultiplier = 1.4f)
+    /// <summary>
+    /// 이브이 영웅증강 적용(진화잠금 + 스탯 배수 + 역할 전환). Augment Table v2: ×1.4, 역할 → 마법사.
+    /// 역할 변경은 타겟 우선순위 태그만 바뀌고 스탯은 종 원본 × 배수 유지(역할별 스탯 재계산 없음 — 해인님 회신 2026-07-16).
+    /// </summary>
+    public void ApplyEeveeHeroAugment(float statMultiplier = 1.4f, string newRole = null)
     {
         evolutionLocked    = true;
         heroStatMultiplier = statMultiplier;
+        if (!string.IsNullOrEmpty(newRole)) roleOverride = newRole;
         currentHp          = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }
 
-    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입). 증강 시스템 연결 시 이 API로 호출.</summary>
-    public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0)
+    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입 + 스탯 배수). Augment Table v2: ×1.4.</summary>
+    public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0, float statMultiplier = 1.4f)
     {
         roleOverride          = newRole;
         grantedSkill          = tauntSkill;
         grantedSkillManaCost  = manaCost;
+        heroStatMultiplier    = statMultiplier;
+        currentHp             = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }
 
