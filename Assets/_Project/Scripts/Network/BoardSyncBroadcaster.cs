@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 로컬 플레이어의 보드/벤치/골드 변경을 감지해 NetworkManager로 송출하는 다리.
+/// 로컬 플레이어의 보드/벤치/골드/증강 변경을 감지해 NetworkManager로 송출하는 다리.
 /// (송출만 담당 — 수신/렌더는 OpponentBoardView, 매니저 직접 참조 대신 GameEvents 구독)
 ///
 /// 보드 변경 이벤트(배치/벤치/판매/진화)는 한 프레임에 여러 번 터질 수 있어(예: 연쇄 진화)
@@ -13,18 +13,20 @@ public class BoardSyncBroadcaster : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnUnitPlaced  += MarkBoardDirty;
-        GameEvents.OnUnitBenched += MarkBoardDirty;
-        GameEvents.OnUnitSold    += MarkBoardDirty;
-        GameEvents.OnGoldChanged += HandleGoldChanged;
+        GameEvents.OnUnitPlaced      += MarkBoardDirty;
+        GameEvents.OnUnitBenched     += MarkBoardDirty;
+        GameEvents.OnUnitSold        += MarkBoardDirty;
+        GameEvents.OnGoldChanged     += HandleGoldChanged;
+        GameEvents.OnAugmentSelected += HandleAugmentSelected;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnUnitPlaced  -= MarkBoardDirty;
-        GameEvents.OnUnitBenched -= MarkBoardDirty;
-        GameEvents.OnUnitSold    -= MarkBoardDirty;
-        GameEvents.OnGoldChanged -= HandleGoldChanged;
+        GameEvents.OnUnitPlaced      -= MarkBoardDirty;
+        GameEvents.OnUnitBenched     -= MarkBoardDirty;
+        GameEvents.OnUnitSold        -= MarkBoardDirty;
+        GameEvents.OnGoldChanged     -= HandleGoldChanged;
+        GameEvents.OnAugmentSelected -= HandleAugmentSelected;
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
@@ -33,6 +35,24 @@ public class BoardSyncBroadcaster : MonoBehaviour
     {
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
         net?.SyncLocalGold(gold);
+    }
+
+    /// <summary>증강 선택 시 누적 목록 전체(영문명, 선택 순)를 재송출 — 유실돼도 다음 선택 때 자가 복구된다.</summary>
+    private void HandleAugmentSelected(AugmentData _)
+    {
+        var gm = GameManager.Instance;
+        if (gm == null || gm.Augment == null || gm.Network == null) return;
+
+        var active = gm.Augment.ActiveAugments;
+        var names = new System.Collections.Generic.List<string>(active.Count);
+        foreach (var augment in active)
+        {
+            var data = augment?.Data;
+            if (data == null) continue;
+            string name = !string.IsNullOrEmpty(data.augmentNameEn) ? data.augmentNameEn : data.augmentName;
+            if (!string.IsNullOrEmpty(name)) names.Add(name);
+        }
+        gm.Network.SyncLocalAugments(names.ToArray());
     }
 
     private void LateUpdate()

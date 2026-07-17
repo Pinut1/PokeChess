@@ -92,6 +92,9 @@ public static class GameEvents
     /// <summary>증강 선택 완료</summary>
     public static event Action<AugmentData> OnAugmentSelected;
 
+    /// <summary>파트너(상대 클라이언트)의 누적 증강 목록 변경. 인자 = 영문명 배열(선택 순). UI 표시·전적 기록용.</summary>
+    public static event Action<string[]> OnPartnerAugmentsChanged;
+
     // ──────────────────────────────────────────
     // 유닛
     // ──────────────────────────────────────────
@@ -217,6 +220,7 @@ public static class GameEvents
 
     public static void AugmentOfferReady(IReadOnlyList<AugmentData> offer) => OnAugmentOfferReady?.Invoke(offer);
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
+    public static void PartnerAugmentsChanged(string[] augmentNamesEn) => OnPartnerAugmentsChanged?.Invoke(augmentNamesEn);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);

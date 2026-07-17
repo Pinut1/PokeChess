@@ -24,27 +24,30 @@ public class MatchRecorder : MonoBehaviour
     private int      _selfLevel = 1;
     private BoardSnapshot _lastPartnerBoard;
     private readonly List<string> _selfAugments = new();
+    private string[] _partnerAugments = Array.Empty<string>();
 
     private void OnEnable()
     {
-        GameEvents.OnRoundChanged         += HandleRoundChanged;
-        GameEvents.OnStageEntered         += HandleStageEntered;
-        GameEvents.OnLevelChanged         += HandleLevelChanged;
-        GameEvents.OnOpponentBoardChanged += HandleOpponentBoardChanged;
-        GameEvents.OnAugmentSelected      += HandleAugmentSelected;
-        GameEvents.OnGameCleared          += HandleGameCleared;
-        GameEvents.OnSessionEnded         += HandleSessionEnded;
+        GameEvents.OnRoundChanged           += HandleRoundChanged;
+        GameEvents.OnStageEntered           += HandleStageEntered;
+        GameEvents.OnLevelChanged           += HandleLevelChanged;
+        GameEvents.OnOpponentBoardChanged   += HandleOpponentBoardChanged;
+        GameEvents.OnAugmentSelected        += HandleAugmentSelected;
+        GameEvents.OnPartnerAugmentsChanged += HandlePartnerAugmentsChanged;
+        GameEvents.OnGameCleared            += HandleGameCleared;
+        GameEvents.OnSessionEnded           += HandleSessionEnded;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnRoundChanged         -= HandleRoundChanged;
-        GameEvents.OnStageEntered         -= HandleStageEntered;
-        GameEvents.OnLevelChanged         -= HandleLevelChanged;
-        GameEvents.OnOpponentBoardChanged -= HandleOpponentBoardChanged;
-        GameEvents.OnAugmentSelected      -= HandleAugmentSelected;
-        GameEvents.OnGameCleared          -= HandleGameCleared;
-        GameEvents.OnSessionEnded         -= HandleSessionEnded;
+        GameEvents.OnRoundChanged           -= HandleRoundChanged;
+        GameEvents.OnStageEntered           -= HandleStageEntered;
+        GameEvents.OnLevelChanged           -= HandleLevelChanged;
+        GameEvents.OnOpponentBoardChanged   -= HandleOpponentBoardChanged;
+        GameEvents.OnAugmentSelected        -= HandleAugmentSelected;
+        GameEvents.OnPartnerAugmentsChanged -= HandlePartnerAugmentsChanged;
+        GameEvents.OnGameCleared            -= HandleGameCleared;
+        GameEvents.OnSessionEnded           -= HandleSessionEnded;
     }
 
     // ─────────────────────────────────────────
@@ -78,6 +81,10 @@ public class MatchRecorder : MonoBehaviour
         string name = !string.IsNullOrEmpty(data.augmentNameEn) ? data.augmentNameEn : data.augmentName;
         if (!string.IsNullOrEmpty(name)) _selfAugments.Add(name);
     }
+
+    /// <summary>파트너 증강은 CustomProperties 미러(누적 전체 배열)라 마지막 수신값으로 덮어쓴다.</summary>
+    private void HandlePartnerAugmentsChanged(string[] augments)
+        => _partnerAugments = augments ?? Array.Empty<string>();
 
     // ─────────────────────────────────────────
     // 종료 → 기록
@@ -123,6 +130,7 @@ public class MatchRecorder : MonoBehaviour
         _selfLevel        = 1;
         _lastPartnerBoard = null;
         _selfAugments.Clear();
+        _partnerAugments  = Array.Empty<string>();
     }
 
     private MatchRecord BuildRecord(string result, string endReason)
@@ -221,7 +229,7 @@ public class MatchRecorder : MonoBehaviour
             level           = 0,                                  // 미전송 — 0 = 알 수 없음
             board           = Array.Empty<UnitRecord>(),
             activeSynergies = Array.Empty<string>(),
-            augments        = Array.Empty<string>(),
+            augments        = _partnerAugments,
         };
 
         var db = PokemonDatabase.Instance;

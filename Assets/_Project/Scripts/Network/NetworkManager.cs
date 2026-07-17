@@ -31,6 +31,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>플레이어 골드를 Player CustomProperties에 저장할 때 쓰는 키(파트너 표시용).</summary>
     private const string GOLD_PROP_KEY = "Gold";
 
+    /// <summary>플레이어의 누적 증강 영문명 배열을 Player CustomProperties에 저장할 때 쓰는 키.
+    /// RPC와 달리 유예(비활성) 중에도 서버에 보존돼 재접속·마스터 교체에 안전하다.</summary>
+    private const string AUGMENTS_PROP_KEY = "Augments";
+
     /// <summary>팀 공통 HP를 Room CustomProperties에 저장할 때 쓰는 키(GDD: 팀 공통 체력).</summary>
     private const string TEAM_HP_PROP_KEY = "TeamHP";
 
@@ -686,6 +690,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    /// <summary>내 누적 증강 목록(영문명, 선택 순)을 Player CustomProperties에 기록 → 파트너 클라가 표시/전적 기록.</summary>
+    public void SyncLocalAugments(string[] augmentNamesEn)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return;
+        var props = new Hashtable { { AUGMENTS_PROP_KEY, augmentNamesEn ?? System.Array.Empty<string>() } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
     /// <summary>팀 공통 HP 초기화(MasterClient만, 아직 미설정일 때). PlayerHealthManager가 게임 시작 시 호출.</summary>
     public void InitTeamHealth(int hp)
     {
@@ -766,6 +778,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             { READY_PROP_KEY, false },
             { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
         };
+        if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
 
@@ -961,6 +974,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             GameEvents.PartnerGoldChanged((int)gold);
         }
 
+        // 파트너 증강 목록: 다른 플레이어의 Augments가 바뀌면 이벤트 발행(모든 클라).
+        if (targetPlayer != PhotonNetwork.LocalPlayer &&
+            changedProps.TryGetValue(AUGMENTS_PROP_KEY, out object augments) &&
+            augments is string[] augmentNames)
+        {
+            GameEvents.PartnerAugmentsChanged(augmentNames);
+        }
+
         // 이하 집계는 MasterClient만.
         if (!IsMasterClient) return;
 
@@ -1143,6 +1164,7 @@ public class NetworkManager : MonoBehaviour
     // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
     public void BroadcastBoardSnapshot(int[] _) { }
     public void SyncLocalGold(int _)            { }
+    public void SyncLocalAugments(string[] _)   { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
     public void RequestSharedShopReturn(int pokemonId, int amount) { }
