@@ -582,7 +582,7 @@ Transform:
   m_GameObject: {fileID: 1116044667}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 1.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -602,6 +602,7 @@ GameObject:
   - component: {fileID: 1481026851}
   - component: {fileID: 1481026847}
   - component: {fileID: 1481026850}
+  - component: {fileID: 1481026853}
   m_Layer: 0
   m_Name: Network_Test
   m_TagString: Untagged
@@ -685,6 +686,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoundPhaseManager
   _shoppingDuration: 30
   _resultDuration: 3
+  _autoStartBattleOnTimeout: 1
 --- !u!114 &1481026852
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -702,11 +704,24 @@ MonoBehaviour:
   _boardManager: {fileID: 0}
   _battleManager: {fileID: 0}
   _shopManager: {fileID: 0}
+  _rewardManager: {fileID: 0}
   _synergyManager: {fileID: 0}
   _itemManager: {fileID: 0}
-  _augmentManager: {fileID: 0}
+  _augmentManager: {fileID: 1481026853}
   _uiManager: {fileID: 0}
   _playerHealthManager: {fileID: 0}
+--- !u!114 &1481026853
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481026846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5eac3cc6472c33d4e820e5e369a6fd99, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AugmentManager
 --- !u!1 &1984529690
 GameObject:
   m_ObjectHideFlags: 0

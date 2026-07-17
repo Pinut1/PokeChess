@@ -23,6 +23,7 @@ public class MatchRecorder : MonoBehaviour
     private string   _finalStageId = "";
     private int      _selfLevel = 1;
     private BoardSnapshot _lastPartnerBoard;
+    private readonly List<string> _selfAugments = new();
 
     private void OnEnable()
     {
@@ -30,6 +31,7 @@ public class MatchRecorder : MonoBehaviour
         GameEvents.OnStageEntered         += HandleStageEntered;
         GameEvents.OnLevelChanged         += HandleLevelChanged;
         GameEvents.OnOpponentBoardChanged += HandleOpponentBoardChanged;
+        GameEvents.OnAugmentSelected      += HandleAugmentSelected;
         GameEvents.OnGameCleared          += HandleGameCleared;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
     }
@@ -40,6 +42,7 @@ public class MatchRecorder : MonoBehaviour
         GameEvents.OnStageEntered         -= HandleStageEntered;
         GameEvents.OnLevelChanged         -= HandleLevelChanged;
         GameEvents.OnOpponentBoardChanged -= HandleOpponentBoardChanged;
+        GameEvents.OnAugmentSelected      -= HandleAugmentSelected;
         GameEvents.OnGameCleared          -= HandleGameCleared;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
     }
@@ -68,6 +71,13 @@ public class MatchRecorder : MonoBehaviour
     private void HandleLevelChanged(int level) => _selfLevel = level;
 
     private void HandleOpponentBoardChanged(BoardSnapshot snap) => _lastPartnerBoard = snap;
+
+    private void HandleAugmentSelected(AugmentData data)
+    {
+        if (data == null) return;
+        string name = !string.IsNullOrEmpty(data.augmentNameEn) ? data.augmentNameEn : data.augmentName;
+        if (!string.IsNullOrEmpty(name)) _selfAugments.Add(name);
+    }
 
     // ─────────────────────────────────────────
     // 종료 → 기록
@@ -112,6 +122,7 @@ public class MatchRecorder : MonoBehaviour
         _finalStageId     = "";
         _selfLevel        = 1;
         _lastPartnerBoard = null;
+        _selfAugments.Clear();
     }
 
     private MatchRecord BuildRecord(string result, string endReason)
@@ -155,7 +166,7 @@ public class MatchRecorder : MonoBehaviour
             level           = _selfLevel,
             board           = Array.Empty<UnitRecord>(),
             activeSynergies = Array.Empty<string>(),
-            augments        = Array.Empty<string>(), // 증강 시스템(해인) 연결 시 채움
+            augments        = _selfAugments.ToArray(),
         };
 
         var board = gm != null ? gm.Board : null;

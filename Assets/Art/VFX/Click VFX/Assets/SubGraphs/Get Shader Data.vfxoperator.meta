@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a56364b7289b4184c93b7ec364275a95
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 233969
+  packageName: Click Effects & Ground Indicators | VFX Essentials
+  packageVersion: 1.1.0
+  assetPath: Assets/Click VFX/Assets/SubGraphs/Get Shader Data.vfxoperator
+  uploadId: 592060

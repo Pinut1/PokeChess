@@ -11,8 +11,8 @@ using UnityEngine;
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage. StageEntered 인자로 직접 받으므로 pull도 불필요.
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품/재련기(Reforger)는 실제 지급 연결됨.
-/// 증강(AugmentChoice)은 AugmentManager가 붙을 때까지 훅 + 경고 로그로 남긴다. grep "[Reward] TODO"로 추적.
+/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품/재련기(Reforger)/증강(AugmentChoice) 전부 실제 지급 연결됨.
+/// 증강 3택1은 두 경로 모두 지원: StageData.preReward=AugmentChoice(현재 R2가 사용) + RewardKind.AugmentChoice(보상 테이블용).
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
@@ -36,6 +36,21 @@ public class RewardManager : MonoBehaviour
         {
             Debug.Log($"[Reward] '{stage.stageId}' 이미 지급됨 — 중복 선지급 스킵");
             return;
+        }
+
+        // 전투 전 이벤트(preReward): 증강 3택1 트리거. 보상 테이블과 별개 필드라 여기서 분기.
+        // (ItemReward/CompanionItem은 기획 미확정 — 사용 스테이지가 생기면 연결.)
+        if (stage.preReward == PreStageReward.AugmentChoice)
+        {
+            if (GameManager.Instance.Augment != null)
+            {
+                GameManager.Instance.Augment.OfferChoice();
+                Debug.Log($"[Reward] '{stage.stageId}' preReward — 증강 3택1 오퍼 트리거");
+            }
+            else
+            {
+                Debug.LogWarning("[Reward] AugmentManager 없음 — preReward 증강 3택1 스킵");
+            }
         }
 
         var db = RewardDatabase.Instance;
@@ -89,7 +104,7 @@ public class RewardManager : MonoBehaviour
                 if (amount > 0) GrantItem(entry.refNameEn, amount);
                 break;
 
-            // ── 종류별 보상 지급 분기. 증강은 AugmentManager 연결 전까지 TODO 로그로 유지. ───────────────
+            // ── 종류별 보상 지급 분기 ───────────────
             case RewardKind.Consumable:
                 if (amount > 0) GrantConsumable(entry.refNameEn, amount);
                 break;
@@ -131,7 +146,15 @@ public class RewardManager : MonoBehaviour
                 break;
 
             case RewardKind.AugmentChoice:
-                Debug.LogWarning("[Reward] TODO AugmentChoice — AugmentManager 미구현(해인), preReward 흐름과 통합 예정");
+                // 증강 3택1 트리거 — AugmentManager가 풀에서 추첨해 오퍼(GameEvents.AugmentOfferReady) 발행.
+                if (GameManager.Instance.Augment == null)
+                {
+                    Debug.LogWarning("[Reward] AugmentManager 없음 — 증강 3택1 스킵");
+                    break;
+                }
+
+                GameManager.Instance.Augment.OfferChoice();
+                Debug.Log("[Reward] 증강 3택1 오퍼 트리거");
                 break;
         }
     }
