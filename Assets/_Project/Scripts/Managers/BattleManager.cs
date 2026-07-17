@@ -638,6 +638,10 @@ public class BattleManager : MonoBehaviour
 
             bu.TickCcState(TICK_INTERVAL);
 
+            // 자뭉열매: 매초 15% 회복, 완전 회복하거나 다른 아군이 없으면 복귀(기획 확정 7/17).
+            if (bu.berryActive)
+                bu.TickBerry(TICK_INTERVAL, HasOtherAliveAlly(bu));
+
             // 마나 충전(기획 확정): 초당 10 고정. 스턴 중에도 차오른다(행동만 불능).
             GainMana(bu, MANA_PER_SECOND * TICK_INTERVAL);
 
@@ -1066,6 +1070,15 @@ public class BattleManager : MonoBehaviour
     {
         foreach (var other in _units)
             if (other.IsAlive && other.coords == coords)
+                return true;
+        return false;
+    }
+
+    /// <summary>self 외에 같은 팀의 살아있는 유닛이 있는지(자뭉열매 복귀 판정 — 혼자 남으면 즉시 복귀).</summary>
+    private bool HasOtherAliveAlly(BattleUnit self)
+    {
+        foreach (var u in _units)
+            if (u != self && u.team == self.team && u.IsAlive)
                 return true;
         return false;
     }
