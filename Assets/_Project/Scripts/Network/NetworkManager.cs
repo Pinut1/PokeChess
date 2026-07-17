@@ -105,6 +105,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>상대방 재접속 유예 타이머</summary>
     private Coroutine _opponentGraceRoutine;
 
+    /// <summary>GracePeriodExpired 중복 발행 방지. 로컬 유예 코루틴(60초)과 Photon PlayerTtl(동일 60초) 만료로 인한
+    /// OnPlayerLeftRoom(IsInactive=false) 재호출이 거의 동시에 도착해 같은 이탈 건을 두 번 발행할 수 있다.</summary>
+    private bool _gracePeriodExpiredFired;
+
     /// <summary>본인 재접속 시도 타이머</summary>
     private Coroutine _selfReconnectRoutine;
 
@@ -858,6 +862,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] {newPlayer.NickName} 입장 | 인원: {PlayerCount}/{MAX_PLAYERS}");
 
+        _gracePeriodExpiredFired = false;
+
         if (_opponentGraceRoutine != null)
         {
             StopCoroutine(_opponentGraceRoutine);
@@ -876,8 +882,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!otherPlayer.IsInactive)
         {
-            // 자진 퇴장(룸 영구 이탈) — 유예 없이 바로 처리
-            GameEvents.GracePeriodExpired(false);
+            // 자진 퇴장(룸 영구 이탈) 또는 PlayerTtl 만료로 인한 서버측 제거 — 유예 없이 바로 처리.
+            // 후자는 로컬 유예 코루틴과 같은 이탈 건이므로 FireGracePeriodExpired가 중복 발행을 막는다.
+            if (_opponentGraceRoutine != null)
+            {
+                StopCoroutine(_opponentGraceRoutine);
+                _opponentGraceRoutine = null;
+            }
+            FireGracePeriodExpired(false);
             return;
         }
 
@@ -896,6 +908,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
         Debug.LogWarning($"[Network] 상대 재접속 유예시간 종료 (둘 다 끊김: {bothDisconnected})");
+        FireGracePeriodExpired(bothDisconnected);
+    }
+
+    /// <summary>같은 이탈 건에 대해 GracePeriodExpired를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
+    private void FireGracePeriodExpired(bool bothDisconnected)
+    {
+        if (_gracePeriodExpiredFired) return;
+        _gracePeriodExpiredFired = true;
         GameEvents.GracePeriodExpired(bothDisconnected);
     }
 
