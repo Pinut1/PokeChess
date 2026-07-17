@@ -575,7 +575,8 @@ public class BattleManager : MonoBehaviour
             range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
             attackCooldown = 0f,
             role = unit.Role,
-            starLevel = Mathf.Clamp(unit.starLevel, 1, 3) // 날따름 지속시간 공식용
+            starLevel = Mathf.Clamp(unit.starLevel, 1, 3), // 날따름 지속시간 공식용
+            hasSitrusBerry = unit.hasHeroBerry // 파치리스 영웅증강 v2 자뭉열매
         };
         // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
         if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
@@ -641,20 +642,24 @@ public class BattleManager : MonoBehaviour
             GainMana(bu, MANA_PER_SECOND * TICK_INTERVAL);
 
             if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
+            if (bu.IsUntargetable) continue;     // 자뭉열매 시식 중 — 행동 불능(마나는 위에서 충전됨)
 
             // 타겟 우선순위: 도발자(강제) > 도발 종료 복귀 타겟(날따름 스냅샷) > 일반 타겟팅
+            // 언타겟(자뭉열매) 대상은 강제/복귀 타겟이라도 노릴 수 없다.
             BattleUnit target;
-            if (bu.tauntedBy != null && bu.tauntedBy.IsAlive)
+            if (bu.tauntedBy != null && bu.tauntedBy.IsAlive && !bu.tauntedBy.IsUntargetable)
             {
                 target = bu.tauntedBy;
             }
-            else if (bu.tauntReturnTarget != null && bu.tauntReturnTarget.IsAlive)
+            else if (bu.tauntReturnTarget != null && bu.tauntReturnTarget.IsAlive && !bu.tauntReturnTarget.IsUntargetable)
             {
                 target = bu.tauntReturnTarget;
             }
             else
             {
-                bu.tauntReturnTarget = null; // 복귀 대상이 죽었으면 소비하고 일반 타겟팅으로
+                // 복귀 대상이 죽었으면 소비. 일시 언타겟(자뭉열매)이면 스냅샷은 남기고 이번 틱만 일반 타겟팅.
+                if (bu.tauntReturnTarget != null && !bu.tauntReturnTarget.IsAlive)
+                    bu.tauntReturnTarget = null;
                 target = FindNearestEnemy(bu);
             }
             bu.lastTickTarget = target; // 도발 발동 시 "원래 타겟" 스냅샷의 원천
@@ -704,6 +709,7 @@ public class BattleManager : MonoBehaviour
             if (!bu.IsAlive || bu.burnTicksRemaining <= 0f) continue;
 
             bu.currentHp -= bu.burnDamagePerTick;
+            bu.TryTriggerSitrusBerry(); // 화상 딜로 45% 미만 진입해도 발동
             bu.burnTicksRemaining -= 1f;
             if (bu.burnTicksRemaining <= 0f) bu.burnDamagePerTick = 0f;
         }
@@ -724,7 +730,7 @@ public class BattleManager : MonoBehaviour
     {
         foreach (var u in _units)
         {
-            if (u.team == center.team || !u.IsAlive) continue;
+            if (u.team == center.team || !u.IsAlive || u.IsUntargetable) continue; // 언타겟은 신규 화상 부여 제외(기존 화상은 계속 틱)
             if (center.coords.DistanceTo(u.coords) > radius) continue;
 
             u.burnDamagePerTick = dmgPerTick;
@@ -867,7 +873,7 @@ public class BattleManager : MonoBehaviour
     {
         var result = new List<BattleUnit>();
         foreach (var u in _units)
-            if (u.team != caster.team && u.IsAlive &&
+            if (u.team != caster.team && u.IsAlive && !u.IsUntargetable &&
                 caster.coords.DistanceTo(u.coords) <= radius)
                 result.Add(u);
         return result;
@@ -886,7 +892,7 @@ public class BattleManager : MonoBehaviour
 
             case SkillTargetType.AllyArea:
                 foreach (var u in _units)
-                    if (u.team == caster.team && u.IsAlive &&
+                    if (u.team == caster.team && u.IsAlive && !u.IsUntargetable &&
                         caster.coords.DistanceTo(u.coords) <= caster.skillAreaRadius)
                         result.Add(u);
                 break;
@@ -896,7 +902,7 @@ public class BattleManager : MonoBehaviour
             {
                 BattleUnit tanker = null;
                 foreach (var u in _units)
-                    if (u.team == caster.team && u.IsAlive && u.role == PokemonRole.Tanker) { tanker = u; break; }
+                    if (u.team == caster.team && u.IsAlive && !u.IsUntargetable && u.role == PokemonRole.Tanker) { tanker = u; break; }
                 var fallback = tanker ?? LowestHpRatioAlly(caster.team);
                 if (fallback != null) result.Add(fallback); // 탱커 없으면 최저HP로 폴백
                 break;
@@ -923,7 +929,7 @@ public class BattleManager : MonoBehaviour
         float weakestRatio = float.MaxValue;
         foreach (var u in _units)
         {
-            if (u.team != team || !u.IsAlive) continue;
+            if (u.team != team || !u.IsAlive || u.IsUntargetable) continue;
             float ratio = u.maxHp > 0f ? u.currentHp / u.maxHp : 0f;
             if (ratio < weakestRatio) { weakestRatio = ratio; weakest = u; }
         }
@@ -938,27 +944,27 @@ public class BattleManager : MonoBehaviour
 
         switch (caster.skillTargetType)
         {
-            case SkillTargetType.EnemyArea: // 대상 중심 반경 내 적 전부
+            case SkillTargetType.EnemyArea: // 대상 중심 반경 내 적 전부(언타겟 제외)
                 foreach (var u in _units)
-                    if (u.team != caster.team && u.IsAlive &&
+                    if (u.team != caster.team && u.IsAlive && !u.IsUntargetable &&
                         u.coords.DistanceTo(primaryTarget.coords) <= caster.skillAreaRadius)
                         result.Add(u);
                 break;
 
-            case SkillTargetType.EnemyLine: // 시전자 사거리 내 + 대상 방향(앞쪽)의 적
+            case SkillTargetType.EnemyLine: // 시전자 사거리 내 + 대상 방향(앞쪽)의 적(언타겟 제외)
             {
                 int toTarget = caster.coords.DistanceTo(primaryTarget.coords);
                 foreach (var u in _units)
-                    if (u.team != caster.team && u.IsAlive &&
+                    if (u.team != caster.team && u.IsAlive && !u.IsUntargetable &&
                         caster.coords.DistanceTo(u.coords) <= caster.skillLineLength &&
                         u.coords.DistanceTo(primaryTarget.coords) <= toTarget)
                         result.Add(u);
-                if (!result.Contains(primaryTarget)) result.Add(primaryTarget);
+                if (!result.Contains(primaryTarget) && !primaryTarget.IsUntargetable) result.Add(primaryTarget);
                 break;
             }
 
             case SkillTargetType.EnemySingle:
-                result.Add(primaryTarget);
+                if (!primaryTarget.IsUntargetable) result.Add(primaryTarget);
                 break;
 
             default: // Ally* (지원 스킬) — 데미지 경로에선 대상 없음(Phase2에서 아군 타겟팅 구현)
@@ -993,6 +999,8 @@ public class BattleManager : MonoBehaviour
         // 피해 적용. 피격 비례 마나 획득은 기획 확정(초당 충전만)으로 제거됨.
         ctx.target.currentHp -= ctx.amount;
 
+        ctx.target.TryTriggerSitrusBerry(); // 자뭉열매: 45% 미만 진입 순간 발동(전투당 1회)
+
         if (!ctx.target.IsAlive)
             foreach (var effect in ctx.source.effects)
                 effect.OnKill(ctx.source, ctx.target);
@@ -1014,7 +1022,7 @@ public class BattleManager : MonoBehaviour
 
         foreach (var other in _units)
         {
-            if (other.team == bu.team || !other.IsAlive) continue;
+            if (other.team == bu.team || !other.IsAlive || other.IsUntargetable) continue;
 
             int priority = ROLE_TARGET_PRIORITY.TryGetValue(other.role, out var p) ? p : DEFAULT_ROLE_PRIORITY;
             int dist = bu.coords.DistanceTo(other.coords);

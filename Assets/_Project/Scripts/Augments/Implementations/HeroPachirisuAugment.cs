@@ -1,8 +1,9 @@
 /// <summary>
 /// HERO_PACHIRISU "기술머신:날따름": 모든 파치리스를 탱커로 전환 + 날따름(도발) 부여 + 스탯 ×1.4(v2 확정).
 /// 도발 로직(시전자 중심 r4, 지속 1.0×1.4×성급)은 BattleManager/BattleUnit에 구현 완료 — 여기선 주입만.
-/// TODO(별도 티켓): v2 자뭉열매 메커니즘 — 전투당 1회, HP 45% 미만 시 언타겟 + 매초 maxHP 15% 회복 후 복귀,
-///   투사체 끌어당김, SK_PACHIRISU_HERO 스킬화, "가장 강한 파치리스 1마리" 대상 선정.
+/// 자뭉열매(v2)도 구현 완료: ApplyParichisuHeroAugment가 hasHeroBerry 설정 → BattleUnit이 전투당 1회
+///   HP 45% 미만 시 언타겟+행동불능 + 매초 maxHP 15% 회복 후 복귀(지속 3s는 PLACEHOLDER).
+/// TODO(별도 티켓): 투사체 끌어당김(수치 미확정), SK_PACHIRISU_HERO 스킬행(시트), "가장 강한 파치리스 1마리" 대상 선정.
 /// </summary>
 public class HeroPachirisuAugment : HeroAugment
 {
