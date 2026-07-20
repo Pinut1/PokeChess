@@ -322,7 +322,6 @@ GameObject:
   - component: {fileID: 1558058662}
   - component: {fileID: 1558058661}
   - component: {fileID: 1558058660}
-  - component: {fileID: 1558058659}
   - component: {fileID: 1558058658}
   - component: {fileID: 1558058666}
   - component: {fileID: 1558058644}
@@ -541,24 +540,6 @@ MonoBehaviour:
   _buyXpAmount: 4
   _requiredXpByLevel: 000000000200000002000000060000000a0000001400000024000000300000004c0000005000000000000000
   _unitCapByLevel: 000000000100000002000000030000000400000005000000060000000700000008000000090000000a000000
---- !u!114 &1558058659
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f8916053d61b8c741850ee5ab43be40e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OpponentBoardView
-  _boardOffset: {x: 500, y: 0, z: 0}
-  _unitHeight: 0.5
-  _starColors:
-  - {r: 0.6, g: 0.8, b: 1, a: 1}
-  - {r: 0.4, g: 0.6, b: 1, a: 1}
-  - {r: 0.2, g: 0.3, b: 1, a: 1}
 --- !u!114 &1558058660
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -608,12 +589,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3faae98bb624b80498bc372741fd6bd5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
-  _tilePrefab: {fileID: 4273570358005902877, guid: 91e0a41b66219de4db6f90127ffe108b, type: 3}
+  _tilePrefab: {fileID: 5824591497658974836, guid: dcf682d7e73d63e4db2f3cea8bdac239, type: 3}
   _hexSize: 1
   _cols: 7
   _rows: 4
+  _boardPosition: {x: 0, y: 0, z: 0}
+  _boardRotation: {x: 0, y: 0, z: 0}
+  _boardScale: {x: 1, y: 1, z: 1}
+  _benchTilePrefab: {fileID: -7624243839348909467, guid: acb86a1738de1364cad1d7ac4f60f2ed, type: 3}
   _benchSize: 9
+  _benchXOffset: 0
+  _benchYOffset: 0
   _benchZOffset: -4
+  _benchRotation: {x: 0, y: 0, z: 0}
+  _benchScale: {x: 1, y: 1, z: 1}
+  _benchSpacingMultiplier: 1.1
 --- !u!114 &1558058664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -626,7 +616,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 393c1ffbbbb38db4b924fef0e84431b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
-  _soloMode: 1
+  _soloMode: 0
 --- !u!114 &1558058665
 MonoBehaviour:
   m_ObjectHideFlags: 0

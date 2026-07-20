@@ -105,9 +105,12 @@ public class UnitDragController : MonoBehaviour
         IDropTarget target = RaycastDropTarget();
 
         if (target != null)
-            target.OnDropUnit(_held); // 콜백 → BoardManager → 이벤트 → BoardView.Resync
-        else if (BoardView.Instance != null)
-            BoardView.Instance.Resync(); // 무효 드롭 — 논리 상태 불변이므로 원위치 복귀
+            target.OnDropUnit(_held);
+
+        // BoardManager가 배치를 거부하면 갱신 이벤트가 발생하지 않는다.
+        // 성공/실패와 관계없이 논리 상태를 다시 그려 실패한 기물을 원래 슬롯으로 돌린다.
+        if (BoardView.Instance != null)
+            BoardView.Instance.Resync();
 
         _held = null;
         _hovered = null;
