@@ -87,5 +87,6 @@ Thumbs.db
 
 # Local AI/Obsidian integration (contains machine-local settings and API credentials)
 /.obsidian/
+/Obsidian/
 /.mcp.json
 /.codex/config.toml
