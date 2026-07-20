@@ -19,6 +19,34 @@ public class BenchTile : MonoBehaviour, IDropTarget
     {
         _renderer = GetComponent<MeshRenderer>();
         if (_renderer != null) _renderer.material.color = _defaultColor;
+
+        EnsureDropCollider();
+    }
+
+    /// <summary>
+    /// Imported tile meshes are not guaranteed to accept a raycast on their top face.
+    /// A root collider keeps bench drops independent from the visual mesh topology.
+    /// </summary>
+    private void EnsureDropCollider()
+    {
+        if (GetComponent<Collider>() != null) return;
+
+        Renderer[] childRenderers = GetComponentsInChildren<Renderer>();
+        if (childRenderers.Length == 0) return;
+
+        Bounds worldBounds = childRenderers[0].bounds;
+        for (int i = 1; i < childRenderers.Length; i++)
+            worldBounds.Encapsulate(childRenderers[i].bounds);
+
+        Vector3 localMin = transform.InverseTransformPoint(worldBounds.min);
+        Vector3 localMax = transform.InverseTransformPoint(worldBounds.max);
+
+        BoxCollider dropCollider = gameObject.AddComponent<BoxCollider>();
+        dropCollider.center = (localMin + localMax) * 0.5f;
+        dropCollider.size = new Vector3(
+            Mathf.Max(0.01f, Mathf.Abs(localMax.x - localMin.x)),
+            Mathf.Max(0.1f, Mathf.Abs(localMax.y - localMin.y)),
+            Mathf.Max(0.01f, Mathf.Abs(localMax.z - localMin.z)));
     }
 
     public void Initialize(int slot, Action<PokemonUnit, int> onDropCallback, string customName = null)

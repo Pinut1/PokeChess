@@ -111,6 +111,9 @@ public static class GameEvents
     /// <summary>유닛 벤치로 돌아옴</summary>
     public static event Action<PokemonUnit> OnUnitBenched;
 
+    /// <summary>유닛 배치가 거부됨. 인자 = 플레이어에게 표시할 사유.</summary>
+    public static event Action<string> OnUnitPlacementRejected;
+
     /// <summary>유닛 판매됨</summary>
     public static event Action<PokemonUnit> OnUnitSold;
 
@@ -245,6 +248,7 @@ public static class GameEvents
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
+    public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();

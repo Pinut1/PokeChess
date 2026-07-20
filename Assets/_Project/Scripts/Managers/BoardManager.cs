@@ -8,15 +8,40 @@ using UnityEngine;
 /// </summary>
 public class BoardManager : MonoBehaviour
 {
-    [Header("Board Settings")]
+    [Header("Board Prefab")]
+    [Tooltip("전장 한 칸에 사용할 HexTile 프리팹입니다. 아트 교체 시 이 필드만 변경합니다.")]
     [SerializeField] private HexTile _tilePrefab;
-    [SerializeField] private float _hexSize = 1.0f; // 인스펙터에서 수정 가능
-    [SerializeField] private int _cols = 7; // 가로 (TFT 기준 7)
-    [SerializeField] private int _rows = 4; // 세로 (TFT 기준 4)
 
-    [Header("Bench Settings")]
-    [SerializeField] private int _benchSize = 9; // TFT 기준 벤치 슬롯 수
-    [SerializeField] private float _benchZOffset = -4f; // 보드 중심 기준 벤치 줄의 z 위치(월드)
+    [Header("Board Layout")]
+    [Tooltip("헥스 좌표 간격의 기준 크기입니다.")]
+    [SerializeField] private float _hexSize = 1.0f;
+    [Tooltip("전장 가로 칸 수입니다.")]
+    [SerializeField] private int _cols = 7;
+    [Tooltip("전장 세로 칸 수입니다.")]
+    [SerializeField] private int _rows = 4;
+    [Tooltip("BoardManager 기준 전장 루트의 로컬 위치입니다.")]
+    [SerializeField] private Vector3 _boardPosition = Vector3.zero;
+    [Tooltip("전장 루트의 로컬 회전값입니다.")]
+    [SerializeField] private Vector3 _boardRotation = Vector3.zero;
+    [Tooltip("전장 전체에 적용할 스케일입니다.")]
+    [SerializeField] private Vector3 _boardScale = Vector3.one;
+
+    [Header("Bench Prefab")]
+    [Tooltip("벤치 한 칸에 사용할 BenchTile 프리팹입니다. 비어 있으면 기존 원기둥 임시 타일을 생성합니다.")]
+    [SerializeField] private BenchTile _benchTilePrefab;
+
+    [Header("Bench Layout")]
+    [Tooltip("벤치 슬롯 수입니다.")]
+    [SerializeField] private int _benchSize = 9;
+    [SerializeField] private float _benchXOffset = 0f;
+    [SerializeField] private float _benchYOffset = 0f;
+    [SerializeField] private float _benchZOffset = -4f;
+    [Tooltip("벤치 루트의 로컬 회전값입니다.")]
+    [SerializeField] private Vector3 _benchRotation = Vector3.zero;
+    [Tooltip("벤치 전체에 적용할 스케일입니다.")]
+    [SerializeField] private Vector3 _benchScale = Vector3.one;
+    [Tooltip("슬롯 간격입니다. Hex Size에 이 값을 곱해 실제 간격을 계산합니다.")]
+    [SerializeField] private float _benchSpacingMultiplier = 1.1f;
 
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
@@ -26,7 +51,11 @@ public class BoardManager : MonoBehaviour
 
     // 벤치 시각 타일 + 슬롯별 월드 좌표(인덱스 = 슬롯).
     private BenchTile[] _benchTiles;
-    private Vector3[] _benchSlotPositions;
+    private Vector3[] _benchSlotLocalPositions;
+
+    // 인스펙터의 위치/회전/스케일을 좌표 변환에도 동일하게 적용하기 위한 런타임 루트.
+    private Transform _boardAnchor;
+    private Transform _benchAnchor;
 
     // 진화(합체) 처리 중 재진입 방지 플래그.
     private bool _isEvolving;
@@ -41,6 +70,15 @@ public class BoardManager : MonoBehaviour
     private void Awake()
     {
         _bench = new PokemonUnit[_benchSize];
+    }
+
+    private void OnValidate()
+    {
+        _hexSize = Mathf.Max(0.01f, _hexSize);
+        _cols = Mathf.Max(1, _cols);
+        _rows = Mathf.Max(1, _rows);
+        _benchSize = Mathf.Max(1, _benchSize);
+        _benchSpacingMultiplier = Mathf.Max(0.01f, _benchSpacingMultiplier);
     }
 
     private void OnEnable()
@@ -81,7 +119,10 @@ public class BoardManager : MonoBehaviour
 
         // 1. 쟁반(Anchor) 생성
         GameObject boardAnchor = new GameObject("BoardAnchor");
-        boardAnchor.transform.SetParent(this.transform);
+        _boardAnchor = boardAnchor.transform;
+        _boardAnchor.SetParent(transform, false);
+        _boardAnchor.SetLocalPositionAndRotation(_boardPosition, Quaternion.Euler(_boardRotation));
+        _boardAnchor.localScale = _boardScale;
 
         Vector3 sumPosition = Vector3.zero;
         int totalTiles = 0;
@@ -91,7 +132,7 @@ public class BoardManager : MonoBehaviour
         {
             // 하이어라키 정리를 위한 행(Row) 폴더 생성
             GameObject rowFolder = new GameObject($"Row_{row}");
-            rowFolder.transform.SetParent(boardAnchor.transform);
+            rowFolder.transform.SetParent(_boardAnchor, false);
 
             for (int col = 0; col < _cols; col++)
             {
@@ -123,7 +164,10 @@ public class BoardManager : MonoBehaviour
         if (totalTiles > 0)
         {
             _centerOffset = sumPosition / totalTiles;
-            boardAnchor.transform.position = -_centerOffset;
+            // Anchor의 인스펙터 Transform은 유지하고, 타일 묶음만 로컬 좌표에서 중앙 정렬합니다.
+            foreach (Transform rowFolder in _boardAnchor)
+                foreach (Transform tile in rowFolder)
+                    tile.localPosition -= _centerOffset;
         }
     }
 
@@ -134,28 +178,48 @@ public class BoardManager : MonoBehaviour
     private void GenerateBench()
     {
         _benchTiles = new BenchTile[_benchSize];
-        _benchSlotPositions = new Vector3[_benchSize];
+        _benchSlotLocalPositions = new Vector3[_benchSize];
 
         GameObject benchAnchor = new GameObject("BenchAnchor");
-        benchAnchor.transform.SetParent(this.transform);
+        _benchAnchor = benchAnchor.transform;
+        _benchAnchor.SetParent(transform, false);
+        _benchAnchor.SetLocalPositionAndRotation(
+            new Vector3(_benchXOffset, _benchYOffset, _benchZOffset),
+            Quaternion.Euler(_benchRotation));
+        _benchAnchor.localScale = _benchScale;
 
-        float spacing = _hexSize * 1.1f;
+        float spacing = _hexSize * _benchSpacingMultiplier;
         float startX = -(_benchSize - 1) * spacing * 0.5f;
+        bool warnedMissingCollider = false;
 
         for (int i = 0; i < _benchSize; i++)
         {
-            Vector3 pos = new Vector3(startX + i * spacing, 0f, _benchZOffset);
-            _benchSlotPositions[i] = pos;
+            Vector3 localPos = new Vector3(startX + i * spacing, 0f, 0f);
+            _benchSlotLocalPositions[i] = localPos;
 
-            GameObject tileGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            tileGo.transform.SetParent(benchAnchor.transform);
-            tileGo.transform.position = pos;
-            tileGo.transform.localScale = new Vector3(_hexSize * 0.9f, 0.05f, _hexSize * 0.9f);
+            BenchTile tile;
+            if (_benchTilePrefab != null)
+            {
+                tile = Instantiate(_benchTilePrefab, _benchAnchor);
+            }
+            else
+            {
+                GameObject tileGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                tileGo.transform.SetParent(_benchAnchor, false);
+                tileGo.transform.localScale = new Vector3(_hexSize * 0.9f, 0.05f, _hexSize * 0.9f);
+                tile = tileGo.AddComponent<BenchTile>();
+            }
 
-            BenchTile tile = tileGo.AddComponent<BenchTile>();
+            tile.transform.localPosition = localPos;
             int slot = i; // 클로저 캡처 주의 — 루프 변수 복사
             tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), $"BenchTile_{slot}");
             _benchTiles[i] = tile;
+
+            if (!warnedMissingCollider && tile.GetComponentInChildren<Collider>() == null)
+            {
+                Debug.LogWarning($"[BoardManager] BenchTile 프리팹에 Collider가 없어 드롭을 받을 수 없습니다: {tile.name}", tile);
+                warnedMissingCollider = true;
+            }
         }
     }
 
@@ -163,14 +227,20 @@ public class BoardManager : MonoBehaviour
     /// 임의의 헥스 좌표(보드 범위 밖 포함)를 보드 정렬 기준 월드 좌표로 변환합니다.
     /// BattleManager가 적 팀 미러 좌표를 시각화할 때 사용.
     /// </summary>
-    public Vector3 CoordsToWorldPosition(HexCoords coords) => coords.ToWorldPosition(_hexSize) - _centerOffset;
+    public Vector3 CoordsToWorldPosition(HexCoords coords)
+    {
+        Vector3 localPosition = coords.ToWorldPosition(_hexSize) - _centerOffset;
+        return _boardAnchor != null ? _boardAnchor.TransformPoint(localPosition) : localPosition;
+    }
 
     /// <summary>벤치 슬롯의 월드 좌표. BoardView가 유닛 위치 재배치에 사용.</summary>
     public Vector3 BenchSlotWorldPosition(int slot)
     {
-        if (_benchSlotPositions == null || slot < 0 || slot >= _benchSlotPositions.Length)
+        if (_benchSlotLocalPositions == null || slot < 0 || slot >= _benchSlotLocalPositions.Length)
             return Vector3.zero;
-        return _benchSlotPositions[slot];
+
+        Vector3 localPosition = _benchSlotLocalPositions[slot];
+        return _benchAnchor != null ? _benchAnchor.TransformPoint(localPosition) : localPosition;
     }
 
     /// <summary>
@@ -250,7 +320,9 @@ public class BoardManager : MonoBehaviour
 
             if (currentBoardCount >= _unitCap)
             {
-                Debug.Log($"[BoardManager] 배치 거부 — 배치 가능 기물 수 초과 ({currentBoardCount}/{_unitCap})");
+                const string reason = "배치 가능한 유닛 수를 초과했습니다.";
+                Debug.LogWarning($"[BoardManager] {reason} ({currentBoardCount}/{_unitCap})");
+                GameEvents.UnitPlacementRejected(reason);
                 return false;
             }
         }
