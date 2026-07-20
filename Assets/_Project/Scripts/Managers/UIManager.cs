@@ -51,6 +51,53 @@ public class UIManager : MonoBehaviour
     private Rect _matchHistoryWindowRect = new Rect(260f, 80f, 980f, 650f);
 
     // ──────────────────────────────────────────
+    // 견본덱 데이터 및 견본덱창 상태
+    // ──────────────────────────────────────────
+
+    private readonly List<DeckData> _sampleDecks = new List<DeckData>();
+
+    private bool _showSampleDeck;
+    private int _selectedSampleDeckIndex;
+
+    private Vector2 _sampleDeckListScroll;
+    private Vector2 _sampleDeckDetailScroll;
+
+    private Rect _sampleDeckWindowRect = new Rect(80f, 50f, 1500f, 780f);
+
+    // 현재 클릭해 고정한 목표 유닛.
+    // -1이면 아직 선택된 유닛이 없다는 뜻이다.
+    private int _selectedSampleDeckPokemonId = -1;
+
+    // 현재 클릭해 고정한 활성 시너지.
+    // -1이면 아직 선택된 시너지가 없다는 뜻이다.
+    private int _selectedSampleDeckSynergyIndex = -1;
+
+    // 마우스를 올린 유닛과 시너지의 임시 툴팁 표시용 인덱스.
+    private int _hoveredSampleDeckUnitIndex = -1;
+    private int _hoveredSampleDeckSynergyIndex = -1;
+
+    // 견본덱 장비 툴팁 상태.
+    // Hover 중인 장비 이름과 클릭으로 고정된 장비 이름을 따로 관리한다.
+    private string _hoveredSampleDeckItemName = "";
+    private string _pinnedSampleDeckItemName = "";
+
+    // 장비 항목 오른쪽 위치를 화면 좌표로 저장한다.
+    // 스크롤 내부와 외부의 GUI 좌표계 차이를 피하기 위해 화면 좌표를 사용한다.
+    private Vector2 _sampleDeckItemTooltipAnchorScreenPosition;
+
+    // 오른쪽 유닛/시너지 상세 패널의 개별 스크롤 위치.
+    private Vector2 _sampleDeckUnitDetailScroll;
+    private Vector2 _sampleDeckSynergyDetailScroll;
+
+    // 랜덤 추천 장비는 매 OnGUI 호출마다 바뀌면 안 되므로
+    // 덱 ID + 포켓몬 ID 기준으로 한 번 생성한 결과를 보관한다.
+    private readonly Dictionary<string, string[]> _temporaryRecommendedItems = new Dictionary<string, string[]>();
+
+    // 현재 이벤트에서 장비 항목이 클릭되었는지 기록한다.
+    // 창의 다른 곳 클릭 처리와 충돌하지 않게 한다.
+    private bool _sampleDeckItemClickedThisEvent;
+
+    // ──────────────────────────────────────────
     // 플레이어 진행 상태 캐시
     // ──────────────────────────────────────────
     // 아래 값은 GameEvents를 통해 갱신한다.
@@ -81,6 +128,8 @@ public class UIManager : MonoBehaviour
     private GUIStyle _unitCardStyle;
     private GUIStyle _selectedListCardStyle;
     private GUIStyle _normalListCardStyle;
+    private GUIStyle _itemTooltipStyle;
+    private Texture2D _itemTooltipBackground;
 
     // ──────────────────────────────────────────
     // Unity 생명주기 / 이벤트 구독
@@ -110,6 +159,7 @@ public class UIManager : MonoBehaviour
     private void Start()
     {
         RefreshMatchHistory();
+        RefreshSampleDecks();
         SyncProgressState();
     }
 
@@ -170,10 +220,14 @@ public class UIManager : MonoBehaviour
         EnsureStyles();
 
         DrawOpenButton();
+        DrawSampleDeckOpenButton();
         DrawProgressPanel();
 
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
+
+        if (_showSampleDeck)
+            DrawSampleDeckWindow();
     }
 
 
@@ -326,6 +380,137 @@ public class UIManager : MonoBehaviour
         DrawMatchDetail(new Rect(340f, 120f, width - 365f, height - 145f), _recentMatches[_selectedMatchIndex]);
 
         GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+    }
+
+    /// <summary>
+    /// 견본덱 장비 Hover 또는 클릭 고정 상태에 따라
+    /// 작은 독립 장비 툴팁을 표시한다.
+    /// </summary>
+    private void DrawSampleDeckItemTooltip()
+    {
+        string itemName =
+            !string.IsNullOrWhiteSpace(_pinnedSampleDeckItemName)
+                ? _pinnedSampleDeckItemName
+                : _hoveredSampleDeckItemName;
+
+        if (string.IsNullOrWhiteSpace(itemName))
+            return;
+
+        ItemData item = FindItemByDisplayName(itemName);
+
+        string description = item != null
+            ? GetSampleDeckItemDescription(item)
+            : "ItemDatabase에서 장비 정보를 찾지 못했습니다.";
+
+        const float tooltipWidth = 300f;
+        const float minimumHeight = 130f;
+        const float maximumHeight = 320f;
+
+        const float offsetX = 12f;
+        const float offsetY = 4f;
+
+        GUIStyle descriptionStyle = new GUIStyle(_mutedStyle)
+        {
+            wordWrap = true,
+            clipping = TextClipping.Clip
+        };
+
+        float descriptionHeight = descriptionStyle.CalcHeight(
+            new GUIContent(description),
+            tooltipWidth - 24f
+        );
+
+        float tooltipHeight = Mathf.Clamp(
+            70f + descriptionHeight,
+            minimumHeight,
+            maximumHeight
+        );
+
+        // 화면 좌표로 저장한 기준점을
+        // 현재 견본덱 GUI.Window 내부 좌표로 다시 변환한다.
+        Vector2 anchorPosition =
+            GUIUtility.ScreenToGUIPoint(
+                _sampleDeckItemTooltipAnchorScreenPosition
+            );
+
+        float x = anchorPosition.x + offsetX;
+        float y = anchorPosition.y + offsetY;
+
+        // 오른쪽 경계를 넘으면 장비 항목의 왼쪽에 표시한다.
+        if (x + tooltipWidth > _sampleDeckWindowRect.width - 15f)
+        {
+            x =
+                anchorPosition.x -
+                tooltipWidth -
+                offsetX;
+        }
+
+        x = Mathf.Clamp(
+            x,
+            15f,
+            _sampleDeckWindowRect.width - tooltipWidth - 15f
+        );
+
+        y = Mathf.Clamp(
+            y,
+            32f,
+            _sampleDeckWindowRect.height - tooltipHeight - 15f
+        );
+
+        Rect tooltipRect = new Rect(
+            x,
+            y,
+            tooltipWidth,
+            tooltipHeight
+        );
+
+        GUI.Box(tooltipRect, GUIContent.none, _itemTooltipStyle);
+
+        GUI.Label(
+            new Rect(
+                tooltipRect.x + 12f,
+                tooltipRect.y + 9f,
+                tooltipRect.width - 24f,
+                26f
+            ),
+            itemName,
+            _sectionTitleStyle
+        );
+
+        if (!string.IsNullOrWhiteSpace(_pinnedSampleDeckItemName))
+        {
+            GUI.Label(
+                new Rect(
+                    tooltipRect.x + tooltipRect.width - 58f,
+                    tooltipRect.y + 12f,
+                    46f,
+                    18f
+                ),
+                "고정",
+                _winStyle
+            );
+        }
+
+        GUI.Box(
+            new Rect(
+                tooltipRect.x + 10f,
+                tooltipRect.y + 41f,
+                tooltipRect.width - 20f,
+                1f
+            ),
+            ""
+        );
+
+        GUI.Label(
+            new Rect(
+                tooltipRect.x + 12f,
+                tooltipRect.y + 50f,
+                tooltipRect.width - 24f,
+                tooltipRect.height - 62f
+            ),
+            description,
+            descriptionStyle
+        );
     }
 
     /// <summary>
@@ -489,13 +674,83 @@ public class UIManager : MonoBehaviour
             );
         }
 
-        GUI.Label(new Rect(rect.x + rect.width - 220f, rect.y + 20f, 60f, 24f), stageText, _sectionTitleStyle);
-        GUI.Label(new Rect(rect.x + rect.width - 160f, rect.y + 20f, 60f, 24f), durationText, _sectionTitleStyle);
-        GUI.Label(new Rect(rect.x + rect.width - 85f, rect.y + 20f, 60f, 24f), modeText, _sectionTitleStyle);
+        const float summaryColumnWidth = 90f;
+        const float summaryStartXOffset = 285f;
 
-        GUI.Label(new Rect(rect.x + rect.width - 220f, rect.y + 47f, 80f, 20f), $"스테이지 R{record.finalRound}", _mutedStyle);
-        GUI.Label(new Rect(rect.x + rect.width - 160f, rect.y + 47f, 60f, 20f), "플레이", _mutedStyle);
-        GUI.Label(new Rect(rect.x + rect.width - 85f, rect.y + 47f, 60f, 20f), "모드", _mutedStyle);
+        float summaryStartX =
+            rect.x + rect.width - summaryStartXOffset;
+
+        float summaryValueY = rect.y + 20f;
+        float summaryLabelY = rect.y + 47f;
+
+        // 최종 스테이지
+        GUI.Label(
+            new Rect(
+                summaryStartX,
+                summaryValueY,
+                summaryColumnWidth,
+                24f
+            ),
+            stageText,
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                summaryStartX,
+                summaryLabelY,
+                summaryColumnWidth,
+                20f
+            ),
+            "최종 스테이지",
+            _mutedStyle
+        );
+
+        // 플레이 시간
+        GUI.Label(
+            new Rect(
+                summaryStartX + summaryColumnWidth,
+                summaryValueY,
+                summaryColumnWidth,
+                24f
+            ),
+            durationText,
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                summaryStartX + summaryColumnWidth,
+                summaryLabelY,
+                summaryColumnWidth,
+                20f
+            ),
+            "플레이 시간",
+            _mutedStyle
+        );
+
+        // 모드
+        GUI.Label(
+            new Rect(
+                summaryStartX + summaryColumnWidth * 2f,
+                summaryValueY,
+                summaryColumnWidth,
+                24f
+            ),
+            modeText,
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                summaryStartX + summaryColumnWidth * 2f,
+                summaryLabelY,
+                summaryColumnWidth,
+                20f
+            ),
+            "모드",
+            _mutedStyle
+        );
 
         GUI.Box(new Rect(rect.x, rect.y + 82f, rect.width, 1f), "");
 
@@ -821,7 +1076,12 @@ public class UIManager : MonoBehaviour
         {
             fontSize = 16,
             fontStyle = FontStyle.Bold,
-            normal = { textColor = new Color(1f, 0.72f, 0.18f) }
+            alignment = TextAnchor.MiddleLeft,
+            clipping = TextClipping.Overflow,
+            normal =
+            {
+                textColor = new Color(1f,0.72f,0.18f)
+            }
         };
 
         _loseStyle = new GUIStyle(GUI.skin.label)
@@ -854,6 +1114,24 @@ public class UIManager : MonoBehaviour
         {
             normal = { textColor = Color.white }
         };
+
+        _itemTooltipBackground = new Texture2D(1, 1);
+        _itemTooltipBackground.SetPixel(
+            0,
+            0,
+            new Color(0.08f, 0.08f, 0.08f, 1f)
+        );
+        _itemTooltipBackground.Apply();
+
+        _itemTooltipStyle = new GUIStyle(GUI.skin.box)
+        {
+            padding = new RectOffset(12, 12, 10, 10),
+            normal =
+            {
+                background = _itemTooltipBackground,
+                textColor = Color.white
+            }
+                };
     }
 
     // ──────────────────────────────────────────
@@ -1021,5 +1299,1613 @@ public class UIManager : MonoBehaviour
                reason.Contains("lost") ||
                reason.Contains("연결") ||
                reason.Contains("끊김");
+    }
+
+    /// <summary>
+    /// 한글 또는 영문 장비 이름으로 ItemDatabase에서 장비를 찾는다.
+    /// </summary>
+    private static ItemData FindItemByDisplayName(string itemName)
+    {
+        if (string.IsNullOrWhiteSpace(itemName))
+            return null;
+
+        ItemDatabase db = ItemDatabase.Instance;
+
+        if (db == null || db.all == null)
+            return null;
+
+        for (int i = 0; i < db.all.Count; i++)
+        {
+            ItemData item = db.all[i];
+
+            if (item == null)
+                continue;
+
+            bool matchesKoreanName =
+                !string.IsNullOrWhiteSpace(item.itemName) &&
+                item.itemName.Equals(
+                    itemName,
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+            bool matchesEnglishName =
+                !string.IsNullOrWhiteSpace(item.itemNameEn) &&
+                item.itemNameEn.Equals(
+                    itemName,
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+            if (matchesKoreanName || matchesEnglishName)
+                return item;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// ItemData에서 실제 값이 있는 효과만 모아
+    /// 견본덱 장비 툴팁에 표시할 문자열을 만든다.
+    /// </summary>
+    private static string GetSampleDeckItemDescription(ItemData item)
+    {
+        if (item == null)
+            return "장비 정보 없음";
+
+        var lines = new List<string>();
+
+        lines.Add($"ID: {item.id}");
+
+        if (!string.IsNullOrWhiteSpace(item.itemNameEn))
+            lines.Add($"영문명: {item.itemNameEn}");
+
+        if (!string.IsNullOrWhiteSpace(item.description))
+        {
+            lines.Add("");
+            lines.Add(item.description.Trim());
+        }
+
+        var effects = new List<string>();
+
+        AddFlatEffect(effects, "체력", item.hpBonus);
+        AddPercentEffect(effects, "최대 체력", item.maxHpPct);
+        AddPercentEffect(effects, "초당 최대 체력 회복", item.hpRegenPercent);
+        AddPercentEffect(effects, "피격 피해 흡수", item.healTakenDmgPct);
+        AddPercentEffect(effects, "치명적 피해 시 보호막", item.shieldPctOnFatalHit);
+
+        AddFlatEffect(effects, "공격력", item.attackBonus);
+        AddPercentEffect(effects, "특수 공격력", item.spAtkPct);
+        AddPercentEffect(effects, "공격속도", item.attackSpeedBonus);
+        AddPercentEffect(effects, "처치 시 이동속도", item.moveSpdPctOnKill);
+
+        AddFlatEffect(effects, "방어력", item.defenseBonus);
+        AddFlatEffect(effects, "특수방어력", item.spDefBonus);
+        AddPercentEffect(effects, "물리 피해 반사", item.reflectPhysPct);
+        AddPercentEffect(effects, "특수 피해 반사", item.reflectSpPct);
+
+        if (!Mathf.Approximately(item.defSpDefPerAttacker, 0f))
+        {
+            effects.Add(
+                $"공격 중인 적 1명당 방어력·특수방어력 " +
+                FormatSignedValue(item.defSpDefPerAttacker)
+            );
+        }
+
+        AddPercentEffect(effects, "치명타 확률", item.criPct);
+        AddPercentEffect(effects, "치명타 피해", item.criDmgPct);
+
+        if (item.burnNearOnPhysHit)
+            effects.Add("물리 피격 시 주변 적에게 화상");
+
+        if (item.ccImmune)
+            effects.Add("첫 군중 제어 효과 무효화");
+
+        if (effects.Count > 0)
+        {
+            lines.Add("");
+            lines.Add("보유 효과");
+
+            for (int i = 0; i < effects.Count; i++)
+                lines.Add($"• {effects[i]}");
+        }
+
+        return string.Join("\n", lines);
+    }
+    private static void AddFlatEffect(
+    List<string> effects,
+    string label,
+    float value)
+    {
+        if (Mathf.Approximately(value, 0f))
+            return;
+
+        effects.Add($"{label} {FormatSignedValue(value)}");
+    }
+
+    private static void AddPercentEffect(
+        List<string> effects,
+        string label,
+        float value)
+    {
+        if (Mathf.Approximately(value, 0f))
+            return;
+
+        effects.Add($"{label} {FormatSignedValue(value)}%");
+    }
+
+    private static string FormatSignedValue(float value)
+    {
+        string formatted = Mathf.Approximately(value, Mathf.Round(value))
+            ? Mathf.RoundToInt(value).ToString()
+            : value.ToString("0.##");
+
+        return value > 0f
+            ? $"+{formatted}"
+            : formatted;
+    }
+
+
+    // ──────────────────────────────────────────
+    // 견본덱 UI
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 화면 상단에 견본덱 열기/닫기 버튼을 표시한다.
+    /// 견본덱을 열면 전적창은 닫아 두 창이 겹치지 않게 한다.
+    /// </summary>
+    private void DrawSampleDeckOpenButton()
+    {
+        const float width = 160f;
+        const float height = 40f;
+
+        float x = (Screen.width - width) * 0.5f + 175f;
+        float y = 20f;
+
+        string label = _showSampleDeck ? "견본덱 닫기" : "견본덱 열기";
+
+        if (GUI.Button(new Rect(x, y, width, height), label))
+        {
+            _showSampleDeck = !_showSampleDeck;
+
+            if (_showSampleDeck)
+            {
+                _showMatchHistory = false;
+                RefreshSampleDecks();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 이동 가능한 견본덱 창을 생성한다.
+    /// </summary>
+    private void DrawSampleDeckWindow()
+    {
+        _sampleDeckWindowRect.x = Mathf.Clamp(
+            _sampleDeckWindowRect.x,
+            0f,
+            Screen.width - 160f
+        );
+
+        _sampleDeckWindowRect.y = Mathf.Clamp(
+            _sampleDeckWindowRect.y,
+            0f,
+            Screen.height - 120f
+        );
+
+        _sampleDeckWindowRect = GUI.Window(
+            1002,
+            _sampleDeckWindowRect,
+            DrawSampleDeckWindowContent,
+            "견본덱"
+        );
+    }
+
+    /// <summary>
+    /// 왼쪽에는 전체 견본덱 목록,
+    /// 오른쪽에는 선택한 견본덱 상세 정보를 표시한다.
+    /// </summary>
+    private void DrawSampleDeckWindowContent(int windowId)
+    {
+        float width = _sampleDeckWindowRect.width;
+        float height = _sampleDeckWindowRect.height;
+
+        // 고정된 장비가 없을 때 Hover 대상은 매 OnGUI 호출마다 다시 감지한다.
+        _hoveredSampleDeckItemName = "";
+        _sampleDeckItemClickedThisEvent = false;
+
+        GUI.Label(
+            new Rect(24f, 32f, 240f, 36f),
+            "견본덱",
+            _titleStyle
+        );
+
+        GUI.Label(
+            new Rect(24f, 67f, 520f, 24f),
+            "덱을 선택하면 목표 유닛·성급·시너지 정보를 확인할 수 있습니다.",
+            _mutedStyle
+        );
+
+        GUI.Label(
+            new Rect(width - 210f, 34f, 70f, 24f),
+            _sampleDecks.Count.ToString(),
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(width - 205f, 60f, 100f, 20f),
+            "등록 덱",
+            _mutedStyle
+        );
+
+        if (GUI.Button(new Rect(width - 180f, 84f, 70f, 28f), "새로고침"))
+            RefreshSampleDecks();
+
+        if (GUI.Button(new Rect(width - 100f, 84f, 70f, 28f), "닫기"))
+            _showSampleDeck = false;
+
+        if (_sampleDecks.Count == 0)
+        {
+            GUI.Label(
+                new Rect(28f, 125f, 700f, 30f),
+                "견본덱 데이터를 불러오지 못했습니다. DeckDatabase Import 상태를 확인하세요.",
+                _labelStyle
+            );
+
+            GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+            return;
+        }
+
+        _selectedSampleDeckIndex = Mathf.Clamp(
+            _selectedSampleDeckIndex,
+            0,
+            _sampleDecks.Count - 1
+        );
+
+        DeckData selectedDeck = _sampleDecks[_selectedSampleDeckIndex];
+
+        const float outerMargin = 24f;
+        const float columnGap = 14f;
+        const float listWidth = 300f;
+        const float centerWidth = 670f;
+
+        float contentY = 120f;
+        float contentHeight = height - 145f;
+
+        float listX = outerMargin;
+        float centerX = listX + listWidth + columnGap;
+        float rightX = centerX + centerWidth + columnGap;
+        float rightWidth = width - rightX - outerMargin;
+
+        // 왼쪽: 견본덱 목록
+        DrawSampleDeckList(
+            new Rect(listX, contentY, listWidth, contentHeight)
+        );
+
+        // 가운데: 선택한 견본덱 구성
+        DrawSampleDeckDetail(
+            new Rect(centerX, contentY, centerWidth, contentHeight),
+            selectedDeck
+        );
+
+        // 오른쪽 상단: 선택한 목표 유닛 상세
+        float unitPanelHeight = contentHeight * 0.56f;
+
+        DrawSampleDeckUnitDetail(
+            new Rect(
+                rightX,
+                contentY,
+                rightWidth,
+                unitPanelHeight
+            ),
+            selectedDeck
+        );
+
+        // 오른쪽 하단: 선택한 시너지 상세
+        DrawSampleDeckSynergyDetail(
+            new Rect(
+                rightX,
+                contentY + unitPanelHeight + columnGap,
+                rightWidth,
+                contentHeight - unitPanelHeight - columnGap
+            ),
+            selectedDeck
+        );
+
+        HandleSampleDeckItemTooltipOutsideClick(
+            new Rect(0f, 0f, width, height)
+        );
+
+        DrawSampleDeckItemTooltip();
+
+        GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+
+        // 다른 모든 패널보다 나중에 그려서
+        // 장비 툴팁이 패널 뒤로 가려지지 않게 한다.
+        DrawSampleDeckItemTooltip();
+
+        GUI.DragWindow(new Rect(0f, 0f, width, 28f));
+    }
+
+    /// <summary>
+    /// 장비가 아닌 견본덱 창의 다른 위치를 클릭하면
+    /// 고정된 장비 툴팁을 닫는다.
+    /// </summary>
+    private void HandleSampleDeckItemTooltipOutsideClick(
+        Rect windowRect)
+    {
+        if (string.IsNullOrWhiteSpace(_pinnedSampleDeckItemName))
+            return;
+
+        Event currentEvent = Event.current;
+
+        if (currentEvent.type != EventType.MouseDown ||
+            currentEvent.button != 0)
+        {
+            return;
+        }
+
+        if (_sampleDeckItemClickedThisEvent)
+            return;
+
+        if (!windowRect.Contains(currentEvent.mousePosition))
+            return;
+
+        _pinnedSampleDeckItemName = "";
+        _hoveredSampleDeckItemName = "";
+    }
+
+    /// <summary>
+    /// 등록된 견본덱 목록을 선택 가능한 카드로 표시한다.
+    /// </summary>
+    private void DrawSampleDeckList(Rect rect)
+    {
+        GUI.Box(rect, "");
+
+        float contentHeight = Mathf.Max(
+            rect.height - 20f,
+            _sampleDecks.Count * 76f + 10f
+        );
+
+        _sampleDeckListScroll = GUI.BeginScrollView(
+            rect,
+            _sampleDeckListScroll,
+            new Rect(0f, 0f, rect.width - 20f, contentHeight)
+        );
+
+        for (int i = 0; i < _sampleDecks.Count; i++)
+        {
+            DeckData deck = _sampleDecks[i];
+
+            Rect cardRect = new Rect(
+                8f,
+                8f + i * 76f,
+                rect.width - 36f,
+                66f
+            );
+
+            bool selected = i == _selectedSampleDeckIndex;
+
+            GUI.Box(
+                cardRect,
+                "",
+                selected ? _selectedListCardStyle : _normalListCardStyle
+            );
+
+            if (GUI.Button(cardRect, GUIContent.none, GUIStyle.none))
+            {
+                if (_selectedSampleDeckIndex != i)
+                {
+                    _selectedSampleDeckIndex = i;
+
+                    // 다른 덱으로 바꾸면 이전 덱에서 선택한
+                    // 유닛·시너지 고정 정보를 초기화한다.
+                    _selectedSampleDeckPokemonId = -1;
+                    _selectedSampleDeckSynergyIndex = -1;
+
+                    _sampleDeckDetailScroll = Vector2.zero;
+                    _sampleDeckUnitDetailScroll = Vector2.zero;
+                    _sampleDeckSynergyDetailScroll = Vector2.zero;
+                }
+            }
+
+            string deckName = string.IsNullOrWhiteSpace(deck.deckName)
+                ? $"덱 {deck.deckId}"
+                : deck.deckName;
+
+            GUI.Label(
+                new Rect(cardRect.x + 12f, cardRect.y + 9f, cardRect.width - 24f, 24f),
+                deckName,
+                _sectionTitleStyle
+            );
+
+            GUI.Label(
+                new Rect(cardRect.x + 12f, cardRect.y + 38f, cardRect.width - 24f, 20f),
+                $"덱 ID {deck.deckId} · 유닛 {deck.unitCount}기 · {deck.totalGoldToBuild}G",
+                _mutedStyle
+            );
+        }
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// 선택된 견본덱의 덱 이름, 유닛, 목표 성급,
+    /// 활성 시너지와 총 필요 골드를 표시한다.
+    /// </summary>
+    private void DrawSampleDeckDetail(Rect rect, DeckData deck)
+    {
+        GUI.Box(rect, "");
+
+        if (deck == null)
+            return;
+
+        string deckName = string.IsNullOrWhiteSpace(deck.deckName)
+            ? $"덱 {deck.deckId}"
+            : deck.deckName;
+
+        GUI.Label(
+            new Rect(rect.x + 22f, rect.y + 18f, rect.width - 250f, 32f),
+            deckName,
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + rect.width - 210f, rect.y + 18f, 180f, 24f),
+            $"완성 비용 {deck.totalGoldToBuild}G",
+            _winStyle
+        );
+
+        GUI.Label(
+            new Rect(rect.x + 22f, rect.y + 52f, 300f, 22f),
+            $"덱 ID {deck.deckId} · 목표 유닛 {deck.unitCount}기",
+            _mutedStyle
+        );
+
+        GUI.Box(
+            new Rect(rect.x, rect.y + 84f, rect.width, 1f),
+            ""
+        );
+
+        Rect scrollRect = new Rect(
+            rect.x + 18f,
+            rect.y + 100f,
+            rect.width - 36f,
+            rect.height - 120f
+        );
+
+        float contentHeight = 500f;
+
+        if (deck.units != null)
+        {
+            int rows = Mathf.CeilToInt(deck.units.Count / 4f);
+            contentHeight += rows * 138f;
+        }
+
+        Rect contentRect = new Rect(
+            0f,
+            0f,
+            scrollRect.width - 20f,
+            contentHeight
+        );
+
+        _sampleDeckDetailScroll = GUI.BeginScrollView(
+            scrollRect,
+            _sampleDeckDetailScroll,
+            contentRect
+        );
+
+        float y = 0f;
+
+        GUI.Label(
+            new Rect(0f, y, 160f, 24f),
+            "목표 유닛",
+            _sectionTitleStyle
+        );
+
+        y += 34f;
+        y = DrawSampleDeckUnits(deck.deckId, deck.units, y);
+
+        y += 20f;
+
+        GUI.Label(
+            new Rect(0f, y, 160f, 24f),
+            "활성 시너지",
+            _sectionTitleStyle
+        );
+
+        y += 32f;
+
+        y = DrawSampleDeckSynergyBadges(
+            deck.activeSynergies,
+            y
+        );
+
+        y += 24f;
+
+        int totalRequiredItemCount = deck.units != null ? deck.units.Count * 2 : 0;
+
+        GUI.Label(
+            new Rect(0f, y, 260f, 24f),
+            "덱 전체 필요 장비",
+            _sectionTitleStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                contentRect.width - 130f,
+                y,
+                120f,
+                24f
+            ),
+            $"총 {totalRequiredItemCount}개",
+            _winStyle
+        );
+
+        y += 32f;
+
+        y = DrawSampleDeckRequiredItems(
+            deck,
+            y,
+            contentRect.width
+        );
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// 견본덱의 활성 시너지를 클릭 가능한 버튼 형태로 표시한다.
+    /// 클릭한 시너지는 오른쪽 하단 상세 패널에 고정된다.
+    /// </summary>
+    private float DrawSampleDeckSynergyBadges(List<string> synergies, float y)
+    {
+        if (synergies == null || synergies.Count == 0)
+        {
+            GUI.Label(
+                new Rect(0f, y, 300f, 24f),
+                "활성 시너지 없음",
+                _mutedStyle
+            );
+
+            return y + 28f;
+        }
+
+        float x = 0f;
+        const float maxWidth = 620f;
+        const float lineHeight = 34f;
+        const float buttonHeight = 26f;
+        const float gap = 8f;
+
+        for (int i = 0; i < synergies.Count; i++)
+        {
+            string text = string.IsNullOrWhiteSpace(synergies[i])
+                ? "-"
+                : synergies[i];
+
+            float buttonWidth = Mathf.Clamp(
+                text.Length * 12f + 32f,
+                90f,
+                180f
+            );
+
+            if (x + buttonWidth > maxWidth)
+            {
+                x = 0f;
+                y += lineHeight;
+            }
+
+            bool selected = i == _selectedSampleDeckSynergyIndex;
+
+            GUIStyle buttonStyle = selected
+                ? _selectedListCardStyle
+                : GUI.skin.button;
+
+            Rect buttonRect = new Rect(
+                x,
+                y,
+                buttonWidth,
+                buttonHeight
+            );
+
+            if (GUI.Button(buttonRect, text, buttonStyle))
+            {
+                _selectedSampleDeckSynergyIndex = i;
+                _sampleDeckSynergyDetailScroll = Vector2.zero;
+
+                // 시너지를 선택하면 장비 툴팁만 닫는다.
+                // 현재 선택된 유닛 정보는 그대로 유지한다.
+                _pinnedSampleDeckItemName = "";
+                _hoveredSampleDeckItemName = "";
+            }
+
+            x += buttonWidth + gap;
+        }
+
+        return y + lineHeight;
+    }
+
+    /// <summary>
+    /// 덱의 모든 목표 유닛에게 배정된 임시 추천 장비를 합산해 표시한다.
+    /// 유닛 카드와 동일한 캐시를 사용하므로 카드 표시 내용과 합계가 일치한다.
+    /// </summary>
+    private float DrawSampleDeckRequiredItems(DeckData deck, float y, float availableWidth)
+    {
+        if (deck == null ||
+            deck.units == null ||
+            deck.units.Count == 0)
+        {
+            GUI.Label(
+                new Rect(0f, y, availableWidth, 22f),
+                "필요 장비 없음",
+                _mutedStyle
+            );
+
+            return y + 28f;
+        }
+
+        var itemCounts = new Dictionary<string, int>();
+
+        for (int i = 0; i < deck.units.Count; i++)
+        {
+            DeckUnitEntry entry = deck.units[i];
+
+            if (entry == null)
+                continue;
+
+            string[] items = GetTemporaryRecommendedItems(
+                deck.deckId,
+                entry.pokemonId
+            );
+
+            if (items == null)
+                continue;
+
+            for (int j = 0; j < items.Length; j++)
+            {
+                string itemName = items[j];
+
+                if (string.IsNullOrWhiteSpace(itemName) ||
+                    itemName == "장비 없음")
+                {
+                    continue;
+                }
+
+                if (itemCounts.ContainsKey(itemName))
+                    itemCounts[itemName]++;
+                else
+                    itemCounts[itemName] = 1;
+            }
+        }
+
+        if (itemCounts.Count == 0)
+        {
+            GUI.Label(
+                new Rect(0f, y, availableWidth, 22f),
+                "필요 장비 없음",
+                _mutedStyle
+            );
+
+            return y + 28f;
+        }
+
+        float x = 0f;
+        const float badgeHeight = 28f;
+        const float lineHeight = 36f;
+        const float gap = 8f;
+
+        foreach (KeyValuePair<string, int> pair in itemCounts)
+        {
+            string text = $"{pair.Key} ×{pair.Value}";
+
+            float badgeWidth = Mathf.Clamp(
+                text.Length * 12f + 30f,
+                110f,
+                210f
+            );
+
+            if (x + badgeWidth > availableWidth - 10f)
+            {
+                x = 0f;
+                y += lineHeight;
+            }
+
+            GUI.Label(
+                new Rect(
+                    x,
+                    y,
+                    badgeWidth,
+                    badgeHeight
+                ),
+                text,
+                _badgeStyle
+            );
+
+            x += badgeWidth + gap;
+        }
+
+        return y + lineHeight;
+    }
+
+    /// <summary>
+    /// 오른쪽 상단에 현재 클릭해 고정한 목표 유닛의 상세 정보를 표시한다.
+    /// 현재 단계에서는 레이아웃과 선택 상태만 먼저 검증한다.
+    /// </summary>
+    private void DrawSampleDeckUnitDetail(Rect rect, DeckData deck)
+    {
+        GUI.Box(rect, "");
+
+        GUI.Label(
+            new Rect(rect.x + 18f, rect.y + 16f, rect.width - 36f, 28f),
+            "유닛 상세",
+            _sectionTitleStyle
+        );
+
+        GUI.Box(
+            new Rect(rect.x, rect.y + 54f, rect.width, 1f),
+            ""
+        );
+
+        if (deck == null ||
+            deck.units == null ||
+            deck.units.Count == 0 ||
+            _selectedSampleDeckPokemonId < 0)
+
+        {
+            GUI.Label(
+                new Rect(rect.x + 18f, rect.y + 76f, rect.width - 36f, 50f),
+                "가운데 목표 유닛을 클릭하면\n상세 정보가 여기에 고정됩니다.",
+                _mutedStyle
+            );
+
+            return;
+        }
+
+        DeckUnitEntry entry = null;
+
+        for (int i = 0; i < deck.units.Count; i++)
+        {
+            DeckUnitEntry candidate = deck.units[i];
+
+            if (candidate != null &&
+                candidate.pokemonId == _selectedSampleDeckPokemonId)
+            {
+                entry = candidate;
+                break;
+            }
+        }
+
+        if (entry == null)
+            return;
+
+        PokemonData pokemon = FindPokemonById(entry.pokemonId);
+
+        string pokemonName =
+            pokemon != null && !string.IsNullOrWhiteSpace(pokemon.pokemonName)
+                ? pokemon.pokemonName
+                : $"Pokemon ID {entry.pokemonId}";
+
+        string costText = pokemon != null
+            ? $"{pokemon.cost}코스트"
+            : "코스트 확인 불가";
+
+        Rect scrollRect = new Rect(
+            rect.x + 14f,
+            rect.y + 66f,
+            rect.width - 28f,
+            rect.height - 80f
+        );
+
+        Rect contentRect = new Rect(
+            0f,
+            0f,
+            scrollRect.width - 20f,
+            520f
+        );
+
+        _sampleDeckUnitDetailScroll = GUI.BeginScrollView(
+            scrollRect,
+            _sampleDeckUnitDetailScroll,
+            contentRect
+        );
+
+        float y = 0f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 30f),
+            pokemonName,
+            _sectionTitleStyle
+        );
+
+        y += 38f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 22f),
+            $"도감 ID: {entry.pokemonId}",
+            _labelStyle
+        );
+
+        y += 26f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 30f),
+            $"목표 성급: {FormatStars(entry.starLevel)}",
+            _winStyle
+        );
+
+        y += 34f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 22f),
+            $"코스트: {costText}",
+            _labelStyle
+        );
+
+        y += 38f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 24f),
+            "능력치",
+            _sectionTitleStyle
+        );
+
+        y += 34f;
+
+        if (pokemon != null)
+        {
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"체력: {pokemon.hp:0}",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"공격력: {pokemon.attack:0}",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"방어력: {pokemon.defense:0}",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"공격속도: {pokemon.attackSpeed:0.00}",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"사거리: {pokemon.range}칸",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"스킬 위력: {pokemon.spellPower:0}",
+                _labelStyle
+            );
+
+            y += 25f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"마나 비용: {pokemon.manaCost}",
+                _labelStyle
+            );
+
+            y += 36f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 24f),
+                "역할 · 속성",
+                _sectionTitleStyle
+            );
+
+            y += 32f;
+
+            string roleText = string.IsNullOrWhiteSpace(pokemon.role)
+                ? "-"
+                : pokemon.role;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"역할: {roleText}",
+                _labelStyle
+            );
+
+            y += 26f;
+
+            string synergyText =
+                pokemon.synergies != null && pokemon.synergies.Count > 0
+                    ? string.Join(", ", pokemon.synergies)
+                    : "-";
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 44f),
+                $"보유 시너지: {synergyText}",
+                _labelStyle
+            );
+
+            y += 50f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 24f),
+                "스킬",
+                _sectionTitleStyle
+            );
+
+            y += 32f;
+
+            string skillIdText = string.IsNullOrWhiteSpace(pokemon.skillId)
+                ? "-"
+                : pokemon.skillId;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 22f),
+                $"스킬 ID: {skillIdText}",
+                _labelStyle
+            );
+
+            y += 26f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 44f),
+                pokemon.skill != null
+                    ? "스킬 데이터 연결됨"
+                    : "스킬 데이터 없음",
+                _mutedStyle
+            );
+                        
+        }
+        else
+        {
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 44f),
+                "PokemonDatabase에서 해당 포켓몬을 찾지 못했습니다.",
+                _mutedStyle
+            );
+        }
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// 오른쪽 하단에 클릭해 고정한 활성 시너지의
+    /// 실제 단계별 효과를 SynergyDatabase에서 조회해 표시한다.
+    /// </summary>
+    private void DrawSampleDeckSynergyDetail(Rect rect, DeckData deck)
+    {
+        GUI.Box(rect, "");
+
+        GUI.Label(
+            new Rect(rect.x + 18f, rect.y + 16f, rect.width - 36f, 28f),
+            "시너지 상세",
+            _sectionTitleStyle
+        );
+
+        GUI.Box(
+            new Rect(rect.x, rect.y + 54f, rect.width, 1f),
+            ""
+        );
+
+        if (deck == null ||
+            deck.activeSynergies == null ||
+            deck.activeSynergies.Count == 0 ||
+            _selectedSampleDeckSynergyIndex < 0 ||
+            _selectedSampleDeckSynergyIndex >= deck.activeSynergies.Count)
+        {
+            GUI.Label(
+                new Rect(rect.x + 18f, rect.y + 76f, rect.width - 36f, 50f),
+                "가운데 활성 시너지를 클릭하면\n단계별 효과가 여기에 고정됩니다.",
+                _mutedStyle
+            );
+
+            return;
+        }
+
+        string activeSynergyText =
+            deck.activeSynergies[_selectedSampleDeckSynergyIndex];
+
+        // 예: "Bug(4/4)"에서
+        // key = "Bug", currentCount = 4를 추출한다.
+        string synergyKey = ExtractSynergyKey(activeSynergyText);
+        int currentCount = ExtractSynergyCurrentCount(activeSynergyText);
+
+        SynergyDatabase db = SynergyDatabase.Instance;
+
+        SynergyData synergy = db != null
+            ? db.GetByKey(synergyKey)
+            : null;
+
+        Rect scrollRect = new Rect(
+            rect.x + 14f,
+            rect.y + 66f,
+            rect.width - 28f,
+            rect.height - 80f
+        );
+
+        float contentHeight = 260f;
+
+        if (synergy != null && synergy.tiers != null)
+            contentHeight = Mathf.Max(260f, 90f + synergy.tiers.Count * 76f);
+
+        Rect contentRect = new Rect(
+            0f,
+            0f,
+            scrollRect.width - 20f,
+            contentHeight
+        );
+
+        _sampleDeckSynergyDetailScroll = GUI.BeginScrollView(
+            scrollRect,
+            _sampleDeckSynergyDetailScroll,
+            contentRect
+        );
+
+        float y = 0f;
+
+        if (synergy == null)
+        {
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 30f),
+                activeSynergyText,
+                _sectionTitleStyle
+            );
+
+            y += 40f;
+
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 60f),
+                $"SynergyDatabase에서 '{synergyKey}' 시너지를 찾지 못했습니다.",
+                _mutedStyle
+            );
+
+            GUI.EndScrollView();
+            return;
+        }
+
+        string synergyName = string.IsNullOrWhiteSpace(synergy.synergyName)
+            ? synergy.synergyNameEn
+            : synergy.synergyName;
+
+        string synergyNameEn = string.IsNullOrWhiteSpace(synergy.synergyNameEn)
+            ? "-"
+            : synergy.synergyNameEn;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 30f),
+            synergyName,
+            _sectionTitleStyle
+        );
+
+        y += 32f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 22f),
+            $"{synergyNameEn} · 현재 {currentCount}기",
+            _mutedStyle
+        );
+
+        y += 34f;
+
+        GUI.Label(
+            new Rect(0f, y, contentRect.width, 24f),
+            "단계별 효과",
+            _sectionTitleStyle
+        );
+
+        y += 32f;
+
+        if (synergy.tiers == null || synergy.tiers.Count == 0)
+        {
+            GUI.Label(
+                new Rect(0f, y, contentRect.width, 40f),
+                "등록된 시너지 단계가 없습니다.",
+                _mutedStyle
+            );
+
+            GUI.EndScrollView();
+            return;
+        }
+
+        for (int i = 0; i < synergy.tiers.Count; i++)
+        {
+            SynergyTier tier = synergy.tiers[i];
+
+            if (tier == null)
+                continue;
+
+            bool isActivated = currentCount >= tier.count;
+
+            Rect tierRect = new Rect(
+                0f,
+                y,
+                contentRect.width - 8f,
+                66f
+            );
+
+            GUI.Box(
+                tierRect,
+                "",
+                isActivated
+                    ? _selectedListCardStyle
+                    : _normalListCardStyle
+            );
+
+            string tierTitle = isActivated
+                ? $"활성  {tier.count}기"
+                : $"미활성  {tier.count}기";
+
+            GUI.Label(
+                new Rect(
+                    tierRect.x + 10f,
+                    tierRect.y + 7f,
+                    tierRect.width - 20f,
+                    22f
+                ),
+                tierTitle,
+                isActivated ? _winStyle : _labelStyle
+            );
+
+            string effectText =
+                string.IsNullOrWhiteSpace(tier.effectDescription)
+                    ? "효과 설명 없음"
+                    : tier.effectDescription;
+
+            GUI.Label(
+                new Rect(
+                    tierRect.x + 10f,
+                    tierRect.y + 31f,
+                    tierRect.width - 20f,
+                    30f
+                ),
+                effectText,
+                _mutedStyle
+            );
+
+            y += 74f;
+        }
+
+        GUI.EndScrollView();
+    }
+
+    /// <summary>
+    /// "Bug(4/4)"에서 "Bug" 부분만 추출한다.
+    /// 괄호가 없으면 원본 문자열을 그대로 반환한다.
+    /// </summary>
+    private static string ExtractSynergyKey(string synergyText)
+    {
+        if (string.IsNullOrWhiteSpace(synergyText))
+            return "";
+
+        int openParenthesisIndex = synergyText.IndexOf('(');
+
+        if (openParenthesisIndex < 0)
+            return synergyText.Trim();
+
+        return synergyText
+            .Substring(0, openParenthesisIndex)
+            .Trim();
+    }
+
+    /// <summary>
+    /// "Bug(4/4)"에서 현재 유닛 수인 4를 추출한다.
+    /// 형식이 올바르지 않으면 0을 반환한다.
+    /// </summary>
+    private static int ExtractSynergyCurrentCount(string synergyText)
+    {
+        if (string.IsNullOrWhiteSpace(synergyText))
+            return 0;
+
+        int openParenthesisIndex = synergyText.IndexOf('(');
+        int slashIndex = synergyText.IndexOf('/');
+
+        if (openParenthesisIndex < 0 ||
+            slashIndex < 0 ||
+            slashIndex <= openParenthesisIndex + 1)
+        {
+            return 0;
+        }
+
+        string countText = synergyText.Substring(
+            openParenthesisIndex + 1,
+            slashIndex - openParenthesisIndex - 1
+        );
+
+        return int.TryParse(countText, out int count)
+            ? count
+            : 0;
+    }
+
+    /// <summary>
+    /// 견본덱의 유닛을 한 줄에 최대 4개씩 카드로 표시한다.
+    /// </summary>
+    private float DrawSampleDeckUnits(int deckId, List<DeckUnitEntry> units, float y)
+    {
+        if (units == null || units.Count == 0)
+        {
+            GUI.Box(new Rect(0f, y, 520f, 42f), "");
+
+            GUI.Label(
+                new Rect(12f, y + 11f, 420f, 20f),
+                "등록된 목표 유닛이 없습니다.",
+                _mutedStyle
+            );
+
+            return y + 52f;
+        }
+
+        const float cardWidth = 150f;
+        const float cardHeight = 126f;
+        const float gap = 10f;
+        const int cardsPerRow = 4;
+
+        var sortedUnits = new List<DeckUnitEntry>(units);
+
+        sortedUnits.Sort((a, b) =>
+        {
+            int aSlot = a != null ? a.slot : int.MaxValue;
+            int bSlot = b != null ? b.slot : int.MaxValue;
+            return aSlot.CompareTo(bSlot);
+        });
+
+        for (int i = 0; i < sortedUnits.Count; i++)
+        {
+            DeckUnitEntry entry = sortedUnits[i];
+            if (entry == null)
+                continue;
+
+            int row = i / cardsPerRow;
+            int col = i % cardsPerRow;
+
+            Rect cardRect = new Rect(
+                col * (cardWidth + gap),
+                y + row * (cardHeight + gap),
+                cardWidth,
+                cardHeight
+            );
+
+            DrawSampleDeckUnitCard(deckId, entry, cardRect);
+
+            Rect itemAreaRect = new Rect(
+                cardRect.x + 8f,
+                cardRect.y + 83f,
+                cardRect.width - 16f,
+                38f
+            );
+
+            Event currentEvent = Event.current;
+
+            bool clickedCard =
+                currentEvent.type == EventType.MouseDown &&
+                currentEvent.button == 0 &&
+                cardRect.Contains(currentEvent.mousePosition);
+
+            bool clickedItemArea =
+                itemAreaRect.Contains(currentEvent.mousePosition);
+
+            if (clickedCard && !clickedItemArea)
+            {
+                _selectedSampleDeckPokemonId = entry.pokemonId;
+                _sampleDeckUnitDetailScroll = Vector2.zero;
+
+                // 다른 유닛을 선택하면 고정된 장비 툴팁을 닫는다.
+                _pinnedSampleDeckItemName = "";
+                _hoveredSampleDeckItemName = "";
+
+                currentEvent.Use();
+            }
+        }
+
+        int rowCount = Mathf.CeilToInt(sortedUnits.Count / (float)cardsPerRow);
+
+        return y + rowCount * (cardHeight + gap);
+    }
+
+    /// <summary>
+    /// 견본덱 유닛 한 마리의 이름, 목표 성급, ID, 코스트와
+    /// 임시 추천 장비 2개를 표시한다.
+    /// </summary>
+    private void DrawSampleDeckUnitCard(int deckId, DeckUnitEntry entry, Rect rect)
+    {
+        GUI.Box(rect, "", _unitCardStyle);
+
+        PokemonData pokemon = FindPokemonById(entry.pokemonId);
+
+        string pokemonName =
+            pokemon != null &&
+            !string.IsNullOrWhiteSpace(pokemon.pokemonName)
+                ? pokemon.pokemonName
+                : $"Pokemon ID {entry.pokemonId}";
+
+        string costText = pokemon != null
+            ? $"{pokemon.cost}코스트"
+            : "코스트 확인 불가";
+
+        GUI.Label(
+            new Rect(
+                rect.x + 8f,
+                rect.y + 7f,
+                rect.width - 16f,
+                22f
+            ),
+            pokemonName,
+            _smallStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                rect.x + 8f,
+                rect.y + 28f,
+                rect.width - 16f,
+                28f
+            ),
+            $"목표 {FormatStars(entry.starLevel)}",
+            _winStyle
+        );
+
+        GUI.Label(
+            new Rect(
+                rect.x + 8f,
+                rect.y + 55f,
+                rect.width - 16f,
+                20f
+            ),
+            $"ID {entry.pokemonId} · {costText}",
+            _mutedStyle
+        );
+
+        // 카드 내 구분선
+        GUI.Box(
+            new Rect(
+                rect.x + 7f,
+                rect.y + 78f,
+                rect.width - 14f,
+                1f
+            ),
+            ""
+        );
+
+        string[] recommendedItems =
+            GetTemporaryRecommendedItems(
+                deckId,
+                entry.pokemonId
+            );
+
+        Rect firstItemRect = new Rect(
+            rect.x + 8f,
+            rect.y + 83f,
+            rect.width - 16f,
+            18f
+        );
+
+        Rect secondItemRect = new Rect(
+            rect.x + 8f,
+            rect.y + 102f,
+            rect.width - 16f,
+            18f
+        );
+
+        DrawSampleDeckItemEntry(
+            firstItemRect,
+            $"추천 1: {recommendedItems[0]}",
+            recommendedItems[0]
+        );
+
+        DrawSampleDeckItemEntry(
+            secondItemRect,
+            $"추천 2: {recommendedItems[1]}",
+            recommendedItems[1]
+        );
+    }
+
+    /// <summary>
+    /// 견본덱 유닛 카드 안의 추천 장비 한 줄을 표시한다.
+    /// Hover 시 임시 툴팁을 열고 클릭하면 고정한다.
+    /// 같은 장비를 다시 클릭하면 고정을 해제한다.
+    /// </summary>
+    private void DrawSampleDeckItemEntry(
+    Rect rect,
+    string displayText,
+    string itemName)
+    {
+        GUI.Label(
+            rect,
+            displayText,
+            _mutedStyle
+        );
+
+        if (string.IsNullOrWhiteSpace(itemName) ||
+            itemName == "장비 없음")
+        {
+            return;
+        }
+
+        Event currentEvent = Event.current;
+
+        bool isHovered =
+            rect.Contains(currentEvent.mousePosition);
+
+        if (!isHovered)
+            return;
+
+        _hoveredSampleDeckItemName = itemName;
+
+        // 고정된 장비가 없을 때만 Hover 위치를 따라간다.
+        if (string.IsNullOrWhiteSpace(_pinnedSampleDeckItemName))
+        {
+            _sampleDeckItemTooltipAnchorScreenPosition =
+                GUIUtility.GUIToScreenPoint(
+                    new Vector2(
+                        rect.xMax,
+                        rect.yMin
+                    )
+                );
+        }
+
+        if (currentEvent.type != EventType.MouseDown ||
+            currentEvent.button != 0)
+        {
+            return;
+        }
+
+        _sampleDeckItemClickedThisEvent = true;
+
+        if (_pinnedSampleDeckItemName == itemName)
+        {
+            // 같은 장비 재클릭 → 해제
+            _pinnedSampleDeckItemName = "";
+        }
+        else
+        {
+            // 새 장비 고정 → 이름과 위치를 같이 저장
+            _pinnedSampleDeckItemName = itemName;
+
+            _sampleDeckItemTooltipAnchorScreenPosition =
+                GUIUtility.GUIToScreenPoint(
+                    new Vector2(
+                        rect.xMax,
+                        rect.yMin
+                    )
+                );
+        }
+
+        currentEvent.Use();
+    }
+
+    /// <summary>
+    /// 중앙 DeckDatabase에서 전체 견본덱 목록을 다시 가져온다.
+    /// </summary>
+    private void RefreshSampleDecks()
+    {
+        _sampleDecks.Clear();
+        _temporaryRecommendedItems.Clear();
+
+        // 새로고침 시 현재 덱 선택은 유지하되,
+        // 상세 선택과 모든 견본덱 스크롤 위치는 초기화한다.
+        _selectedSampleDeckPokemonId = -1;
+        _selectedSampleDeckSynergyIndex = -1;
+
+        _sampleDeckListScroll = Vector2.zero;
+        _sampleDeckDetailScroll = Vector2.zero;
+        _sampleDeckUnitDetailScroll = Vector2.zero;
+        _sampleDeckSynergyDetailScroll = Vector2.zero;
+
+        DeckDatabase db = DeckDatabase.Instance;
+
+        if (db == null || db.decks == null)
+        {
+            _selectedSampleDeckIndex = 0;
+            return;
+        }
+
+        for (int i = 0; i < db.decks.Count; i++)
+        {
+            DeckData deck = db.decks[i];
+
+            if (deck != null)
+                _sampleDecks.Add(deck);
+        }
+
+        _sampleDecks.Sort((a, b) => a.deckId.CompareTo(b.deckId));
+
+        if (_sampleDecks.Count == 0)
+            _selectedSampleDeckIndex = 0;
+        else
+            _selectedSampleDeckIndex = Mathf.Clamp(
+                _selectedSampleDeckIndex,
+                0,
+                _sampleDecks.Count - 1
+            );
+    }
+
+    /// <summary>
+    /// PokemonDatabase의 전체 목록에서 도감 ID가 일치하는 포켓몬을 찾는다.
+    /// 별도 조회 메서드 이름에 의존하지 않도록 현재 all 목록을 직접 검사한다.
+    /// </summary>
+    private static PokemonData FindPokemonById(int pokemonId)
+    {
+        PokemonDatabase db = PokemonDatabase.Instance;
+
+        return db != null
+            ? db.GetById(pokemonId)
+            : null;
+    }
+
+    /// <summary>
+    /// 덱과 포켓몬 조합별로 실제 ItemDatabase에서 임시 추천 장비 2개를 뽑는다.
+    /// 한 번 뽑힌 결과는 Dictionary에 저장되어 OnGUI 호출마다 바뀌지 않는다.
+    /// </summary>
+    private string[] GetTemporaryRecommendedItems(int deckId, int pokemonId)
+    {
+        string key = $"{deckId}_{pokemonId}";
+
+        if (_temporaryRecommendedItems.TryGetValue(
+            key,
+            out string[] cachedItems))
+        {
+            return cachedItems;
+        }
+
+        ItemDatabase db = ItemDatabase.Instance;
+
+        if (db == null || db.all == null || db.all.Count == 0)
+        {
+            string[] emptyResult = { "장비 없음", "장비 없음" };
+            _temporaryRecommendedItems[key] = emptyResult;
+            return emptyResult;
+        }
+
+        var availableItems = new List<ItemData>();
+
+        for (int i = 0; i < db.all.Count; i++)
+        {
+            ItemData item = db.all[i];
+
+            if (item != null)
+                availableItems.Add(item);
+        }
+
+        if (availableItems.Count == 0)
+        {
+            string[] emptyResult = { "장비 없음", "장비 없음" };
+            _temporaryRecommendedItems[key] = emptyResult;
+            return emptyResult;
+        }
+
+        int firstIndex = UnityEngine.Random.Range(0, availableItems.Count);
+
+        int secondIndex = UnityEngine.Random.Range(0, availableItems.Count);
+
+        string firstName =
+            string.IsNullOrWhiteSpace(availableItems[firstIndex].itemName)
+                ? availableItems[firstIndex].itemNameEn
+                : availableItems[firstIndex].itemName;
+
+        string secondName =
+            string.IsNullOrWhiteSpace(availableItems[secondIndex].itemName)
+                ? availableItems[secondIndex].itemNameEn
+                : availableItems[secondIndex].itemName;
+
+        string[] result =
+        {
+            firstName,
+            secondName
+        };
+
+        _temporaryRecommendedItems[key] = result;
+
+        return result;
     }
 }
