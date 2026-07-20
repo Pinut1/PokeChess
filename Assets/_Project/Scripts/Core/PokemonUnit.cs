@@ -63,6 +63,9 @@ public class PokemonUnit : MonoBehaviour
     public PokemonSkillData grantedSkill;
     public int grantedSkillManaCost;
 
+    /// <summary>파치리스 영웅증강 v2 자뭉열매: true면 전투당 1회 HP 45% 미만 시 언타겟+회복(BattleUnit이 스냅샷).</summary>
+    public bool hasHeroBerry;
+
     /// <summary>주입 스킬이 유효한지(파치리스 도발 등).</summary>
     public bool HasGrantedSkill => grantedSkill != null && grantedSkill.HasSkill;
 
@@ -92,6 +95,7 @@ public class PokemonUnit : MonoBehaviour
         grantedSkill          = tauntSkill;
         grantedSkillManaCost  = manaCost;
         heroStatMultiplier    = statMultiplier;
+        hasHeroBerry          = true; // v2 자뭉열매(전투당 1회 언타겟+회복)
         currentHp             = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }

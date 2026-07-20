@@ -3,7 +3,7 @@
 ## 개요
 증강 라운드에 3개의 증강 중 1개를 선택해 영구 효과를 얻는 시스템.
 **확정 6종 — Augment Table v2 (2026-07-16 해인님 회신) 반영.** 등급은 전체 SUPERBALL(=Gold) 단일.
-선택은 로컬 전용(2인 각자 경제와 동일 규칙) — 파트너 증강 표시/동기화는 추후.
+선택은 로컬 전용(2인 각자 경제와 동일 규칙). 파트너 증강 동기화는 완료(7/17, PR #43) — Player CustomProperties 미러, `GameEvents.OnPartnerAugmentsChanged`, 전적 partner.augments 기록.
 
 ---
 
@@ -49,7 +49,9 @@
 ### 별도 티켓 (전투 신규 메커니즘 — 미구현)
 - [ ] 이브이 v2 "나인이볼부스트": 진화체 8종 소환 + 종별 버프 전달(현재 봇 4마리), `SK_EEVEE_HERO` 스킬화,
       진화의 돌 면역, 돌연변이 시너지 → 고유 시너지 전환, "가장 강한 이브이" 대상 선정
-- [ ] 파치리스 v2: 투사체 끌어당김, 자뭉열매(전투당 1회, HP 45%↓ 언타겟 + 매초 maxHP 15% 회복 후 복귀), `SK_PACHIRISU_HERO`
+- [x] ~~자뭉열매~~ ✅ 구현(7/17): 전투당 1회, HP 45% 미만 시 언타겟+행동불능 + 매초 maxHP 15% 회복,
+      **완전 회복하거나 다른 아군이 없으면 복귀**(기획 확정 7/17 — TFT 블리츠크랭크식). `BattleUnit.BERRY_*`
+- [ ] 파치리스 v2 잔여: 투사체 끌어당김(수치 미확정), `SK_PACHIRISU_HERO`
 - [ ] skill_table에 `SK_PACHIRISU_HERO`/`SK_EEVEE_HERO` 행 추가(시트 반영)
 - [ ] 3D 배치 입력의 `IsChoiceBlocking` 참조 배선
 

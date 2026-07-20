@@ -68,6 +68,19 @@ public class BattleUnit
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
 
+    // ── 자뭉열매(파치리스 영웅증강 v2, TFT 블리츠크랭크식 — 기획 확정 7/17) ──
+    // 전투당 1회, HP 45% 미만 시 언타겟+행동불능으로 빠져 매초 maxHP 15% 회복.
+    // 완전 회복하거나 다른 아군이 없으면 전투에 복귀한다.
+    public const float BERRY_TRIGGER_HP_RATIO  = 0.45f; // 기획 확정(v2)
+    public const float BERRY_HEAL_PCT_PER_SEC  = 0.15f; // 기획 확정(v2)
+
+    public bool hasSitrusBerry;       // 파치리스 영웅증강 유닛만 true(전투 시작 스냅샷)
+    public bool sitrusBerryConsumed;  // 전투당 1회 소비 여부
+    public bool berryActive;          // true면 열매 시식 중
+
+    /// <summary>언타겟 상태(자뭉열매 시식 중). 모든 대상 선정(타겟팅·범위기·도발)에서 제외된다.</summary>
+    public bool IsUntargetable => berryActive;
+
     public bool IsAlive => currentHp > 0f;
 
     // ─────────────────────────────────────────
@@ -103,6 +116,38 @@ public class BattleUnit
                 tauntedBy = null;
                 tauntRemaining = 0f;
             }
+        }
+
+    }
+
+    /// <summary>
+    /// 피해로 HP가 깎인 직후 호출 — 자뭉열매 발동 판정(전투당 1회).
+    /// 45% "미만"으로 내려간 순간 발동. 이미 죽었으면(과잉 피해) 발동하지 않는다(부활 아님).
+    /// </summary>
+    public void TryTriggerSitrusBerry()
+    {
+        if (!hasSitrusBerry || sitrusBerryConsumed || !IsAlive) return;
+        if (maxHp <= 0f || currentHp / maxHp >= BERRY_TRIGGER_HP_RATIO) return;
+
+        sitrusBerryConsumed = true;
+        berryActive = true;
+        Debug.Log($"[Battle] 자뭉열매 발동 — 언타겟 + 매초 {BERRY_HEAL_PCT_PER_SEC:P0} 회복, 완전 회복/아군 전멸 시 복귀 (HP {currentHp:0}/{maxHp:0})");
+    }
+
+    /// <summary>
+    /// 자뭉열매 매틱 처리(BattleManager가 호출 — "다른 아군 생존" 판정은 로스터를 아는 매니저 몫).
+    /// 매초 maxHP 15% 회복하고, 완전 회복하거나 다른 아군이 없으면 복귀한다.
+    /// </summary>
+    public void TickBerry(float deltaTime, bool hasOtherAliveAlly)
+    {
+        if (!berryActive) return;
+
+        ApplyHeal(maxHp * BERRY_HEAL_PCT_PER_SEC * deltaTime); // "매초 15%"의 틱 분할
+
+        if (currentHp >= maxHp || !hasOtherAliveAlly)
+        {
+            berryActive = false;
+            Debug.Log($"[Battle] 자뭉열매 종료 — 복귀 ({(currentHp >= maxHp ? "완전 회복" : "아군 전멸")}, HP {currentHp:0}/{maxHp:0})");
         }
     }
 
