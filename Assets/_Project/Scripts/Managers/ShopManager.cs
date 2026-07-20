@@ -129,6 +129,19 @@ public class ShopManager : MonoBehaviour
     /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
     private readonly Dictionary<PokemonData, int> _remainingPool = new();
 
+    private sealed class SharedShopReservation
+    {
+        public int revision;
+        public int[] pokemonIds;
+    }
+
+    /// <summary>MasterClient 권위의 플레이어별 상점 예약. 비마스터도 마스터 교체 대비 미러를 유지한다.</summary>
+    private readonly Dictionary<int, SharedShopReservation> _sharedReservations = new();
+    private bool _poolInitialized;
+    private bool _sharedRollPending;
+    private bool _sharedPurchasePending;
+    private int _shopRevision;
+
     /// <summary>진화체 → 기본종(풀 관리 대상) 역매핑. 진화 유닛 판매 시 소비된 기본종 카피를 올바른 풀로 되돌리기 위함.</summary>
     private readonly Dictionary<PokemonData, PokemonData> _evolvedToBase = new();
 
@@ -228,6 +241,8 @@ public class ShopManager : MonoBehaviour
 
         BuildEvolutionToBaseMap();
 
+        _poolInitialized = true;
+
         Debug.Log($"[ShopPool] 챔피언 풀 초기화 완료: {_remainingPool.Count}종");
     }
 
@@ -318,16 +333,6 @@ public class ShopManager : MonoBehaviour
     // ──────────────────────────────────────────
     // 레벨 / XP
     // ──────────────────────────────────────────
-
-    /// <summary>
-    /// XP 구매 골드 비용 할인(레벨 할인 증강 seam). 음수 delta로 원복.
-    /// 최소 1G 보장(무료 XP 구매로 무한 레벨업 방지). ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
-    /// </summary>
-    public void AddBuyXpCostDiscount(int discount)
-    {
-        _buyXpCostGold = Mathf.Max(1, _buyXpCostGold - discount);
-        Debug.Log($"[Shop] XP 구매 비용 할인 {(discount >= 0 ? "-" : "+")}{Mathf.Abs(discount)}G => {_buyXpCostGold}G");
-    }
 
     /// <summary>
     /// 팀 라운드 결과 확정 후 기본 XP 지급.
@@ -471,6 +476,16 @@ public class ShopManager : MonoBehaviour
     /// <summary>샵 풀에서 레벨별 코스트 확률과 남은 풀 수량을 기준으로 _shopSize개를 다시 공개.</summary>
     public void Roll()
     {
+        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        if (network != null && network.UsesSharedShopPool)
+        {
+            if (_sharedRollPending || _sharedPurchasePending) return;
+            _sharedRollPending = true;
+            if (!network.RequestSharedShopRoll(_currentLevel, _cost4ForceOpen))
+                _sharedRollPending = false;
+            return;
+        }
+
         if (_pool == null || _pool.Count == 0)
         {
             for (int i = 0; i < _slots.Length; i++) _slots[i] = null;
@@ -478,31 +493,65 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
+        ReturnLocalShopSlotsToPool();
         for (int i = 0; i < _slots.Length; i++)
-            _slots[i] = RollOnePokemon();
+        {
+            _slots[i] = RollOnePokemonWeighted(_currentLevel, _cost4ForceOpen);
+            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+        }
 
         GameEvents.ShopRerolled();
     }
 
-    /// <summary>4코 상점 오픈 증강 활성 여부. 켜지면 레벨 확률표에 4코 등장 확률이 강제 주입된다.</summary>
+    /// <summary>
+    /// (구 4코 상시 오픈 플래그) Augment Table v2에서 "지속 확률 등장"이 제거되어 항상 false.
+    /// 공유 상점 RPC 시그니처(forceCostFour) 호환용으로만 유지 — 공유 상점 작업 정리 시 제거 가능.
+    /// </summary>
     private bool _cost4ForceOpen;
 
-    /// <summary>4코 강제 오픈 시 주입되는 4코 등장 확률(%) — 기획 미확정 PLACEHOLDER.</summary>
-    private const int COST4_FORCE_OPEN_RATE = 15;
-
     /// <summary>
-    /// 4코 상점 강제 오픈(증강 seam): 즉시 상점을 4코스트 5마리로 무료 갱신하고("5마리 즉시"),
-    /// 이후 레벨과 무관하게 4코가 확률표에 등장한다. ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
+    /// ECONOMY_SHOP(구독서비스) 증강 seam: 상점을 "서로 다른" 4코스트 5마리로 1회 무료 갱신.
+    /// v2 확정 — 지속 확률 등장 없음, 발동 시점(즉시 1회 + 1~3R 중 1회)은 EconomyShopAugment가 관리.
+    /// ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
     /// </summary>
-    public void ForceOpenCostFour()
+    public void OpenCostFourShopOnce()
     {
-        _cost4ForceOpen = true;
+        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        if (network != null && network.UsesSharedShopPool)
+        {
+            if (_sharedRollPending || _sharedPurchasePending) return;
+            _sharedRollPending = true;
+            if (!network.RequestSharedShopRoll(_currentLevel, false, true))
+                _sharedRollPending = false;
+            return;
+        }
+
+        ReturnLocalShopSlotsToPool();
+
+        // "서로 다른 4단계 포켓몬" — 종 중복 없이 우선 채우고, 종 수가 모자라면 중복 허용 폴백.
+        var distinct = new List<PokemonData>();
+        foreach (var pair in _remainingPool)
+            if (pair.Key != null && pair.Key.cost == 4 && pair.Value > 0)
+                distinct.Add(pair.Key);
 
         for (int i = 0; i < _slots.Length; i++)
-            _slots[i] = RollOnePokemonOfCost(4);
+        {
+            if (distinct.Count > 0)
+            {
+                int pick = Random.Range(0, distinct.Count);
+                _slots[i] = distinct[pick];
+                distinct.RemoveAt(pick);
+            }
+            else
+            {
+                _slots[i] = RollOnePokemonOfCostWeighted(4, _currentLevel, false);
+            }
+
+            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+        }
 
         GameEvents.ShopRerolled();
-        Debug.Log($"[Shop] 4코 상점 강제 오픈 — 즉시 4코 {_slots.Length}슬롯 갱신, 이후 등장률 {COST4_FORCE_OPEN_RATE}%");
+        Debug.Log($"[Shop] 구독서비스 — 서로 다른 4코 {_slots.Length}슬롯 무료 갱신");
     }
 
     /// <summary>특정 코스트만 굴림(4코 강제 오픈용). 해당 코스트 풀이 비면 일반 굴림으로 폴백.</summary>
@@ -552,12 +601,6 @@ public class ShopManager : MonoBehaviour
     private int RollCostByLevel(int level)
     {
         int[] rates = GetCostRates(level);
-
-        // 4코 상점 오픈 증강: 확률표에 4코가 없는 저레벨에도 4코 등장을 강제 주입.
-        // (총합이 100을 넘어도 가중치 방식이라 비율로만 동작.)
-        if (_cost4ForceOpen && rates[3] <= 0)
-            rates[3] = COST4_FORCE_OPEN_RATE;
-
         int total = 0;
 
         for (int i = 0; i < rates.Length; i++)
@@ -607,6 +650,12 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool Reroll()
     {
+        if (_sharedRollPending || _sharedPurchasePending)
+        {
+            Debug.Log("[Shop] 이전 공유 풀 요청 처리 중 — 리롤 대기");
+            return false;
+        }
+
         if (RerollCount > 0)
         {
             RerollCount--;
@@ -644,11 +693,10 @@ public class ShopManager : MonoBehaviour
         PokemonData data = _slots[slot];
         if (data == null) return false;
 
-        if (!HasPoolStock(data, 1))
-        {
-            Debug.Log($"[ShopPool] {data.pokemonName} 남은 풀 수량 없음 — 구매 불가");
-            return false;
-        }
+        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        bool usesSharedPool = network != null && network.UsesSharedShopPool;
+
+        if (_sharedRollPending || _sharedPurchasePending) return false;
 
         if (Gold < data.cost)
         {
@@ -663,6 +711,17 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
+        if (usesSharedPool)
+        {
+            _sharedPurchasePending = true;
+            if (!network.RequestSharedShopPurchase(_shopRevision, slot))
+            {
+                _sharedPurchasePending = false;
+                return false;
+            }
+            return true;
+        }
+
         PokemonUnit unit = UnitFactory.Create(data);
         if (unit == null) return false;
 
@@ -671,8 +730,6 @@ public class ShopManager : MonoBehaviour
             Destroy(unit.gameObject); // 방어적 정리(이론상 도달 안 함)
             return false;
         }
-
-        DecreaseChampionPool(data, 1);
 
         AddGold(-data.cost);
         _slots[slot] = null;
@@ -708,11 +765,259 @@ public class ShopManager : MonoBehaviour
             return;
 
         int amount = GetBaseUnitCount(unit.starLevel);
+
+        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        if (network != null && network.UsesSharedShopPool)
+        {
+            network.RequestSharedShopReturn(data.id, amount);
+            return;
+        }
+
         int maxCount = GetInitialPoolCount(data.cost);
 
         _remainingPool[data] = Mathf.Min(maxCount, _remainingPool[data] + amount);
 
         Debug.Log($"[ShopPool] {data.pokemonName} 풀 복귀 +{amount} / 남은 수량: {_remainingPool[data]}");
+    }
+
+    // ──────────────────────────────────────────
+    // 공유 챔피언 풀 (MasterClient 권위)
+    // ──────────────────────────────────────────
+
+    /// <summary>기존 미구매 예약을 반환하고 새 상점 5칸을 풀에서 예약한다. MasterClient만 호출.</summary>
+    public bool TryAuthorityRollSharedShop(
+        int actorNumber, int level, bool forceCostFour, bool onlyCostFour,
+        out int revision, out int[] pokemonIds)
+    {
+        EnsureChampionPoolInitialized();
+        revision = 0;
+        pokemonIds = null;
+        if (!_poolInitialized || actorNumber <= 0) return false;
+
+        if (_sharedReservations.TryGetValue(actorNumber, out var oldReservation))
+            ReturnReservationToPool(oldReservation);
+
+        int nextRevision = oldReservation != null ? oldReservation.revision + 1 : 1;
+        var slots = new int[_shopSize];
+
+        for (int i = 0; i < slots.Length; i++)
+        {
+            PokemonData selected = onlyCostFour
+                ? RollOnePokemonOfCostWeighted(4, level, forceCostFour)
+                : RollOnePokemonWeighted(level, forceCostFour);
+            if (selected == null) continue;
+
+            slots[i] = selected.id;
+            DecreaseChampionPool(selected, 1); // 상점 노출 즉시 예약 차감
+        }
+
+        _sharedReservations[actorNumber] = new SharedShopReservation
+        {
+            revision = nextRevision,
+            pokemonIds = slots
+        };
+        revision = nextRevision;
+        pokemonIds = (int[])slots.Clone();
+        Debug.Log($"[SharedShopPool] actor={actorNumber} 상점 예약 rev={revision}");
+        return true;
+    }
+
+    /// <summary>예약 슬롯을 소유 상태로 전환한다. 풀은 노출 때 이미 차감됐으므로 추가 차감하지 않는다.</summary>
+    public bool TryAuthorityPurchaseSharedShop(int actorNumber, int revision, int slot, out int pokemonId)
+    {
+        pokemonId = 0;
+        if (!_sharedReservations.TryGetValue(actorNumber, out var reservation) ||
+            reservation.revision != revision || reservation.pokemonIds == null ||
+            slot < 0 || slot >= reservation.pokemonIds.Length)
+            return false;
+
+        pokemonId = reservation.pokemonIds[slot];
+        if (pokemonId <= 0) return false;
+        reservation.pokemonIds[slot] = 0;
+        return true;
+    }
+
+    /// <summary>판매 또는 구매 커밋 실패 카피를 공유 풀에 반환한다. MasterClient만 호출.</summary>
+    public void AuthorityReturnSharedShopCopy(int pokemonId, int amount)
+    {
+        if (amount <= 0) return;
+        EnsureChampionPoolInitialized();
+        PokemonData data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetById(pokemonId) : null;
+        if (data == null || !_remainingPool.TryGetValue(data, out int remain)) return;
+
+        _remainingPool[data] = Mathf.Min(GetInitialPoolCount(data.cost), remain + amount);
+        Debug.Log($"[SharedShopPool] {data.pokemonName} 풀 복귀 +{amount} / 남은 {_remainingPool[data]}");
+    }
+
+    public void ApplySharedShopSnapshot(int revision, int[] pokemonIds)
+    {
+        _sharedRollPending = false;
+        if (revision <= 0 || pokemonIds == null)
+        {
+            Debug.LogWarning("[SharedShopPool] 상점 갱신 요청 실패");
+            return;
+        }
+
+        if (_slots == null || _slots.Length != pokemonIds.Length)
+            _slots = new PokemonData[pokemonIds.Length];
+
+        var db = PokemonDatabase.Instance;
+        for (int i = 0; i < pokemonIds.Length; i++)
+            _slots[i] = pokemonIds[i] > 0 && db != null ? db.GetById(pokemonIds[i]) : null;
+
+        _shopRevision = revision;
+        GameEvents.ShopRerolled();
+    }
+
+    /// <summary>구매 승인 후 로컬 골드/벤치 상태를 커밋한다.</summary>
+    public void ResolveSharedShopPurchase(int revision, int slot, int pokemonId, bool success)
+    {
+        _sharedPurchasePending = false;
+        if (!success || revision != _shopRevision || _slots == null ||
+            slot < 0 || slot >= _slots.Length || _slots[slot] == null || _slots[slot].id != pokemonId)
+        {
+            Debug.LogWarning("[SharedShopPool] 구매 승인 실패 또는 오래된 응답");
+            return;
+        }
+
+        PokemonData data = _slots[slot];
+        var board = GameManager.Instance != null ? GameManager.Instance.Board : null;
+        if (board == null || Gold < data.cost || !board.HasBenchSpace())
+        {
+            GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
+            _slots[slot] = null;
+            GameEvents.ShopRerolled();
+            Debug.LogWarning("[SharedShopPool] 구매 커밋 실패 — 예약 카피 풀 반환");
+            return;
+        }
+
+        PokemonUnit unit = UnitFactory.Create(data);
+        if (unit == null || !board.TryPlaceInBench(unit))
+        {
+            if (unit != null) Destroy(unit.gameObject);
+            GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
+            _slots[slot] = null;
+            GameEvents.ShopRerolled();
+            return;
+        }
+
+        AddGold(-data.cost);
+        _slots[slot] = null;
+        GameEvents.ShopRerolled();
+        Debug.Log($"[SharedShopPool] {data.pokemonName} 구매 확정 (-{data.cost}G)");
+    }
+
+    /// <summary>모든 클라이언트가 권위 풀/예약 미러를 유지해 MasterClient 교체에 대비한다.</summary>
+    public void ApplySharedPoolMirror(int[] pokemonIds, int[] remaining, int actorNumber, int revision, int[] slots)
+    {
+        EnsureChampionPoolInitialized();
+        var db = PokemonDatabase.Instance;
+        if (pokemonIds != null && remaining != null && db != null)
+        {
+            int count = Mathf.Min(pokemonIds.Length, remaining.Length);
+            for (int i = 0; i < count; i++)
+            {
+                PokemonData data = db.GetById(pokemonIds[i]);
+                if (data != null && _remainingPool.ContainsKey(data))
+                    _remainingPool[data] = Mathf.Max(0, remaining[i]);
+            }
+        }
+
+        if (actorNumber > 0 && slots != null)
+        {
+            _sharedReservations[actorNumber] = new SharedShopReservation
+            {
+                revision = revision,
+                pokemonIds = (int[])slots.Clone()
+            };
+        }
+    }
+
+    public void GetSharedPoolMirror(out int[] pokemonIds, out int[] remaining)
+    {
+        EnsureChampionPoolInitialized();
+        pokemonIds = new int[_remainingPool.Count];
+        remaining = new int[_remainingPool.Count];
+        int index = 0;
+        foreach (var pair in _remainingPool)
+        {
+            pokemonIds[index] = pair.Key.id;
+            remaining[index] = pair.Value;
+            index++;
+        }
+    }
+
+    public IEnumerable<(int actorNumber, int revision, int[] slots)> GetSharedReservationsMirror()
+    {
+        foreach (var pair in _sharedReservations)
+            yield return (pair.Key, pair.Value.revision, (int[])pair.Value.pokemonIds.Clone());
+    }
+
+    private void EnsureChampionPoolInitialized()
+    {
+        if (_poolInitialized) return;
+        if (_useDatabasePool) SeedPoolFromDatabase();
+        InitializeChampionPool();
+    }
+
+    private void ReturnReservationToPool(SharedShopReservation reservation)
+    {
+        if (reservation?.pokemonIds == null) return;
+        foreach (int id in reservation.pokemonIds)
+            if (id > 0) AuthorityReturnSharedShopCopy(id, 1);
+    }
+
+    private void ReturnLocalShopSlotsToPool()
+    {
+        if (_slots == null) return;
+        foreach (PokemonData data in _slots)
+        {
+            if (data == null || !_remainingPool.TryGetValue(data, out int remain)) continue;
+            _remainingPool[data] = Mathf.Min(GetInitialPoolCount(data.cost), remain + 1);
+        }
+    }
+
+    private PokemonData RollOnePokemonWeighted(int level, bool forceCostFour)
+    {
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            PokemonData selected = PickWeightedByRemaining(RollCostByLevel(level, forceCostFour));
+            if (selected != null) return selected;
+        }
+        return PickWeightedByRemaining(0);
+    }
+
+    private PokemonData RollOnePokemonOfCostWeighted(int cost, int fallbackLevel, bool forceCostFour)
+    {
+        return PickWeightedByRemaining(cost) ?? RollOnePokemonWeighted(fallbackLevel, forceCostFour);
+    }
+
+    /// <summary>같은 코스트에서는 종 균등이 아니라 남은 카피 수 비례로 뽑는다.</summary>
+    private PokemonData PickWeightedByRemaining(int cost)
+    {
+        int totalCopies = 0;
+        foreach (var pair in _remainingPool)
+            if (pair.Key != null && pair.Value > 0 && (cost <= 0 || pair.Key.cost == cost))
+                totalCopies += pair.Value;
+        if (totalCopies <= 0) return null;
+
+        int roll = Random.Range(0, totalCopies);
+        foreach (var pair in _remainingPool)
+        {
+            if (pair.Key == null || pair.Value <= 0 || (cost > 0 && pair.Key.cost != cost)) continue;
+            if (roll < pair.Value) return pair.Key;
+            roll -= pair.Value;
+        }
+        return null;
+    }
+
+    private int RollCostByLevel(int level, bool forceCostFour)
+    {
+        bool previous = _cost4ForceOpen;
+        _cost4ForceOpen = forceCostFour;
+        int result = RollCostByLevel(level);
+        _cost4ForceOpen = previous;
+        return result;
     }
 
     private int GetBaseUnitCount(int starLevel)

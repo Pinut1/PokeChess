@@ -52,6 +52,12 @@ MonoBehaviour:
   - RPC_TradeReceive
   - RPC_GoldReceive
   - RPC_GoldTransferAck
+  - RPC_ApplySharedPoolMirror
+  - RPC_ApplySharedShopSnapshot
+  - RPC_RequestSharedShopPurchase
+  - RPC_RequestSharedShopReturn
+  - RPC_RequestSharedShopRoll
+  - RPC_ResolveSharedShopPurchase
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

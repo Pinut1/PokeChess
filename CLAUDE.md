@@ -53,7 +53,7 @@ Assets/_Project/Scripts/
 - `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
 
 **🟡 타 담당 영역**
-- ✅ 증강 시스템 — 확정 7종 + 3택1 오퍼 흐름 전부 구현(7/16, 영욱이 해인 파트 대행). `AugmentCatalog`(7종 정의)·`AugmentFactory`·`AugmentManager.OfferChoice`·R2 preReward 연결·임시 `AugmentOfferHud`·전적 기록(augments) 포함. 상세/잔여 PLACEHOLDER는 `Assets/_Project/Docs/AugmentSystem.md`. 남은 것: 선택 UI 정식화(태욱), 수치 확정(해인 — 레벨할인폭/4코 등장률/전용리롤 해석/티어)
+- ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=확정 2회 오픈, 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — 나인이볼부스트(8종 소환+버프)·자뭉열매·SK_ 스킬행(전투 신규 메커니즘)
 - ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
 - ✅ `Managers/RewardManager` `AugmentChoice` 지급 — 연결 완료(7/16). preReward(StageData)와 RewardKind 두 경로 모두 지원
 

@@ -67,6 +67,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public bool IsInRoom      => PhotonNetwork.InRoom;
     public bool IsMasterClient => _soloMode || PhotonNetwork.IsMasterClient;
     public int  PlayerCount   => _soloMode ? 1 : PhotonNetwork.CurrentRoom?.PlayerCount ?? 0;
+    public bool UsesSharedShopPool => !_soloMode && PhotonNetwork.InRoom;
 
     // 전적 기록(MatchRecorder) 등이 Photon 타입에 직접 의존하지 않도록 문자열로 노출.
     public string RoomName       => _soloMode ? "solo" : PhotonNetwork.CurrentRoom?.Name ?? "";
@@ -103,6 +104,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     /// <summary>상대방 재접속 유예 타이머</summary>
     private Coroutine _opponentGraceRoutine;
+
+    /// <summary>GracePeriodExpired 중복 발행 방지. 로컬 유예 코루틴(60초)과 Photon PlayerTtl(동일 60초) 만료로 인한
+    /// OnPlayerLeftRoom(IsInactive=false) 재호출이 거의 동시에 도착해 같은 이탈 건을 두 번 발행할 수 있다.</summary>
+    private bool _gracePeriodExpiredFired;
 
     /// <summary>본인 재접속 시도 타이머</summary>
     private Coroutine _selfReconnectRoutine;
@@ -303,6 +308,140 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         var props = new Hashtable { { READY_PROP_KEY, true } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    // ─────────────────────────────────────────
+    // 공유 챔피언 풀 / 상점 예약 (MasterClient 권위)
+    // ─────────────────────────────────────────
+
+    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false)
+    {
+        if (!UsesSharedShopPool) return false;
+        if (IsMasterClient)
+            ProcessSharedShopRoll(PhotonNetwork.LocalPlayer.ActorNumber, level, forceCostFour, onlyCostFour);
+        else
+            photonView.RPC(nameof(RPC_RequestSharedShopRoll), RpcTarget.MasterClient, level, forceCostFour, onlyCostFour);
+        return true;
+    }
+
+    public bool RequestSharedShopPurchase(int revision, int slot)
+    {
+        if (!UsesSharedShopPool) return false;
+        if (IsMasterClient)
+            ProcessSharedShopPurchase(PhotonNetwork.LocalPlayer.ActorNumber, revision, slot);
+        else
+            photonView.RPC(nameof(RPC_RequestSharedShopPurchase), RpcTarget.MasterClient, revision, slot);
+        return true;
+    }
+
+    public void RequestSharedShopReturn(int pokemonId, int amount)
+    {
+        if (!UsesSharedShopPool || pokemonId <= 0 || amount <= 0) return;
+        if (IsMasterClient) ProcessSharedShopReturn(pokemonId, amount);
+        else photonView.RPC(nameof(RPC_RequestSharedShopReturn), RpcTarget.MasterClient, pokemonId, amount);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, PhotonMessageInfo info)
+    {
+        if (!IsMasterClient || info.Sender == null) return;
+        ProcessSharedShopRoll(info.Sender.ActorNumber, level, forceCostFour, onlyCostFour);
+    }
+
+    private void ProcessSharedShopRoll(int actorNumber, int level, bool forceCostFour, bool onlyCostFour)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (shop == null || !shop.TryAuthorityRollSharedShop(
+                actorNumber, level, forceCostFour, onlyCostFour, out int revision, out int[] slots))
+        {
+            SendSharedShopSnapshot(actorNumber, 0, System.Array.Empty<int>());
+            return;
+        }
+
+        BroadcastSharedPoolMirror(actorNumber, revision, slots);
+        SendSharedShopSnapshot(actorNumber, revision, slots);
+    }
+
+    private void SendSharedShopSnapshot(int actorNumber, int revision, int[] slots)
+    {
+        Player target = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+        if (target != null)
+            photonView.RPC(nameof(RPC_ApplySharedShopSnapshot), target, revision, slots ?? System.Array.Empty<int>());
+    }
+
+    [PunRPC]
+    private void RPC_ApplySharedShopSnapshot(int revision, int[] slots)
+    {
+        GameManager.Instance?.Shop?.ApplySharedShopSnapshot(revision, slots);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopPurchase(int revision, int slot, PhotonMessageInfo info)
+    {
+        if (!IsMasterClient || info.Sender == null) return;
+        ProcessSharedShopPurchase(info.Sender.ActorNumber, revision, slot);
+    }
+
+    private void ProcessSharedShopPurchase(int actorNumber, int revision, int slot)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        int pokemonId = 0;
+        bool success = shop != null && shop.TryAuthorityPurchaseSharedShop(
+            actorNumber, revision, slot, out pokemonId);
+
+        Player target = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+        if (target != null)
+            photonView.RPC(nameof(RPC_ResolveSharedShopPurchase), target,
+                revision, slot, success ? pokemonId : 0, success);
+
+        if (success && shop != null)
+        {
+            foreach (var state in shop.GetSharedReservationsMirror())
+            {
+                if (state.actorNumber != actorNumber) continue;
+                BroadcastSharedPoolMirror(actorNumber, state.revision, state.slots);
+                break;
+            }
+        }
+    }
+
+    [PunRPC]
+    private void RPC_ResolveSharedShopPurchase(int revision, int slot, int pokemonId, bool success)
+    {
+        GameManager.Instance?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopReturn(int pokemonId, int amount)
+    {
+        if (IsMasterClient) ProcessSharedShopReturn(pokemonId, amount);
+    }
+
+    private void ProcessSharedShopReturn(int pokemonId, int amount)
+    {
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (shop == null) return;
+        shop.AuthorityReturnSharedShopCopy(pokemonId, amount);
+        BroadcastSharedPoolMirror(-1, 0, System.Array.Empty<int>());
+    }
+
+    private void BroadcastSharedPoolMirror(int actorNumber, int revision, int[] slots)
+    {
+        if (!IsMasterClient) return;
+        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        if (shop == null) return;
+
+        shop.GetSharedPoolMirror(out int[] pokemonIds, out int[] remaining);
+        photonView.RPC(nameof(RPC_ApplySharedPoolMirror), RpcTarget.All,
+            pokemonIds, remaining, actorNumber, revision, slots ?? System.Array.Empty<int>());
+    }
+
+    [PunRPC]
+    private void RPC_ApplySharedPoolMirror(
+        int[] pokemonIds, int[] remaining, int actorNumber, int revision, int[] slots)
+    {
+        GameManager.Instance?.Shop?.ApplySharedPoolMirror(
+            pokemonIds, remaining, actorNumber, revision, slots);
     }
 
     /// <summary>
@@ -723,6 +862,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] {newPlayer.NickName} 입장 | 인원: {PlayerCount}/{MAX_PLAYERS}");
 
+        _gracePeriodExpiredFired = false;
+
         if (_opponentGraceRoutine != null)
         {
             StopCoroutine(_opponentGraceRoutine);
@@ -741,8 +882,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!otherPlayer.IsInactive)
         {
-            // 자진 퇴장(룸 영구 이탈) — 유예 없이 바로 처리
-            GameEvents.GracePeriodExpired(false);
+            // 자진 퇴장(룸 영구 이탈) 또는 PlayerTtl 만료로 인한 서버측 제거 — 유예 없이 바로 처리.
+            // 후자는 로컬 유예 코루틴과 같은 이탈 건이므로 FireGracePeriodExpired가 중복 발행을 막는다.
+            if (_opponentGraceRoutine != null)
+            {
+                StopCoroutine(_opponentGraceRoutine);
+                _opponentGraceRoutine = null;
+            }
+            FireGracePeriodExpired(false);
             return;
         }
 
@@ -761,6 +908,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
         Debug.LogWarning($"[Network] 상대 재접속 유예시간 종료 (둘 다 끊김: {bothDisconnected})");
+        FireGracePeriodExpired(bothDisconnected);
+    }
+
+    /// <summary>같은 이탈 건에 대해 GracePeriodExpired를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
+    private void FireGracePeriodExpired(bool bothDisconnected)
+    {
+        if (_gracePeriodExpiredFired) return;
+        _gracePeriodExpiredFired = true;
         GameEvents.GracePeriodExpired(bothDisconnected);
     }
 
@@ -770,6 +925,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Debug.Log("[Network] 2인 모두 입장 — 게임 시작");
 
         if (!IsMasterClient) return;
+
+        // 재접속 시 OnJoinedRoom/OnPlayerEnteredRoom이 다시 호출될 수 있다.
+        // 이미 생성된 매치라면 씬을 다시 로드하지 않아 공유 상점 풀과 예약을 보존한다.
+        if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(MATCH_GUID_ROOM_KEY))
+        {
+            Debug.Log("[Network] 기존 매치 재입장 — 게임 씬 재로드 생략");
+            return;
+        }
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
 
@@ -934,6 +1097,7 @@ public class NetworkManager : MonoBehaviour
     public bool IsInRoom       => false;
     public bool IsMasterClient => true;   // 오프라인에서는 항상 호스트 취급
     public int  PlayerCount    => 1;
+    public bool UsesSharedShopPool => false;
 
     // 실구현과 동일한 표면(전적 기록 등에서 사용).
     public string RoomName        => "offline";
@@ -979,6 +1143,9 @@ public class NetworkManager : MonoBehaviour
     // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
     public void BroadcastBoardSnapshot(int[] _) { }
     public void SyncLocalGold(int _)            { }
+    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
+    public bool RequestSharedShopPurchase(int revision, int slot) => false;
+    public void RequestSharedShopReturn(int pokemonId, int amount) { }
 
     /// <summary>오프라인(1인)은 씬 로드 즉시 라운드 1 시작.</summary>
     public void NotifySceneReady()              => BroadcastRoundStart(1);

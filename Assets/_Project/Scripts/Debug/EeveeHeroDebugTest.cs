@@ -132,7 +132,7 @@ public class EeveeHeroDebugTest : MonoBehaviour
             seen++;
             if (unit.HasGrantedSkill) { already++; continue; }
             unit.ApplyParichisuHeroAugment(PokemonRole.Tanker,
-                PachirisuHeroAugment.CreateTauntSkill(), PachirisuHeroAugment.TAUNT_MANA_COST);
+                HeroPachirisuAugment.CreateTauntSkill(), HeroPachirisuAugment.TAUNT_MANA_COST);
             applied++;
         }
         string msg = $"도발 증강 — 파치리스 {seen}마리 발견, 신규 적용 {applied}, 기적용 {already}";

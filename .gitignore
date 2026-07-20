@@ -84,3 +84,8 @@ Thumbs.db
 /[Aa]ssets/_Project/[Tt]emp.meta
 /[Aa]ssets/UserChoices.choices.meta
 /bridge.md
+
+# Local AI/Obsidian integration (contains machine-local settings and API credentials)
+/.obsidian/
+/.mcp.json
+/.codex/config.toml

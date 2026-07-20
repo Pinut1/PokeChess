@@ -2,63 +2,75 @@
 
 ## 개요
 증강 라운드에 3개의 증강 중 1개를 선택해 영구 효과를 얻는 시스템.
-**확정 7종 구현 완료(2026-07-16)** — 목록 출처: 덱기획 v1 (GAP_2026-07-01_slice-1-5.md §2.B).
+**확정 6종 — Augment Table v2 (2026-07-16 해인님 회신) 반영.** 등급은 전체 SUPERBALL(=Gold) 단일.
 선택은 로컬 전용(2인 각자 경제와 동일 규칙) — 파트너 증강 표시/동기화는 추후.
 
 ---
 
 ## 게임 내 흐름
 ```
-증강 라운드 진입 (stage_data의 preReward=AugmentChoice, 현재 R2)
+증강 라운드 진입 (stage_data의 preReward=AugmentChoice, 현재 1-2)
   → RewardManager가 AugmentManager.OfferChoice() 호출
-    → 풀(7종 − 보유분)에서 3개 무작위 추첨 → GameEvents.AugmentOfferReady
+    → 풀(6종 − 보유분)에서 3개 무작위 추첨 → GameEvents.AugmentOfferReady
       → 선택 UI 표시 (임시: AugmentOfferHud — AugmentManager가 자동 부착)
-        → 플레이어 선택 → AugmentManager.SelectAugment()
+        → 선택 / 카드 내려두기(블로킹 해제) / 1분 초과·전원 Ready 시 랜덤 자동 선택
           → AugmentFactory 생성 + Apply() + GameEvents.AugmentSelected (전적 기록 등)
 ```
 
+### 블로킹 UX (기획 확정 2026-07-16, 롤체 기준)
+- 선택 창이 떠 있는 동안 조작 블로킹 — `AugmentManager.IsChoiceBlocking`
+  - 임시 HUD는 화면 전체 클릭을 모달로 흡수(다른 OnGUI 차단)
+  - ⚠️ **3D 배치 입력(레이캐스트)은 IMGUI로 못 막음** — 입력 처리 측이 `IsChoiceBlocking` 참조 필요(후속 배선)
+- "▼ 카드 내려두기" 버튼으로 블로킹 해제(하단 복귀 버튼 표시), 타이머는 계속 진행
+- **1분 초과** 또는 **전원 Ready(전투 진입)** 시 미선택이면 랜덤 자동 선택
+  - 정확한 기획은 "로컬 Ready 클릭 시" — Ready 로컬 신호가 이벤트화되면 그 시점으로 개선
+
 ---
 
-## 확정 증강 7종
-| AugmentId | 이름 | 등급* | 효과 | 연결 seam |
-|------|------|------|------|------|
-| `GoldInterest` | 이자 | Silver | 이자율 +1(10G당) + 즉시 50G | `Shop.AddInterestPerTenGold` / `AddGold` |
-| `LevelDiscount` | 레벨 할인 | Silver | XP 구매 비용 -2G (PLACEHOLDER) | `Shop.AddBuyXpCostDiscount` |
-| `RerollRefund` | 리롤 환급 | Silver | 리롤 소모 시 45% 환급 | `GameEvents.OnRerollSpent` → `Shop.AddReroll` |
-| `PachirisuHero` | 영웅증강: 파치리스 | Prismatic | 탱커 전환 + 날따름 부여 + 즉시지급 1 + 리롤 3 | `PokemonUnit.ApplyParichisuHeroAugment` |
-| `EeveeHero` | 영웅증강: 이브이 | Prismatic | 진화잠금 + ×1.4 + 3성 봇소환 + 즉시지급 1 + 리롤 3 | `PokemonUnit.ApplyEeveeHeroAugment` |
-| `FourCostShopOpen` | 4코 상점 오픈 | Gold | 즉시 4코 5마리 + 4코 상시 등장(15%, PLACEHOLDER) | `Shop.ForceOpenCostFour` |
-| `Quarry` | 채석가 | Silver | 매 라운드 진화의 돌 1개(무작위) | `Item.AddStone` |
+## 확정 증강 6종 (Augment Table v2)
+| AugmentId(v2) | 이름 | 발동 | 효과 | 연결 seam |
+|---|---|---|---|---|
+| `ECONOMY_GOLD` | 골드를 획득했다! | 즉시 | +50G, 이자율 1→2(10G당) | `Shop.AddInterestPerTenGold`/`AddGold` |
+| `ECONOMY_SHOP` | 구독서비스 | 즉시 + 1~3R 중 1회 (총 2회 확정) | 서로 다른 4코 5마리 상점 오픈 + 회당 4G | `Shop.OpenCostFourShopOnce` |
+| `HERO_PACHIRISU` | 기술머신:날따름 | 즉시 | 파치리스 지급 + 탱커 전환 + 날따름 + ×1.4 | `PokemonUnit.ApplyParichisuHeroAugment` |
+| `HERO_EEVEE` | 기술머신:나인이볼부스트 | 즉시 | 이브이 지급 + 진화잠금 + 마법사 전환 + ×1.4 + 3성 봇소환 | `PokemonUnit.ApplyEeveeHeroAugment` |
+| `REROLL_TICKET` | 하이퍼 티켓 | 즉시(+상시) | 무료 리롤 +5, 리롤 시 45% 환급 | `Shop.AddReroll` / `OnRerollSpent` |
+| `GAMBLE_STONE` | 진화 스페셜리스트 | R2~5 매 라운드 | 돌 1개/라운드(최대 4) + 최초 재조합기+2G | `Item.AddStone`/`AddReforger` |
 
-*등급 배정은 기획 미명시 PLACEHOLDER.
+### v2 반영으로 확정/정리된 것 (2026-07-16)
+- ~~레벨 할인~~ **삭제** — v2 목록에 없음 (`Shop.AddBuyXpCostDiscount`도 제거)
+- 구독서비스: 구 "15% 지속 확률 등장" → **확정 발동 2회**로 정정 (확률 주입 로직 제거)
+- 영웅증강 "전용리롤 3": 전용 상점 아님 — **일반 무료 리롤 3개가 맞는 구현** (HeroAugment 유지)
+- 영웅증강 둘 다 ×1.4 (파치리스에도 배수 적용), 이브이 역할 → **마법사**
+- 채석가(→진화 스페셜리스트): 돌 무작위·매 라운드 지급 맞는 구현 + 최초 재조합기+2G 추가
+- 날따름 마나 30: 임시 유지 (엑셀 밸런스 조정 후 확정값 재전달 예정)
+- 역할군 변경 시 스탯: **역할 태그만 변경(타겟 우선순위), 스탯은 종 원본 ×1.4 — 별도 스탯 테이블 없음** (개발 회신)
 
-### 남은 PLACEHOLDER / 기획 확인 필요
-- [ ] 레벨 할인폭 (현재 -2G)
-- [ ] 4코 강제 오픈 등장률 (현재 15%)
-- [ ] 영웅증강 "전용리롤 3" 해석 — 현재 일반 무료 리롤 3개로 구현. 대상 종만 나오는 전용 상점이면 교체 필요
-- [ ] 채석가 돌 종류 (현재 EvolutionStoneDatabase 무작위)
-- [ ] 날따름 마나비용 (현재 30 — `PachirisuHeroAugment.TAUNT_MANA_COST`)
-- [ ] 증강 등급(Tier) 공식 배정
-- [ ] 2인 협동 시 파트너 증강 표시/동기화 여부
+### 별도 티켓 (전투 신규 메커니즘 — 미구현)
+- [ ] 이브이 v2 "나인이볼부스트": 진화체 8종 소환 + 종별 버프 전달(현재 봇 4마리), `SK_EEVEE_HERO` 스킬화,
+      진화의 돌 면역, 돌연변이 시너지 → 고유 시너지 전환, "가장 강한 이브이" 대상 선정
+- [ ] 파치리스 v2: 투사체 끌어당김, 자뭉열매(전투당 1회, HP 45%↓ 언타겟 + 매초 maxHP 15% 회복 후 복귀), `SK_PACHIRISU_HERO`
+- [ ] skill_table에 `SK_PACHIRISU_HERO`/`SK_EEVEE_HERO` 행 추가(시트 반영)
+- [ ] 3D 배치 입력의 `IsChoiceBlocking` 참조 배선
 
 ---
 
 ## 코드 구조
 | 파일 | 역할 |
 |------|------|
-| `Data/AugmentData.cs` | AugmentId enum(7종) + 표시용 데이터 (ScriptableObject) |
+| `Data/AugmentData.cs` | AugmentId enum(6종, v2 id와 1:1) + 표시용 데이터 (ScriptableObject) |
 | `Augments/Augment.cs` | 추상 베이스 — `Apply()` + 라이프사이클 훅 |
-| `Augments/AugmentCatalog.cs` | 7종 표시 정보 정의(코드 생성) — 시트 확정 시 JSON 임포터로 전환 |
+| `Augments/AugmentCatalog.cs` | 6종 표시 정보 정의(코드 생성) — 시트 확정 시 JSON 임포터로 전환 |
 | `Augments/AugmentFactory.cs` | AugmentId → 구체 클래스 생성 |
-| `Augments/Implementations/HeroAugment.cs` | 영웅증강 공통 골격(즉시지급/리롤/태그) |
-| `Managers/AugmentManager.cs` | 오퍼 추첨, 활성 증강 관리, GameEvents 브릿지 |
-| `UI/AugmentOfferHud.cs` | 임시 3택1 OnGUI — 정식 UI(태욱, UIManager) 이관 대상 |
+| `Augments/Implementations/HeroAugment.cs` | 영웅증강 공통 골격(즉시지급/리롤 3/태그) |
+| `Managers/AugmentManager.cs` | 오퍼 추첨, 블로킹/타임아웃/자동선택, 활성 증강 관리, GameEvents 브릿지 |
+| `UI/AugmentOfferHud.cs` | 임시 3택1 OnGUI(모달+내려두기) — 정식 UI(태욱, UIManager) 이관 대상 |
 
 ### 새 증강 추가 방법
-1. `AugmentId` enum에 항목 추가
+1. `AugmentId` enum에 항목 추가 (v2 augmentId와 이름 맞춤)
 2. `Implementations/` 폴더에 클래스 작성, 필요한 훅만 오버라이드
 3. `AugmentFactory`에 case 한 줄 추가
-4. `AugmentCatalog`에 표시 정보(이름/설명/티어) 추가
+4. `AugmentCatalog`에 표시 정보(이름/설명) 추가
 
 ### 라이프사이클 훅 (필요한 것만 오버라이드)
 ```csharp
@@ -69,19 +81,19 @@ public virtual void OnBattleEnd(bool isWin)      // 전투 종료
 public virtual void OnUnitPlaced(PokemonUnit u)  // 유닛 보드 배치
 public virtual void OnUnitBenched(PokemonUnit u) // 유닛 벤치 배치 (구매/보상 획득 포함)
 public virtual void OnUnitSold(PokemonUnit u)    // 유닛 판매
-public virtual void OnRerollSpent()              // 수동 리롤 소모 (리롤 환급용)
+public virtual void OnRerollSpent()              // 수동 리롤 소모 (환급용)
 ```
 
 ---
 
 ## 데이터 관리
-현재는 **AugmentCatalog(코드)** 가 7종 정의부 — 기획 시트가 없어 JSON 원본이 성립하지 않음.
-증강 시트가 생기면 기존 파이프라인(구글시트 → `augment_data.json` → `Import Augment JSON` → 중앙 DB SO)으로 전환하고
-AugmentCatalog를 제거한다. `augmentId` 값은 반드시 `AugmentId` enum + `AugmentFactory` case와 일치해야 함.
+현재는 **AugmentCatalog(코드)** 가 6종 정의부 — 원본은 `Augment Table v2` md 문서(해인님).
+시트/JSON 파이프라인이 생기면 v2 컬럼(`deliveryType`/`triggerTiming` 포함) 기준으로 임포터 전환하고
+AugmentCatalog를 제거한다. `augmentNameEn`이 v2 `augmentId` 문자열과 1:1 (전적 기록에도 이 값 사용).
 
 ---
 
 ## 담당
-- **구조 / 로직**: 김영욱 (황해인 파트 대행, 2026-07-16 구현)
-- **선택 UI 정식화**: 김태욱 (UI) — `AugmentOfferHud` 로직을 UIManager로 이관
-- **증강 목록/수치 기획**: 황해인 (기획)
+- **구조 / 로직**: 김영욱 (황해인 파트 대행, 2026-07-16 구현 + v2 반영)
+- **선택 UI 정식화**: 김태욱 (UI) — `AugmentOfferHud` 로직을 UIManager로 이관 (+배치 입력 블로킹 배선)
+- **증강 목록/수치 기획**: 황해인 (기획) — 원본: Augment Table v2
