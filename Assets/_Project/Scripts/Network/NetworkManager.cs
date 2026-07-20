@@ -45,6 +45,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private const string BATTLE_RESULT_PROP_KEY = "BattleResult";
     private const int    RESULT_NOT_REPORTED = -1;
 
+    /// <summary>현재 진행 라운드를 Room CustomProperties에 저장할 때 쓰는 키.
+    /// RPC_OnRoundStart는 비접속자에게 유실되므로, 재접속 클라이언트는 이 속성으로 라운드를 복구한다.</summary>
+    private const string ROUND_PROP_KEY = "Round";
+
+    /// <summary>내가 마지막으로 수신/적용한 라운드. 재접속 시 Room 속성의 현재 라운드와 비교해 유실분을 복구.</summary>
+    private int _lastKnownRound;
+
+    /// <summary>내 보드 스냅샷 송출 revision(단조 증가). 수신 측은 과거 revision을 무시해 순서 역전을 막는다.</summary>
+    private int _localBoardRevision;
+
+    /// <summary>상대 보드 스냅샷의 마지막 적용 revision. 새 판(라운드 1) 시작 시 리셋.</summary>
+    private int _lastOpponentBoardRevision = -1;
+
     /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
     private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
 
@@ -283,6 +296,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         if (!IsMasterClient) return;
+        // 재접속 클라이언트의 라운드 복구용으로 Room 속성에도 기록(RPC는 비접속자에게 유실됨).
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { ROUND_PROP_KEY, round } });
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
     }
 
@@ -666,7 +681,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         if (_soloMode) return; // 파트너 없음 — 송출 불필요
         if (!PhotonNetwork.InRoom) return;
-        photonView.RPC(nameof(RPC_OnBoardSnapshot), RpcTarget.Others, data);
+        photonView.RPC(nameof(RPC_OnBoardSnapshot), RpcTarget.Others, ++_localBoardRevision, data);
     }
 
     /// <summary>
@@ -752,10 +767,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // RPC 수신
     // ─────────────────────────────────────────
 
-    /// <summary>상대 보드 스냅샷 수신 → 미러 렌더용 이벤트 발행.</summary>
+    /// <summary>상대 보드 스냅샷 수신 → 미러 렌더용 이벤트 발행.
+    /// 재접속 직후 재송출과 일반 송출이 교차 도착할 수 있어, 과거 revision은 버려 최신 미러를 보존한다.</summary>
     [PunRPC]
-    private void RPC_OnBoardSnapshot(int[] data)
+    private void RPC_OnBoardSnapshot(int revision, int[] data)
     {
+        if (revision <= _lastOpponentBoardRevision)
+        {
+            Debug.Log($"[Network] 과거 보드 스냅샷 무시 (rev {revision} ≤ {_lastOpponentBoardRevision})");
+            return;
+        }
+        _lastOpponentBoardRevision = revision;
         GameEvents.OpponentBoardChanged(BoardSnapshot.Decode(data));
     }
 
@@ -781,6 +803,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
+        _lastKnownRound = round;      // 재접속 라운드 복구 기준점
+
+        if (round == 1)
+        {
+            // 새 판 — 보드 스냅샷 revision 리셋(이전 판의 revision과 비교되지 않도록)
+            _localBoardRevision = 0;
+            _lastOpponentBoardRevision = -1;
+        }
 
         GameEvents.RoundChanged(round);
     }
@@ -884,6 +914,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Debug.Log("[Network] 상대 재접속 성공 — 유예 타이머 취소");
             GameEvents.OpponentReconnected();
         }
+
+        // 진행 중 매치에 파트너가 재입장 — 파트너가 자리를 비운 사이 보낸 내 스냅샷 RPC는
+        // 유실됐으므로 현재 보드를 재송출해 파트너 쪽 미러를 복구시킨다.
+        if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(MATCH_GUID_ROOM_KEY))
+            GameEvents.BoardResyncRequested();
 
         if (PlayerCount == MAX_PLAYERS)
             OnRoomFull();
@@ -1093,6 +1128,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             {
                 Debug.Log("[Network] 재접속 성공");
                 _selfReconnectRoutine = null;
+                ResyncAfterReconnect();
                 yield break;
             }
 
@@ -1103,6 +1139,45 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Debug.LogWarning("[Network] 재접속 실패 — 세션 종료(패배 처리)");
         _selfReconnectRoutine = null;
         GameEvents.SessionEnded(SessionEndReason.ReconnectFailed);
+    }
+
+    /// <summary>
+    /// 본인 재접속 성공 직후 상태 복구.
+    /// - 내 보드 스냅샷 재송출: 끊긴 동안의 내 보드 변경은 송출이 막혀 파트너 미러가 낡아 있다.
+    /// - 파트너 골드/증강/팀 HP 재발행: 속성 자체는 최신이지만 변경 "이벤트"를 못 받아 UI가 낡아 있다.
+    /// - 라운드 복구: 끊긴 동안 라운드가 진행됐으면 Room 속성 기준으로 현재 라운드에 쇼핑부터 재진입.
+    /// (상대 보드 미러 복구는 상대 클라이언트가 OnPlayerEnteredRoom에서 재송출해 처리된다.)
+    /// </summary>
+    private void ResyncAfterReconnect()
+    {
+        GameEvents.BoardResyncRequested();
+
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player == PhotonNetwork.LocalPlayer) continue;
+
+            if (player.CustomProperties.TryGetValue(GOLD_PROP_KEY, out object gold))
+                GameEvents.PartnerGoldChanged((int)gold);
+
+            if (player.CustomProperties.TryGetValue(AUGMENTS_PROP_KEY, out object augments) &&
+                augments is string[] augmentNames)
+                GameEvents.PartnerAugmentsChanged(augmentNames);
+        }
+
+        int teamHp = TeamHealth;
+        if (teamHp >= 0) GameEvents.HealthChanged(teamHp);
+
+        // 끊긴 동안 라운드가 진행됐으면 현재 라운드로 재진입.
+        // RPC_OnRoundStart를 로컬 직접 호출해 일반 라운드 시작과 같은 리셋 절차(준비/전투결과 속성 초기화)를 탄다.
+        if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundObj))
+        {
+            int currentRound = (int)roundObj;
+            if (currentRound > _lastKnownRound)
+            {
+                Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+                RPC_OnRoundStart(currentRound);
+            }
+        }
     }
 }
 

@@ -105,6 +105,12 @@ public static class GameEvents
     /// </summary>
     public static event Action<BoardSnapshot> OnOpponentBoardChanged;
 
+    /// <summary>
+    /// 내 보드 스냅샷 재송출 요청. 재접속/파트너 재입장 시 유실된 미러 복구용.
+    /// NetworkManager가 발행 → BoardSyncBroadcaster가 다음 LateUpdate에 송출.
+    /// </summary>
+    public static event Action OnBoardResyncRequested;
+
     /// <summary>유닛 보드에 배치됨</summary>
     public static event Action<PokemonUnit> OnUnitPlaced;
 
@@ -243,6 +249,7 @@ public static class GameEvents
     public static void ItemCouponChanged(int amount) => OnItemCouponChanged?.Invoke(amount);
     public static void InventoryChanged() => OnInventoryChanged?.Invoke();
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
+    public static void BoardResyncRequested() => OnBoardResyncRequested?.Invoke();
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
