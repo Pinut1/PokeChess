@@ -1,6 +1,8 @@
 # PokeChess 다음 작업 (2026-07-20 갱신)
 
-> **7/20 인수인계**: 김영욱 조기퇴소. 최종 인수인계 문서 → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
+> **7/20 인수인계**: 김영욱 조기수료(7/28로 변경, 마지막 작업 주 7/21~27). 최종 인수인계 문서 → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
+>
+> **현재 Core 잔여 작업 단일 기준**: [HANDOFF_2026-07-20_core-gaps.md](HANDOFF_2026-07-20_core-gaps.md). 아래 6/16 기반 장기 체크리스트에는 이미 완료된 항목이 섞여 있으므로 구현 여부 판단에 사용하지 말 것.
 
 > 작업 이어가기용 체크리스트. GDD(더블업식 2인 Co-op PvE) + 6/16 동기화 작업 기준.
 > 팀: **김영욱**(Core/Network + 전투/보드), **김태욱**(상점/아이템/UI). 김기욱 이탈로 전투/보드는 김영욱이 흡수.
@@ -13,16 +15,21 @@
 > 상세 조사: [공용 유닛 풀 브랜치 조사](INVESTIGATION_2026-07-17_shared-pool-branches.md)
 
 - [x] ~~채택안 결정~~ → **7/20 `feature/shared-shop-pool`(#42, MasterClient 권위·revision 스냅샷) 채택·병합 완료.** 4코 상점 오픈 v2·채석가 최초 보너스도 master 반영됨
-- [ ] **미채택 PR #40(`feature/shared-unit-pool-sync`, PunRPC 방식) 닫기** — 태욱 확인 후. **절대 병합 금지**(ShopManager/NetworkManager 대규모 충돌)
+- [x] **미채택 PR #40(`feature/shared-unit-pool-sync`, PunRPC 방식) 닫음** — #42 채택안과 중복되어 미병합 종료
 - [ ] 채택안(master) 기준 공용 풀 **2클라 회귀 테스트**
 - [ ] `Docs/DEVLOG_2026-07-16.md`의 공용 풀 구현 작성자·PR 설명을 실제 커밋/역할에 맞게 정정
 
 ### 기능 프리즈 전 후속
 
 - [x] PR #42~#45 순차 병합 — **7/20 완료** (공용 풀 + 파트너 증강 동기화 + 자뭉열매 + 전적 서버 조회)
-- [ ] PR #46(견본덱 UI, 태욱) 리뷰·병합
+- [x] PR #46(견본덱 UI, 태욱) 리뷰·병합 — **7/20 완료**
 - [ ] 통신교환·골드 전송 잔여 2인 실테스트
 - [ ] 나인이볼부스트 8단계 순차 소환, 파치리스 적 전체 2초 어그로 구현
+- [ ] 재접속/후입장 보드 재동기화
+- [ ] 파트너 보드 speciesId→종/모델 해석
+- [ ] 통신기 유닛·골드 전송 정식 UI 연결(태욱 협의)
+- [ ] 보스 전용 기믹 1종 세로 슬라이스(기획 스펙 필요)
+- [ ] `SK_EEVEE_HERO`/`SK_PACHIRISU_HERO` 정식 데이터 행과 신규 메커니즘
 - [ ] AS_BUFF·MANA_REGEN 최신 공식과 원본 VFX Table 반영
 - [x] 인수인계 문서 정리 — **7/20 완료** → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
 
@@ -56,8 +63,8 @@
 - 헥스 보드/벤치 생성, 일반 진화(3합체 별업)
 
 ## ⚠️ 알려진 임시 구현 (교체 필요)
-- [ ] `BattleManager` 적 팀이 **"내 보드 미러"** placeholder → Stage/Trainer 데이터 기반 PVE 적으로 교체
-- [ ] 전투에 **시너지/아이템/증강 버프 미적용** (SynergyTier에 구조화된 효과 데이터 없음 — 설명 문자열뿐)
+- [x] ~~`BattleManager` 적 팀의 "내 보드 미러" placeholder 교체~~ → Stage/Trainer 데이터 기반 PVE 적 생성 완료. 데이터 누락 시에만 미러 폴백
+- [x] ~~전투 시너지/아이템 효과 미적용~~ → 일반 시너지와 아군·적 아이템 효과 연결 완료. 개별 영웅증강 정식 스펙은 별도 티켓
 - [ ] `PokemonData.synergies`가 `List<string>` → 기획 확정 후 `List<SynergyType>` enum으로 교체
 - [ ] 파트너 보드 미러가 캡슐만 표시 (종/모델 미해석) — 필요 시 PokemonData 룩업 추가
 
@@ -66,16 +73,17 @@
 ## 김영욱 — Core/Network + 전투/보드
 
 ### 통신기 (자원 공유 / 통신 진화) — 우선순위 높음
-- [ ] 골드 전송 (CustomProperties 기반, 마스터 검증)
-- [ ] 유닛 전송 (벤치→파트너 벤치) — **원자 트랜잭션 RPC**: 요청→검증→상대 스폰 (복사/소실 방지, GDD 명시)
-- [ ] 통신 진화: 강철톤/핫삼류 전송 즉시 진화, 취소 불가, 양쪽 필드+대기석 동일 포켓몬 모두 진화체로
+- [x] 골드 전송 백엔드 — 선차감→상대 수신→ACK, 실패 시 환급
+- [x] 유닛 전송 백엔드 — 벤치→파트너 벤치 원자 트랜잭션 RPC. 매핑 없는 종은 일반 유닛 그대로 전송
+- [x] 통신 진화 모델A — 매핑된 종은 수신 측에서 즉시 진화체로 생성, 취소 불가
 - [ ] 통신기 UI 트리거 (UI 파트와 연동)
 
 ### 전투 (PVE)
-- [ ] Stage Table / Trainer Entry 데이터 구조 + 임포터 (Wild/Trainer/Boss)
-- [ ] `BattleManager.SetupUnits()` 적 생성을 데이터 기반으로 교체
-- [ ] 마나·스킬 전투 (PokemonSkillData: damage/manaCost/targetType/area/line)
-- [ ] 시너지 전투 버프 적용 (SynergyTier 효과 데이터 구조화 후)
+- [x] Stage Table / Trainer Entry 데이터 구조 + 임포터 (Wild/Trainer/Boss)
+- [x] `BattleManager` 적 생성을 Stage 데이터 기반으로 교체
+- [x] 마나·스킬 전투 (PokemonSkillData: damage/manaCost/targetType/area/line)
+- [x] 일반 시너지 전투 버프 적용
+- [ ] 보스 전용 패턴/페이즈 기믹
 - [ ] 라운드 보상 (Reward Table) 적용
 
 ### 네트워크 안정화
