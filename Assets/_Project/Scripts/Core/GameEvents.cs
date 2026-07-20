@@ -214,6 +214,15 @@ public static class GameEvents
     /// </summary>
     public static event Action<MatchRecord> OnMatchRecorded;
 
+    /// <summary>서버 전적 조회 요청(전적창 UI → SupabaseMatchUploader). 인자 = 최대 건수.</summary>
+    public static event Action<int> OnServerMatchesRequested;
+
+    /// <summary>
+    /// 서버 전적 조회 결과(SupabaseMatchUploader → 전적창 UI).
+    /// records = 최신순 목록(실패 시 null), error = 실패 사유(성공 시 null/빈 문자열).
+    /// </summary>
+    public static event Action<IReadOnlyList<MatchRecord>, string> OnServerMatchesLoaded;
+
     // ──────────────────────────────────────────
     // Invoke 헬퍼 (외부에서 직접 ?.Invoke 말고 여기 통해서 호출)
     // ──────────────────────────────────────────
@@ -260,4 +269,6 @@ public static class GameEvents
     public static void SessionEnded(SessionEndReason reason) => OnSessionEnded?.Invoke(reason);
     public static void GameCleared()                => OnGameCleared?.Invoke();
     public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
+    public static void RequestServerMatches(int count) => OnServerMatchesRequested?.Invoke(count);
+    public static void ServerMatchesLoaded(IReadOnlyList<MatchRecord> records, string error) => OnServerMatchesLoaded?.Invoke(records, error);
 }

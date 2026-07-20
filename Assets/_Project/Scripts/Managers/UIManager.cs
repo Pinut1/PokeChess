@@ -14,6 +14,9 @@ using UnityEngine;
 ///    - MatchHistoryStore.LoadRecent()를 이용한 과거 전적 조회
 ///    - GameEvents.OnMatchRecorded 구독을 통한 신규 전적 실시간 반영
 ///    - 최근 전적 목록과 선택 전적 상세 표시
+///    - (Phase 3, 영욱 배선 — 태욱님 리뷰 필요) 로컬/서버 출처 탭: 서버 탭은
+///      GameEvents.RequestServerMatches → SupabaseMatchUploader가 조회 →
+///      OnServerMatchesLoaded로 수신해 같은 목록/상세 UI를 재사용
 ///
 /// 구조 원칙:
 /// - 진행 상태는 OnGUI에서 ShopManager를 매번 조회하지 않는다.
@@ -31,6 +34,14 @@ public class UIManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     private readonly List<MatchRecord> _recentMatches = new List<MatchRecord>();
+
+    /// <summary>전적 출처. Local=jsonl, Server=Supabase(이벤트로 SupabaseMatchUploader에 요청).</summary>
+    private enum HistorySource { Local, Server }
+
+    // (Phase 3, 영욱 배선 — 태욱님 리뷰 필요) 서버 전적 탭 상태.
+    // 서버 목록도 _recentMatches에 채워 기존 목록/상세 그리기 코드를 그대로 재사용한다.
+    private HistorySource _historySource = HistorySource.Local;
+    private string _serverStatus = "";   // 서버 탭 빈 목록일 때 표시(불러오는 중/실패 사유)
 
     private bool _showMatchHistory;
     private int _selectedMatchIndex;
@@ -77,6 +88,7 @@ public class UIManager : MonoBehaviour
     private void OnEnable()
     {
         GameEvents.OnMatchRecorded += HandleMatchRecorded;
+        GameEvents.OnServerMatchesLoaded += HandleServerMatchesLoaded;
 
         GameEvents.OnGoldChanged += HandleGoldChanged;
         GameEvents.OnLevelChanged += HandleLevelChanged;
@@ -87,6 +99,7 @@ public class UIManager : MonoBehaviour
     private void OnDisable()
     {
         GameEvents.OnMatchRecorded -= HandleMatchRecorded;
+        GameEvents.OnServerMatchesLoaded -= HandleServerMatchesLoaded;
 
         GameEvents.OnGoldChanged -= HandleGoldChanged;
         GameEvents.OnLevelChanged -= HandleLevelChanged;
@@ -297,7 +310,10 @@ public class UIManager : MonoBehaviour
 
         if (_recentMatches.Count == 0)
         {
-            GUI.Label(new Rect(28f, 95f, 500f, 30f), "저장된 전적이 없습니다.", _labelStyle);
+            string emptyText = _historySource == HistorySource.Server
+                ? (string.IsNullOrEmpty(_serverStatus) ? "서버에 저장된 전적이 없습니다." : _serverStatus)
+                : "저장된 전적이 없습니다.";
+            GUI.Label(new Rect(28f, 120f, 700f, 30f), emptyText, _labelStyle);
             GUI.DragWindow(new Rect(0f, 0f, width, 28f));
             return;
         }
@@ -336,6 +352,31 @@ public class UIManager : MonoBehaviour
 
         if (GUI.Button(new Rect(width - 180f, 84f, 70f, 28f), "새로고침"))
             RefreshMatchHistory();
+
+        // 전적 출처 탭 (Phase 3): 로컬 jsonl ↔ Supabase 서버. 전환 시 즉시 다시 불러온다.
+        DrawSourceToggle(new Rect(24f, 84f, 150f, 28f));
+    }
+
+    /// <summary>로컬/서버 전적 출처 토글 버튼 두 개를 그린다. 현재 선택은 비활성 표시.</summary>
+    private void DrawSourceToggle(Rect rect)
+    {
+        float half = rect.width / 2f;
+
+        GUI.enabled = _historySource != HistorySource.Local;
+        if (GUI.Button(new Rect(rect.x, rect.y, half - 2f, rect.height), "로컬"))
+        {
+            _historySource = HistorySource.Local;
+            RefreshMatchHistory();
+        }
+
+        GUI.enabled = _historySource != HistorySource.Server;
+        if (GUI.Button(new Rect(rect.x + half + 2f, rect.y, half - 2f, rect.height), "서버"))
+        {
+            _historySource = HistorySource.Server;
+            RefreshMatchHistory();
+        }
+
+        GUI.enabled = true;
     }
 
     /// <summary>
@@ -664,6 +705,16 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void RefreshMatchHistory()
     {
+        // 서버 탭이면 이벤트로 요청하고 응답(HandleServerMatchesLoaded)에서 목록을 채운다.
+        if (_historySource == HistorySource.Server)
+        {
+            _recentMatches.Clear();
+            _selectedMatchIndex = 0;
+            _serverStatus = "서버 전적 불러오는 중…";
+            GameEvents.RequestServerMatches(_recentMatchCount);
+            return;
+        }
+
         _recentMatches.Clear();
 
         List<MatchRecord> records = MatchHistoryStore.LoadRecent(_recentMatchCount);
@@ -679,12 +730,38 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 서버 전적 조회 결과 수신. 서버 탭일 때만 목록에 반영한다
+    /// (요청 후 로컬 탭으로 돌아간 경우 로컬 목록을 덮어쓰지 않도록).
+    /// </summary>
+    private void HandleServerMatchesLoaded(IReadOnlyList<MatchRecord> records, string error)
+    {
+        if (_historySource != HistorySource.Server)
+            return;
+
+        _recentMatches.Clear();
+        _selectedMatchIndex = 0;
+
+        if (records == null)
+        {
+            _serverStatus = string.IsNullOrEmpty(error) ? "서버 전적 조회 실패" : error;
+            return;
+        }
+
+        _recentMatches.AddRange(records);
+        _serverStatus = _recentMatches.Count == 0 ? "서버에 저장된 전적이 없습니다." : "";
+    }
+
+    /// <summary>
     /// 새 전적 기록 이벤트를 받아 목록 가장 앞에 즉시 추가한다.
     /// 설정된 최대 표시 개수를 초과한 오래된 전적은 목록 끝에서 제거한다.
     /// </summary>
     private void HandleMatchRecorded(MatchRecord record)
     {
         if (record == null)
+            return;
+
+        // 서버 탭은 조회 시점 스냅샷 — 신규 기록은 로컬 탭에만 즉시 반영(서버는 새로고침으로).
+        if (_historySource != HistorySource.Local)
             return;
 
         _recentMatches.Insert(0, record);

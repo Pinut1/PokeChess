@@ -1,17 +1,20 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
 /// <summary>
-/// 전적 Phase 2 — Supabase 업로드 (스키마: Docs/SCHEMA_2026-07-10_supabase-matches.sql).
+/// 전적 Phase 2+3 — Supabase 업로드/조회 (스키마: Docs/SCHEMA_2026-07-10_supabase-matches.sql).
 ///
 /// 흐름:
 ///  1. Start에서 세션 확보 — 저장된 refresh_token이 있으면 갱신, 없으면 익명 가입.
 ///     (기기당 익명 계정 1개. PlayerPrefs에 refresh_token 보관 → 재실행해도 같은 유저)
 ///  2. GameEvents.OnMatchRecorded 구독 → 로컬 jsonl 기록 직후 REST로 업로드.
 ///  3. 닉네임은 세션 확보 시 profiles에 upsert (현재 NetworkManager.LocalNickname).
+///  4. (Phase 3) GameEvents.OnServerMatchesRequested 구독 → 내 전적을 최신순 조회해
+///     GameEvents.ServerMatchesLoaded로 회신. UI와는 이벤트로만 통신(직접 참조 금지 규칙).
 ///
 /// 설계 결정:
 ///  - SDK 없이 UnityWebRequest만 사용 (의존성/유지보수 최소화, 인수인계 고려).
@@ -33,8 +36,17 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     public bool HasSession => !string.IsNullOrEmpty(_accessToken);
 
-    private void OnEnable()  => GameEvents.OnMatchRecorded += HandleMatchRecorded;
-    private void OnDisable() => GameEvents.OnMatchRecorded -= HandleMatchRecorded;
+    private void OnEnable()
+    {
+        GameEvents.OnMatchRecorded          += HandleMatchRecorded;
+        GameEvents.OnServerMatchesRequested += HandleServerMatchesRequested;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnMatchRecorded          -= HandleMatchRecorded;
+        GameEvents.OnServerMatchesRequested -= HandleServerMatchesRequested;
+    }
 
     private void Start()
     {
@@ -173,6 +185,80 @@ public class SupabaseMatchUploader : MonoBehaviour
         return sb.ToString();
     }
 
+    // ---------------- 조회 (Phase 3) ----------------
+
+    private void HandleServerMatchesRequested(int count)
+    {
+        if (!HasSession)
+        {
+            GameEvents.ServerMatchesLoaded(null, "서버 세션 없음 — 오프라인이거나 인증 실패 (로컬 전적을 확인하세요)");
+            return;
+        }
+        StartCoroutine(FetchRecentMatches(Mathf.Clamp(count, 1, 100)));
+    }
+
+    /// <summary>내 전적을 종료 시각 최신순으로 최대 count건 조회 → ServerMatchesLoaded 발행.</summary>
+    private IEnumerator FetchRecentMatches(int count)
+    {
+        // RLS(user_id = auth.uid())가 서버 방어선이지만, 명시 필터로 의도를 드러낸다.
+        string url = $"{_projectUrl}/rest/v1/matches" +
+                     $"?user_id=eq.{_userId}&order=ended_at.desc.nullslast&limit={count}";
+
+        using var req = UnityWebRequest.Get(url);
+        req.SetRequestHeader("apikey", _anonKey);
+        req.SetRequestHeader("Authorization", "Bearer " + _accessToken);
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogWarning($"[Supabase] 전적 조회 실패 ({req.responseCode}): {req.downloadHandler.text}");
+            GameEvents.ServerMatchesLoaded(null, $"서버 전적 조회 실패 ({req.responseCode})");
+            yield break;
+        }
+
+        List<MatchRecord> records = ParseMatchRows(req.downloadHandler.text);
+        Debug.Log($"[Supabase] 전적 조회 완료: {records.Count}건");
+        GameEvents.ServerMatchesLoaded(records, null);
+    }
+
+    /// <summary>PostgREST 응답(JSON 배열) → MatchRecord 목록. JsonUtility는 최상위 배열을 못 읽어 래퍼로 감싼다.</summary>
+    private static List<MatchRecord> ParseMatchRows(string json)
+    {
+        var result = new List<MatchRecord>();
+        MatchRowArray wrapper;
+        try
+        {
+            wrapper = JsonUtility.FromJson<MatchRowArray>("{\"rows\":" + json + "}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Supabase] 전적 응답 파싱 실패: {e.Message}");
+            return result;
+        }
+        if (wrapper?.rows == null) return result;
+
+        foreach (var row in wrapper.rows)
+        {
+            if (row == null || string.IsNullOrEmpty(row.match_id)) continue;
+            result.Add(new MatchRecord
+            {
+                schemaVersion   = row.schema_version,
+                matchId         = row.match_id,
+                gameVersion     = row.game_version,
+                startedAtUtc    = row.started_at,
+                endedAtUtc      = row.ended_at,
+                durationSeconds = row.duration_seconds,
+                result          = row.result,
+                endReason       = row.end_reason,
+                finalRound      = row.final_round,
+                finalStageId    = row.final_stage_id,
+                self            = row.self_record,
+                partner         = row.partner_record,
+            });
+        }
+        return result;
+    }
+
     // ---------------- 공통 ----------------
 
     private UnityWebRequest BuildJsonPost(string url, string jsonBody, bool authed)
@@ -206,5 +292,27 @@ public class SupabaseMatchUploader : MonoBehaviour
     [Serializable] private class AuthUser
     {
         public string id;
+    }
+
+    /// <summary>matches 테이블 행(snake_case). self/partner jsonb는 업로드 때 JsonUtility로 쓴 그대로라 PlayerRecord로 역직렬화된다.</summary>
+    [Serializable] private class MatchRow
+    {
+        public int schema_version;
+        public string match_id;
+        public string game_version;
+        public string started_at;
+        public string ended_at;
+        public int duration_seconds;
+        public string result;
+        public string end_reason;
+        public int final_round;
+        public string final_stage_id;
+        public PlayerRecord self_record;
+        public PlayerRecord partner_record;
+    }
+
+    [Serializable] private class MatchRowArray
+    {
+        public MatchRow[] rows;
     }
 }
