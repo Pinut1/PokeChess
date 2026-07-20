@@ -60,7 +60,22 @@
 ## 5. 운영 정보 (계정/인프라)
 
 - **Photon PUN2**: App ID는 `Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset`. 대시보드 계정 정보는 별도 전달(문서에 기재하지 않음)
-- **Supabase**(전적 서버): URL/anon key는 `SupabaseMatchUploader` 참조. 계정 정보 별도 전달
+- **Supabase**(전적 서버): URL/anon key는 `SupabaseMatchUploader` 인스펙터 값(anon key는 공개 전제, RLS가 방어선 — service_role 등 비밀키는 저장소에 없음). 계정 정보 별도 전달
+
+### 계정 이관 절차
+
+**Supabase — 조직 초대 방식** (URL/anon key 유지 → 코드·씬 수정 불필요)
+1. supabase.com/dashboard → 해당 Organization → Settings > Team(Members)
+2. 태욱 이메일을 **Owner** 역할로 초대(무료 플랜 가능) → 수락하면 완료. 이후 영욱은 org 탈퇴해도 프로젝트 유지됨
+3. DB 비밀번호는 태욱이 Settings > Database에서 **리셋** 권장(클라이언트는 안 쓰므로 게임에 영향 없음)
+4. Auth 설정의 **Anonymous sign-ins 활성화** 상태 유지할 것 — 꺼지면 전적 업로드가 로컬 기록만 남김
+
+**Photon — 신규 App ID 발급 방식** (앱 계정 간 이전은 셀프서비스 미지원)
+1. 태욱 본인 계정으로 dashboard.photonengine.com 가입 → Create App > **Photon PUN** (무료 20 CCU, 2인 게임 충분)
+2. 새 App ID를 `PhotonServerSettings.asset`의 App Id PUN 칸에 입력 후 커밋 — 방은 App ID별 격리라 전환 즉시 분리됨
+3. 기존 App ID는 방치해도 무방
+
+> 두 방식 모두 **비밀번호 전달이 불필요**한 경로. 부득이 비밀번호를 넘길 경우 저장소/단톡 금지, 대면 전달.
 - **데이터 원본**: 구글 시트(기획 소유). SO는 임포터 산출물이므로 직접 수정 금지
 - **GDD**: 로컬 docx로만 존재 — 사본 공유 필요
 
