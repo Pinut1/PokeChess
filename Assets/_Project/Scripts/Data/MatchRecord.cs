@@ -45,7 +45,7 @@ public class PlayerRecord
 
     public UnitRecord[] board;           // 최종 보드(벤치 제외)
     public string[]     activeSynergies; // "Dark:3" = 시너지영문명:고유종수
-    public string[]     augments;        // 증강 시스템(해인) 연결 전까지 빈 배열
+    public string[]     augments;        // 증강 영문명(선택 순). self=OnAugmentSelected 누적, partner=CustomProperties 미러
 }
 
 [Serializable]
