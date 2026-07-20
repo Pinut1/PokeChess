@@ -28,7 +28,7 @@
 - [ ] 재접속/후입장 보드 재동기화
 - [ ] 파트너 보드 speciesId→종/모델 해석
 - [ ] 통신기 유닛·골드 전송 정식 UI 연결(태욱 협의)
-- [ ] 보스 전용 기믹 1종 세로 슬라이스(기획 스펙 필요)
+- [x] ~~보스 전용 기믹~~ — 스코프 아웃(7/21): 기획에 없음, 스탯 배수가 최종 스펙
 - [ ] `SK_EEVEE_HERO`/`SK_PACHIRISU_HERO` 정식 데이터 행과 신규 메커니즘
 - [ ] AS_BUFF·MANA_REGEN 최신 공식과 원본 VFX Table 반영
 - [x] 인수인계 문서 정리 — **7/20 완료** → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
@@ -83,7 +83,7 @@
 - [x] `BattleManager` 적 생성을 Stage 데이터 기반으로 교체
 - [x] 마나·스킬 전투 (PokemonSkillData: damage/manaCost/targetType/area/line)
 - [x] 일반 시너지 전투 버프 적용
-- [ ] 보스 전용 패턴/페이즈 기믹
+- [x] ~~보스 전용 패턴/페이즈 기믹~~ — 스코프 아웃(7/21, 기획에 없음)
 - [ ] 라운드 보상 (Reward Table) 적용
 
 ### 네트워크 안정화

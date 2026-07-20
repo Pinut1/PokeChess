@@ -111,25 +111,9 @@
 - `Assets/_Project/Scripts/Managers/BattleManager.cs`
 - `Assets/_Project/Docs/AugmentSystem.md`
 
-#### 5. 보스 전용 기믹
+#### 5. ~~보스 전용 기믹~~ — 스코프 아웃 (2026-07-21, 영욱 확인)
 
-현재 상태:
-
-- `StageType.ChampionBattle`과 적별 `statMultiplier`, `hpMultiplier`, `atkMultiplier`는 있다.
-- 런타임은 `stageType`에 따라 분기하지 않으며 일반 적과 같은 스킬/행동 루프를 사용한다.
-
-착수 전 반드시 받을 값:
-
-- 최소 검증 보스 1종의 패턴 목록, 발동 조건, 쿨다운, 대상 규칙
-- 페이즈 전환 HP 구간과 페이즈별 변화
-- 협동 요소가 두 플레이어 전투에 어떻게 걸리는지
-- 소환물 데이터, 전조/VFX, 승패 예외 규칙
-
-권장 구현 방향:
-
-- 보스마다 하드코딩하기보다 Stage/Trainer 데이터가 참조하는 기믹 ID와 런타임 패턴 실행기를 둔다.
-- 기존 `BattleUnit` 효과/스킬 루프를 재사용하고 보스 전용 상태만 별도 컴포넌트 또는 전략 객체에 둔다.
-- 첫 티켓은 보스 1종 세로 슬라이스로 제한한다.
+**기획에 보스 전용 패턴/페이즈 개념이 없다.** 보스(챔피언) 라운드는 스탯 배수(`statMultiplier`/`hpMultiplier`/`atkMultiplier`) + 강한 스킬 구성으로 충분하며, 현재 구현이 그대로 최종 스펙이다. **새 티켓으로 다시 살리지 말 것** — 기획이 이후 보스 패턴을 신설하는 경우에만 재개.
 
 ### P2 — 데이터 원본과 함께 처리
 

@@ -63,7 +63,7 @@ Assets/_Project/Scripts/
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
 - ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`) + **전적창 서버 조회 로컬/서버 탭**(Phase 3, PR #45, 7/20 병합). 전 구간 완료.
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
-- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. 별도 신규 메커니즘인 나인이볼부스트·`SK_` 영웅스킬·보스 전용 기믹은 미구현
+- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. 별도 신규 메커니즘인 나인이볼부스트·`SK_` 영웅스킬은 미구현. 보스 전용 기믹은 **스코프 아웃**(7/21 확인: 기획에 패턴/페이즈 없음 — 스탯 배수가 최종 스펙)
 
 ## 작업 분배 (태욱 — 상점/아이템/UI)
 레벨/XP 시스템(PR #13) 후속:
