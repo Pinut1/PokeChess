@@ -1,4 +1,6 @@
-# PokeChess 다음 작업 (2026-07-17 갱신)
+# PokeChess 다음 작업 (2026-07-20 갱신)
+
+> **7/20 인수인계**: 김영욱 조기퇴소. 최종 인수인계 문서 → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
 
 > 작업 이어가기용 체크리스트. GDD(더블업식 2인 Co-op PvE) + 6/16 동기화 작업 기준.
 > 팀: **김영욱**(Core/Network + 전투/보드), **김태욱**(상점/아이템/UI). 김기욱 이탈로 전투/보드는 김영욱이 흡수.
@@ -10,20 +12,19 @@
 
 > 상세 조사: [공용 유닛 풀 브랜치 조사](INVESTIGATION_2026-07-17_shared-pool-branches.md)
 
-- [ ] `feature/shared-unit-pool-sync`와 `feature/shared-shop-pool`의 담당자·설계 의도를 김태욱/김영욱이 함께 확인
-- [ ] MasterClient 권위·revision 스냅샷 방식과 PunRPC 방식 중 채택안을 결정하고, **두 브랜치를 동시에 병합하지 않기**
-- [ ] 미채택 브랜치는 채택 브랜치로 대체됐음을 명시하고 PR/브랜치 정리
-- [ ] `ShopManager.cs`·`NetworkManager.cs` 충돌 범위를 비교한 뒤 채택 브랜치 기준 2클라 회귀 테스트
+- [x] ~~채택안 결정~~ → **7/20 `feature/shared-shop-pool`(#42, MasterClient 권위·revision 스냅샷) 채택·병합 완료.** 4코 상점 오픈 v2·채석가 최초 보너스도 master 반영됨
+- [ ] **미채택 PR #40(`feature/shared-unit-pool-sync`, PunRPC 방식) 닫기** — 태욱 확인 후. **절대 병합 금지**(ShopManager/NetworkManager 대규모 충돌)
+- [ ] 채택안(master) 기준 공용 풀 **2클라 회귀 테스트**
 - [ ] `Docs/DEVLOG_2026-07-16.md`의 공용 풀 구현 작성자·PR 설명을 실제 커밋/역할에 맞게 정정
-- [ ] 4코 상점 오픈 v2와 채석가 최초 보너스는 `feature/shared-shop-pool`에 구현됐음을 병합 후 master에서 재확인
 
 ### 기능 프리즈 전 후속
 
-- [ ] PR #42~#45 리뷰 반영 및 순차 병합
+- [x] PR #42~#45 순차 병합 — **7/20 완료** (공용 풀 + 파트너 증강 동기화 + 자뭉열매 + 전적 서버 조회)
+- [ ] PR #46(견본덱 UI, 태욱) 리뷰·병합
 - [ ] 통신교환·골드 전송 잔여 2인 실테스트
 - [ ] 나인이볼부스트 8단계 순차 소환, 파치리스 적 전체 2초 어그로 구현
 - [ ] AS_BUFF·MANA_REGEN 최신 공식과 원본 VFX Table 반영
-- [ ] 7/21 기능 프리즈 후 인수인계 문서·미결 수치 목록 정리
+- [x] 인수인계 문서 정리 — **7/20 완료** → [HANDOFF_2026-07-20_final.md](HANDOFF_2026-07-20_final.md)
 
 ---
 
