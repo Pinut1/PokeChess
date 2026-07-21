@@ -134,7 +134,22 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleAllPlayersReady()
     {
-        if (CurrentPhase != GamePhase.Shopping) return;
+        if (CurrentPhase != GamePhase.Shopping)
+            return;
+
+        AugmentManager augment =
+            GameManager.Instance != null
+                ? GameManager.Instance.Augment
+                : null;
+
+        if (augment != null && augment.HasPendingChoice)
+        {
+            Debug.LogWarning(
+                "[Phase] 증강 선택 대기 중 — 전투 시작 보류"
+            );
+            return;
+        }
+
         EnterPhase(GamePhase.Battle);
     }
 
@@ -230,13 +245,36 @@ public class RoundPhaseManager : MonoBehaviour
 
     private IEnumerator ShoppingTimer()
     {
-        // 자동 시작이 꺼져 있으면 제한시간으로 전투를 강제하지 않는다.
-        // 이 경우 두 플레이어가 모두 Ready → OnAllPlayersReady 로만 전투가 시작된다.
+        // 자동 시작이 꺼져 있으면 두 플레이어 Ready로만 전투가 시작된다.
         if (!_autoStartBattleOnTimeout)
             yield break;
 
-        yield return new WaitForSeconds(_shoppingDuration);
-        EnterPhase(GamePhase.Battle);
+        float elapsed = 0f;
+
+        while (elapsed < _shoppingDuration)
+        {
+            // 증강 선택 대기 중에는 쇼핑 타이머를 진행시키지 않는다.
+            AugmentManager augment =
+                GameManager.Instance != null
+                    ? GameManager.Instance.Augment
+                    : null;
+
+            if (augment == null || !augment.HasPendingChoice)
+                elapsed += Time.deltaTime;
+
+            yield return null;
+        }
+
+        // 타이머 종료 직전에 증강 오퍼가 생겼을 가능성까지 방어한다.
+        while (GameManager.Instance != null
+               && GameManager.Instance.Augment != null
+               && GameManager.Instance.Augment.HasPendingChoice)
+        {
+            yield return null;
+        }
+
+        if (CurrentPhase == GamePhase.Shopping)
+            EnterPhase(GamePhase.Battle);
     }
 
     private IEnumerator ResultTimer()
@@ -278,7 +316,22 @@ public class RoundPhaseManager : MonoBehaviour
     /// </summary>
     public void PlayerReady()
     {
-        if (CurrentPhase != GamePhase.Shopping) return;
+        if (CurrentPhase != GamePhase.Shopping)
+            return;
+
+        AugmentManager augment =
+            GameManager.Instance != null
+                ? GameManager.Instance.Augment
+                : null;
+
+        if (augment != null && augment.HasPendingChoice)
+        {
+            Debug.LogWarning(
+                "[Phase] 증강을 먼저 선택해야 준비할 수 있습니다."
+            );
+            return;
+        }
+
         GameManager.Instance.Network.BroadcastPlayerReady();
     }
 

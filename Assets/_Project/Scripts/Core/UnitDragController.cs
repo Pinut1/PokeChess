@@ -30,9 +30,15 @@ public class UnitDragController : MonoBehaviour
     private IDropTarget _hovered;
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
 
+    private AugmentManager _augmentManager;
+
     private void Awake()
     {
-        if (_camera == null) _camera = Camera.main;
+        if (_camera == null)
+            _camera = Camera.main;
+
+        if (GameManager.Instance != null)
+            _augmentManager = GameManager.Instance.GetComponent<AugmentManager>();
     }
 
     private void OnEnable()
@@ -54,6 +60,13 @@ public class UnitDragController : MonoBehaviour
         // 쇼핑 페이즈에서만 드래그 허용
         var phase = GameManager.Instance != null ? GameManager.Instance.Phase : null;
         if (phase != null && phase.CurrentPhase != GamePhase.Shopping)
+        {
+            if (_held != null) CancelDrag();
+            return;
+        }
+
+        // 증강 선택창이 펼쳐진 동안 3D 조작 차단
+        if (_augmentManager != null && _augmentManager.IsChoiceBlocking)
         {
             if (_held != null) CancelDrag();
             return;

@@ -12,7 +12,6 @@ using UnityEngine;
 public class AugmentOfferHud : MonoBehaviour
 {
     private IReadOnlyList<AugmentData> _offer;
-    private GUIStyle _blockerStyle; // 배경 없는 투명 버튼(클릭 흡수용)
 
     private void OnEnable()
     {
@@ -63,43 +62,72 @@ public class AugmentOfferHud : MonoBehaviour
 
     private void DrawModal(AugmentManager augment)
     {
-        // 화면 전체 클릭 흡수(모달). 투명 스타일 버튼이라 시각 요소 없이 이벤트만 소비한다.
-        _blockerStyle ??= new GUIStyle();
-        GUI.Button(new Rect(0, 0, Screen.width, Screen.height), GUIContent.none, _blockerStyle);
+        const float cardWidth = 240f;
+        const float cardHeight = 150f;
+        const float gap = 16f;
 
-        const float cardWidth = 240f, cardHeight = 150f, gap = 16f;
         int count = _offer.Count;
 
         float totalWidth = count * cardWidth + (count - 1) * gap;
-        float panelW = totalWidth + 40f, panelH = cardHeight + 112f;
+        float panelW = totalWidth + 40f;
+        float panelH = cardHeight + 112f;
         float panelX = (Screen.width - panelW) * 0.5f;
         float panelY = (Screen.height - panelH) * 0.5f;
 
-        GUI.Box(new Rect(panelX, panelY, panelW, panelH),
-                $"증강을 선택하세요 (3택1) — 남은 시간 {FormatRemaining(augment)} (초과 시 자동 선택)");
+        Rect panelRect = new Rect(panelX, panelY, panelW, panelH);
+
+        GUI.Box(
+            panelRect,
+            $"증강을 선택하세요 (3택1) — 남은 시간 {FormatRemaining(augment)} (초과 시 자동 선택)"
+        );
 
         for (int i = 0; i < count; i++)
         {
-            var data = _offer[i];
-            if (data == null) continue;
+            AugmentData data = _offer[i];
+            if (data == null)
+                continue;
 
             float x = panelX + 20f + i * (cardWidth + gap);
             float y = panelY + 32f;
 
-            GUI.Box(new Rect(x, y, cardWidth, cardHeight),
-                    $"[{data.tier}] {data.augmentName}\n\n{data.description}");
+            GUI.Box(
+                new Rect(x, y, cardWidth, cardHeight),
+                $"[{data.tier}] {data.augmentName}\n\n{data.description}"
+            );
 
-            if (GUI.Button(new Rect(x, y + cardHeight + 8f, cardWidth, 28f), $"{data.augmentName} 선택"))
+            Rect selectRect =
+                new Rect(x, y + cardHeight + 8f, cardWidth, 28f);
+
+            if (GUI.Button(selectRect, $"{data.augmentName} 선택"))
             {
                 augment.SelectAugment(data);
-                return; // 선택 시 _offer가 비워지므로 이번 프레임 렌더 중단(반복 중 변경 방지)
+                return;
             }
         }
 
-        // 카드 내려두기(스킵/미루기) — 블로킹 해제. 타이머는 계속 흐른다.
-        var minimizeRect = new Rect(panelX + (panelW - 200f) * 0.5f, panelY + panelH - 34f, 200f, 26f);
+        Rect minimizeRect = new Rect(
+            panelX + (panelW - 200f) * 0.5f,
+            panelY + panelH - 34f,
+            200f,
+            26f
+        );
+
         if (GUI.Button(minimizeRect, "▼ 카드 내려두기"))
+        {
             augment.SetOfferMinimized(true);
+            return;
+        }
+
+        // 모달 바깥 클릭만 소비한다.
+        // 전체 화면 투명 버튼을 사용하지 않아 카드 선택 버튼 클릭을 방해하지 않는다.
+        Event currentEvent = Event.current;
+
+        if (currentEvent != null
+            && currentEvent.type == EventType.MouseDown
+            && !panelRect.Contains(currentEvent.mousePosition))
+        {
+            currentEvent.Use();
+        }
     }
 
     private static string FormatRemaining(AugmentManager augment)
