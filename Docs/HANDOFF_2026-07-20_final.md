@@ -76,7 +76,10 @@
 ⚠️ 전투/상점/네트워크 로직에는 **아직 자동 테스트를 붙일 수 없다** — 이유와 해결법은 `CLAUDE.md` 기술 부채의 🔺 항목 참조.
 
 **② 밸런스 시트 대조 하네스 — `Scripts/Debug/BalanceCheckHarness.cs`**
-빈 GameObject에 붙이고 Play → 화면 좌상단 "공식 대조 실행" 버튼.
+
+> ⚠️ **씬에 미포함(의도적)**. 다른 디버그 하네스(`TradeDebugTest` 등)는 `GameSceneTest`의 `GameManager`에 붙어 있지만, 이건 **일부러 안 붙여뒀다** — 씬 파일은 머지 충돌 시 복구가 어려워 공유 씬 변경을 최소화하려는 것.
+>
+> **쓰는 법**: `GameSceneTest` 열고 `GameManager` 오브젝트에 `BalanceCheckHarness` 컴포넌트를 Add → Play → 화면 **우측 상단** "공식 대조 실행" 버튼. 확인 끝나면 **씬 저장하지 말고** 컴포넌트를 제거할 것.
 - 밸런스 시트(`PokeChess_Balance_Tool.xlsx` 1v1 시뮬레이터)의 기대값과 **실제 `BattleManager.Mitigation`/`CritFactor` 계산을 대조**해 PASS/FAIL 표시. 공식을 하네스에 복사하지 않고 실제 함수를 호출하므로, 코드가 시트와 어긋나면 여기서 잡힌다
 - 현재 보드의 **시너지 활성 단계**(`SynergyManager.GetActiveSynergies()`)
 - 전투 중 **유닛 실측 스탯**(`BattleManager.Units`) — 시너지/아이템 버프가 실제로 반영됐는지 확인
