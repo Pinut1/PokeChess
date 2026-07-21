@@ -90,3 +90,5 @@ Thumbs.db
 /Obsidian/
 /.mcp.json
 /.codex/config.toml
+# Claude Code 로컬 권한/설정 (하위 폴더 포함). settings.json은 팀 공유 가능하도록 남겨둔다
+**/.claude/settings.local.json

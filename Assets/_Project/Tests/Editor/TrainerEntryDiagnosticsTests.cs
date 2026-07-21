@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -41,12 +42,15 @@ namespace PokeChess.Tests
             diagnostics.RecordInlineEnemyFallback("2-1", "TR_GHOST", hasTrainerEntry: false);
 
             var report = diagnostics.BuildReport(System.Array.Empty<string>());
-            string warning = TextsOf(report, TrainerEntryIssueSeverity.Warning).Single();
 
-            Assert.That(warning, Does.Contain("TR_GHOST"));
-            Assert.That(warning, Does.Contain("1-3"));
-            Assert.That(warning, Does.Contain("2-1"));
+            // 중단 사유이므로 Error로 나가야 한다 (Warning이면 최종 중단 에러와 심각도가 어긋남)
+            string error = TextsOf(report, TrainerEntryIssueSeverity.Error).Single();
+
+            Assert.That(error, Does.Contain("TR_GHOST"));
+            Assert.That(error, Does.Contain("1-3"));
+            Assert.That(error, Does.Contain("2-1"));
             Assert.That(diagnostics.TrainerIdInlineFallbackCount, Is.EqualTo(2));
+            Assert.That(diagnostics.HasBlockingIssues, Is.True);
         }
 
         [Test]
@@ -156,6 +160,31 @@ namespace PokeChess.Tests
             string error = TextsOf(report, TrainerEntryIssueSeverity.Error).Single();
             Assert.That(error, Does.Contain("1-4"));
             Assert.That(error, Does.Contain("적이 한 마리도"));
+        }
+
+        [Test]
+        public void EveryBlockingCause_ProducesAtLeastOneErrorMessage()
+        {
+            // 중단시키면서 메시지는 Warning으로 내면 콘솔에서 원인 줄을 놓치게 된다.
+            // 차단 사유가 늘어날 때 이 불변식이 깨지지 않도록 고정한다.
+            var cases = new Dictionary<string, Action<TrainerEntryDiagnostics>>
+            {
+                ["누락 trainerId"] = d => d.RecordInlineEnemyFallback("1-3", "TR_GHOST", hasTrainerEntry: false),
+                ["중복 trainerId"] = d => d.RecordDuplicateTrainerId("GYM_R2"),
+                ["적 0마리 스테이지"] = d => d.RecordEmptyStage("1-4"),
+            };
+
+            foreach (var kv in cases)
+            {
+                var diagnostics = new TrainerEntryDiagnostics();
+                kv.Value(diagnostics);
+
+                Assert.That(diagnostics.HasBlockingIssues, Is.True, $"{kv.Key}: 중단 사유여야 함");
+                Assert.That(
+                    TextsOf(diagnostics.BuildReport(System.Array.Empty<string>()), TrainerEntryIssueSeverity.Error),
+                    Is.Not.Empty,
+                    $"{kv.Key}: 중단시키면 Error 메시지가 있어야 함");
+            }
         }
 
         [Test]
