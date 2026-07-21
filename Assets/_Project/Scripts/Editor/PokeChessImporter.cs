@@ -585,7 +585,21 @@ public static class PokeChessImporter
 
             AddEnemies(stage, sourceEnemies);
 
+            // StageType이 전부 전투이므로 적 0마리는 항상 결함
+            if (stage.enemies.Count == 0)
+                diagnostics.RecordEmptyStage(stage.stageId);
+
             stages.Add(stage);
+        }
+
+        // 깨진 데이터가 에셋에 저장되지 않도록, 쓰기 전에 진단하고 결함이 있으면 중단한다.
+        LogTrainerEntryDiagnostics(diagnostics, trainerMap.Keys);
+        if (diagnostics.HasBlockingIssues)
+        {
+            Debug.LogError(
+                "[PokeChess] 스테이지 Import 중단 — 위 오류를 해결한 뒤 다시 실행하세요. " +
+                "StageDatabase.asset은 변경되지 않았습니다.");
+            return;
         }
 
         const string resDir = "Assets/Resources";
@@ -595,7 +609,6 @@ public static class PokeChessImporter
         so.stages = stages;
         EditorUtility.SetDirty(so);
 
-        LogTrainerEntryDiagnostics(diagnostics, trainerMap.Keys);
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 스테이지 {stages.Count}개 Import 완료 (trainer_entry join 적용)");
     }

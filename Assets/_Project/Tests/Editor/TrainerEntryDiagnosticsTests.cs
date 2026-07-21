@@ -116,5 +116,58 @@ namespace PokeChess.Tests
             Assert.That(report, Has.Count.EqualTo(1));
             Assert.That(report[0].Severity, Is.EqualTo(TrainerEntryIssueSeverity.Info));
         }
+
+        [Test]
+        public void CleanData_DoesNotBlockImport()
+        {
+            var diagnostics = new TrainerEntryDiagnostics();
+            diagnostics.RecordTrainerEntryReferenced("TR_A");
+
+            Assert.That(diagnostics.HasBlockingIssues, Is.False);
+        }
+
+        [Test]
+        public void MissingTrainerId_BlocksImport()
+        {
+            var diagnostics = new TrainerEntryDiagnostics();
+            diagnostics.RecordInlineEnemyFallback("1-3", "TR_TYPO", hasTrainerEntry: false);
+
+            Assert.That(diagnostics.HasBlockingIssues, Is.True);
+        }
+
+        [Test]
+        public void DuplicateTrainerId_BlocksImport()
+        {
+            var diagnostics = new TrainerEntryDiagnostics();
+            diagnostics.RecordDuplicateTrainerId("GYM_R2");
+
+            Assert.That(diagnostics.HasBlockingIssues, Is.True);
+        }
+
+        [Test]
+        public void EmptyStage_BlocksImportAndIsReportedAsError()
+        {
+            var diagnostics = new TrainerEntryDiagnostics();
+            diagnostics.RecordEmptyStage("1-4");
+
+            Assert.That(diagnostics.HasBlockingIssues, Is.True);
+
+            var report = diagnostics.BuildReport(System.Array.Empty<string>());
+            string error = TextsOf(report, TrainerEntryIssueSeverity.Error).Single();
+            Assert.That(error, Does.Contain("1-4"));
+            Assert.That(error, Does.Contain("적이 한 마리도"));
+        }
+
+        [Test]
+        public void UnreferencedTrainerId_DoesNotBlockImport()
+        {
+            var diagnostics = new TrainerEntryDiagnostics();
+
+            // 안 쓰는 엔트리는 산출물에 영향이 없으므로 경고까지만
+            var report = diagnostics.BuildReport(new[] { "TR_ORPHAN" });
+
+            Assert.That(TextsOf(report, TrainerEntryIssueSeverity.Warning), Has.Length.EqualTo(1));
+            Assert.That(diagnostics.HasBlockingIssues, Is.False);
+        }
     }
 }

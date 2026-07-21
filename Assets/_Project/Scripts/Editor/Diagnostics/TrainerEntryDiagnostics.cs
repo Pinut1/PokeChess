@@ -36,6 +36,7 @@ namespace PokeChess.EditorTools
             new Dictionary<string, List<string>>(IdComparer);
         private readonly Dictionary<string, List<string>> _emptyEnemyTrainerStages =
             new Dictionary<string, List<string>>(IdComparer);
+        private readonly List<string> _emptyStageIds = new List<string>();
 
         private int _legacyInlineEnemyCount;
         private int _trainerIdInlineFallbackCount;
@@ -47,6 +48,25 @@ namespace PokeChess.EditorTools
         public int TrainerIdInlineFallbackCount => _trainerIdInlineFallbackCount;
 
         public IReadOnlyList<string> DuplicateTrainerIds => _duplicateTrainerIds;
+
+        /// <summary>적이 한 마리도 배치되지 않은 스테이지 id. StageType이 전부 전투이므로 항상 결함이다.</summary>
+        public IReadOnlyList<string> EmptyStageIds => _emptyStageIds;
+
+        /// <summary>
+        /// 임포트를 중단해야 하는 결함이 있는지. 산출물이 깨지거나(적 0마리)
+        /// 어느 데이터가 맞는지 모호한(중복·누락 trainerId) 경우가 해당된다.
+        /// 미참조 trainerId는 산출물에 영향이 없으므로 경고로만 남긴다.
+        /// </summary>
+        public bool HasBlockingIssues =>
+            _duplicateTrainerIds.Count > 0 ||
+            _missingTrainerStages.Count > 0 ||
+            _emptyStageIds.Count > 0;
+
+        /// <summary>적이 한 마리도 없는 스테이지를 기록한다.</summary>
+        public void RecordEmptyStage(string stageId)
+        {
+            _emptyStageIds.Add(stageId ?? "");
+        }
 
         /// <summary>trainer_entry_data에 같은 trainerId가 두 번 이상 나온 경우.</summary>
         public void RecordDuplicateTrainerId(string trainerId)
@@ -139,6 +159,14 @@ namespace PokeChess.EditorTools
                     $"{string.Join(", ", empty.Value)}. stage_data 인라인 enemies로 폴백했습니다. 데이터 확인 필요."));
             }
 
+            if (_emptyStageIds.Count > 0)
+            {
+                messages.Add(new TrainerEntryDiagnosticMessage(
+                    TrainerEntryIssueSeverity.Error,
+                    $"적이 한 마리도 배치되지 않은 스테이지 {_emptyStageIds.Count}개: " +
+                    $"{string.Join(", ", _emptyStageIds)}. 모든 StageType이 전투이므로 데이터 오류입니다."));
+            }
+
             var unreferenced = GetUnreferencedTrainerIds(allTrainerIds);
             if (unreferenced.Count > 0)
             {
@@ -154,6 +182,7 @@ namespace PokeChess.EditorTools
                 $"누락 trainerId {_missingTrainerStages.Count}개, " +
                 $"enemies 비어있는 trainerId {_emptyEnemyTrainerStages.Count}개, " +
                 $"미참조 trainerId {unreferenced.Count}개, " +
+                $"적 0마리 스테이지 {_emptyStageIds.Count}개, " +
                 $"trainerId 있는데 인라인 폴백한 스테이지 {_trainerIdInlineFallbackCount}개, " +
                 $"trainerId 없는 레거시 인라인 스테이지 {_legacyInlineEnemyCount}개."));
 
