@@ -92,10 +92,16 @@ public class BalanceCheckHarness : MonoBehaviour
         _lines.Add($"{label}: {actual:F3} [시트 {expected:F2}] {(ok ? "PASS" : "FAIL")}");
     }
 
+    /// <summary>기존 하네스 배치: TradeDebugTest(10,460) / GoldTransfer(300,460) / EeveeHero(300,570).
+    /// 겹치지 않도록 우측 상단을 쓰고, 목록은 아래로 무한히 자라지 않게 상한을 둔다.</summary>
+    private const int MaxSynergyLines = 6;
+    private const int MaxUnitLines    = 6;
+
     private void OnGUI()
     {
         const float w = 430f;
-        float x = 10f, y = 10f;
+        float x = Screen.width - w - 20f;
+        float y = 10f;
 
         GUI.Box(new Rect(x - 5f, y - 5f, w + 10f, 320f), GUIContent.none);
 
@@ -148,11 +154,21 @@ public class BalanceCheckHarness : MonoBehaviour
             return;
         }
 
+        int shownSynergy = 0;
         foreach (var s in active)
         {
+            if (shownSynergy >= MaxSynergyLines) break;
+
             string name = s.data != null ? s.data.name : "?";
             GUI.Label(new Rect(x, y, w, 20f),
                 $"  {name}: {s.uniqueCount}종 → 티어 {s.activeTierIndex + 1}단계");
+            y += 20f;
+            shownSynergy++;
+        }
+
+        if (active.Count > MaxSynergyLines)
+        {
+            GUI.Label(new Rect(x, y, w, 20f), $"  … 외 {active.Count - MaxSynergyLines}개");
             y += 20f;
         }
     }
@@ -175,7 +191,7 @@ public class BalanceCheckHarness : MonoBehaviour
         int shown = 0;
         foreach (var bu in battle.Units)
         {
-            if (bu == null || shown >= 6) break;
+            if (bu == null || shown >= MaxUnitLines) break;
 
             GUI.Label(new Rect(x, y, w, 20f),
                 $"  [{bu.team}] HP {bu.currentHp:F0}/{bu.maxHp:F0} " +
