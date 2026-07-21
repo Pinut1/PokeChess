@@ -166,7 +166,7 @@ Unity를 열면 `ProjectSettings/EditorSettings.asset`, `GraphicsSettings.asset`
 | `Docs/NEXT_TASKS.md` | 작업 체크리스트 (7/20 갱신) |
 | `Assets/_Project/Docs/AugmentSystem.md` | 증강 시스템 상세 |
 | `Docs/INVESTIGATION_2026-07-17_shared-pool-branches.md` | #40 vs #42 경쟁 브랜치 경위 |
-| `Docs/DEVLOG_*.md` | 일자별 작업 기록 (최신 7/20) |
+| `Docs/DEVLOG_*.md` | 일자별 작업 기록 (최신 **7/21**) |
 | `Docs/SCHEMA_2026-07-10_supabase-matches.sql` | 전적 서버 스키마 |
 | `Docs/trainer-entry-pipeline.md` | stage_data ↔ trainer_entry join 구조 |
 | `Docs/damage-formula.md` | 데미지 파이프라인(효과→크리→경감) — 밸런스 하네스와 함께 볼 것 |
