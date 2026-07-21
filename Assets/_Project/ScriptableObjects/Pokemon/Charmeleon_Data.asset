@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Fire_L
   evolvesIntoEn: Charizard
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5749835628181888105, guid: e974eaf444247f742a5272dffe1bd080, type: 3}
   icon: {fileID: 0}

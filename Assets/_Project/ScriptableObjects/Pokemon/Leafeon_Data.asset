@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4913272651977317491, guid: e977c16d8c556f04b8aa3428602cba4f, type: 3}
   icon: {fileID: 0}

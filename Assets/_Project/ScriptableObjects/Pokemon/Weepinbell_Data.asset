@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Grass_S
   evolvesIntoEn: Victreebel
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 306441882200034536, guid: 990b65b41d29fae4db64dbcdf1bed1df, type: 3}
   icon: {fileID: 0}

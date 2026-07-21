@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Fire_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 128360561177754895, guid: aa7ea0d2819cb2649af0f07d2cf1f1d0, type: 3}
   icon: {fileID: 0}

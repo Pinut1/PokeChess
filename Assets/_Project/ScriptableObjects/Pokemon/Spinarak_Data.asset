@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Bug_L
   evolvesIntoEn: Ariados
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5709975880969104834, guid: 5e45f3afe32db4e43b53256ef69e87b8, type: 3}
   icon: {fileID: 0}

@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Dragon_S
   evolvesIntoEn: Gabite
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4035362680199816743, guid: 08f9d3b225b6b41458ee28cb8737db32, type: 3}
   icon: {fileID: 0}

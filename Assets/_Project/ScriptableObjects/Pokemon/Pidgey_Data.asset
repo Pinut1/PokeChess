@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Normal_L
   evolvesIntoEn: Pidgeotto
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 3663222512595383064, guid: b547230743f7fd148aea684752d9df1e, type: 3}
   icon: {fileID: 0}

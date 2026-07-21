@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Normal_S
   evolvesIntoEn: Delcatty
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 856570726573815156, guid: b74ba2f3b510ffc48b76263c3296dd65, type: 3}
   icon: {fileID: 0}

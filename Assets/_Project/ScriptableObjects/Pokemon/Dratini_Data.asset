@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Dragon_L
   evolvesIntoEn: Dragonair
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5766917390229746773, guid: 1526e041148676d44a41ce05368a4555, type: 3}
   icon: {fileID: 0}

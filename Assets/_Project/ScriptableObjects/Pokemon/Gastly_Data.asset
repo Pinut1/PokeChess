@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Poison_L
   evolvesIntoEn: Haunter
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7558165394612339446, guid: 74ea15a1ca9c2f141bd13be2defea061, type: 3}
   icon: {fileID: 0}

@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Dragon_S
   evolvesIntoEn: Garchomp
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 716011222236089568, guid: 03a56023a3b6bcb459576c98b0e60d47, type: 3}
   icon: {fileID: 0}

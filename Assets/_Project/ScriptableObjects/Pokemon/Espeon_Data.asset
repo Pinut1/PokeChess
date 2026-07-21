@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Ethereal_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 6847240379958895362, guid: c775aab07f322f745b911de460ec023d, type: 3}
   icon: {fileID: 0}

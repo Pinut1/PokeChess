@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Breaker_S
   evolvesIntoEn: Lucario
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5652155190952240467, guid: deb53040ef3dabe4d8e98f2d2e7db687, type: 3}
   icon: {fileID: 0}

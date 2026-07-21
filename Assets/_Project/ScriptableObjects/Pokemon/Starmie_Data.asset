@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Water_L
   evolvesIntoEn: Mr. Mime
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 3372410765926221787, guid: 84bf59f58ab35594c993fa0ad9d7bda3, type: 3}
   icon: {fileID: 0}

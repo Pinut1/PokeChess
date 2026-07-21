@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Normal_S
   evolvesIntoEn: Persian
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 890747016085531506, guid: 5550d33509f91e242b4b76fe19866088, type: 3}
   icon: {fileID: 0}

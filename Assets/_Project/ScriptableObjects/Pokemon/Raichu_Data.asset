@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Electric_L
   evolvesIntoEn: Clefairy
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2141878498342791485, guid: 12bcf8edfa317c74ba01332bca765ff1, type: 3}
   icon: {fileID: 0}

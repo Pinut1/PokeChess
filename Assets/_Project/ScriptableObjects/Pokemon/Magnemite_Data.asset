@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Electric_S
   evolvesIntoEn: Magneton
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5747464548766857799, guid: 07f926a0e1ae08c4589f6805a1000ef5, type: 3}
   icon: {fileID: 0}

@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Dark_L
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4559591983205366297, guid: bafd60acf88f6644b9f3c596dfd52171, type: 3}
   icon: {fileID: 0}

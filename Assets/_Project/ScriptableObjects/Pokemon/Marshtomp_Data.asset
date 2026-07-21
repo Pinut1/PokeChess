@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Swampert
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 1526556058473970907, guid: 3d3489d57f1b72f41b944134b487a064, type: 3}
   icon: {fileID: 0}

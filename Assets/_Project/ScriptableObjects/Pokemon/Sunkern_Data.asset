@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Sunflora
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 6213108853360145069, guid: 4ac549ddc484f3c45ac95f3375e1a86c, type: 3}
   icon: {fileID: 0}

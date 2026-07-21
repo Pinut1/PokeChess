@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Bug_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2869195627003650431, guid: 546fd861a6b4e1d4598a61e853fa22cc, type: 3}
   icon: {fileID: 0}

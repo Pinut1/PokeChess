@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Poliwhirl
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2046050766088244061, guid: 231d8c3e23a553d4596e6b539915095c, type: 3}
   icon: {fileID: 0}

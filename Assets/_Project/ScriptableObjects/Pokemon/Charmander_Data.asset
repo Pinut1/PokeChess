@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Fire_L
   evolvesIntoEn: Charmeleon
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 891459477275189965, guid: ba424d0cc65cfd941a9d6c21379d0e14, type: 3}
   icon: {fileID: 0}

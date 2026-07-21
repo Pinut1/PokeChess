@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4117403574781913029, guid: a2f261b7bf255354b9401f25cbb5b45d, type: 3}
   icon: {fileID: 0}

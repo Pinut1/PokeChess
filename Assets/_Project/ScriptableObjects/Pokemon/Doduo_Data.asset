@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Normal_S
   evolvesIntoEn: Dodrio
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 1868359561622759509, guid: f88b0197c57baf24f9aff3f9309dc7fe, type: 3}
   icon: {fileID: 0}

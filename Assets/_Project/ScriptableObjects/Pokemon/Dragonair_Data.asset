@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Dragon_L
   evolvesIntoEn: Dragonite
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7832067856625573867, guid: 77efae014ae10534b833924aa26afda7, type: 3}
   icon: {fileID: 0}

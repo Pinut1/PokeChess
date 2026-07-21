@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 3472621911760537835, guid: 7310fb2946fa8c342bda7e441fec7750, type: 3}
   icon: {fileID: 0}

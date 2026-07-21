@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Slowbro
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7833592935581154444, guid: 9138ae72367a1c54288d3c32fa2ae3a4, type: 3}
   icon: {fileID: 0}

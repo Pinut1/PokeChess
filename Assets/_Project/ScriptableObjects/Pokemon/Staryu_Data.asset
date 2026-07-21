@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Starmie
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 1339580967768197020, guid: ca7f448e35617154d9bc4f33402f1852, type: 3}
   icon: {fileID: 0}

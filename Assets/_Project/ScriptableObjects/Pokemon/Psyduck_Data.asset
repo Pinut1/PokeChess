@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Golduck
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4725220814583268935, guid: b31e68a1f9800814fa680f45d129d5ff, type: 3}
   icon: {fileID: 0}

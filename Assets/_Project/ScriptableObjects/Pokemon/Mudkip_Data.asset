@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Marshtomp
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 6301963386088318064, guid: 3e75228b93b74874c8c5ef847263fab2, type: 3}
   icon: {fileID: 0}

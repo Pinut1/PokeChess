@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Electric_L
   evolvesIntoEn: Raichu
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 222093421977506564, guid: 5a3ec2b612017f540bea82c3bc4ca655, type: 3}
   icon: {fileID: 0}

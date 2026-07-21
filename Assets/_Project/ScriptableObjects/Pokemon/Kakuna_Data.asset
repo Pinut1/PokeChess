@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Bug_S
   evolvesIntoEn: Beedrill
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7078551392427482358, guid: f36ee8dd9d7c2564b8e32c8f2e813003, type: 3}
   icon: {fileID: 0}

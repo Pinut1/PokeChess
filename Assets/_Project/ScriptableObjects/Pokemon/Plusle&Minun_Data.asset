@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Cheerleader_L
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5094012104270938135, guid: 7ae9e5a79550fb04fba1cd4c3be0b7fd, type: 3}
   icon: {fileID: 0}

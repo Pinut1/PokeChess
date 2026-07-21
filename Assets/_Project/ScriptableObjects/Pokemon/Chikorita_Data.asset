@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Bayleef
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7243501375990545681, guid: de0143cb87ddb9e43893591873966d10, type: 3}
   icon: {fileID: 0}

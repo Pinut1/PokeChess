@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Ice_S
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5864177176959718239, guid: 89b6b30d4489a6d4a9db232618df3105, type: 3}
   icon: {fileID: 0}

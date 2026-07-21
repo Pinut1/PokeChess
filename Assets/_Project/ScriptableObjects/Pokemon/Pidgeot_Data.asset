@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Normal_L
   evolvesIntoEn: Pikachu
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7568373076975829535, guid: 209f6797ea435344e820ca206583c813, type: 3}
   icon: {fileID: 0}

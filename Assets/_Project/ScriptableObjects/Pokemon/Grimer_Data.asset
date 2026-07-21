@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Poison_S
   evolvesIntoEn: Muk
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 9184753099289837227, guid: 39fbb62ce61e65c45a66544cd67196d2, type: 3}
   icon: {fileID: 0}

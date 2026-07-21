@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Poison_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2260254016006031915, guid: 8945f3e78d70bbc43aeba09967bee4e1, type: 3}
   icon: {fileID: 0}

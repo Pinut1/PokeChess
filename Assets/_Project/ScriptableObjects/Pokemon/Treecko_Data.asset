@@ -39,5 +39,5 @@ MonoBehaviour:
   attackVfxId: Grass_S
   evolvesIntoEn: Grovyle
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 5917013211056616713, guid: 6240237448f851f4ebaae2484583ae91, type: 3}
   icon: {fileID: 0}

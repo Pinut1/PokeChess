@@ -40,5 +40,5 @@ MonoBehaviour:
   attackVfxId: Bug_L
   evolvesIntoEn: Venomoth
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 1575549018016058295, guid: 2567714a980dfff468d0d9fd5d7ea3c8, type: 3}
   icon: {fileID: 0}
