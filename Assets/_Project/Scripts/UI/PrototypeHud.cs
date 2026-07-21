@@ -21,8 +21,10 @@ public class PrototypeHud : MonoBehaviour
         if (gm == null) return;
 
         DrawStatusPanel(gm);
+        DrawShopProbabilityPanel(gm);
         DrawItemShopBar(gm);
         DrawShopBar(gm);
+
         DrawReady(gm);
         DrawVictory(gm);
     }
@@ -50,89 +52,240 @@ public class PrototypeHud : MonoBehaviour
     // ── 상단 좌측: 라운드·페이즈 / 팀 라이프 / 골드 / 파트너 골드 / 아이템 정보 ──
     private void DrawStatusPanel(GameManager gm)
     {
-        // 진행 정보 중 XP·레벨·유닛 캡은 UIManager가 담당한다.
-        GUILayout.BeginArea(new Rect(10, 10, 280, 268), GUI.skin.box);
+        const float panelX = 10f;
+        const float panelY = 10f;
+        const float panelWidth = 280f;
+        const float panelHeight = 320f;
+
+        GUILayout.BeginArea(
+            new Rect(
+                panelX,
+                panelY,
+                panelWidth,
+                panelHeight
+            ),
+            GUI.skin.box
+        );
+
+        // 기존 Scene / Is Master / Players 표시 아래로 내용 내리기
+        GUILayout.Space(68f);
 
         if (gm.Phase != null)
-            GUILayout.Label($"라운드 {gm.Phase.CurrentRound}   |   {PhaseKr(gm.Phase.CurrentPhase)}");
+            GUILayout.Label(
+                $"라운드 {gm.Phase.CurrentRound} | " +
+                $"{PhaseKr(gm.Phase.CurrentPhase)}"
+            );
 
         if (gm.PlayerHealth != null)
-            GUILayout.Label($"팀 라이프: {Mathf.Max(0, gm.PlayerHealth.Health)} / {gm.PlayerHealth.MaxHealth}");
+            GUILayout.Label(
+                $"팀 라이프: " +
+                $"{Mathf.Max(0, gm.PlayerHealth.Health)} / " +
+                $"{gm.PlayerHealth.MaxHealth}"
+            );
 
-        // 디버그: 무한 HP 토글 (검증 편의용 — 팀 데미지 전부 무시)
-        string infHpLabel = NetworkManager.DebugInfiniteTeamHealth ? "무한 HP: ON ▣" : "무한 HP: OFF ☐";
+        string infHpLabel =
+            NetworkManager.DebugInfiniteTeamHealth
+                ? "무한 HP: ON ▣"
+                : "무한 HP: OFF ☐";
+
         if (GUILayout.Button(infHpLabel))
-            NetworkManager.DebugInfiniteTeamHealth = !NetworkManager.DebugInfiniteTeamHealth;
+            NetworkManager.DebugInfiniteTeamHealth =
+                !NetworkManager.DebugInfiniteTeamHealth;
 
         if (gm.Shop != null)
-        {
             GUILayout.Label($"내 골드: {gm.Shop.Gold} G");
-        }
 
-        GUILayout.Space(4);
-        GUILayout.Label(_partnerGold >= 0 ? $"파트너 골드: {_partnerGold} G" : "파트너 골드: -");
+        GUILayout.Space(4f);
+
+        GUILayout.Label(
+            _partnerGold >= 0
+                ? $"파트너 골드: {_partnerGold} G"
+                : "파트너 골드: -"
+        );
 
         if (gm.Item != null)
         {
-            GUILayout.Space(4);
+            GUILayout.Space(4f);
             GUILayout.Label($"아이템 쿠폰: {gm.Item.ItemCoupon}");
-            GUILayout.Label($"아이템 인벤토리: {gm.Item.InventoryCount}/20");
+            GUILayout.Label(
+                $"아이템 인벤토리: {gm.Item.InventoryCount}/20"
+            );
         }
 
         GUILayout.EndArea();
     }
 
-    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 리롤 + 판매 ──
+    // ──────────────────────────────────────────
+    // 아이템 상점 위쪽: 공용 풀 상태 + 코스트별 등장 확률
+    // ──────────────────────────────────────────
+    private void DrawShopProbabilityPanel(GameManager gm)
+    {
+        var shop = gm.Shop;
+        if (shop == null)
+            return;
+
+        const float width = 749f;
+        const float height = 64f;
+
+        float x = (Screen.width - width) / 2f;
+        float y = Screen.height - 299f;
+
+        GUILayout.BeginArea(
+            new Rect(x, y, width, height),
+            GUI.skin.box
+        );
+
+        var titleStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontStyle = FontStyle.Bold,
+            fontSize = 14
+        };
+
+        var probabilityStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 14
+        };
+
+        string poolStatus = "솔로 상점 풀";
+
+        if (gm.Network != null &&
+            gm.Network.UsesSharedShopPool)
+        {
+            poolStatus = gm.Network.IsMasterClient
+                ? "2인 공용 풀 ON · 내 역할: MasterClient"
+                : "2인 공용 풀 ON · 내 역할: 파트너";
+        }
+
+        GUILayout.Label(poolStatus, titleStyle);
+
+        int[] rates = shop.GetCurrentCostRatesForDebug();
+
+        string rateText =
+            $"1코 {GetRate(rates, 0)}%   " +
+            $"2코 {GetRate(rates, 1)}%   " +
+            $"3코 {GetRate(rates, 2)}%   " +
+            $"4코 {GetRate(rates, 3)}%   " +
+            $"5코 {GetRate(rates, 4)}%";
+
+        GUILayout.Label(rateText, probabilityStyle);
+        GUILayout.EndArea();
+    }
+
+    // ──────────────────────────────────────────
+    // 하단 중앙: 유닛 상점 슬롯 + 풀 잔여 수량 + 등장 확률
+    // ──────────────────────────────────────────
     private void DrawShopBar(GameManager gm)
     {
         var shop = gm.Shop;
-        if (shop == null) return;
+        if (shop == null)
+            return;
 
         var slots = shop.CurrentSlots;
-        int n = slots?.Count ?? 0;
-        const float w = 110f, h = 46f, gap = 6f;
+        int count = slots?.Count ?? 0;
 
-        float totalW = n * (w + gap);
-        float startX = (Screen.width - totalW) / 2f;
-        float y = Screen.height - 120f;
+        const float width = 145f;
+        const float height = 84f;
+        const float gap = 6f;
 
-        for (int i = 0; i < n; i++)
+        float totalWidth =
+            count > 0
+                ? count * width + (count - 1) * gap
+                : 0f;
+
+        float startX = (Screen.width - totalWidth) / 2f;
+        float y = Screen.height - 158f;
+
+        for (int i = 0; i < count; i++)
         {
-            var data = slots[i];
+            PokemonData data = slots[i];
             GUI.enabled = data != null;
 
-            string label = data != null ? $"{data.pokemonName}\n{data.cost} G" : "(빈 슬롯)";
+            string label;
 
-            if (GUI.Button(new Rect(startX + i * (w + gap), y, w, h), label))
+            if (data == null)
+            {
+                label = "(빈 슬롯)";
+            }
+            else if (shop.TryGetPoolDebugInfo(
+                         data,
+                         out int remaining,
+                         out int initial,
+                         out int sameCostRemaining,
+                         out float costRatePercent,
+                         out float appearancePercent))
+            {
+                label =
+                    $"{data.pokemonName}  {data.cost}G\n" +
+                    $"풀 {remaining}/{initial}\n" +
+                    $"다음 등장 {appearancePercent:0.00}%\n" +
+                    $"{costRatePercent:0.#}% × " +
+                    $"{remaining}/{sameCostRemaining}";
+            }
+            else
+            {
+                label =
+                    $"{data.pokemonName}\n" +
+                    $"{data.cost}G\n" +
+                    "풀 정보 없음";
+            }
+
+            var buttonRect = new Rect(
+                startX + i * (width + gap),
+                y,
+                width,
+                height
+            );
+
+            if (GUI.Button(buttonRect, label))
                 shop.Buy(i);
 
             GUI.enabled = true;
         }
 
-        float by = y + h + gap;
+        float buttonY = y + height + gap;
 
-        // 유닛 상점 리롤 — 무료 리롤 자원 우선, 없으면 골드.
-        string rerollLabel = shop.RerollCount > 0
-            ? $"리롤 (무료 {shop.RerollCount})"
-            : $"리롤 ({shop.RerollCost}G)";
-        if (GUI.Button(new Rect(startX, by, w, 30), rerollLabel))
-            shop.Reroll();
+        string rerollLabel =
+            shop.RerollCount > 0
+                ? $"리롤 (무료 {shop.RerollCount})"
+                : $"리롤 ({shop.RerollCost}G)";
 
-        // 첫 벤치 유닛 판매
-        if (GUI.Button(new Rect(startX + (w + gap), by, w, 30), "첫 벤치 판매"))
+        if (GUI.Button(
+                new Rect(
+                    startX,
+                    buttonY,
+                    width,
+                    30f
+                ),
+                rerollLabel))
         {
+            shop.Reroll();
+        }
+
+        if (GUI.Button(
+                new Rect(
+                    startX + width + gap,
+                    buttonY,
+                    width,
+                    30f
+                ),
+                "첫 벤치 판매"))
+        {
+            if (gm.Board == null)
+                return;
+
             var bench = gm.Board.GetBenchSnapshot();
 
             for (int i = 0; i < bench.Count; i++)
             {
-                if (bench[i] != null)
-                {
-                    gm.Board.SellUnit(bench[i]);
-                    break;
-                }
+                if (bench[i] == null)
+                    continue;
+
+                gm.Board.SellUnit(bench[i]);
+                break;
             }
         }
-        // 준비 완료는 우측 하단(DrawReady)으로 분리.
     }
 
     // ── 유닛 상점 위쪽: 아이템 상점 슬롯(쿠폰 구매). 0번 슬롯=진화의 돌, 1~3번 슬롯=일반 아이템 ──
@@ -147,7 +300,7 @@ public class PrototypeHud : MonoBehaviour
 
         float totalW = n * (w + gap);
         float startX = (Screen.width - totalW) / 2f;
-        float y = Screen.height - 190f;
+        float y = Screen.height - 225f;
 
         for (int i = 0; i < n; i++)
         {
@@ -168,7 +321,17 @@ public class PrototypeHud : MonoBehaviour
             GUI.enabled = true;
         }
     }
-    
+    private static int GetRate(int[] rates, int index)
+    {
+        if (rates == null ||
+            index < 0 ||
+            index >= rates.Length)
+        {
+            return 0;
+        }
+
+        return rates[index];
+    }
 
     private static string PhaseKr(GamePhase p) => p switch
     {

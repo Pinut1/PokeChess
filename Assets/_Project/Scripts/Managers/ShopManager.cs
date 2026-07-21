@@ -644,6 +644,103 @@ public class ShopManager : MonoBehaviour
         };
     }
 
+    // ──────────────────────────────────────────
+    // 공용 풀 / 상점 확률 UI 조회 API
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 현재 플레이어 레벨의 1~5코스트 등장 확률을 반환한다.
+    /// index 0 = 1코스트, index 4 = 5코스트.
+    /// </summary>
+    public int[] GetCurrentCostRatesForDebug()
+    {
+        return GetCostRates(_currentLevel);
+    }
+
+    /// <summary>
+    /// 상점 카드에 표시할 포켓몬별 풀 잔여 수량과
+    /// 다음 상점 한 슬롯에서의 등장 확률을 계산한다.
+    ///
+    /// 등장 확률 =
+    /// 해당 코스트 등장 확률
+    /// × 해당 포켓몬 남은 수량
+    /// ÷ 같은 코스트 전체 남은 수량
+    /// </summary>
+    public bool TryGetPoolDebugInfo(
+        PokemonData data,
+        out int remaining,
+        out int initial,
+        out int sameCostRemaining,
+        out float costRatePercent,
+        out float appearancePercent)
+    {
+        remaining = 0;
+        initial = 0;
+        sameCostRemaining = 0;
+        costRatePercent = 0f;
+        appearancePercent = 0f;
+
+        if (data == null)
+            return false;
+
+        // 진화체가 전달되면 실제 풀 관리 대상인 기본종으로 변환한다.
+        PokemonData poolData =
+            _evolvedToBase.TryGetValue(data, out PokemonData baseData)
+                ? baseData
+                : data;
+
+        if (poolData == null ||
+            !_remainingPool.TryGetValue(poolData, out remaining))
+        {
+            return false;
+        }
+
+        initial = GetInitialPoolCount(poolData.cost);
+
+        // 같은 코스트 포켓몬들의 현재 남은 카피 수 합계.
+        foreach (var pair in _remainingPool)
+        {
+            PokemonData candidate = pair.Key;
+
+            if (candidate == null ||
+                candidate.cost != poolData.cost)
+            {
+                continue;
+            }
+
+            sameCostRemaining += Mathf.Max(0, pair.Value);
+        }
+
+        int[] rates = GetCostRates(_currentLevel);
+        int rateIndex = poolData.cost - 1;
+
+        if (rateIndex < 0 || rateIndex >= rates.Length)
+            return true;
+
+        int totalRateWeight = 0;
+
+        for (int i = 0; i < rates.Length; i++)
+            totalRateWeight += Mathf.Max(0, rates[i]);
+
+        if (totalRateWeight <= 0)
+            return true;
+
+        costRatePercent =
+            100f *
+            Mathf.Max(0, rates[rateIndex]) /
+            totalRateWeight;
+
+        if (sameCostRemaining > 0)
+        {
+            appearancePercent =
+                costRatePercent *
+                remaining /
+                sameCostRemaining;
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// 유닛 상점을 새로 굴림. 무료 리롤 자원을 우선 소모하고, 없으면 골드로 폴백. 성공 시 true.
     /// 실제 소모가 일어나면 GameEvents.RerollSpent를 발행(리롤 환급 증강 등의 훅).

@@ -247,16 +247,18 @@ public class UIManager : MonoBehaviour
 
         // PrototypeHud의 유닛 상점 배치값과 동일하게 계산한다.
         const int shopSlotCount = 5;
-        const float shopSlotWidth = 110f;
+        const float shopSlotWidth = 145f;
         const float shopSlotGap = 6f;
 
-        float shopTotalWidth = shopSlotCount * (shopSlotWidth + shopSlotGap);
+        float shopTotalWidth = shopSlotCount * shopSlotWidth + (shopSlotCount - 1) * shopSlotGap;
+
         float shopStartX = (Screen.width - shopTotalWidth) / 2f;
 
         // 유닛 상점 왼쪽에 패널 배치.
         // 작은 해상도에서는 화면 밖으로 나가지 않도록 최소 10px을 보장한다.
         float x = Mathf.Max(10f, shopStartX - width - 20f);
-        float y = Screen.height - 190f;
+        
+        float y = Screen.height - 225f;
 
         GUI.Box(new Rect(x, y, width, height), "플레이어 정보");
 
