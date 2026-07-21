@@ -62,6 +62,9 @@ public class BattleManager : MonoBehaviour
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
 
+    /// <summary>전투 중인 유닛 스냅샷(읽기 전용). BalanceCheckHarness가 실측 스탯을 확인하는 용도.</summary>
+    public IReadOnlyList<BattleUnit> Units => _units;
+
     private void OnEnable()  => GameEvents.OnBattleStart += HandleBattleStart;
     private void OnDisable() => GameEvents.OnBattleStart -= HandleBattleStart;
 
@@ -749,11 +752,15 @@ public class BattleManager : MonoBehaviour
     // 경감은 100/(100+def) → 방어 1당 유효체력 +1%, 항상 양수(max(1) 불필요),
     // 별 배수와 곱셈으로 공존. 관통/타입상성은 추후 이 두 헬퍼에 곱셈 레이어로 확장.
 
-    /// <summary>방어 비율 경감 계수. def 1당 유효체력 +1%. (관통은 여기서 def를 깎는 식으로 확장)</summary>
-    private static float Mitigation(float def) => 100f / (100f + Mathf.Max(0f, def));
+    /// <summary>
+    /// 방어 비율 경감 계수. def 1당 유효체력 +1%. (관통은 여기서 def를 깎는 식으로 확장)
+    /// public인 이유: BalanceCheckHarness가 밸런스 시트 기대값과 대조할 때 이 함수를 직접 호출한다.
+    /// 하네스가 공식을 복사해두면 검증 의미가 없어지므로 실제 계산 경로를 노출한다.
+    /// </summary>
+    public static float Mitigation(float def) => 100f / (100f + Mathf.Max(0f, def));
 
     /// <summary>크리 기대값 배수(난수 없는 결정론 — 2인 동기화 안전). 크리 없으면 1.</summary>
-    private static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
+    public static float CritFactor(BattleUnit a) => 1f + a.critChance * (a.critMultiplier - 1f);
 
     /// <summary>평타 1회: attack 기반 물리 피해(파이프라인). 마나는 초당 충전만(기획 확정) — 평타 획득 없음.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)

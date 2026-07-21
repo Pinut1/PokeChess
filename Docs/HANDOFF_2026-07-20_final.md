@@ -68,6 +68,22 @@
 - [ ] #42 병합 후 공용 풀 **2클라 회귀 테스트** (예약/구매/반환, 마스터 교체 시나리오)
 - [ ] 재접속 시나리오 2인 테스트
 
+### 테스트 수단 (7/21 추가)
+
+**① 자동 테스트 — EditMode 16개**
+`PokeChess.EditorTests` 어셈블리. Test Runner에서 실행하거나 Unity MCP `run_tests`로 돌린다.
+대상은 `TrainerEntryDiagnostics`(임포터 데이터 검증) 전부 + 기존 씬 안정성 3개.
+⚠️ 전투/상점/네트워크 로직에는 **아직 자동 테스트를 붙일 수 없다** — 이유와 해결법은 `CLAUDE.md` 기술 부채의 🔺 항목 참조.
+
+**② 밸런스 시트 대조 하네스 — `Scripts/Debug/BalanceCheckHarness.cs`**
+빈 GameObject에 붙이고 Play → 화면 좌상단 "공식 대조 실행" 버튼.
+- 밸런스 시트(`PokeChess_Balance_Tool.xlsx` 1v1 시뮬레이터)의 기대값과 **실제 `BattleManager.Mitigation`/`CritFactor` 계산을 대조**해 PASS/FAIL 표시. 공식을 하네스에 복사하지 않고 실제 함수를 호출하므로, 코드가 시트와 어긋나면 여기서 잡힌다
+- 현재 보드의 **시너지 활성 단계**(`SynergyManager.GetActiveSynergies()`)
+- 전투 중 **유닛 실측 스탯**(`BattleManager.Units`) — 시너지/아이템 버프가 실제로 반영됐는지 확인
+- 기준 케이스: 꼬부기(HP950/ATK25/DEF45/AS0.50) vs 파이리(HP650/ATK30/DEF30/AS0.40). 7/21 검증 시 4항목 전부 PASS
+- 범위 밖: 스킬 DPS는 마나 충전·시전 주기가 얽혀 있어 미검증(시트 값을 참고치로만 표시)
+- 밸런스 수치를 바꾸면 **시트와 `Cases` 배열을 함께 갱신**할 것 — 안 그러면 FAIL이 뜬다
+
 ## 5. 운영 정보 (계정/인프라)
 
 - **Photon PUN2**: App ID는 `Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset`. 대시보드 계정 정보는 별도 전달(문서에 기재하지 않음)
