@@ -13,9 +13,17 @@
 
 따라서 새로 구현할 기능으로 다시 잡지 않는다. 다만 통신교환·골드 전송은 실제 2클라이언트 회귀 테스트가 남아 있다.
 
+> **2026-07-21 갱신**: P0 #1(재접속 재동기화, PR #47)·#2(파트너 보드 모델, PR #48) 코드·리뷰 완료 후 `master` 병합. 두 항목 다 **실제 2클라이언트 Photon 검증은 아직 미수행** — 다음 실사 테스트 세션 우선 항목.
+
 ## Claude 작업 큐
 
 ### P0 — 코드만으로 착수 가능
+
+#### 1. ~~재접속/후입장 보드 재동기화~~ — 완료 (2026-07-21, PR #47 병합)
+
+코드 구현·CodeRabbit 리뷰·수동 코드 검토 완료. **단, PR 체크리스트의 실제 2클라이언트 Photon 검증(강제 끊김→재접속, 끊긴 동안 라운드 진행, revision 역전)은 아직 미수행** — 다음 실사 테스트 세션에서 진행할 것.
+
+<details><summary>착수 당시 기록(참고용)</summary>
 
 #### 1. 재접속/후입장 보드 재동기화
 
@@ -40,6 +48,14 @@
 - `Assets/_Project/Scripts/Network/BoardSnapshot.cs`
 - `Assets/_Project/Scripts/Core/RoundPhaseManager.cs`
 
+</details>
+
+#### 2. ~~파트너 보드 종/모델 해석~~ — 완료 (2026-07-21, PR #48 병합)
+
+코드 구현·CodeRabbit 리뷰·수동 코드 검토 완료. `UnitFactory.Create`와 동일한 `Instantiate(data.modelPrefab, ...)` 패턴 재사용, 종별 풀링, 캡슐 폴백 유지. 성급별 스케일(`0.6+(star-1)*0.15`)을 모델 루트에 직접 덮어쓰는 방식이라 실제 보드의 성급 스케일링과 시각적으로 다를 수 있음 — 실사 확인 필요(PR 체크리스트 미검증 항목).
+
+<details><summary>착수 당시 기록(참고용)</summary>
+
 #### 2. 파트너 보드 종/모델 해석
 
 현재 상태:
@@ -61,6 +77,8 @@
 - `Assets/_Project/Scripts/Network/BoardSnapshot.cs`
 - `Assets/_Project/Scripts/Core/UnitFactory.cs`
 - `Assets/_Project/Scripts/Data/PokemonDatabase.cs`
+
+</details>
 
 ### P1 — UI 담당 협의 후 착수
 
