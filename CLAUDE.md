@@ -64,6 +64,11 @@ Assets/_Project/Scripts/
 - ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`) + **전적창 서버 조회 로컬/서버 탭**(Phase 3, PR #45, 7/20 병합). 전 구간 완료.
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
 - 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. 별도 신규 메커니즘인 나인이볼부스트·`SK_` 영웅스킬은 미구현. 보스 전용 기믹은 **스코프 아웃**(7/21 확인: 기획에 패턴/페이즈 없음 — 스탯 배수가 최종 스펙)
+- 🔺 **자동 테스트가 핵심 로직에 못 붙는 구조 (7/21 확인, 미해결)**
+  - 문제: `BattleManager`·`ShopManager`·`NetworkManager` 등 런타임 코드가 전부 **predefined assembly(`Assembly-CSharp`)** 에 있는데, **asmdef 기반 테스트 어셈블리는 predefined assembly를 참조할 수 없다**(Unity 제약). 그래서 `PokeChess.EditorTests`에서 이 타입들이 아예 안 보인다. 기존 `SceneStabilityTests`가 도는 건 UnityEditor API만 쓰기 때문.
+  - 정공법: `Assets/_Project/Scripts/`에 런타임 asmdef, `Scripts/Editor/`에 에디터 asmdef를 만들어 predefined assembly에서 탈출. `_Project/Scripts` 밖의 `.cs`는 서드파티 데모뿐이라 충돌 위험은 낮음.
+  - ⚠️ **함정**: 지금은 `Assembly-CSharp`가 Photon을 자동 참조하지만, 자체 asmdef로 옮기면 `PhotonUnityNetworking`·`PhotonRealtime` 등을 **전부 명시적으로 참조 추가해야** 한다. 첫 시도에 컴파일 에러가 대량 발생하므로 시간 여유가 있을 때 착수할 것. (수료 직전 착수 금지 — 빌드가 깨진 채 인수인계될 위험)
+  - 우회책(현재 적용): 의존성 없는 순수 로직만 전용 asmdef로 분리 — `PokeChess.Editor.Diagnostics`(`TrainerEntryDiagnostics`)가 그 예. 통합 동작은 `Scripts/Debug/`의 디버그 하네스로 확인한다(`BalanceCheckHarness`).
 
 ## 작업 분배 (태욱 — 상점/아이템/UI)
 레벨/XP 시스템(PR #13) 후속:
