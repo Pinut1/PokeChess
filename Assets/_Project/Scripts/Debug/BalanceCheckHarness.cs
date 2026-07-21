@@ -4,17 +4,27 @@ using UnityEngine;
 
 /// <summary>
 /// 밸런스 시트(PokeChess_Balance_Tool.xlsx "1v1 자동전투 시뮬레이터") 기대값을
-/// 실제 BattleManager 계산과 대조하는 디버그 하네스.
+/// 실제 BattleManager.Mitigation 및 크리 미포함 시트 모델 DPS와 대조하는 디버그 하네스.
 ///
 /// 지금까지 엑셀에서 눈으로 확인하던 걸 씬에서 버튼 한 번으로 판정한다.
-/// 공식을 여기에 복사해두면 검증 의미가 없으므로 BattleManager.Mitigation을
-/// 직접 호출한다 — 코드가 시트와 어긋나면 여기서 FAIL이 뜬다.
 ///
-/// PASS/FAIL 검증 범위: 경감계수, 평타 DPS. 둘 다 시트에 기대값이 있는 항목이다.
+/// 무엇을 어디서 가져오는지 (과장 없이):
+/// - 경감계수: BattleManager.Mitigation을 직접 호출한다. 공식을 여기 복사해두면
+///   코드가 바뀌어도 계속 PASS가 떠서 검증 의미가 없으므로 실제 함수를 부른다.
+///   따라서 이 항목은 코드가 시트와 어긋나면 FAIL이 뜬다.
+/// - 평타 DPS: 이 하네스가 ATK × AS × Mitigation으로 자체 계산한다. 시트의 DPS
+///   모델을 재현한 것이지 BattleManager의 전투 경로를 그대로 태운 값이 아니다.
+///   실제 전투는 효과(OnDealDamage) → CritFactor → Mitigation 순서로 처리되므로
+///   효과와 크리가 빠져 있다. 즉 "시트 모델이 코드의 경감계수와 맞는지"를 보는 것이지
+///   전투 파이프라인 전체를 검증하는 것이 아니다.
+///
+/// PASS/FAIL 검증 범위: 경감계수, 평타 DPS(위 단서 포함). 둘 다 시트에 기대값이 있다.
 ///
 /// 검증하지 않는 것(시트에 근거가 없어 판정 불가):
 /// - CritFactor: 시트 1v1·Data·상수 탭 어디에도 크리 항목이 없다(2026-07-14 기준 확인).
 ///   따라서 대조하지 않고, "전장 유닛 실측" 섹션에서 현재 값을 표시만 한다.
+/// - 효과(ICombatEffect) 개입: 아이템/시너지가 OnDealDamage에서 amount를 가공하는
+///   경로는 이 하네스가 재현하지 않는다.
 /// - 스킬 DPS·총 DPS·승자: 마나 충전/시전 주기가 얽혀 있어 미모델링.
 ///   시트 값을 참고치로만 출력한다.
 /// </summary>
@@ -76,6 +86,8 @@ public class BalanceCheckHarness : MonoBehaviour
             Check($"  {c.aName} 경감계수", actualAMitigation, c.expectedAMitigation, MitigationTolerance);
             Check($"  {c.bName} 경감계수", actualBMitigation, c.expectedBMitigation, MitigationTolerance);
 
+            // 시트의 DPS 모델(ATK × AS × 경감)을 재현한 값이다. BattleManager의 전투 경로
+            // (효과 → CritFactor → Mitigation)를 그대로 태운 값이 아니므로 효과·크리가 빠져 있다.
             float actualABasicDps = c.aAtk * c.aAtkSpeed * actualAMitigation;
             float actualBBasicDps = c.bAtk * c.bAtkSpeed * actualBMitigation;
 
@@ -91,6 +103,7 @@ public class BalanceCheckHarness : MonoBehaviour
 
         _lines.Add("");
         _lines.Add("※ PASS/FAIL 대상은 경감계수·평타 DPS뿐입니다.");
+        _lines.Add("※ 경감계수는 BattleManager.Mitigation 직접 호출, 평타 DPS는 시트 모델 재현(효과·크리 제외).");
         _lines.Add("※ CritFactor는 시트에 크리 항목이 없어 대조하지 않습니다(아래 실측 섹션에 표시만).");
     }
 
