@@ -18,6 +18,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitSold        += MarkBoardDirty;
         GameEvents.OnGoldChanged     += HandleGoldChanged;
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
+        GameEvents.OnBoardResyncRequested += MarkBoardDirtyForResync;
     }
 
     private void OnDisable()
@@ -27,9 +28,13 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitSold        -= MarkBoardDirty;
         GameEvents.OnGoldChanged     -= HandleGoldChanged;
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
+        GameEvents.OnBoardResyncRequested -= MarkBoardDirtyForResync;
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
+
+    /// <summary>재접속/파트너 재입장 시 변경 이벤트 없이도 현재 보드를 강제 재송출.</summary>
+    private void MarkBoardDirtyForResync() => _boardDirty = true;
 
     private void HandleGoldChanged(int gold)
     {
