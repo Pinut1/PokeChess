@@ -80,7 +80,9 @@
 > ⚠️ **씬에 미포함(의도적)**. 다른 디버그 하네스(`TradeDebugTest` 등)는 `GameSceneTest`의 `GameManager`에 붙어 있지만, 이건 **일부러 안 붙여뒀다** — 씬 파일은 머지 충돌 시 복구가 어려워 공유 씬 변경을 최소화하려는 것.
 >
 > **쓰는 법**: `GameSceneTest` 열고 `GameManager` 오브젝트에 `BalanceCheckHarness` 컴포넌트를 Add → Play → 화면 **우측 상단** "공식 대조 실행" 버튼. 확인 끝나면 **씬 저장하지 말고** 컴포넌트를 제거할 것.
-- 밸런스 시트(`PokeChess_Balance_Tool.xlsx` 1v1 시뮬레이터)의 기대값과 **실제 `BattleManager.Mitigation`/`CritFactor` 계산을 대조**해 PASS/FAIL 표시. 공식을 하네스에 복사하지 않고 실제 함수를 호출하므로, 코드가 시트와 어긋나면 여기서 잡힌다
+- 밸런스 시트(`PokeChess_Balance_Tool.xlsx` 1v1 시뮬레이터)의 기대값과 **실제 `BattleManager.Mitigation` 계산을 대조**해 PASS/FAIL 표시. 공식을 하네스에 복사하지 않고 실제 함수를 호출하므로, 코드가 시트와 어긋나면 여기서 잡힌다
+  - **PASS/FAIL 대상**: 경감계수, 평타 DPS (둘 다 시트에 기대값이 있는 항목)
+  - **미검증**: `CritFactor`는 시트 1v1·Data·상수 탭 어디에도 크리 항목이 없어(2026-07-14 기준) 대조 불가 — 실측 섹션에 값만 표시한다. 시트에 크리 컬럼이 생기면 그때 `Check()`를 추가할 것
 - 현재 보드의 **시너지 활성 단계**(`SynergyManager.GetActiveSynergies()`)
 - 전투 중 **유닛 실측 스탯**(`BattleManager.Units`) — 시너지/아이템 버프가 실제로 반영됐는지 확인
 - 기준 케이스: 꼬부기(HP950/ATK25/DEF45/AS0.50) vs 파이리(HP650/ATK30/DEF30/AS0.40). 7/21 검증 시 4항목 전부 PASS

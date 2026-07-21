@@ -7,11 +7,16 @@ using UnityEngine;
 /// 실제 BattleManager 계산과 대조하는 디버그 하네스.
 ///
 /// 지금까지 엑셀에서 눈으로 확인하던 걸 씬에서 버튼 한 번으로 판정한다.
-/// 공식을 여기에 복사해두면 검증 의미가 없으므로 BattleManager.Mitigation/CritFactor를
+/// 공식을 여기에 복사해두면 검증 의미가 없으므로 BattleManager.Mitigation을
 /// 직접 호출한다 — 코드가 시트와 어긋나면 여기서 FAIL이 뜬다.
 ///
-/// 범위: 경감계수·평타 DPS·TTK·승자까지. 스킬 DPS는 마나 충전/시전 주기가 얽혀 있어
-/// 이 하네스에서는 시트 값을 그대로 참고치로만 표시한다(미검증 항목으로 명시).
+/// PASS/FAIL 검증 범위: 경감계수, 평타 DPS. 둘 다 시트에 기대값이 있는 항목이다.
+///
+/// 검증하지 않는 것(시트에 근거가 없어 판정 불가):
+/// - CritFactor: 시트 1v1·Data·상수 탭 어디에도 크리 항목이 없다(2026-07-14 기준 확인).
+///   따라서 대조하지 않고, "전장 유닛 실측" 섹션에서 현재 값을 표시만 한다.
+/// - 스킬 DPS·총 DPS·승자: 마나 충전/시전 주기가 얽혀 있어 미모델링.
+///   시트 값을 참고치로만 출력한다.
 /// </summary>
 public class BalanceCheckHarness : MonoBehaviour
 {
@@ -80,9 +85,13 @@ public class BalanceCheckHarness : MonoBehaviour
             // 평타만 놓고 본 TTK — 스킬 미포함이라 시트 최종 승자와 다를 수 있다(참고용)
             float aTtk = actualABasicDps > 0f ? c.bHp / actualABasicDps : float.PositiveInfinity;
             float bTtk = actualBBasicDps > 0f ? c.aHp / actualBBasicDps : float.PositiveInfinity;
-            _lines.Add($"  · 평타만 TTK: {c.aName}→{aTtk:F1}초 / {c.bName}→{bTtk:F1}초 (참고)");
+            _lines.Add($"  · 평타만 TTK: {c.aName}→{aTtk:F1}초 / {c.bName}→{bTtk:F1}초 (참고, 미검증)");
             _lines.Add($"  · 시트 최종 승자: {c.expectedWinner} (남은 HP {c.expectedWinnerHp:F0}) — 스킬 포함, 미검증");
         }
+
+        _lines.Add("");
+        _lines.Add("※ PASS/FAIL 대상은 경감계수·평타 DPS뿐입니다.");
+        _lines.Add("※ CritFactor는 시트에 크리 항목이 없어 대조하지 않습니다(아래 실측 섹션에 표시만).");
     }
 
     private void Check(string label, float actual, float expected, float tolerance)
@@ -97,37 +106,89 @@ public class BalanceCheckHarness : MonoBehaviour
     private const int MaxSynergyLines = 6;
     private const int MaxUnitLines    = 6;
 
+    private const float LineH       = 20f;
+    private const float HeaderH     = 22f;
+    private const float TitleH      = 24f;
+    private const float ButtonH     = 28f;
+    private const float VerdictH    = 24f;
+    private const float ScrollMaxH  = 120f;
+    private const float ScrollMinH  = 36f;
+
     private void OnGUI()
     {
         const float w = 430f;
         float x = Screen.width - w - 20f;
-        float y = 10f;
+        const float top = 10f;
 
-        GUI.Box(new Rect(x - 5f, y - 5f, w + 10f, 320f), GUIContent.none);
+        // 배경 박스는 내용보다 먼저 그려야 뒤에 깔리므로, 높이를 미리 계산한다.
+        // 고정 높이로 두면 시너지/유닛 줄 수에 따라 내용이 박스 밖으로 삐져나온다.
+        float contentH = MeasureContentHeight();
+        GUI.Box(new Rect(x - 5f, top - 5f, w + 10f, contentH + 10f), GUIContent.none);
 
-        GUI.Label(new Rect(x, y, w, 22f), "밸런스 시트 대조 (PokeChess_Balance_Tool.xlsx)");
-        y += 24f;
+        float y = top;
 
-        if (GUI.Button(new Rect(x, y, 150f, 24f), "공식 대조 실행"))
+        GUI.Label(new Rect(x, y, w, HeaderH), "밸런스 시트 대조 (PokeChess_Balance_Tool.xlsx)");
+        y += TitleH;
+
+        if (GUI.Button(new Rect(x, y, 150f, ButtonH - 4f), "공식 대조 실행"))
             RunSheetComparison();
-        y += 28f;
+        y += ButtonH;
 
         if (_hasRun)
         {
             GUI.color = _allPassed ? Color.green : Color.red;
-            GUI.Label(new Rect(x, y, w, 22f), _allPassed ? "전체 PASS" : "FAIL 있음 — 코드와 시트가 어긋났습니다");
+            GUI.Label(new Rect(x, y, w, HeaderH), _allPassed ? "전체 PASS" : "FAIL 있음 — 코드와 시트가 어긋났습니다");
             GUI.color = Color.white;
-            y += 24f;
+            y += VerdictH;
 
-            _scroll = GUI.BeginScrollView(new Rect(x, y, w, 120f), _scroll, new Rect(0, 0, w - 20f, _lines.Count * 18f));
+            float scrollH = ScrollHeight();
+            _scroll = GUI.BeginScrollView(new Rect(x, y, w, scrollH), _scroll,
+                                          new Rect(0f, 0f, w - 20f, _lines.Count * 18f));
             for (int i = 0; i < _lines.Count; i++)
                 GUI.Label(new Rect(0f, i * 18f, w - 20f, 18f), _lines[i]);
             GUI.EndScrollView();
-            y += 126f;
+            y += scrollH + 6f;
         }
 
         DrawSynergySection(x, ref y, w);
         DrawLiveUnitSection(x, ref y, w);
+    }
+
+    private float ScrollHeight()
+    {
+        return Mathf.Clamp(_lines.Count * 18f, ScrollMinH, ScrollMaxH);
+    }
+
+    /// <summary>배경 박스 높이용 사전 측정. 아래 Draw*와 줄 수 계산이 반드시 일치해야 한다.</summary>
+    private float MeasureContentHeight()
+    {
+        float h = TitleH + ButtonH;
+        if (_hasRun) h += VerdictH + ScrollHeight() + 6f;
+        h += HeaderH + SynergyLineCount() * LineH;
+        h += HeaderH + UnitLineCount() * LineH;
+        return h;
+    }
+
+    private int SynergyLineCount()
+    {
+        var gm = GameManager.Instance;
+        var synergy = gm != null ? gm.Synergy : null;
+        if (synergy == null) return 1;                       // "SynergyManager 없음"
+
+        var active = synergy.GetActiveSynergies();
+        if (active == null || active.Count == 0) return 1;   // "활성 시너지 없음"
+
+        int shown = Mathf.Min(active.Count, MaxSynergyLines);
+        return shown + (active.Count > MaxSynergyLines ? 1 : 0); // "… 외 N개"
+    }
+
+    private int UnitLineCount()
+    {
+        var gm = GameManager.Instance;
+        var battle = gm != null ? gm.Battle : null;
+        if (battle == null || battle.Units == null || battle.Units.Count == 0) return 1; // "전투 중이 아님"
+
+        return Mathf.Min(battle.Units.Count, MaxUnitLines);
     }
 
     /// <summary>현재 보드의 시너지 활성 단계 — 실제 SynergyManager 상태를 그대로 읽는다.</summary>
@@ -184,7 +245,8 @@ public class BalanceCheckHarness : MonoBehaviour
 
         if (battle == null || battle.Units == null || battle.Units.Count == 0)
         {
-            GUI.Label(new Rect(x, y, w, 20f), "  전투 중이 아님");
+            GUI.Label(new Rect(x, y, w, LineH), "  전투 중이 아님");
+            y += LineH; // 마지막 섹션이라 지금은 무의미하지만, 섹션이 추가되면 어긋나므로 맞춰둔다
             return;
         }
 
