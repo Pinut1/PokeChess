@@ -109,7 +109,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -230,9 +230,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 06e3833a63d919e4192fe3ca58e384c9, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BenchTile
-  _defaultColor: {r: 0.7660377, g: 0.7660377, b: 0.51888216, a: 1}
+  _defaultColor: {r: 0.7075472, g: 0.7075472, b: 0.2236116, a: 1}
   _hoverColor: {r: 0, g: 0.9712446, b: 1, a: 1}
 --- !u!1 &1710670703866666
 GameObject:
