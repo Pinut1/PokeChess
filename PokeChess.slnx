@@ -14,6 +14,7 @@
   <Project Path="PunDemos.DemoSlotcarEditor.csproj" />
   <Project Path="PhotonChat.csproj" />
   <Project Path="PhotonUnityNetworking.Utilities.PhotonPlayer.Editor.csproj" />
+  <Project Path="PokeChess.Editor.Diagnostics.csproj" />
   <Project Path="Boxophobic.PolyverseSkies.Runtime.csproj" />
   <Project Path="Boxophobic.PolyverseSkies.Scripts.csproj" />
   <Project Path="PhotonUnityNetworking.Utilities.Culling.Editor.csproj" />

@@ -1,7 +1,9 @@
 {
   "name": "PokeChess.EditorTests",
   "rootNamespace": "PokeChess.Tests",
-  "references": [],
+  "references": [
+    "PokeChess.Editor.Diagnostics"
+  ],
   "includePlatforms": [
     "Editor"
   ],
