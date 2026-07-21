@@ -114,6 +114,15 @@ public class UIManager : MonoBehaviour
     private int _buyXpAmount;
 
     // ──────────────────────────────────────────
+    // 안내 메시지(토스트) 상태
+    // ──────────────────────────────────────────
+
+    private string _toastMessage = "";
+    private float _toastHideTime;
+
+    private const float ToastDuration = 2.5f;
+
+    // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
 
@@ -143,6 +152,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged += HandleLevelChanged;
         GameEvents.OnXpChanged += HandleXpChanged;
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+
+        GameEvents.OnUnitPlacementRejected += HandleUnitPlacementRejected;
     }
 
     private void OnDisable()
@@ -154,6 +165,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged -= HandleLevelChanged;
         GameEvents.OnXpChanged -= HandleXpChanged;
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+
+        GameEvents.OnUnitPlacementRejected -= HandleUnitPlacementRejected;
     }
 
     private void Start()
@@ -215,6 +228,19 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
+    /// <summary>
+    /// 유닛 배치가 거부됐을 때 전달받은 사유를
+    /// 화면 중앙에 일정 시간 표시한다.
+    /// </summary>
+    private void HandleUnitPlacementRejected(string reason)
+    {
+        _toastMessage = string.IsNullOrWhiteSpace(reason)
+            ? "유닛을 배치할 수 없습니다."
+            : reason;
+
+        _toastHideTime = Time.unscaledTime + ToastDuration;
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -228,6 +254,47 @@ public class UIManager : MonoBehaviour
 
         if (_showSampleDeck)
             DrawSampleDeckWindow();
+
+        DrawToastMessage();
+    }
+
+    /// <summary>
+    /// 배치 실패 등의 안내 메시지를 화면 상단 중앙에 잠시 표시한다.
+    /// </summary>
+    private void DrawToastMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_toastMessage))
+            return;
+
+        if (Time.unscaledTime >= _toastHideTime)
+        {
+            _toastMessage = "";
+            return;
+        }
+
+        const float width = 420f;
+        const float height = 48f;
+
+        float x = (Screen.width - width) * 0.5f;
+        float y = 80f;
+
+        GUI.Box(
+            new Rect(x, y, width, height),
+            GUIContent.none
+        );
+
+        GUIStyle toastStyle = new GUIStyle(_labelStyle)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 16,
+            fontStyle = FontStyle.Bold
+        };
+
+        GUI.Label(
+            new Rect(x + 10f, y + 6f, width - 20f, height - 12f),
+            _toastMessage,
+            toastStyle
+        );
     }
 
 
@@ -1613,10 +1680,6 @@ public class UIManager : MonoBehaviour
         HandleSampleDeckItemTooltipOutsideClick(
             new Rect(0f, 0f, width, height)
         );
-
-        DrawSampleDeckItemTooltip();
-
-        GUI.DragWindow(new Rect(0f, 0f, width, 28f));
 
         // 다른 모든 패널보다 나중에 그려서
         // 장비 툴팁이 패널 뒤로 가려지지 않게 한다.
