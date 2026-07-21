@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using PokeChess.EditorTools;
 using UnityEditor;
 using UnityEngine;
 
@@ -528,7 +529,8 @@ public static class PokeChessImporter
         }
 
         // trainer_entry_data.json 로드
-        var trainerMap = LoadTrainerEntryMap();
+        var diagnostics = new TrainerEntryDiagnostics();
+        var trainerMap = LoadTrainerEntryMap(diagnostics);
 
         // 스테이지당 .asset을 만들지 않고, 단일 StageDatabase.asset의 List를 통째로 교체.
         var stages = new List<StageData>();
@@ -556,24 +558,29 @@ public static class PokeChessImporter
             };
 
             List<EnemyPlacementJson> sourceEnemies = null;
+            TrainerEntryJson trainerEntry = null;
+            bool hasTrainerEntry = !string.IsNullOrEmpty(e.trainerId) &&
+                                   trainerMap.TryGetValue(e.trainerId, out trainerEntry);
 
-            // 1순위: trainerId가 있고 trainer_entry_data.json에서 찾을 수 있으면 그 적 구성을 사용
-            if (!string.IsNullOrEmpty(e.trainerId) &&
-                trainerMap.TryGetValue(e.trainerId, out var trainerEntry) &&
-                trainerEntry.enemies != null)
+            // 엔트리를 찾았다면 적 구성 사용 여부와 무관하게 이름은 반영하고 "참조됨"으로 집계
+            if (hasTrainerEntry)
             {
-                sourceEnemies = trainerEntry.enemies;
+                diagnostics.RecordTrainerEntryReferenced(e.trainerId);
 
                 if (!string.IsNullOrEmpty(trainerEntry.trainerName))
                     stage.trainerName = trainerEntry.trainerName;
+            }
+
+            // 1순위: trainer_entry에 실제 적 구성이 있으면 그것을 사용 (빈 리스트는 없는 것으로 취급)
+            if (hasTrainerEntry && trainerEntry.enemies != null && trainerEntry.enemies.Count > 0)
+            {
+                sourceEnemies = trainerEntry.enemies;
             }
             else
             {
                 // 2순위: 전환기 폴백 — 기존 stage_data.json 인라인 enemies 사용
                 sourceEnemies = e.enemies;
-
-                if (!string.IsNullOrEmpty(e.trainerId))
-                    Debug.LogWarning($"[PokeChess] trainerId '{e.trainerId}'를 trainer_entry_data에서 찾지 못해 stage_data 인라인 enemies를 사용합니다.");
+                diagnostics.RecordInlineEnemyFallback(stage.stageId, e.trainerId, hasTrainerEntry);
             }
 
             AddEnemies(stage, sourceEnemies);
@@ -588,6 +595,7 @@ public static class PokeChessImporter
         so.stages = stages;
         EditorUtility.SetDirty(so);
 
+        LogTrainerEntryDiagnostics(diagnostics, trainerMap.Keys);
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 스테이지 {stages.Count}개 Import 완료 (trainer_entry join 적용)");
     }
@@ -842,7 +850,7 @@ public static class PokeChessImporter
         return set;
     }
 
-    private static Dictionary<string, TrainerEntryJson> LoadTrainerEntryMap()
+    private static Dictionary<string, TrainerEntryJson> LoadTrainerEntryMap(TrainerEntryDiagnostics diagnostics)
     {
         var map = new Dictionary<string, TrainerEntryJson>(StringComparer.OrdinalIgnoreCase);
 
@@ -865,11 +873,38 @@ public static class PokeChessImporter
             if (trainer == null || string.IsNullOrEmpty(trainer.trainerId))
                 continue;
 
-            map[trainer.trainerId] = trainer;
+            if (map.ContainsKey(trainer.trainerId))
+            {
+                diagnostics.RecordDuplicateTrainerId(trainer.trainerId);
+                continue;
+            }
+
+            map.Add(trainer.trainerId, trainer);
         }
 
         Debug.Log($"[PokeChess] trainer_entry_data {map.Count}개 로드 완료");
         return map;
+    }
+
+    private static void LogTrainerEntryDiagnostics(
+        TrainerEntryDiagnostics diagnostics,
+        IEnumerable<string> allTrainerIds)
+    {
+        foreach (var message in diagnostics.BuildReport(allTrainerIds))
+        {
+            switch (message.Severity)
+            {
+                case TrainerEntryIssueSeverity.Error:
+                    Debug.LogError($"[PokeChess] {message.Text}");
+                    break;
+                case TrainerEntryIssueSeverity.Warning:
+                    Debug.LogWarning($"[PokeChess] {message.Text}");
+                    break;
+                default:
+                    Debug.Log($"[PokeChess] {message.Text}");
+                    break;
+            }
+        }
     }
 
     private static void AddEnemies(StageData stage, List<EnemyPlacementJson> sourceEnemies)
