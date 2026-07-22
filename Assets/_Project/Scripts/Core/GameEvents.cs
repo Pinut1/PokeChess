@@ -139,6 +139,9 @@ public static class GameEvents
     /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
     public static event Action OnTradeRejected;
 
+    /// <summary>수신자에게 통신 진화 영구 override가 활성화됨. 보드·벤치·상점이 각각 구독해 로컬 상태를 치환.</summary>
+    public static event Action<TradeEvolutionMapping> OnTradeEvolutionActivated;
+
     /// <summary>통신기 골드 전송으로 파트너에게서 골드 수령 완료(받는 쪽). 인자 = 받은 골드. 골드 잔액 표시는 OnGoldChanged가 담당.</summary>
     public static event Action<int> OnPartnerGoldReceived;
 
@@ -261,6 +264,7 @@ public static class GameEvents
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
     public static void TradeRejected()               => OnTradeRejected?.Invoke();
+    public static void TradeEvolutionActivated(TradeEvolutionMapping mapping) => OnTradeEvolutionActivated?.Invoke(mapping);
     public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
     public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);
     public static void GoldTransferRejected(string reason) => OnGoldTransferRejected?.Invoke(reason);

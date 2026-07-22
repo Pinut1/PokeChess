@@ -20,25 +20,50 @@ public static class UnitFactory
         var unit = go.AddComponent<PokemonUnit>();
         unit.data = data;
         unit.starLevel = Mathf.Clamp(starLevel, 1, 3);
+        unit.poolOriginPokemonId = data.id;
+
+        RefreshVisual(unit);
+        unit.ResetForBattle(); // currentHp 채움 (Start 전 사용 대비 명시 호출)
+        return unit;
+    }
+
+    /// <summary>현재 PokemonData에 맞춰 모델 자식만 교체. 유닛 루트/위치/아이템/콜라이더는 유지한다.</summary>
+    public static void RefreshVisual(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null) return;
+
+        const string visualRootName = "UnitVisual";
+        Transform visualRoot = unit.transform.Find(visualRootName);
+        if (visualRoot == null)
+        {
+            var root = new GameObject(visualRootName);
+            visualRoot = root.transform;
+            visualRoot.SetParent(unit.transform, false);
+        }
+
+        for (int i = visualRoot.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = visualRoot.GetChild(i).gameObject;
+            if (Application.isPlaying) Object.Destroy(child);
+            else Object.DestroyImmediate(child);
+        }
 
         GameObject visual;
-        if (data.modelPrefab != null)
+        if (unit.data.modelPrefab != null)
         {
-            visual = Object.Instantiate(data.modelPrefab, go.transform);
+            visual = Object.Instantiate(unit.data.modelPrefab, visualRoot);
         }
         else
         {
             visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            visual.transform.SetParent(go.transform);
+            visual.transform.SetParent(visualRoot, false);
             visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
         }
         visual.transform.localPosition = Vector3.zero;
+        visual.transform.localRotation = Quaternion.identity;
 
         // 레이캐스트 픽업용 콜라이더 보장 (모델 프리팹에 없을 수도 있음)
-        if (go.GetComponentInChildren<Collider>() == null)
-            go.AddComponent<CapsuleCollider>();
-
-        unit.ResetForBattle(); // currentHp 채움 (Start 전 사용 대비 명시 호출)
-        return unit;
+        if (visual.GetComponentInChildren<Collider>() == null && unit.GetComponent<Collider>() == null)
+            unit.gameObject.AddComponent<CapsuleCollider>();
     }
 }

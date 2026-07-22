@@ -16,6 +16,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitPlaced      += MarkBoardDirty;
         GameEvents.OnUnitBenched     += MarkBoardDirty;
         GameEvents.OnUnitSold        += MarkBoardDirty;
+        GameEvents.OnUnitChanged     += MarkBoardDirty;
         GameEvents.OnGoldChanged     += HandleGoldChanged;
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested += MarkBoardDirtyForResync;
@@ -26,6 +27,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitPlaced      -= MarkBoardDirty;
         GameEvents.OnUnitBenched     -= MarkBoardDirty;
         GameEvents.OnUnitSold        -= MarkBoardDirty;
+        GameEvents.OnUnitChanged     -= MarkBoardDirty;
         GameEvents.OnGoldChanged     -= HandleGoldChanged;
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested -= MarkBoardDirtyForResync;

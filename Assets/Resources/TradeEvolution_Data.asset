@@ -15,29 +15,51 @@ MonoBehaviour:
   mappings:
   - targetPokemonEn: Golbat
     evolvedPokemonEn: Crobat
-    note: "\uD06C\uB85C\uBC43 (Golbat\u2192Crobat, \uD655\uC778)"
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
+    note: "\uD06C\uB85C\uBC43 (\uCE5C\uBC00\uB3C4 \uC9C4\uD654\uB97C \uD1B5\uC2E0
+      \uC9C4\uD654\uB85C \uB300\uCCB4)"
   - targetPokemonEn: Kadabra
     evolvedPokemonEn: Alakazam
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
     note: "\uD6C4\uB518 (Kadabra\u2192Alakazam)"
-  - targetPokemonEn: Abra
-    evolvedPokemonEn: Kadabra
-    note: "\uC724\uAC94\uB77C (\uBCF4\uD1B5 \uC77C\uBC18\uC9C4\uD654\uC778\uB370
-      DB\uAC00 trade \uD45C\uAE30 \u2014 \uD655\uC778)"
   - targetPokemonEn: Graveler
     evolvedPokemonEn: Golem
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
     note: "\uB531\uAD6C\uB9AC (Graveler\u2192Golem)"
-  - targetPokemonEn: Geodude
-    evolvedPokemonEn: Graveler
-    note: "\uB370\uAD6C\uB9AC (\uBCF4\uD1B5 \uC77C\uBC18\uC9C4\uD654 \u2014 \uD655\uC778)"
   - targetPokemonEn: Slowpoke
     evolvedPokemonEn: Slowking
-    note: "\uC57C\uB3C4\uD0B9 (Slowpoke\u2192Slowking, \uD655\uC778)"
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
+    note: "\uC57C\uB3C4\uD0B9 (Slowpoke\u2192Slowking)"
   - targetPokemonEn: Haunter
     evolvedPokemonEn: Gengar
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
     note: "\uD32C\uD140 (Haunter\u2192Gengar)"
   - targetPokemonEn: Onix
     evolvedPokemonEn: Steelix
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
     note: "\uAC15\uCCA0\uD1A4 (Onix\u2192Steelix)"
   - targetPokemonEn: Scyther
     evolvedPokemonEn: Scizor
+    affectsField: 1
+    affectsBench: 1
+    affectsShop: 1
+    isReversible: 0
     note: "\uD56B\uC0BC (Scyther\u2192Scizor)"

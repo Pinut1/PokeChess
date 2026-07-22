@@ -38,7 +38,7 @@ MonoBehaviour:
     lineLength: 4
     vfxId: VFX_Water_Magician
   attackVfxId: Water_S
-  evolvesIntoEn: Wobbuffet
+  evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 0}
   icon: {fileID: 0}

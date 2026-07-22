@@ -65,6 +65,7 @@ public class SynergyManager : MonoBehaviour
         GameEvents.OnUnitPlaced  += HandleBoardChanged;
         GameEvents.OnUnitBenched += HandleBoardChanged;
         GameEvents.OnUnitSold    += HandleBoardChanged;
+        GameEvents.OnUnitChanged += HandleBoardChanged;
     }
 
     private void OnDisable()
@@ -72,6 +73,7 @@ public class SynergyManager : MonoBehaviour
         GameEvents.OnUnitPlaced  -= HandleBoardChanged;
         GameEvents.OnUnitBenched -= HandleBoardChanged;
         GameEvents.OnUnitSold    -= HandleBoardChanged;
+        GameEvents.OnUnitChanged -= HandleBoardChanged;
     }
 
     private void HandleBoardChanged(PokemonUnit _) => RecalculateSynergies();

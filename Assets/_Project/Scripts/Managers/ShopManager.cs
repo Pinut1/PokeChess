@@ -124,6 +124,8 @@ public class ShopManager : MonoBehaviour
     public IReadOnlyList<ScriptableObject> CurrentItemSlots => _itemSlots;
 
     private PokemonData[] _slots;
+    // 공용/로컬 풀에서 실제 예약한 원본 종 ID. _slots는 플레이어에게 보이는 진화체일 수 있다.
+    private int[] _slotPoolSourceIds;
     private ScriptableObject[] _itemSlots;
 
     /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
@@ -145,9 +147,13 @@ public class ShopManager : MonoBehaviour
     /// <summary>진화체 → 기본종(풀 관리 대상) 역매핑. 진화 유닛 판매 시 소비된 기본종 카피를 올바른 풀로 되돌리기 위함.</summary>
     private readonly Dictionary<PokemonData, PokemonData> _evolvedToBase = new();
 
+    /// <summary>수신 플레이어에게 영구 적용된 통신 진화 원본 ID → 진화체 ID.</summary>
+    private readonly Dictionary<int, int> _tradeEvolutionOverrides = new();
+
     private void Awake()
     {
         _slots = new PokemonData[_shopSize];
+        _slotPoolSourceIds = new int[_shopSize];
         _itemSlots = new ScriptableObject[_itemShopSize];
 
         Gold = _startingGold;
@@ -175,6 +181,7 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnUnitSold += HandleUnitSold;
         GameEvents.OnLevelChanged += HandleLevelChanged;
         GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
+        GameEvents.OnTradeEvolutionActivated += HandleTradeEvolutionActivated;
     }
 
     private void OnDisable()
@@ -183,6 +190,86 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnUnitSold -= HandleUnitSold;
         GameEvents.OnLevelChanged -= HandleLevelChanged;
         GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
+        GameEvents.OnTradeEvolutionActivated -= HandleTradeEvolutionActivated;
+    }
+
+    private void HandleTradeEvolutionActivated(TradeEvolutionMapping mapping)
+        => ApplyTradeEvolutionOverride(mapping);
+
+    /// <summary>현재 슬롯과 이후 롤에 원본→진화체 표시/생성 override를 적용.</summary>
+    public int ApplyTradeEvolutionOverride(TradeEvolutionMapping mapping)
+    {
+        if (mapping == null || !mapping.affectsShop) return 0;
+        var db = PokemonDatabase.Instance;
+        var target = db != null ? db.GetByNameEn(mapping.targetPokemonEn) : null;
+        var evolved = db != null ? db.GetByNameEn(mapping.evolvedPokemonEn) : null;
+        if (target == null || evolved == null)
+        {
+            Debug.LogError($"[TradeEvolution] 상점 매핑 누락: {mapping.targetPokemonEn} -> {mapping.evolvedPokemonEn}");
+            return 0;
+        }
+
+        _tradeEvolutionOverrides[target.id] = evolved.id;
+        EnsureSlotSourceArray();
+        int changed = 0;
+        for (int i = 0; i < _slots.Length; i++)
+        {
+            PokemonData source = GetSlotPoolSource(i);
+            if (source == null || source.id != target.id) continue;
+            if (_slots[i] != evolved) changed++;
+            _slots[i] = evolved;
+        }
+
+        GameEvents.ShopRerolled();
+        Debug.Log($"[TradeEvolution] 상점 override {target.pokemonNameEn} -> {evolved.pokemonNameEn} (현재 슬롯 {changed}개)");
+        return changed;
+    }
+
+    private void EnsureSlotSourceArray()
+    {
+        if (_slots == null) _slots = new PokemonData[_shopSize];
+        if (_slotPoolSourceIds == null || _slotPoolSourceIds.Length != _slots.Length)
+            _slotPoolSourceIds = new int[_slots.Length];
+    }
+
+    private PokemonData ResolveTradeEvolutionOffer(PokemonData source)
+    {
+        if (source == null) return null;
+        if (!_tradeEvolutionOverrides.TryGetValue(source.id, out int evolvedId)) return source;
+        var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetById(evolvedId) : null;
+        return evolved != null ? evolved : source;
+    }
+
+    private PokemonData GetSlotPoolSource(int slot)
+    {
+        if (_slots == null || slot < 0 || slot >= _slots.Length) return null;
+        EnsureSlotSourceArray();
+        int sourceId = _slotPoolSourceIds[slot];
+        if (sourceId > 0 && PokemonDatabase.Instance != null)
+            return PokemonDatabase.Instance.GetById(sourceId);
+        return _slots[slot];
+    }
+
+    private void SetUnitShopSlot(int slot, PokemonData poolSource)
+    {
+        EnsureSlotSourceArray();
+        _slotPoolSourceIds[slot] = poolSource != null ? poolSource.id : 0;
+        _slots[slot] = ResolveTradeEvolutionOffer(poolSource);
+    }
+
+    private void ClearUnitShopSlot(int slot)
+    {
+        if (_slots == null || slot < 0 || slot >= _slots.Length) return;
+        EnsureSlotSourceArray();
+        _slots[slot] = null;
+        _slotPoolSourceIds[slot] = 0;
+    }
+
+    private static void ConfigurePurchasedUnit(PokemonUnit unit, PokemonData poolSource, PokemonData offered)
+    {
+        if (unit == null || poolSource == null) return;
+        unit.poolOriginPokemonId = poolSource.id;
+        unit.isTradeEvolved = offered != null && offered.id != poolSource.id;
     }
 
     private void Start()
@@ -466,7 +553,20 @@ public class ShopManager : MonoBehaviour
     {
         if (unit == null || unit.data == null) return 0;
         int baseUnits = GetBaseUnitCount(unit.starLevel);
-        return unit.data.cost * baseUnits;
+        PokemonData origin = ResolvePoolOrigin(unit);
+        return (origin != null ? origin.cost : unit.data.cost) * baseUnits;
+    }
+
+    private PokemonData ResolvePoolOrigin(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null) return null;
+        var db = PokemonDatabase.Instance;
+        if (unit.poolOriginPokemonId > 0 && db != null)
+        {
+            var explicitOrigin = db.GetById(unit.poolOriginPokemonId);
+            if (explicitOrigin != null) return explicitOrigin;
+        }
+        return _evolvedToBase.TryGetValue(unit.data, out var baseData) ? baseData : unit.data;
     }
 
     // ──────────────────────────────────────────
@@ -488,7 +588,7 @@ public class ShopManager : MonoBehaviour
 
         if (_pool == null || _pool.Count == 0)
         {
-            for (int i = 0; i < _slots.Length; i++) _slots[i] = null;
+            for (int i = 0; i < _slots.Length; i++) ClearUnitShopSlot(i);
             GameEvents.ShopRerolled();
             return;
         }
@@ -496,8 +596,9 @@ public class ShopManager : MonoBehaviour
         ReturnLocalShopSlotsToPool();
         for (int i = 0; i < _slots.Length; i++)
         {
-            _slots[i] = RollOnePokemonWeighted(_currentLevel, _cost4ForceOpen);
-            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+            PokemonData source = RollOnePokemonWeighted(_currentLevel, _cost4ForceOpen);
+            SetUnitShopSlot(i, source);
+            if (source != null) DecreaseChampionPool(source, 1);
         }
 
         GameEvents.ShopRerolled();
@@ -539,15 +640,16 @@ public class ShopManager : MonoBehaviour
             if (distinct.Count > 0)
             {
                 int pick = Random.Range(0, distinct.Count);
-                _slots[i] = distinct[pick];
+                SetUnitShopSlot(i, distinct[pick]);
                 distinct.RemoveAt(pick);
             }
             else
             {
-                _slots[i] = RollOnePokemonOfCostWeighted(4, _currentLevel, false);
+                SetUnitShopSlot(i, RollOnePokemonOfCostWeighted(4, _currentLevel, false));
             }
 
-            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+            PokemonData source = GetSlotPoolSource(i);
+            if (source != null) DecreaseChampionPool(source, 1);
         }
 
         GameEvents.ShopRerolled();
@@ -691,16 +793,17 @@ public class ShopManager : MonoBehaviour
         if (_slots == null || slot < 0 || slot >= _slots.Length) return false;
 
         PokemonData data = _slots[slot];
-        if (data == null) return false;
+        PokemonData poolSource = GetSlotPoolSource(slot);
+        if (data == null || poolSource == null) return false;
 
         var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
         bool usesSharedPool = network != null && network.UsesSharedShopPool;
 
         if (_sharedRollPending || _sharedPurchasePending) return false;
 
-        if (Gold < data.cost)
+        if (Gold < poolSource.cost)
         {
-            Debug.Log($"[Shop] 골드 부족 — {data.pokemonName} 구매 실패 (필요 {data.cost}, 보유 {Gold})");
+            Debug.Log($"[Shop] 골드 부족 — {data.pokemonName} 구매 실패 (필요 {poolSource.cost}, 보유 {Gold})");
             return false;
         }
 
@@ -724,6 +827,7 @@ public class ShopManager : MonoBehaviour
 
         PokemonUnit unit = UnitFactory.Create(data);
         if (unit == null) return false;
+        ConfigurePurchasedUnit(unit, poolSource, data);
 
         if (!board.TryPlaceInBench(unit))
         {
@@ -731,10 +835,10 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
-        AddGold(-data.cost);
-        _slots[slot] = null;
+        AddGold(-poolSource.cost);
+        ClearUnitShopSlot(slot);
         GameEvents.ShopRerolled(); // 표시 갱신(슬롯 비움 반영)
-        Debug.Log($"[Shop] {data.pokemonName} 구매 (-{data.cost}G)");
+        Debug.Log($"[Shop] {data.pokemonName} 구매 (-{poolSource.cost}G)");
         return true;
     }
 
@@ -759,7 +863,7 @@ public class ShopManager : MonoBehaviour
         if (unit == null || unit.data == null) return;
 
         // 진화 유닛(data가 진화체로 스왑됨)이면 소비된 기본종 풀로 되돌린다.
-        PokemonData data = _evolvedToBase.TryGetValue(unit.data, out var baseData) ? baseData : unit.data;
+        PokemonData data = ResolvePoolOrigin(unit);
 
         if (!_remainingPool.ContainsKey(data))
             return;
@@ -860,10 +964,14 @@ public class ShopManager : MonoBehaviour
 
         if (_slots == null || _slots.Length != pokemonIds.Length)
             _slots = new PokemonData[pokemonIds.Length];
+        EnsureSlotSourceArray();
 
         var db = PokemonDatabase.Instance;
         for (int i = 0; i < pokemonIds.Length; i++)
-            _slots[i] = pokemonIds[i] > 0 && db != null ? db.GetById(pokemonIds[i]) : null;
+        {
+            PokemonData poolSource = pokemonIds[i] > 0 && db != null ? db.GetById(pokemonIds[i]) : null;
+            SetUnitShopSlot(i, poolSource);
+        }
 
         _shopRevision = revision;
         GameEvents.ShopRerolled();
@@ -874,37 +982,40 @@ public class ShopManager : MonoBehaviour
     {
         _sharedPurchasePending = false;
         if (!success || revision != _shopRevision || _slots == null ||
-            slot < 0 || slot >= _slots.Length || _slots[slot] == null || _slots[slot].id != pokemonId)
+            slot < 0 || slot >= _slots.Length || _slots[slot] == null ||
+            GetSlotPoolSource(slot) == null || GetSlotPoolSource(slot).id != pokemonId)
         {
             Debug.LogWarning("[SharedShopPool] 구매 승인 실패 또는 오래된 응답");
             return;
         }
 
         PokemonData data = _slots[slot];
+        PokemonData poolSource = GetSlotPoolSource(slot);
         var board = GameManager.Instance != null ? GameManager.Instance.Board : null;
-        if (board == null || Gold < data.cost || !board.HasBenchSpace())
+        if (board == null || poolSource == null || Gold < poolSource.cost || !board.HasBenchSpace())
         {
             GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
-            _slots[slot] = null;
+            ClearUnitShopSlot(slot);
             GameEvents.ShopRerolled();
             Debug.LogWarning("[SharedShopPool] 구매 커밋 실패 — 예약 카피 풀 반환");
             return;
         }
 
         PokemonUnit unit = UnitFactory.Create(data);
+        ConfigurePurchasedUnit(unit, poolSource, data);
         if (unit == null || !board.TryPlaceInBench(unit))
         {
             if (unit != null) Destroy(unit.gameObject);
             GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
-            _slots[slot] = null;
+            ClearUnitShopSlot(slot);
             GameEvents.ShopRerolled();
             return;
         }
 
-        AddGold(-data.cost);
-        _slots[slot] = null;
+        AddGold(-poolSource.cost);
+        ClearUnitShopSlot(slot);
         GameEvents.ShopRerolled();
-        Debug.Log($"[SharedShopPool] {data.pokemonName} 구매 확정 (-{data.cost}G)");
+        Debug.Log($"[SharedShopPool] {data.pokemonName} 구매 확정 (-{poolSource.cost}G)");
     }
 
     /// <summary>모든 클라이언트가 권위 풀/예약 미러를 유지해 MasterClient 교체에 대비한다.</summary>
@@ -970,8 +1081,9 @@ public class ShopManager : MonoBehaviour
     private void ReturnLocalShopSlotsToPool()
     {
         if (_slots == null) return;
-        foreach (PokemonData data in _slots)
+        for (int i = 0; i < _slots.Length; i++)
         {
+            PokemonData data = GetSlotPoolSource(i);
             if (data == null || !_remainingPool.TryGetValue(data, out int remain)) continue;
             _remainingPool[data] = Mathf.Min(GetInitialPoolCount(data.cost), remain + 1);
         }

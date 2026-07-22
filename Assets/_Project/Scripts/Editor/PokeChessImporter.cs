@@ -177,6 +177,7 @@ public static class PokeChessImporter
     private class TradeEvoJson
     {
         public string targetPokemonEn, evolvedPokemonEn, note;
+        public bool affectsField, affectsBench, affectsShop, isReversible;
     }
 
     [Serializable]
@@ -625,17 +626,63 @@ public static class PokeChessImporter
 
         string path = $"{resDir}/TradeEvolution_Data.asset"; // 통신진화는 단일 SO에 모음
         var so = LoadOrCreate<TradeEvolutionData>(path);
+        var pokemonDb = AssetDatabase.LoadAssetAtPath<PokemonDatabase>("Assets/Resources/PokemonDatabase.asset");
 
-        so.mappings = new List<TradeEvolutionMapping>();
+        var imported = new List<TradeEvolutionMapping>();
+        var seenTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool hasErrors = false;
         if (db.mappings != null)
             foreach (var m in db.mappings)
-                if (!string.IsNullOrEmpty(m.targetPokemonEn))
-                    so.mappings.Add(new TradeEvolutionMapping
-                    {
-                        targetPokemonEn  = m.targetPokemonEn,
-                        evolvedPokemonEn = m.evolvedPokemonEn,
-                        note             = m.note
-                    });
+            {
+                if (string.IsNullOrWhiteSpace(m.targetPokemonEn) || string.IsNullOrWhiteSpace(m.evolvedPokemonEn))
+                {
+                    Debug.LogError("[PokeChess] 통신진화 Import 오류 — target/evolved 영문명은 비울 수 없습니다.");
+                    hasErrors = true;
+                    continue;
+                }
+
+                string target = m.targetPokemonEn.Trim();
+                string evolved = m.evolvedPokemonEn.Trim();
+                if (!seenTargets.Add(target))
+                {
+                    Debug.LogError($"[PokeChess] 통신진화 Import 오류 — 원본 종 중복: {target}");
+                    hasErrors = true;
+                    continue;
+                }
+
+                if (string.Equals(target, evolved, StringComparison.OrdinalIgnoreCase))
+                {
+                    Debug.LogError($"[PokeChess] 통신진화 Import 오류 — 원본과 진화체가 같습니다: {target}");
+                    hasErrors = true;
+                    continue;
+                }
+
+                if (pokemonDb == null || pokemonDb.GetByNameEn(target) == null || pokemonDb.GetByNameEn(evolved) == null)
+                {
+                    Debug.LogError($"[PokeChess] 통신진화 Import 오류 — PokemonDatabase 종 누락: {target} -> {evolved}");
+                    hasErrors = true;
+                    continue;
+                }
+
+                imported.Add(new TradeEvolutionMapping
+                {
+                    targetPokemonEn  = target,
+                    evolvedPokemonEn = evolved,
+                    affectsField     = m.affectsField,
+                    affectsBench     = m.affectsBench,
+                    affectsShop      = m.affectsShop,
+                    isReversible     = m.isReversible,
+                    note             = m.note
+                });
+            }
+
+        if (hasErrors)
+        {
+            Debug.LogError("[PokeChess] 통신진화 Import 중단 — 기존 TradeEvolution_Data.asset을 보존합니다.");
+            return;
+        }
+
+        so.mappings = imported;
 
         EditorUtility.SetDirty(so);
         AssetDatabase.SaveAssets();
