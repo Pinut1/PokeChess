@@ -63,7 +63,7 @@ Assets/_Project/Scripts/
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
 - ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`) + **전적창 서버 조회 로컬/서버 탭**(Phase 3, PR #45, 7/20 병합). 전 구간 완료.
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
-- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. 별도 신규 메커니즘인 나인이볼부스트·`SK_` 영웅스킬은 미구현. 보스 전용 기믹은 **스코프 아웃**(7/21 확인: 기획에 패턴/페이즈 없음 — 스탯 배수가 최종 스펙)
+- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. **나인이볼부스트 증강(HERO_EEVEE)은 구현·동작 중**(간이 봇소환) — 미구현은 v2 풀 연출(진화체 8종 순차 소환+종별 버프)뿐. `SK_` 영웅스킬은 skill_table에 행 0건(기획 미작성)이라 코드로만 동작. 보스 전용 기믹은 **스코프 아웃**(7/21 확인, 근거: 기획 역기획서 `SCHEMA_2026-06-19_stage-data-v2.md`에 보스=statMul/hpMul+q,r 포메이션만, 패턴/페이즈 컬럼 자체가 없음 — 스탯 배수가 최종 스펙. 현 데이터는 1-5 슬라이스 한정)
 - 🔺 **자동 테스트가 핵심 로직에 못 붙는 구조 (7/21 확인, 미해결)**
   - 문제: `BattleManager`·`ShopManager`·`NetworkManager` 등 런타임 코드가 전부 **predefined assembly(`Assembly-CSharp`)** 에 있는데, **asmdef 기반 테스트 어셈블리는 predefined assembly를 참조할 수 없다**(Unity 제약). 그래서 `PokeChess.EditorTests`에서 이 타입들이 아예 안 보인다. 기존 `SceneStabilityTests`가 도는 건 UnityEditor API만 쓰기 때문.
   - 정공법: `Assets/_Project/Scripts/`에 런타임 asmdef, `Scripts/Editor/`에 에디터 asmdef를 만들어 predefined assembly에서 탈출. `_Project/Scripts` 밖의 `.cs`는 서드파티 데모뿐이라 충돌 위험은 낮음.
