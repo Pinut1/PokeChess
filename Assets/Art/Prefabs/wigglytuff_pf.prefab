@@ -9,6 +9,18 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.38
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.38
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.38
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -48,9 +60,13 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
       propertyPath: m_Name
-      value: Wigglytuff
+      value: wigglytuff_pf
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 768e37be6a4949c4da1856c3b4ff387e, type: 3}
       propertyPath: m_IsActive
