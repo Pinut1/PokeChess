@@ -59,6 +59,7 @@ public class BoardManager : MonoBehaviour
 
     // 진화(합체) 처리 중 재진입 방지 플래그.
     private bool _isEvolving;
+    private bool _isApplyingTradeEvolution;
 
     // 보드 중앙 정렬에 사용된 오프셋. CoordsToWorldPosition에서 재사용.
     private Vector3 _centerOffset;
@@ -84,11 +85,66 @@ public class BoardManager : MonoBehaviour
     private void OnEnable()
     {
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+        GameEvents.OnUnitChanged += HandleUnitChanged;
+        GameEvents.OnTradeEvolutionActivated += HandleTradeEvolutionActivated;
     }
 
     private void OnDisable()
     {
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+        GameEvents.OnUnitChanged -= HandleUnitChanged;
+        GameEvents.OnTradeEvolutionActivated -= HandleTradeEvolutionActivated;
+    }
+
+    private void HandleUnitChanged(PokemonUnit unit)
+    {
+        if (_isApplyingTradeEvolution || unit == null || unit.data == null) return;
+        CheckEvolution(unit.data.id, unit.starLevel);
+    }
+
+    private void HandleTradeEvolutionActivated(TradeEvolutionMapping mapping)
+        => ApplyTradeEvolution(mapping);
+
+    /// <summary>확정 규칙을 로컬 보드·벤치의 동일 원본 종 전체에 즉시 적용한다.</summary>
+    public int ApplyTradeEvolution(TradeEvolutionMapping mapping)
+    {
+        if (mapping == null || string.IsNullOrEmpty(mapping.targetPokemonEn) ||
+            string.IsNullOrEmpty(mapping.evolvedPokemonEn)) return 0;
+
+        var db = PokemonDatabase.Instance;
+        var target = db != null ? db.GetByNameEn(mapping.targetPokemonEn) : null;
+        var evolved = db != null ? db.GetByNameEn(mapping.evolvedPokemonEn) : null;
+        if (target == null || evolved == null)
+        {
+            Debug.LogError($"[TradeEvolution] PokemonDatabase 매핑 누락: {mapping.targetPokemonEn} -> {mapping.evolvedPokemonEn}");
+            return 0;
+        }
+
+        var candidates = new HashSet<PokemonUnit>();
+        if (mapping.affectsField)
+            foreach (var unit in GetUnitsOnBoard())
+                if (unit != null && unit.MatchesTradeEvolutionTarget(target)) candidates.Add(unit);
+        if (mapping.affectsBench)
+            foreach (var unit in GetUnitsInBench())
+                if (unit != null && unit.MatchesTradeEvolutionTarget(target)) candidates.Add(unit);
+
+        int changed = 0;
+        _isApplyingTradeEvolution = true;
+        try
+        {
+            foreach (var unit in candidates)
+                if (unit != null && unit.ApplyPermanentTradeEvolution(evolved)) changed++;
+        }
+        finally
+        {
+            _isApplyingTradeEvolution = false;
+        }
+
+        CheckEvolution(evolved.id, 1);
+        CheckEvolution(evolved.id, 2);
+        if (changed > 0)
+            Debug.Log($"[TradeEvolution] 보드/벤치 {mapping.targetPokemonEn} {changed}마리 -> {mapping.evolvedPokemonEn}");
+        return changed;
     }
 
     private void HandleUnitCapChanged(int cap)

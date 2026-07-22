@@ -40,8 +40,35 @@ public class PokemonUnit : MonoBehaviour
     public bool HasFreeSlot    => UsedSlots < MaxItemSlots;
     public bool IsStoneEvolved => equippedStone != null;
 
-    /// <summary>통신교환으로 진화체를 받았는지(NetworkManager.RPC_TradeReceive가 매핑 적중 시 설정). 베이스 핸드오버면 false.</summary>
+    /// <summary>통신 진화 override로 현재 종이 영구 교체되었는지.</summary>
     public bool isTradeEvolved;
+
+    /// <summary>풀·가격 계산에 사용하는 최초 상점 원본 종 ID. 종 교체와 무관하게 유지한다.</summary>
+    public int poolOriginPokemonId;
+
+    public bool MatchesTradeEvolutionTarget(PokemonData target)
+    {
+        if (target == null) return false;
+        return data == target || preStoneData == target;
+    }
+
+    /// <summary>성급·장착물·풀 원산지를 유지한 채 영구 통신 진화체로 종을 교체한다.</summary>
+    public bool ApplyPermanentTradeEvolution(PokemonData evolvedData)
+    {
+        if (evolvedData == null || data == null) return false;
+        if (poolOriginPokemonId <= 0)
+            poolOriginPokemonId = preStoneData != null ? preStoneData.id : data.id;
+
+        bool changed = data != evolvedData || !isTradeEvolved;
+        data = evolvedData;
+        isTradeEvolved = true;
+        if (equippedStone != null) preStoneData = evolvedData;
+
+        currentHp = Mathf.Min(currentHp, MaxHp);
+        UnitFactory.RefreshVisual(this);
+        GameEvents.UnitChanged(this);
+        return changed;
+    }
 
     // ──────────────────────────────────────────
     // 영웅 증강 런타임 변형 (증강 시스템=해인이 선택 시 설정하는 seam)
@@ -139,6 +166,8 @@ public class PokemonUnit : MonoBehaviour
 
     private void Start()
     {
+        if (poolOriginPokemonId <= 0 && data != null)
+            poolOriginPokemonId = data.id;
         ResetForBattle();
     }
 

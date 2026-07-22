@@ -10,6 +10,10 @@ using UnityEngine;
 [Serializable]
 public class TradeEvolutionMapping
 {
+    public bool affectsField;
+    public bool affectsBench;
+    public bool affectsShop;
+    public bool isReversible;
     public string targetPokemonEn;   // 전송 전 포켓몬 영문명
     public string evolvedPokemonEn;  // 전송 즉시 진화 후 영문명
     [TextArea]
@@ -42,31 +46,44 @@ public class TradeEvolutionData : ScriptableObject
         }
     }
 
-    // 잦은 조회를 위한 캐시 (targetEn → evolvedEn). 코드에서 딕셔너리로 제어.
-    private Dictionary<string, string> _lookup;
+    // 잦은 조회를 위한 캐시 (targetEn → mapping). 코드에서 딕셔너리로 제어.
+    private Dictionary<string, TradeEvolutionMapping> _lookup;
 
     private void OnEnable()  => _lookup = null;   // 핫리로드/임포트 후 재빌드 강제
     private void OnDisable() => _lookup = null;
 
-    private Dictionary<string, string> Lookup
+    private Dictionary<string, TradeEvolutionMapping> Lookup
     {
         get
         {
             if (_lookup == null)
             {
-                _lookup = new Dictionary<string, string>();
+                _lookup = new Dictionary<string, TradeEvolutionMapping>(StringComparer.Ordinal);
                 foreach (var m in mappings)
-                    if (!string.IsNullOrEmpty(m.targetPokemonEn))
-                        _lookup[m.targetPokemonEn] = m.evolvedPokemonEn;
+                    if (m != null && !string.IsNullOrEmpty(m.targetPokemonEn))
+                        _lookup[m.targetPokemonEn] = m;
             }
             return _lookup;
         }
     }
 
     /// <summary>해당 종이 통신교환 시 진화하는지 여부.</summary>
-    public bool IsTradeEvolver(string targetNameEn) => Lookup.ContainsKey(targetNameEn);
+    public bool IsTradeEvolver(string targetNameEn) => GetMapping(targetNameEn) != null;
+
+    public TradeEvolutionMapping GetMapping(string targetNameEn)
+        => targetNameEn != null && Lookup.TryGetValue(targetNameEn, out var mapping) ? mapping : null;
+
+    public bool TryGetMapping(string targetNameEn, out TradeEvolutionMapping mapping)
+    {
+        if (targetNameEn == null)
+        {
+            mapping = null;
+            return false;
+        }
+        return Lookup.TryGetValue(targetNameEn, out mapping);
+    }
 
     /// <summary>targetPokemonEn의 통신진화 후 영문명. 대상이 아니면 null.</summary>
     public string GetEvolved(string targetNameEn)
-        => Lookup.TryGetValue(targetNameEn, out var evolved) ? evolved : null;
+        => GetMapping(targetNameEn)?.evolvedPokemonEn;
 }

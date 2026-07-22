@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 #if PHOTON_UNITY_NETWORKING
 using ExitGames.Client.Photon;
@@ -34,6 +35,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>플레이어의 누적 증강 영문명 배열을 Player CustomProperties에 저장할 때 쓰는 키.
     /// RPC와 달리 유예(비활성) 중에도 서버에 보존돼 재접속·마스터 교체에 안전하다.</summary>
     private const string AUGMENTS_PROP_KEY = "Augments";
+
+    /// <summary>이 플레이어에게 활성화된 통신 진화 원본 영문명 배열. 재접속/씬 재생성 복구용.</summary>
+    private const string TRADE_EVOLUTIONS_PROP_KEY = "TradeEvos";
+    private readonly HashSet<string> _activeTradeEvolutionTargets = new(System.StringComparer.OrdinalIgnoreCase);
 
     /// <summary>팀 공통 HP를 Room CustomProperties에 저장할 때 쓰는 키(GDD: 팀 공통 체력).</summary>
     private const string TEAM_HP_PROP_KEY = "TeamHP";
@@ -516,11 +521,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         // 통신진화 매핑 있으면 진화체로, 없으면 그대로 핸드오버(데이터 미입력 폴백).
         var te = TradeEvolutionData.Instance;
-        string evolved = te != null ? te.GetEvolved(baseNameEn) : null;
+        TradeEvolutionMapping mapping = te != null ? te.GetMapping(baseNameEn) : null;
+        string evolved = mapping != null ? mapping.evolvedPokemonEn : null;
         string targetName = string.IsNullOrEmpty(evolved) ? baseNameEn : evolved;
 
+        var poolSource = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(baseNameEn) : null;
         var data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(targetName) : null;
-        if (data == null)
+        if (data == null || poolSource == null)
         {
             Debug.LogWarning($"[Trade] '{targetName}' PokemonDatabase에 없음 — 거부");
             photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
@@ -528,6 +535,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         var unit = UnitFactory.Create(data, Mathf.Clamp(starLevel, 1, 3));
+        if (unit != null)
+        {
+            unit.poolOriginPokemonId = poolSource.id;
+            unit.isTradeEvolved = mapping != null;
+        }
         if (unit == null || !board.TryPlaceInBench(unit))
         {
             if (unit != null) Destroy(unit.gameObject);
@@ -535,12 +547,42 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        // 매핑이 적중해 베이스가 아닌 진화체를 받았을 때만 특수진화 배율(×1.5) 대상.
-        unit.isTradeEvolved = !string.IsNullOrEmpty(evolved);
+        if (mapping != null)
+            ActivateLocalTradeEvolution(mapping, true);
 
         Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
         GameEvents.TradeUnitReceived(unit);
         photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);
+    }
+
+    private bool ActivateLocalTradeEvolution(TradeEvolutionMapping mapping, bool persist)
+    {
+        if (mapping == null || string.IsNullOrEmpty(mapping.targetPokemonEn)) return false;
+        if (!_activeTradeEvolutionTargets.Add(mapping.targetPokemonEn)) return false;
+
+        GameEvents.TradeEvolutionActivated(mapping);
+        if (persist && !_soloMode && PhotonNetwork.InRoom)
+        {
+            var values = new List<string>(_activeTradeEvolutionTargets).ToArray();
+            PhotonNetwork.LocalPlayer.SetCustomProperties(
+                new Hashtable { { TRADE_EVOLUTIONS_PROP_KEY, values } });
+        }
+        return true;
+    }
+
+    private void RestoreLocalTradeEvolutions()
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return;
+        if (!PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(
+                TRADE_EVOLUTIONS_PROP_KEY, out object value) || !(value is string[] targets)) return;
+
+        var data = TradeEvolutionData.Instance;
+        if (data == null) return;
+        foreach (string target in targets)
+        {
+            var mapping = data.GetMapping(target);
+            if (mapping != null) ActivateLocalTradeEvolution(mapping, false);
+        }
     }
 
     [PunRPC]
@@ -694,6 +736,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode) { BroadcastRoundStart(1); return; }
         if (!PhotonNetwork.InRoom) return;
         var props = new Hashtable { { SCENE_READY_PROP_KEY, true } };
+        bool existingMatch = PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(
+            ROUND_PROP_KEY, out object roundValue) && roundValue is int;
+        if (existingMatch)
+        {
+            RestoreLocalTradeEvolutions();
+        }
+        else
+        {
+            // Photon Player 속성은 방을 넘어 남을 수 있으므로 새 판 진입 전에 이전 판 상태를 제거한다.
+            _activeTradeEvolutionTargets.Clear();
+            props[TRADE_EVOLUTIONS_PROP_KEY] = System.Array.Empty<string>();
+        }
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
@@ -800,7 +854,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             { READY_PROP_KEY, false },
             { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
         };
-        if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
+        if (round == 1)
+        {
+            props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>();
+            props[TRADE_EVOLUTIONS_PROP_KEY] = System.Array.Empty<string>();
+            _activeTradeEvolutionTargets.Clear();
+        }
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastKnownRound = round;      // 재접속 라운드 복구 기준점
@@ -1151,6 +1210,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void ResyncAfterReconnect()
     {
         GameEvents.BoardResyncRequested();
+        RestoreLocalTradeEvolutions();
 
         foreach (var player in PhotonNetwork.PlayerList)
         {

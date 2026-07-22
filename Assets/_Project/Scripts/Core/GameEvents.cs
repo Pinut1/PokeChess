@@ -136,6 +136,9 @@ public static class GameEvents
     /// <summary>통신교환으로 파트너에게서 유닛을 받아 벤치에 배치 완료(A측). 인자 = 받은 유닛(진화체일 수 있음).</summary>
     public static event Action<PokemonUnit> OnTradeUnitReceived;
 
+    /// <summary>수신 플레이어에게 통신 진화 규칙이 활성화됨. 보드·벤치·상점 소비자가 멱등 적용한다.</summary>
+    public static event Action<TradeEvolutionMapping> OnTradeEvolutionActivated;
+
     /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
     public static event Action OnTradeRejected;
 
@@ -260,6 +263,7 @@ public static class GameEvents
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
+    public static void TradeEvolutionActivated(TradeEvolutionMapping mapping) => OnTradeEvolutionActivated?.Invoke(mapping);
     public static void TradeRejected()               => OnTradeRejected?.Invoke();
     public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
     public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);

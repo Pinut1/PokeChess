@@ -177,6 +177,7 @@ public static class PokeChessImporter
     private class TradeEvoJson
     {
         public string targetPokemonEn, evolvedPokemonEn, note;
+        public bool affectsField, affectsBench, affectsShop, isReversible;
     }
 
     [Serializable]
@@ -619,27 +620,90 @@ public static class PokeChessImporter
         var json = Resources.Load<TextAsset>("Data/trade_evolution_data");
         if (json == null) { Debug.LogError("[PokeChess] trade_evolution_data.json 없음"); return; }
 
-        var db = JsonUtility.FromJson<TradeEvoDatabase>(json.text);
+        var pokemonJson = Resources.Load<TextAsset>("Data/pokemon_data");
+        if (pokemonJson == null) { Debug.LogError("[PokeChess] pokemon_data.json 없음 — 통신진화 검증 실패"); return; }
+
+        TradeEvoDatabase db;
+        PokemonJsonDb pokemonDb;
+        try
+        {
+            db = JsonUtility.FromJson<TradeEvoDatabase>(json.text);
+            pokemonDb = JsonUtility.FromJson<PokemonJsonDb>(pokemonJson.text);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[PokeChess] 통신진화 JSON 파싱 실패: {e.Message}");
+            return;
+        }
+
+        if (db == null || db.mappings == null || db.mappings.Count == 0 ||
+            pokemonDb == null || pokemonDb.pokemon == null || pokemonDb.pokemon.Count == 0)
+        {
+            Debug.LogError("[PokeChess] 통신진화 Import 실패 — JSON 루트 또는 목록이 올바르지 않음");
+            return;
+        }
+
+        var pokemonNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pokemon in pokemonDb.pokemon)
+            if (pokemon != null && !string.IsNullOrWhiteSpace(pokemon.nameEn))
+                pokemonNames.Add(pokemon.nameEn);
+
+        var targets = new HashSet<string>(StringComparer.Ordinal);
+        var errors = new List<string>();
+        var imported = new List<TradeEvolutionMapping>(db.mappings.Count);
+        for (int i = 0; i < db.mappings.Count; i++)
+        {
+            var m = db.mappings[i];
+            if (m == null)
+            {
+                errors.Add($"mappings[{i}]가 null");
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(m.targetPokemonEn) || string.IsNullOrWhiteSpace(m.evolvedPokemonEn))
+            {
+                errors.Add($"mappings[{i}]의 target/evolved 이름이 비어 있음");
+                continue;
+            }
+            if (!targets.Add(m.targetPokemonEn))
+                errors.Add($"targetPokemonEn 중복: {m.targetPokemonEn}");
+            if (m.targetPokemonEn == m.evolvedPokemonEn)
+                errors.Add($"자기 자신으로 진화하는 매핑: {m.targetPokemonEn}");
+            if (!pokemonNames.Contains(m.targetPokemonEn))
+                errors.Add($"pokemon_data.json에 원본 종 없음: {m.targetPokemonEn}");
+            if (!pokemonNames.Contains(m.evolvedPokemonEn))
+                errors.Add($"pokemon_data.json에 진화 종 없음: {m.evolvedPokemonEn}");
+            if (!m.affectsField && !m.affectsBench && !m.affectsShop)
+                errors.Add($"적용 범위가 하나도 없는 매핑: {m.targetPokemonEn}");
+
+            imported.Add(new TradeEvolutionMapping
+            {
+                targetPokemonEn = m.targetPokemonEn,
+                evolvedPokemonEn = m.evolvedPokemonEn,
+                affectsField = m.affectsField,
+                affectsBench = m.affectsBench,
+                affectsShop = m.affectsShop,
+                isReversible = m.isReversible,
+                note = m.note
+            });
+        }
+
+        if (errors.Count > 0)
+        {
+            Debug.LogError($"[PokeChess] 통신진화 Import 취소 ({errors.Count}건):\n- {string.Join("\n- ", errors)}");
+            return;
+        }
+
         const string resDir = "Assets/Resources";           // 런타임 TradeEvolutionData.Instance가 Resources에서 로드
         EnsureDir(resDir);
 
         string path = $"{resDir}/TradeEvolution_Data.asset"; // 통신진화는 단일 SO에 모음
         var so = LoadOrCreate<TradeEvolutionData>(path);
-
-        so.mappings = new List<TradeEvolutionMapping>();
-        if (db.mappings != null)
-            foreach (var m in db.mappings)
-                if (!string.IsNullOrEmpty(m.targetPokemonEn))
-                    so.mappings.Add(new TradeEvolutionMapping
-                    {
-                        targetPokemonEn  = m.targetPokemonEn,
-                        evolvedPokemonEn = m.evolvedPokemonEn,
-                        note             = m.note
-                    });
+        so.mappings = imported;
 
         EditorUtility.SetDirty(so);
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");
+        Debug.Log($"[PokeChess] 통신진화 매핑 {imported.Count}개 검증 및 Import 완료");
     }
 
     [MenuItem("PokeChess/Import Deck JSON")]
