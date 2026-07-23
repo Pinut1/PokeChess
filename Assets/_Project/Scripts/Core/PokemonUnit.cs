@@ -53,7 +53,8 @@ public class PokemonUnit : MonoBehaviour
     /// <see cref="BoardManager"/>.CheckEvolution이 참조. 이 플래그가 이브이 3성 봇소환의 판정 기준이기도 함(BattleManager).</summary>
     public bool evolutionLocked;
 
-    /// <summary>영웅증강 전용 스탯 배수(이브이 ×1.4). MaxHp/Attack/SpellPower에 곱해지며 특수진화 ×1.5와 독립적으로 누적.</summary>
+    /// /// 영웅증강 전용 스탯 배수(이브이 ×1.4).
+    /// MaxHp/Attack/SpellPower에 곱해지며 특수진화 ×1.4와 독립적으로 누적.
     public float heroStatMultiplier = 1f;
 
     /// <summary>파치리스 영웅증강: 비어있지 않으면 <see cref="Role"/>이 이 값을 반환(서포터→탱커). 시너지는 data.synergies 그대로 유지.</summary>
@@ -103,10 +104,10 @@ public class PokemonUnit : MonoBehaviour
     // ──────────────────────────────────────────
     // 별 강화 스케일링
     // ──────────────────────────────────────────
-    // TFT 표준: 성이 오를 때마다 약 1.8배. (2성=1.8x, 3성=1.8x1.8=3.24x)
+    // 별 등급 배율: 1성=1.0배, 2성=1.8배, 3성=2.8배.
     // HP/공격/특수공격에만 적용. 방어/특수방어/공속/사거리는 성과 무관(원본 그대로).
     // 인덱스 = starLevel - 1.
-    private static readonly float[] STAR_MULTIPLIER = { 1f, 1.8f, 3.24f };
+    private static readonly float[] STAR_MULTIPLIER = { 1f, 1.8f, 2.8f };
 
     /// <summary>지정 별 등급의 스탯 배수. (BattleManager가 적 유닛 스탯 계산에 재사용)</summary>
     public static float StarMultiplierFor(int starLevel)
@@ -118,9 +119,9 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>현재 별 등급의 스탯 배수.</summary>
     public float StarMultiplier => StarMultiplierFor(starLevel);
 
-    // PLACEHOLDER(기획확정 전): 진화의 돌·통신교환으로 얻은 "특수진화체"는 별배율에 ×1.5 추가.
-    // 돌은 장착 중에만(IsStoneEvolved, 해제 시 자동으로 빠짐), 통신교환은 영구(isTradeEvolved).
-    private const float SPECIAL_EVOLUTION_MULTIPLIER = 1.5f;
+    // 진화의 돌·통신교환으로 얻은 특수진화체는 별 배율에 ×1.4 추가.
+    // 돌은 장착 중에만 적용되고, 통신진화는 영구 적용된다.
+    private const float SPECIAL_EVOLUTION_MULTIPLIER = 1.4f;
     public bool IsSpecialEvolved => IsStoneEvolved || isTradeEvolved;
     public float SpecialEvolutionMultiplier => IsSpecialEvolved ? SPECIAL_EVOLUTION_MULTIPLIER : 1f;
 

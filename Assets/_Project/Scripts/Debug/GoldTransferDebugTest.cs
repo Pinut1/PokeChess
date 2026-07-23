@@ -34,7 +34,7 @@ public class GoldTransferDebugTest : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null || gm.Network == null || gm.Shop == null) return;
 
-        float x = 300f, y = 460f;   // TradeDebugTest(좌측 x=10) 오른쪽
+        float x = 300f, y = 420f;   // TradeDebugTest(좌측 x=10) 오른쪽
         GUI.Label(new Rect(x, y, 280, 22), $"골드 전송(보유 {gm.Shop.Gold}G):");
         y += 24f;
         foreach (int amount in AMOUNTS)

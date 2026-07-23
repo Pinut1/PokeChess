@@ -20,6 +20,16 @@ public class PrototypeHud : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null) return;
 
+        if (gm.Network != null && gm.Network.IsMasterClient)
+        {
+            if (GUI.Button(
+                    new Rect(Screen.width - 220f, 10f, 200f, 40f),
+                    "게임 재시작"))
+            {
+                gm.Network.RestartGame();
+            }
+        }
+
         DrawStatusPanel(gm);
         DrawShopProbabilityPanel(gm);
         DrawItemShopBar(gm);

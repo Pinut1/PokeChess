@@ -19,4 +19,10 @@ public class ItemDatabase : NamedScriptableDatabase<ItemDatabase, ItemData>
 
     /// <summary>영문명으로 조회(대소문자 무관). 없으면 null.</summary>
     public ItemData GetByNameEn(string nameEn) => Lookup(nameEn);
+
+    /// <summary>ID로 일반 아이템 조회. 없으면 null.</summary>
+    public ItemData GetById(int id)
+    {
+        return all.Find(item => item != null && item.id == id);
+    }
 }

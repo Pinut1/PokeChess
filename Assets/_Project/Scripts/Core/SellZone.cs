@@ -3,7 +3,8 @@ using UnityEngine;
 /// <summary>
 /// 유닛 드롭 영역.
 /// 판매 모드에서는 BoardManager.SellUnit을 호출하고,
-/// 통신교환 모드에서는 NetworkManager.SendTradeUnit을 호출한다.
+/// 통신교환 모드에서는 유닛을 드롭하는 즉시
+/// NetworkManager.SendTradeUnit을 호출한다.
 /// HexTile / BenchTile과 동일한 IDropTarget 패턴을 사용한다.
 /// </summary>
 [RequireComponent(typeof(Collider))]
@@ -74,7 +75,7 @@ public class SellZone : MonoBehaviour, IDropTarget
 
     private static void SellUnit(PokemonUnit unit)
     {
-        var board =
+        BoardManager board =
             GameManager.Instance != null
                 ? GameManager.Instance.Board
                 : null;
@@ -92,19 +93,7 @@ public class SellZone : MonoBehaviour, IDropTarget
 
     private static void TradeUnit(PokemonUnit unit)
     {
-        // 현재 NetworkManager 구현은 보낸 유닛을
-        // 성공 ACK 후 벤치에서 제거하므로 벤치 유닛만 허용한다.
-        if (unit.isOnBoard)
-        {
-            Debug.LogWarning(
-                "[TradeZone] 보드 위 유닛은 통신교환할 수 없습니다."
-            );
-
-            GameEvents.TradeRejected();
-            return;
-        }
-
-        var network =
+        NetworkManager network =
             GameManager.Instance != null
                 ? GameManager.Instance.Network
                 : null;
@@ -119,6 +108,33 @@ public class SellZone : MonoBehaviour, IDropTarget
             return;
         }
 
+        Debug.Log(
+            $"[TradeZone] {unit.data.pokemonName} ★{unit.starLevel} 즉시 전송 요청"
+        );
+
         network.SendTradeUnit(unit);
     }
+
+    private void OnMouseDown()
+    {
+        if (_zoneType != DropZoneType.Trade)
+            return;
+
+        NetworkManager network =
+            GameManager.Instance != null
+                ? GameManager.Instance.Network
+                : null;
+
+        if (network == null)
+        {
+            Debug.LogWarning(
+                "[TradeZone] NetworkManager가 없어 유닛을 수령할 수 없습니다."
+            );
+            return;
+        }
+
+        network.TryReceiveNextTradeUnit();
+    }
+
+
 }

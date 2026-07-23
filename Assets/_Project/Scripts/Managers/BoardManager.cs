@@ -339,7 +339,16 @@ public class BoardManager : MonoBehaviour
         if (!placed) return false;
 
         GameEvents.UnitPlaced(unit);
-        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+
+        if (unit.data != null)
+        {
+            CheckEvolution(
+                unit.data.id,
+                unit.starLevel,
+                unit.isTradeEvolved
+            );
+        }
+
         return true;
     }
 
@@ -404,7 +413,16 @@ public class BoardManager : MonoBehaviour
         unit.isOnBoard = false;
 
         GameEvents.UnitBenched(unit);
-        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+
+        if (unit.data != null)
+        {
+            CheckEvolution(
+                unit.data.id,
+                unit.starLevel,
+                unit.isTradeEvolved
+            );
+        }
+
         return true;
     }
 
@@ -444,7 +462,16 @@ public class BoardManager : MonoBehaviour
         unit.isOnBoard = false;
 
         GameEvents.UnitBenched(unit);
-        if (unit.data != null) CheckEvolution(unit.data.id, unit.starLevel);
+
+        if (unit.data != null)
+        {
+            CheckEvolution(
+                unit.data.id,
+                unit.starLevel,
+                unit.isTradeEvolved
+            );
+        }
+
         return true;
     }
 
@@ -489,6 +516,53 @@ public class BoardManager : MonoBehaviour
 
         GameEvents.UnitSold(unit); // ShopManager(환급) · SynergyManager(재계산) · BoardView(resync)
         Destroy(unit.gameObject);
+        return true;
+    }
+
+    /// <summary>
+    /// 통신교환 전송 성공 시 유닛을 보드/벤치에서 제거한다.
+    /// 판매가 아니므로 OnUnitSold를 발행하지 않고,
+    /// 장착 아이템과 진화의 돌도 인벤토리로 반환하지 않는다.
+    /// 유닛 오브젝트 파괴는 호출한 NetworkManager가 처리한다.
+    /// </summary>
+    public bool RemoveUnitForTrade(PokemonUnit unit)
+    {
+        if (unit == null)
+            return false;
+
+        if (TryFindBoardCoords(unit, out HexCoords coords))
+        {
+            _battleField[coords] = null;
+            GameEvents.BoardResyncRequested();
+
+            Debug.Log(
+                $"[BoardManager] 통신교환 유닛 보드에서 제거: " +
+                $"{unit.data?.pokemonName} ★{unit.starLevel}"
+            );
+
+            return true;
+        }
+
+        int slot = FindBenchSlot(unit);
+
+        if (slot < 0)
+        {
+            Debug.LogWarning(
+                "[BoardManager] 통신교환 유닛의 보드/벤치 위치를 찾지 못했습니다."
+            );
+
+            return false;
+        }
+
+        _bench[slot] = null;
+
+        GameEvents.BoardResyncRequested();
+
+        Debug.Log(
+            $"[BoardManager] 통신교환 유닛 벤치에서 제거: " +
+            $"{unit.data?.pokemonName} ★{unit.starLevel}"
+        );
+
         return true;
     }
 
@@ -556,6 +630,22 @@ public class BoardManager : MonoBehaviour
         return count;
     }
 
+    /// <summary>
+    /// 외부 시스템이 유닛의 종이나 진화 상태를 변경한 뒤
+    /// 동일 종·동일 성급 3마리 합체를 다시 검사한다.
+    /// </summary>
+    public void RecheckEvolution(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null)
+            return;
+
+        CheckEvolution(
+            unit.data.id,
+            unit.starLevel,
+            unit.isTradeEvolved
+        );
+    }
+
     // ──────────────────────────────────────────
     // 합체 (일반 진화 = 동일 종 3개 → 별업, GDD 4.2)
     // ──────────────────────────────────────────
@@ -566,7 +656,7 @@ public class BoardManager : MonoBehaviour
     /// 1성→2성→3성, 3성이 상한. 진화 대상이 없으면(최종형/데이터 미비) 종은 유지하고 별만 올림.
     /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
     /// </summary>
-    private void CheckEvolution(int speciesId, int starLevel)
+    private void CheckEvolution(int speciesId, int starLevel, bool isTradeEvolved)
     {
         if (_isEvolving) return;
         if (starLevel >= 3) return;
@@ -577,14 +667,34 @@ public class BoardManager : MonoBehaviour
         // 돌 낀 유닛은 머지 후보 제외 — 안 그러면 합체 시 소비된 유닛의 돌이 Destroy로 같이 증발한다.
         // "머지하려면 돌부터 빼라"가 의도된 흐름(진화의 돌 설계 문서, 2026-06-22).
         foreach (var kv in _battleField)
-            if (kv.Value != null && kv.Value.data != null && !kv.Value.IsStoneEvolved &&
-                kv.Value.data.id == speciesId && kv.Value.starLevel == starLevel)
+        {
+            PokemonUnit unit = kv.Value;
+
+            if (unit != null &&
+                unit.data != null &&
+                !unit.IsStoneEvolved &&
+                unit.data.id == speciesId &&
+                unit.starLevel == starLevel &&
+                unit.isTradeEvolved == isTradeEvolved)
+            {
                 boardMatches.Add(kv.Key);
+            }
+        }
 
         for (int i = 0; i < _bench.Length; i++)
-            if (_bench[i] != null && _bench[i].data != null && !_bench[i].IsStoneEvolved &&
-                _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
+        {
+            PokemonUnit unit = _bench[i];
+
+            if (unit != null &&
+                unit.data != null &&
+                !unit.IsStoneEvolved &&
+                unit.data.id == speciesId &&
+                unit.starLevel == starLevel &&
+                unit.isTradeEvolved == isTradeEvolved)
+            {
                 benchMatches.Add(i);
+            }
+        }
 
         if (boardMatches.Count + benchMatches.Count < 3) return;
 
@@ -616,7 +726,8 @@ public class BoardManager : MonoBehaviour
         // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
         // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
         // 진화잠금(이브이 영웅증강 등)이면 종 스왑을 건너뛰고 별만 올린다 — 3성까지 원본 종 유지.
-        string evolvedEn = survivor.evolutionLocked ? null : survivor.data.evolvesIntoEn;
+        string evolvedEn = survivor.evolutionLocked || survivor.isTradeEvolved ? null : survivor.data.evolvesIntoEn;
+
         if (!string.IsNullOrEmpty(evolvedEn))
         {
             var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
@@ -637,6 +748,6 @@ public class BoardManager : MonoBehaviour
         else                 GameEvents.UnitBenched(survivor);
 
         // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
-        CheckEvolution(survivor.data.id, survivor.starLevel);
+        CheckEvolution(survivor.data.id, survivor.starLevel, survivor.isTradeEvolved);
     }
 }
