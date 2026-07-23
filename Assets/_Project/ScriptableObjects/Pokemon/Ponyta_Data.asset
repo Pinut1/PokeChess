@@ -26,16 +26,16 @@ MonoBehaviour:
   synergies:
   - Fire
   role: Magician
-  skillId: FIRE_MAGICIAN
+  skillId: Flamethrower
   skill:
-    skillId: FIRE_MAGICIAN
+    skillId: Flamethrower
     skillName: "\uD654\uC5FC\uBC29\uC0AC"
-    description: "\uC9C1\uC120 \uBC94\uC704 \uBD88\uAF43 \uB370\uBBF8\uC9C0"
+    description: "\uD30C\uC774\uB9AC, \uB098\uC778\uD14C\uC77C, \uD3EC\uB2C8\uD0C0"
     effectType: 1
     targetType: 5
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Fire_Magician
+    vfxId: VFX_Fire_Magician_SPELL
   attackVfxId: Fire_L
   evolvesIntoEn: Rapidash
   shopBuyable: 1

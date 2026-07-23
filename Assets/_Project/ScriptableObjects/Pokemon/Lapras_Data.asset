@@ -26,16 +26,16 @@ MonoBehaviour:
   synergies:
   - Water
   role: Supporter
-  skillId: WATER_SUPPORTER
+  skillId: SparklingAria
   skill:
-    skillId: WATER_SUPPORTER
-    skillName: "\uBB3C\uC758\uC7A5\uB9C9"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 \uBCF4\uD638\uB9C9"
+    skillId: SparklingAria
+    skillName: "\uBB3C\uAC70\uD488\uC544\uB9AC\uC544"
+    description: "\uC804\uCCB4 \uC544\uAD70 \uBCF4\uD638\uB9C9 / \uB77C\uD504\uB77C\uC2A4"
     effectType: 3
     targetType: 2
     areaRadius: 4
     lineLength: 4
-    vfxId: VFX_Water_Supporter
+    vfxId: VFX_Water_Supporter_SHIELD
   attackVfxId: Water_L
   evolvesIntoEn: 
   shopBuyable: 1

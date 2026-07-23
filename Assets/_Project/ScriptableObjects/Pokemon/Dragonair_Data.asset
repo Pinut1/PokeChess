@@ -26,16 +26,16 @@ MonoBehaviour:
   synergies:
   - Dragon
   role: Magician
-  skillId: DRAGON_MAGICIAN
+  skillId: DragonPulse
   skill:
-    skillId: DRAGON_MAGICIAN
-    skillName: "\uC6A9\uC131\uAD70"
-    description: "\uAD11\uC5ED \uB4DC\uB798\uACE4 \uACE0\uB370\uBBF8\uC9C0"
+    skillId: DragonPulse
+    skillName: "\uC6A9\uC758\uD30C\uB3D9"
+    description: "\uBBF8\uB1FD"
     effectType: 1
     targetType: 5
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Dragon_Magician
+    vfxId: VFX_Dragon_Magician_SPELL
   attackVfxId: Dragon_L
   evolvesIntoEn: Dragonite
   shopBuyable: 0

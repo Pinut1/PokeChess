@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
   m_Name: Plusle&Minun_Data
   m_EditorClassIdentifier: Assembly-CSharp::PokemonData
-  id: 311
+  id: 310
   pokemonName: "\uD50C\uB7EC\uC2DC\uC640\uB9C8\uC774\uB18D"
   pokemonNameEn: Plusle&Minun
   cost: 5
@@ -24,20 +24,20 @@ MonoBehaviour:
   spellPower: 205
   manaCost: 45
   synergies:
-  - Cheerleader
+  - Cheer
   - Electric
   role: Supporter
-  skillId: CHEER_SUPPORTER
+  skillId: 
   skill:
-    skillId: CHEER_SUPPORTER
-    skillName: "\uC751\uC6D0"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uACA9\uC18D\uB3C4 \uC99D\uAC00"
-    effectType: 5
-    targetType: 2
-    areaRadius: 2
-    lineLength: 4
-    vfxId: VFX_Cheer_Supporter
-  attackVfxId: Cheerleader_L
+    skillId: 
+    skillName: 
+    description: 
+    effectType: 0
+    targetType: 0
+    areaRadius: 0
+    lineLength: 0
+    vfxId: 
+  attackVfxId: 
   evolvesIntoEn: 
   shopBuyable: 1
   modelPrefab: {fileID: 5094012104270938135, guid: 7ae9e5a79550fb04fba1cd4c3be0b7fd, type: 3}

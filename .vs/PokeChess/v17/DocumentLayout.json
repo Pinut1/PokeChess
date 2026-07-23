@@ -1,14 +1,17 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\KIMYEJI\\GitHub\\PokeChess\\",
+  "WorkspaceRootPath": "C:\\Haein\\unity project\\PokeChess\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{1D25F758-CD64-B512-4329-A65DFFDFFAE9}|Assembly-CSharp-Editor.csproj|c:\\kimyeji\\github\\pokechess\\assets\\_project\\scripts\\editor\\pokechessimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{6581AE51-4480-C742-999C-6895A44268F7}|Assembly-CSharp.csproj|c:\\haein\\unity project\\pokechess\\assets\\_project\\scripts\\data\\vfxdatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{6581AE51-4480-C742-999C-6895A44268F7}|Assembly-CSharp.csproj|solutionrelative:assets\\_project\\scripts\\data\\vfxdatabase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{1D25F758-CD64-B512-4329-A65DFFDFFAE9}|Assembly-CSharp-Editor.csproj|c:\\haein\\unity project\\pokechess\\assets\\_project\\scripts\\editor\\pokechessimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{1D25F758-CD64-B512-4329-A65DFFDFFAE9}|Assembly-CSharp-Editor.csproj|solutionrelative:assets\\_project\\scripts\\editor\\pokechessimporter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{1D25F758-CD64-B512-4329-A65DFFDFFAE9}|Assembly-CSharp-Editor.csproj|c:\\kimyeji\\github\\pokechess\\assets\\_project\\scripts\\editor\\flipbookshaderswitcher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{1D25F758-CD64-B512-4329-A65DFFDFFAE9}|Assembly-CSharp-Editor.csproj|solutionrelative:assets\\_project\\scripts\\editor\\flipbookshaderswitcher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,32 +21,40 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 0,
           "Children": [
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
-            },
-            {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "FlipbookShaderSwitcher.cs",
-              "DocumentMoniker": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
-              "RelativeDocumentMoniker": "Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
-              "ToolTip": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
-              "RelativeToolTip": "Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
-              "ViewState": "AgIAACcAAAAAAAAAAAAYwAAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 0,
+              "Title": "VfxDatabase.cs",
+              "DocumentMoniker": "C:\\Haein\\unity project\\PokeChess\\Assets\\_Project\\Scripts\\Data\\VfxDatabase.cs",
+              "RelativeDocumentMoniker": "Assets\\_Project\\Scripts\\Data\\VfxDatabase.cs",
+              "ToolTip": "C:\\Haein\\unity project\\PokeChess\\Assets\\_Project\\Scripts\\Data\\VfxDatabase.cs",
+              "RelativeToolTip": "Assets\\_Project\\Scripts\\Data\\VfxDatabase.cs",
+              "ViewState": "AgIAAA4AAAAAAAAAAADwvwwAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-24T05:49:07.148Z",
+              "WhenOpened": "2026-07-23T05:36:43.889Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
+              "Title": "FlipbookShaderSwitcher.cs",
+              "DocumentMoniker": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
+              "RelativeDocumentMoniker": "..\\..\\..\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
+              "ToolTip": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
+              "RelativeToolTip": "..\\..\\..\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\FlipbookShaderSwitcher.cs",
+              "ViewState": "AgIAACcAAAAAAAAAAAAYwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-24T05:49:07.148Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "PokeChessImporter.cs",
-              "DocumentMoniker": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
+              "DocumentMoniker": "C:\\Haein\\unity project\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
               "RelativeDocumentMoniker": "Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
-              "ToolTip": "C:\\KIMYEJI\\GitHub\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
+              "ToolTip": "C:\\Haein\\unity project\\PokeChess\\Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
               "RelativeToolTip": "Assets\\_Project\\Scripts\\Editor\\PokeChessImporter.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",

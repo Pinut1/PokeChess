@@ -26,9 +26,9 @@ MonoBehaviour:
   synergies:
   - Ethereal
   role: Assassin
-  skillId: ETHEREAL_ASSASSIN
+  skillId: PsychoCut
   skill:
-    skillId: ETHEREAL_ASSASSIN
+    skillId: PsychoCut
     skillName: "\uC0AC\uC774\uCF54\uCEE4\uD130"
     description: "\uC090, \uCE90\uC774\uC2DC, \uC5D0\uBE0C\uC774(\uBD07)"
     effectType: 1
@@ -37,7 +37,7 @@ MonoBehaviour:
     lineLength: 1
     vfxId: VFX_Ethereal_Assassin_SPELL
   attackVfxId: Ethereal_S
-  evolvesIntoEn: 
+  evolvesIntoEn: Clefairy
   shopBuyable: 1
   modelPrefab: {fileID: 5811253845198291556, guid: 3a5a21fd2f3d03040984ede0151a8dd7, type: 3}
   icon: {fileID: 0}

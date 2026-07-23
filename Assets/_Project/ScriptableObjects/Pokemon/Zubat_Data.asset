@@ -27,16 +27,17 @@ MonoBehaviour:
   - Poison
   - Flying
   role: Archer
-  skillId: POISON_ARCHER
+  skillId: SelfASBuff
   skill:
-    skillId: POISON_ARCHER
-    skillName: "\uB3C5\uCE68"
-    description: "\uB2E8\uC77C \uC801 \uB370\uBBF8\uC9C0"
-    effectType: 0
-    targetType: 3
+    skillId: SelfASBuff
+    skillName: "\uD3C9\uD0C0\uAE30\uBC18\uC720\uB2DB \uACF5\uC18D\uC99D\uAC00"
+    description: "\uACF5\uC18D\uC99D\uAC00 / \uD3C9\uD0C0\uAE30\uBC18 \uC5ED\uD560\uAD70
+      \uC720\uB2DB \uC804\uCCB4\uC801\uC6A9"
+    effectType: 5
+    targetType: 0
     areaRadius: 0
-    lineLength: 4
-    vfxId: VFX_Poison_Archer
+    lineLength: 1
+    vfxId: VFX_AS_BUFF
   attackVfxId: Poison_L
   evolvesIntoEn: Golbat
   shopBuyable: 1

@@ -27,16 +27,16 @@ MonoBehaviour:
   - Electric
   - Breaker
   role: Assassin
-  skillId: STEEL_ASSASSIN
+  skillId: SupercellSlam
   skill:
-    skillId: STEEL_ASSASSIN
-    skillName: "\uCF54\uC5B4\uD380\uCC98"
-    description: "\uB2E8\uC77C \uC801 \uBC29\uC5B4\uBB34\uC2DC \uACE0\uB370\uBBF8\uC9C0"
+    skillId: SupercellSlam
+    skillName: "\uC36C\uB354\uB2E4\uC774\uBE0C"
+    description: "\uC96C\uD53C\uC120\uB354 \uCF54\uC77C"
     effectType: 1
     targetType: 3
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Steel_Assassin
+    vfxId: VFX_Electric_Assassin_SPELL
   attackVfxId: Electric_S
   evolvesIntoEn: Magneton
   shopBuyable: 1

@@ -26,16 +26,16 @@ MonoBehaviour:
   synergies:
   - Poison
   role: Tanker
-  skillId: POISON_TANKER
+  skillId: AcidArmor
   skill:
-    skillId: POISON_TANKER
-    skillName: "\uB3C4\uBC1C"
-    description: "\uC8FC\uBCC0 \uC801 \uC5B4\uADF8\uB85C \uC9D1\uC911"
-    effectType: 3
+    skillId: AcidArmor
+    skillName: "\uB179\uAE30"
+    description: "\uC790\uD790 / \uC9C8\uBED0\uAE30"
+    effectType: 2
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Poison_Tanker
+    vfxId: VFX_Poison_Tanker_HP_REGEN
   attackVfxId: Poison_S
   evolvesIntoEn: Muk
   shopBuyable: 1

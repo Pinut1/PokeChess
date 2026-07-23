@@ -17,11 +17,11 @@ MonoBehaviour:
   synergyNameEn: Grass
   tiers:
   - count: 3
-    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +0.1"
+    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 5
-    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +0.2"
+    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 7
-    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +0.3"
+    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 9
-    effectDescription: "\uACF5\uACA9\uC18D\uB3C4 +0.4"
+    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
   icon: {fileID: 0}

@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Breaker_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 11
+  id: 12
   synergyName: "\uD30C\uAD34"
   synergyNameEn: Breaker
   tiers:
   - count: 2
-    effectDescription: "\uACF5\uACA9\uB825 +10%"
+    effectDescription: "attack \uBE44\uC728 \uC99D\uAC00"
   - count: 3
-    effectDescription: "\uACF5\uACA9\uB825 +20%"
+    effectDescription: "attack \uBE44\uC728 \uC99D\uAC00"
   - count: 4
-    effectDescription: "\uACF5\uACA9\uB825 +35%"
+    effectDescription: "attack \uBE44\uC728 \uC99D\uAC00"
   icon: {fileID: 0}

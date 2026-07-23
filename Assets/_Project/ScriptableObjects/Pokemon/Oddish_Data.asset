@@ -27,16 +27,17 @@ MonoBehaviour:
   - Grass
   - Poison
   role: Supporter
-  skillId: GRASS_SUPPORTER
+  skillId: GrassWhistle
   skill:
-    skillId: GRASS_SUPPORTER
-    skillName: "\uC528\uBFCC\uB9AC\uAE30"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 HP \uD68C\uBCF5"
+    skillId: GrassWhistle
+    skillName: "\uD480\uD53C\uB9AC"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 HP \uD68C\uBCF5 / \uB69C\uBC85\uCD78,
+      \uD574\uB108\uCE20"
     effectType: 2
     targetType: 2
     areaRadius: 2
     lineLength: 4
-    vfxId: VFX_Grass_Supporter
+    vfxId: VFX_Grass_Supporter_HP_REGEN
   attackVfxId: Grass_L
   evolvesIntoEn: Gloom
   shopBuyable: 1

@@ -27,16 +27,16 @@ MonoBehaviour:
   - Bug
   - Poison
   role: Magician
-  skillId: BUG_MAGICIAN
+  skillId: PollenPuff
   skill:
-    skillId: BUG_MAGICIAN
-    skillName: "\uBC84\uADF8\uBC84\uC988"
-    description: "\uAD11\uC5ED \uBC8C\uB808 \uB370\uBBF8\uC9C0"
+    skillId: PollenPuff
+    skillName: "\uAF43\uAC00\uB8E8\uACBD\uB2E8"
+    description: "\uCF58\uD321"
     effectType: 1
     targetType: 4
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Bug_Magician
+    vfxId: VFX_Bug_Magician_SPELL
   attackVfxId: Bug_L
   evolvesIntoEn: Venomoth
   shopBuyable: 1

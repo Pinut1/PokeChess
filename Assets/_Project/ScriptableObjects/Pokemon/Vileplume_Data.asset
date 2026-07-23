@@ -27,16 +27,16 @@ MonoBehaviour:
   - Grass
   - Poison
   role: Magician
-  skillId: GRASS_MAGICIAN
+  skillId: SolarBeam
   skill:
-    skillId: GRASS_MAGICIAN
+    skillId: SolarBeam
     skillName: "\uC194\uB77C\uBE54"
-    description: "\uAD11\uC5ED \uD480 \uC18D\uC131 \uB370\uBBF8\uC9C0"
+    description: "\uB77C\uD50C\uB808\uC2DC\uC544"
     effectType: 1
     targetType: 5
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Grass_Magician
+    vfxId: VFX_Grass_Magician_SPELL
   attackVfxId: Grass_L
   evolvesIntoEn: 
   shopBuyable: 0

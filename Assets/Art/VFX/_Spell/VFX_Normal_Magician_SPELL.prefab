@@ -14595,7 +14595,7 @@ GameObject:
   - component: {fileID: 567296262245892827}
   - component: {fileID: 5575597689784465756}
   m_Layer: 0
-  m_Name: VFX_Nomal_Magician_SPELL
+  m_Name: VFX_Normal_Magician_SPELL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
