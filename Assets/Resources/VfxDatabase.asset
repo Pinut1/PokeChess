@@ -191,5 +191,5 @@ MonoBehaviour:
     prefab: {fileID: 930871465850678006, guid: 0bc0a66ace513c44d9aecb05a719263a, type: 3}
     lifetime: 0
   - vfxId: VFX_Electric_Tanker_TAUNT
-    prefab: {fileID: 7642558270988228936, guid: f269673de2f5b644b874c0400c70854f, type: 3}
+    prefab: {fileID: 3153356435855344799, guid: 2ddd5e2464d5de24dbfddc34b177e15f, type: 3}
     lifetime: 0
