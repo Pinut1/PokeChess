@@ -232,4 +232,51 @@ public class PokemonUnit : MonoBehaviour
         returnedItems = new List<ItemData>(items);
         items.Clear();
     }
+
+    /// <summary>
+    /// 성급 합체 전에 현재 장착물을 유닛에서 분리한다.
+    ///
+    /// 일반 아이템과 진화의 돌을 인벤토리에 넣지는 않고 참조만 반환한다.
+    /// RemoveStone()을 사용하지 않으므로 data가 원본 포켓몬으로 되돌아가지 않는다.
+    ///
+    /// 예:
+    /// 라이츄 → 돌과 원본 피카츄 정보를 분리하더라도
+    /// 현재 data는 라이츄로 유지된다.
+    /// </summary>
+    public void DetachEquipmentForMerge(
+        out EvolutionStoneData detachedStone,
+        out PokemonData detachedPreStoneData,
+        out List<ItemData> detachedItems)
+    {
+        detachedStone = equippedStone;
+        detachedPreStoneData = preStoneData;
+        detachedItems = new List<ItemData>(items);
+
+        items.Clear();
+        equippedStone = null;
+        preStoneData = null;
+    }
+
+    /// <summary>
+    /// 이미 돌 진화체인 신규 합체 유닛에 진화의 돌 상태를 복원한다.
+    ///
+    /// TryEquipStone()은 현재 종에서 다시 진화 대상을 찾기 때문에
+    /// 이미 라이츄인 유닛에 번개의돌을 다시 장착할 수 없다.
+    /// 따라서 합체 복원에서는 현재 data를 변경하지 않고
+    /// 돌과 돌 장착 전 원본 종 정보만 복원한다.
+    /// </summary>
+    public bool RestoreStoneStateAfterMerge(
+        EvolutionStoneData stone,
+        PokemonData originalData)
+    {
+        if (stone == null || originalData == null)
+            return false;
+
+        if (equippedStone != null || !HasFreeSlot)
+            return false;
+
+        equippedStone = stone;
+        preStoneData = originalData;
+        return true;
+    }
 }

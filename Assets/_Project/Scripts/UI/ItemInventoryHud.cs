@@ -31,25 +31,48 @@ public class ItemInventoryHud : MonoBehaviour
     private void OnGUI()
     {
         var gm = GameManager.Instance;
-        if (gm == null || gm.Item == null) return;
+        if (gm == null || gm.Item == null)
+            return;
 
-        if (gm.Phase != null && gm.Phase.CurrentPhase != GamePhase.Shopping)
+        bool isShopping =
+            gm.Phase == null ||
+            gm.Phase.CurrentPhase == GamePhase.Shopping;
+
+        // 쇼핑이 아니면 진행 중이던 아이템 드래그만 취소한다.
+        // 선택된 유닛은 유지해 전투 중에도 장착 정보를 확인할 수 있게 한다.
+        if (!isShopping)
         {
             _dragging = null;
-            _inspectUnit = null;
-            return;
+            _dragLabel = null;
         }
 
-        // 하단 좌측 앵커: 현재 행 수만큼 높이를 잡아 상점 바(하단 중앙, ~Screen.height-120) 위에 배치.
+        // 하단 좌측 앵커
         int total = gm.Item.Items.Count + gm.Item.Stones.Count;
-        int rowCount = Mathf.Max(1, Mathf.CeilToInt(total / (float)COLS));
-        float panelH = 24f + rowCount * (SLOT_H + SLOT_GAP) + 6f;
+        int rowCount = Mathf.Max(
+            1,
+            Mathf.CeilToInt(total / (float)COLS)
+        );
+
+        float panelH =
+            24f +
+            rowCount * (SLOT_H + SLOT_GAP) +
+            6f;
+
         _panelY = Screen.height - 150f - panelH;
 
-        HandleInput(gm);
-        DrawInventory(gm);
-        DrawInspectPanel(gm);
-        DrawDragGhost();
+        // 클릭에 의한 유닛 선택은 모든 페이즈에서 허용한다.
+        // 아이템 드래그 및 장착은 HandleInput 내부에서 쇼핑일 때만 처리한다.
+        HandleInput(gm, isShopping);
+
+        // 인벤토리는 쇼핑 중에만 표시
+        if (isShopping)
+        {
+            DrawInventory(gm);
+            DrawDragGhost();
+        }
+
+        // 장착 정보 패널은 전투 중에도 표시
+        DrawInspectPanel(gm, isShopping);
     }
 
     private Rect SlotRect(int index)
@@ -81,37 +104,77 @@ public class ItemInventoryHud : MonoBehaviour
         }
     }
 
-    private void HandleInput(GameManager gm)
+    private void HandleInput(GameManager gm, bool isShopping)
     {
-        var e = Event.current;
+        Event e = Event.current;
         var item = gm.Item;
 
-        if (e.type == EventType.MouseDown && _dragging == null)
+        if (e.type == EventType.MouseDown &&
+            _dragging == null)
         {
-            int i = 0;
-            foreach (var it in item.Items)
+            // 쇼핑 중에만 인벤토리 아이템을 집을 수 있다.
+            if (isShopping)
             {
-                if (SlotRect(i).Contains(e.mousePosition)) { _dragging = it; _dragLabel = it.itemName; e.Use(); return; }
-                i++;
-            }
-            foreach (var st in item.Stones)
-            {
-                if (SlotRect(i).Contains(e.mousePosition)) { _dragging = st; _dragLabel = st.stoneName; e.Use(); return; }
-                i++;
+                int i = 0;
+
+                foreach (var it in item.Items)
+                {
+                    if (SlotRect(i).Contains(e.mousePosition))
+                    {
+                        _dragging = it;
+                        _dragLabel = it.itemName;
+                        e.Use();
+                        return;
+                    }
+
+                    i++;
+                }
+
+                foreach (var st in item.Stones)
+                {
+                    if (SlotRect(i).Contains(e.mousePosition))
+                    {
+                        _dragging = st;
+                        _dragLabel = st.stoneName;
+                        e.Use();
+                        return;
+                    }
+
+                    i++;
+                }
             }
 
-            // 인벤토리 칸이 아니면 보드 위 유닛 클릭으로 간주 — 장착 목록 조회용 선택.
-            var clicked = RaycastUnit(e.mousePosition);
-            if (clicked != null) _inspectUnit = clicked;
+            // 쇼핑·전투 모두 보드 위 유닛 선택 가능
+            PokemonUnit clicked =
+                RaycastUnit(e.mousePosition);
+
+            if (clicked != null)
+            {
+                _inspectUnit = clicked;
+                e.Use();
+            }
         }
-        else if (e.type == EventType.MouseUp && _dragging != null)
+        else if (
+            isShopping &&
+            e.type == EventType.MouseUp &&
+            _dragging != null)
         {
-            var target = RaycastUnit(e.mousePosition);
+            PokemonUnit target =
+                RaycastUnit(e.mousePosition);
+
             if (target != null)
             {
-                bool success = item.EquipToUnit(_dragging, target);
-                Debug.Log($"[ItemHud] 장착 {(success ? "성공" : "실패")}: {_dragLabel} → {target.data?.pokemonName}");
+                bool success =
+                    item.EquipToUnit(_dragging, target);
+
+                Debug.Log(
+                    $"[ItemHud] 장착 " +
+                    $"{(success ? "성공" : "실패")}: " +
+                    $"{_dragLabel} → " +
+                    $"{target.data?.pokemonName}"
+                );
             }
+
             _dragging = null;
             _dragLabel = null;
             e.Use();
@@ -125,24 +188,90 @@ public class ItemInventoryHud : MonoBehaviour
         GUI.Box(new Rect(pos.x - 40f, pos.y - 15f, 80f, 30f), _dragLabel);
     }
 
-    private void DrawInspectPanel(GameManager gm)
+    private void DrawInspectPanel(GameManager gm, bool isShopping)
     {
-        if (_inspectUnit == null) return;
+        if (_inspectUnit == null)
+            return;
 
-        GUILayout.BeginArea(new Rect(Screen.width - 260f, 10f, 250f, 220f), GUI.skin.box);
-        GUILayout.Label($"[{_inspectUnit.data?.pokemonName ?? "?"}] 장착 아이템");
-
-        foreach (var it in new List<ItemData>(_inspectUnit.items))
+        // 전투 도중 유닛이 제거되었을 경우 안전 처리
+        if (_inspectUnit.data == null)
         {
-            if (GUILayout.Button($"해제: {it.itemName}"))
-                gm.Item.UnequipFromUnit(it, _inspectUnit);
+            _inspectUnit = null;
+            return;
+        }
+
+        GUILayout.BeginArea(
+            new Rect(
+                Screen.width - 260f,
+                10f,
+                250f,
+                220f
+            ),
+            GUI.skin.box
+        );
+
+        GUILayout.Label(
+            $"[{_inspectUnit.data.pokemonName}] 장착 아이템"
+        );
+
+        if (_inspectUnit.items == null ||
+            _inspectUnit.items.Count == 0)
+        {
+            GUILayout.Label("일반 아이템 없음");
+        }
+        else
+        {
+            foreach (
+                ItemData it
+                in new List<ItemData>(_inspectUnit.items))
+            {
+                if (it == null)
+                    continue;
+
+                if (isShopping)
+                {
+                    if (GUILayout.Button(
+                            $"해제: {it.itemName}"))
+                    {
+                        gm.Item.UnequipFromUnit(
+                            it,
+                            _inspectUnit
+                        );
+                    }
+                }
+                else
+                {
+                    GUILayout.Label($"• {it.itemName}");
+                }
+            }
         }
 
         if (_inspectUnit.equippedStone != null)
         {
-            string stoneName = _inspectUnit.equippedStone.stoneName;
-            if (GUILayout.Button($"해제: [돌]{stoneName}"))
-                gm.Item.UnequipFromUnit(_inspectUnit.equippedStone, _inspectUnit);
+            string stoneName =
+                _inspectUnit.equippedStone.stoneName;
+
+            if (isShopping)
+            {
+                if (GUILayout.Button(
+                        $"해제: [돌]{stoneName}"))
+                {
+                    gm.Item.UnequipFromUnit(
+                        _inspectUnit.equippedStone,
+                        _inspectUnit
+                    );
+                }
+            }
+            else
+            {
+                GUILayout.Label($"• [돌] {stoneName}");
+            }
+        }
+
+        if (!isShopping)
+        {
+            GUILayout.Space(4f);
+            GUILayout.Label("전투 중에는 장비를 해제할 수 없습니다.");
         }
 
         if (GUILayout.Button("닫기"))
@@ -151,15 +280,60 @@ public class ItemInventoryHud : MonoBehaviour
         GUILayout.EndArea();
     }
 
-    /// <summary>UnitDragController와 동일한 레이캐스트 패턴(유닛 Collider 필요).</summary>
+    /// <summary>
+    /// 포인터 아래 모든 Collider를 검사하여 가장 가까운 PokemonUnit을 찾는다.
+    /// 필드 타일 Collider가 먼저 맞아도 유닛 선택이 가능하다.
+    /// </summary>
     private PokemonUnit RaycastUnit(Vector2 guiMousePos)
     {
-        if (_camera == null) return null;
+        if (_camera == null)
+            return null;
 
-        Vector3 screenPos = new Vector3(guiMousePos.x, Screen.height - guiMousePos.y, 0f);
+        Vector3 screenPos = new Vector3(
+            guiMousePos.x,
+            Screen.height - guiMousePos.y,
+            0f
+        );
+
         Ray ray = _camera.ScreenPointToRay(screenPos);
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _raycastMask))
-            return hit.collider.GetComponentInParent<PokemonUnit>();
+
+        RaycastHit[] hits =
+            Physics.RaycastAll(
+                ray,
+                1000f,
+                _raycastMask
+            );
+
+        System.Array.Sort(
+            hits,
+            (a, b) => a.distance.CompareTo(b.distance)
+        );
+
+        foreach (RaycastHit hit in hits)
+        {
+            PokemonUnit unit =
+                hit.collider.GetComponentInParent<PokemonUnit>();
+
+            if (unit != null)
+                return unit;
+
+            BattleManager battleManager =
+                GameManager.Instance != null
+                    ? GameManager.Instance.GetComponent<BattleManager>()
+                    : null;
+
+            if (battleManager != null)
+            {
+                PokemonUnit sourceUnit =
+                    battleManager.GetSourceUnitFromVisual(
+                        hit.collider.gameObject
+                    );
+
+                if (sourceUnit != null)
+                    return sourceUnit;
+            }
+        }
+
         return null;
     }
 }

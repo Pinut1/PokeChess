@@ -16,6 +16,8 @@ public class EeveeHeroDebugTest : MonoBehaviour
     private PokemonData _eeveeData;
     private PokemonData _pachirisuData;
 
+    private ItemManager _itemManager;
+
     private void OnGUI()
     {
         var gm = GameManager.Instance;
@@ -49,8 +51,84 @@ public class EeveeHeroDebugTest : MonoBehaviour
             _lastResult = LogBoardSkillStates(gm);
         y += 26f;
 
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑤ 보드 유닛 스킬 상태 로그"))
+            _lastResult = LogBoardSkillStates(gm);
+        y += 32f;
+
+        GUI.Label(new Rect(x, y, 320, 22), "진화의 돌 지급:");
+        y += 24f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑥ 불꽃의돌 지급"))
+            _lastResult = GiveEvolutionStone("FireStone", "불꽃의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑦ 물의돌 지급"))
+            _lastResult = GiveEvolutionStone("WaterStone", "물의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑧ 천둥의돌 지급"))
+            _lastResult = GiveEvolutionStone("ThunderStone", "천둥의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑨ 리프의돌 지급"))
+            _lastResult = GiveEvolutionStone("LeafStone", "리프의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑩ 얼음의돌 지급"))
+            _lastResult = GiveEvolutionStone("IceStone", "얼음의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑪ 달의돌 지급"))
+            _lastResult = GiveEvolutionStone("MoonStone", "달의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑫ 태양의돌 지급"))
+            _lastResult = GiveEvolutionStone("SunStone", "태양의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑬ 빛의돌 지급"))
+            _lastResult = GiveEvolutionStone("ShinyStone", "빛의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑭ 어둠의돌 지급"))
+            _lastResult = GiveEvolutionStone("DuskStone", "어둠의돌");
+        y += 26f;
+
+        if (GUI.Button(new Rect(x, y, 220, 24), "⑮ 각성의돌 지급"))
+            _lastResult = GiveEvolutionStone("DawnStone", "각성의돌");
+
         if (!string.IsNullOrEmpty(_lastResult))
             GUI.Label(new Rect(x, y, 320, 22), _lastResult);
+    }
+
+    private string GiveEvolutionStone(
+    string stoneNameEn,
+    string displayName)
+    {
+        if (_itemManager == null)
+            _itemManager = FindFirstObjectByType<ItemManager>();
+
+        if (_itemManager == null)
+            return "ItemManager를 찾지 못함";
+
+        bool success =
+            _itemManager.AddStoneByNameEn(stoneNameEn);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[EvolutionStoneDebug] 지급 실패: " +
+                $"{displayName} / DB 영문명 '{stoneNameEn}'"
+            );
+
+            return $"{displayName} 지급 실패";
+        }
+
+        Debug.Log(
+            $"[EvolutionStoneDebug] {displayName} 1개 지급"
+        );
+
+        return $"{displayName} 1개 지급 완료";
     }
 
     private string GiveEeveeToBench(GameManager gm)

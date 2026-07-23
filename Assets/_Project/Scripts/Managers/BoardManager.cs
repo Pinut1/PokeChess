@@ -43,6 +43,9 @@ public class BoardManager : MonoBehaviour
     [Tooltip("슬롯 간격입니다. Hex Size에 이 값을 곱해 실제 간격을 계산합니다.")]
     [SerializeField] private float _benchSpacingMultiplier = 1.1f;
 
+    [Header("Managers")]
+    [SerializeField] private ItemManager _itemManager;
+
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
 
@@ -67,9 +70,21 @@ public class BoardManager : MonoBehaviour
     // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
     private int _unitCap = 1;
 
+    private readonly List<PendingStarEvolution> _pendingStarEvolutions = new();
+    private bool _isBattlePhase;
+
+    private struct PendingStarEvolution
+    {
+        public int SpeciesId;
+        public int StarLevel;
+    }
+
     private void Awake()
     {
         _bench = new PokemonUnit[_benchSize];
+
+        if (_itemManager == null)
+            _itemManager = FindFirstObjectByType<ItemManager>();
     }
 
     private void OnValidate()
@@ -84,11 +99,15 @@ public class BoardManager : MonoBehaviour
     private void OnEnable()
     {
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+        GameEvents.OnUnitChanged += HandleUnitChanged;
+        GameEvents.OnPhaseChanged += HandlePhaseChanged;
     }
 
     private void OnDisable()
     {
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+        GameEvents.OnUnitChanged -= HandleUnitChanged;
+        GameEvents.OnPhaseChanged -= HandlePhaseChanged;
     }
 
     private void HandleUnitCapChanged(int cap)
@@ -99,6 +118,63 @@ public class BoardManager : MonoBehaviour
 
         // 레벨업으로 캡이 늘면 롤체처럼 벤치 앞쪽 기물을 빈 보드로 자동 승격한다.
         AutoPromoteBenchToBoard();
+    }
+
+    private void HandlePhaseChanged(GamePhase phase)
+    {
+        _isBattlePhase = phase == GamePhase.Battle;
+
+        if (phase == GamePhase.Shopping)
+            ApplyPendingStarEvolutions();
+    }
+
+    private void AddPendingStarEvolution(int speciesId, int starLevel)
+    {
+        foreach (PendingStarEvolution pending in _pendingStarEvolutions)
+        {
+            if (pending.SpeciesId == speciesId &&
+                pending.StarLevel == starLevel)
+            {
+                return;
+            }
+        }
+
+        _pendingStarEvolutions.Add(new PendingStarEvolution
+        {
+            SpeciesId = speciesId,
+            StarLevel = starLevel
+        });
+
+        Debug.Log($"[Evolve] 전투 중 합체 대기 등록: {speciesId} / {starLevel}성");
+    }
+
+    private void ApplyPendingStarEvolutions()
+    {
+        if (_pendingStarEvolutions.Count == 0)
+            return;
+
+        var pendingList =
+            new List<PendingStarEvolution>(_pendingStarEvolutions);
+
+        _pendingStarEvolutions.Clear();
+
+        foreach (PendingStarEvolution pending in pendingList)
+        {
+            CheckEvolution(
+                pending.SpeciesId,
+                pending.StarLevel,
+                false
+            );
+        }
+    }
+
+    /// <summary>
+    /// 진화의 돌 장착·해제나 외부 효과로 유닛의 종/성급이 바뀌었을 때
+    /// 변경된 현재 종과 성급을 기준으로 합체를 다시 검사한다.
+    /// </summary>
+    private void HandleUnitChanged(PokemonUnit unit)
+    {
+        RecheckEvolution(unit);
     }
 
     /// <summary>
@@ -696,103 +772,489 @@ public class BoardManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     /// <summary>
-    /// 보드+벤치 통틀어 같은 종(data.id)·같은 성(starLevel) 유닛이 3개 이상이면 1개로 합쳐 별업.
-    /// 별업 시 종이 진화체(evolvesIntoEn)로 바뀐다 — 꼬마돌1성×3 → 데구리2성, 데구리2성×3 → 딱구리3성.
-    /// 1성→2성→3성, 3성이 상한. 진화 대상이 없으면(최종형/데이터 미비) 종은 유지하고 별만 올림.
-    /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
+    /// 성급 합체에 소비될 유닛과 원래 위치 정보.
     /// </summary>
-    private void CheckEvolution(int speciesId, int starLevel, bool isTradeEvolved)
+    private struct EvolutionCandidate
     {
-        if (_isEvolving) return;
-        if (starLevel >= 3) return;
+        public PokemonUnit Unit;
+        public bool IsOnBoard;
+        public HexCoords BoardCoords;
+        public int BenchSlot;
 
-        var boardMatches = new List<HexCoords>();
-        var benchMatches = new List<int>();
+        public EvolutionCandidate(
+            PokemonUnit unit,
+            HexCoords boardCoords)
+        {
+            Unit = unit;
+            IsOnBoard = true;
+            BoardCoords = boardCoords;
+            BenchSlot = -1;
+        }
 
-        // 돌 낀 유닛은 머지 후보 제외 — 안 그러면 합체 시 소비된 유닛의 돌이 Destroy로 같이 증발한다.
-        // "머지하려면 돌부터 빼라"가 의도된 흐름(진화의 돌 설계 문서, 2026-06-22).
+        public EvolutionCandidate(
+            PokemonUnit unit,
+            int benchSlot)
+        {
+            Unit = unit;
+            IsOnBoard = false;
+            BoardCoords = default;
+            BenchSlot = benchSlot;
+        }
+    }
+
+    /// <summary>
+    /// 보드와 벤치에서 현재 종 ID와 성급이 같은 유닛 3마리를 찾아
+    /// 모두 제거한 뒤 다음 성급 유닛을 신규 생성한다.
+    ///
+    /// 위치 선정 규칙:
+    /// - 소비 대상 중 보드 유닛이 있으면 보드 위치 중 무작위
+    /// - 전부 벤치라면 벤치 슬롯 중 무작위
+    ///
+    /// 장착물 처리:
+    /// - 진화의 돌이 있으면 1개는 결과 유닛에 반드시 유지
+    /// - 중복 진화의 돌은 인벤토리 반환
+    /// - 남은 슬롯에 일반 아이템을 무작위 장착
+    /// - 장착되지 않은 일반 아이템은 인벤토리 반환
+    /// </summary>
+    private void CheckEvolution(
+        int speciesId,
+        int starLevel,
+        bool isTradeEvolved)
+    {
+        if (_isEvolving)
+            return;
+
+        if (starLevel >= 3)
+            return;
+
+        var candidates = new List<EvolutionCandidate>();
+
+        // 현재 pokemonId와 성급만 합체 조건으로 사용한다.
+        // 돌 진화 여부와 통신진화 여부는 합체 자체를 막지 않는다.
         foreach (var kv in _battleField)
         {
             PokemonUnit unit = kv.Value;
 
-            if (unit != null &&
-                unit.data != null &&
-                !unit.IsStoneEvolved &&
-                unit.data.id == speciesId &&
-                unit.starLevel == starLevel &&
-                unit.isTradeEvolved == isTradeEvolved)
+            if (unit == null || unit.data == null)
+                continue;
+
+            if (unit.data.id != speciesId ||
+                unit.starLevel != starLevel)
             {
-                boardMatches.Add(kv.Key);
+                continue;
             }
+
+            candidates.Add(
+                new EvolutionCandidate(unit, kv.Key)
+            );
         }
 
-        for (int i = 0; i < _bench.Length; i++)
+        for (int slot = 0; slot < _bench.Length; slot++)
         {
-            PokemonUnit unit = _bench[i];
+            PokemonUnit unit = _bench[slot];
 
-            if (unit != null &&
-                unit.data != null &&
-                !unit.IsStoneEvolved &&
-                unit.data.id == speciesId &&
-                unit.starLevel == starLevel &&
-                unit.isTradeEvolved == isTradeEvolved)
+            if (unit == null || unit.data == null)
+                continue;
+
+            if (unit.data.id != speciesId ||
+                unit.starLevel != starLevel)
             {
-                benchMatches.Add(i);
+                continue;
             }
+
+            candidates.Add(
+                new EvolutionCandidate(unit, slot)
+            );
         }
 
-        if (boardMatches.Count + benchMatches.Count < 3) return;
+        if (candidates.Count < 3)
+            return;
+
+        if (_isBattlePhase)
+        {
+            AddPendingStarEvolution(speciesId, starLevel);
+            return;
+        }
 
         _isEvolving = true;
 
-        // 소비할 3개 모으기(보드 우선). consumed[0]이 생존자 = 첫 위치.
-        var consumed = new List<PokemonUnit>();
-        foreach (var c in boardMatches) { if (consumed.Count < 3) consumed.Add(_battleField[c]); }
-        foreach (var s in benchMatches) { if (consumed.Count < 3) consumed.Add(_bench[s]); }
+        // 이번 합체에서 소비할 유닛 3마리.
+        // 기존과 동일하게 보드를 먼저 찾고 벤치를 뒤에 찾았으므로
+        // 후보가 3마리를 넘으면 앞쪽 3마리를 소비한다.
+        var consumed = new List<EvolutionCandidate>
+    {
+        candidates[0],
+        candidates[1],
+        candidates[2]
+    };
 
-        bool survivorOnBoard = boardMatches.Count > 0;
-        HexCoords survivorCoords = survivorOnBoard ? boardMatches[0] : default;
-        int survivorSlot = survivorOnBoard ? -1 : benchMatches[0];
-        PokemonUnit survivor = consumed[0];
+        // 결과 유닛이 생성될 위치 후보.
+        var boardDestinations = new List<EvolutionCandidate>();
 
-        // 소비된 3개의 위치 비우기
-        foreach (var c in boardMatches)
-            if (consumed.Contains(_battleField[c])) _battleField[c] = null;
-        for (int i = 0; i < _bench.Length; i++)
-            if (_bench[i] != null && consumed.Contains(_bench[i])) _bench[i] = null;
-
-        // 생존자 외 2개 파괴
-        foreach (var u in consumed)
-            if (u != survivor && u != null) Destroy(u.gameObject);
-
-        // 별업 + 종 진화(evolvesIntoEn으로 스왑) + 재배치
-        survivor.starLevel = Mathf.Clamp(starLevel + 1, 1, 3);
-
-        // 상위 성급은 진화체로 종을 교체(꼬마돌→데구리→딱구리). data 스왑만으로 스탯/스킬/시너지 전부 전환됨.
-        // 진화 대상이 없거나(최종형) DB에 진화체가 없으면 종 유지(같은 종 별업으로 폴백).
-        // 진화잠금(이브이 영웅증강 등)이면 종 스왑을 건너뛰고 별만 올린다 — 3성까지 원본 종 유지.
-        string evolvedEn = survivor.evolutionLocked || survivor.isTradeEvolved ? null : survivor.data.evolvesIntoEn;
-
-        if (!string.IsNullOrEmpty(evolvedEn))
+        foreach (EvolutionCandidate candidate in consumed)
         {
-            var evolved = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(evolvedEn) : null;
-            if (evolved != null) survivor.data = evolved;
-            else Debug.LogWarning($"[Evolve] 진화체 '{evolvedEn}' 가 PokemonDatabase에 없음 — 종 유지(별만 상승). 데이터 보강 필요");
+            if (candidate.IsOnBoard)
+                boardDestinations.Add(candidate);
         }
 
-        survivor.ResetForBattle();   // 진화체 MaxHp 기준 풀회복 (data 스왑 후 호출)
-        if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
-        else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
+        EvolutionCandidate destination;
+
+        if (boardDestinations.Count > 0)
+        {
+            int randomIndex = Random.Range(
+                0,
+                boardDestinations.Count
+            );
+
+            destination = boardDestinations[randomIndex];
+        }
+        else
+        {
+            int randomIndex = Random.Range(0, consumed.Count);
+            destination = consumed[randomIndex];
+        }
+
+        PokemonUnit templateUnit = destination.Unit;
+        PokemonData currentSpeciesData = templateUnit.data;
+
+        // 세 유닛의 일반 아이템과 진화의 돌을 모두 수거한다.
+        var collectedItems = new List<ItemData>();
+        var collectedStones = new List<EvolutionStoneData>();
+
+        EvolutionStoneData retainedStone = null;
+        PokemonData retainedPreStoneData = null;
+
+        bool resultTradeEvolved = false;
+        bool resultEvolutionLocked = false;
+
+        float resultHeroStatMultiplier = 1f;
+        string resultRoleOverride = null;
+        PokemonSkillData resultGrantedSkill = null;
+        int resultGrantedSkillManaCost = 0;
+        bool resultHasHeroBerry = false;
+
+        foreach (EvolutionCandidate candidate in consumed)
+        {
+            PokemonUnit unit = candidate.Unit;
+
+            if (unit == null)
+                continue;
+
+            unit.DetachEquipmentForMerge(
+                out EvolutionStoneData stone,
+                out PokemonData preStoneData,
+                out List<ItemData> items
+            );
+
+            if (items != null)
+            {
+                foreach (ItemData item in items)
+                {
+                    if (item != null)
+                        collectedItems.Add(item);
+                }
+            }
+
+            if (stone != null)
+            {
+                collectedStones.Add(stone);
+
+                // 결과 유닛에 유지할 첫 번째 돌과 원본 종 정보.
+                if (retainedStone == null)
+                {
+                    retainedStone = stone;
+                    retainedPreStoneData = preStoneData;
+                }
+            }
+
+            // 현재 종이 같다면 통신진화 상태가 하나라도 있을 경우 유지한다.
+            if (unit.isTradeEvolved)
+                resultTradeEvolved = true;
+
+            // 영웅증강 상태도 합체 결과가 잃지 않도록 유지한다.
+            if (unit.evolutionLocked)
+                resultEvolutionLocked = true;
+
+            if (unit.heroStatMultiplier > resultHeroStatMultiplier)
+                resultHeroStatMultiplier = unit.heroStatMultiplier;
+
+            if (!string.IsNullOrEmpty(unit.roleOverride))
+                resultRoleOverride = unit.roleOverride;
+
+            if (unit.grantedSkill != null)
+            {
+                resultGrantedSkill = unit.grantedSkill;
+                resultGrantedSkillManaCost =
+                    unit.grantedSkillManaCost;
+            }
+
+            if (unit.hasHeroBerry)
+                resultHasHeroBerry = true;
+        }
+
+        // 신규 생성 전에 기존 3마리의 논리 위치를 전부 비운다.
+        foreach (EvolutionCandidate candidate in consumed)
+        {
+            if (candidate.IsOnBoard)
+            {
+                _battleField[candidate.BoardCoords] = null;
+            }
+            else if (candidate.BenchSlot >= 0 &&
+                     candidate.BenchSlot < _bench.Length)
+            {
+                _bench[candidate.BenchSlot] = null;
+            }
+        }
+
+        /*
+         * 목적지로 선정된 기존 유닛을 템플릿으로 복제한다.
+         *
+         * 기존 유닛을 생존시키는 것이 아니라,
+         * 새로운 GameObject와 PokemonUnit 인스턴스를 생성한다.
+         */
+        PokemonUnit evolvedUnit = Instantiate(
+            templateUnit,
+            templateUnit.transform.parent
+        );
+
+        evolvedUnit.name =
+            $"{currentSpeciesData.pokemonName}_Star_{starLevel + 1}";
+
+        // Instantiate가 복사한 장착 상태를 확실히 초기화한다.
+        evolvedUnit.items = new List<ItemData>();
+        evolvedUnit.equippedStone = null;
+        evolvedUnit.preStoneData = null;
+
+        evolvedUnit.starLevel = Mathf.Clamp(
+            starLevel + 1,
+            1,
+            3
+        );
+
+        evolvedUnit.isTradeEvolved = resultTradeEvolved;
+        evolvedUnit.evolutionLocked = resultEvolutionLocked;
+        evolvedUnit.heroStatMultiplier =
+            resultHeroStatMultiplier;
+        evolvedUnit.roleOverride =
+            resultRoleOverride;
+        evolvedUnit.grantedSkill =
+            resultGrantedSkill;
+        evolvedUnit.grantedSkillManaCost =
+            resultGrantedSkillManaCost;
+        evolvedUnit.hasHeroBerry =
+            resultHasHeroBerry;
+
+        /*
+         * 진화의 돌로 만들어진 현재 종이면 종을 추가로 변경하지 않는다.
+         *
+         * 예:
+         * 라이츄 1성 × 3
+         * → 라이츄 2성
+         *
+         * 피카츄나 다음 evolvesInto 종으로 바뀌면 안 된다.
+         */
+        PokemonData resultData = currentSpeciesData;
+
+        if (retainedStone == null &&
+            !resultEvolutionLocked &&
+            !resultTradeEvolved)
+        {
+            string evolvedEn =
+                currentSpeciesData.evolvesIntoEn;
+
+            if (!string.IsNullOrEmpty(evolvedEn))
+            {
+                PokemonData nextData =
+                    PokemonDatabase.Instance != null
+                        ? PokemonDatabase.Instance
+                            .GetByNameEn(evolvedEn)
+                        : null;
+
+                if (nextData != null)
+                {
+                    resultData = nextData;
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[Evolve] 진화체 '{evolvedEn}'가 " +
+                        "PokemonDatabase에 없습니다. 종을 유지합니다."
+                    );
+                }
+            }
+        }
+
+        evolvedUnit.data = resultData;
+
+        /*
+         * 돌 진화체라면 진화의 돌 하나를 먼저 복원한다.
+         * 돌이 장비 슬롯 하나를 차지하므로 일반 아이템은 최대 1개만 장착된다.
+         */
+        if (retainedStone != null)
+        {
+            bool restored =
+                evolvedUnit.RestoreStoneStateAfterMerge(
+                    retainedStone,
+                    retainedPreStoneData
+                );
+
+            if (!restored)
+            {
+                Debug.LogError(
+                    "[Evolve] 신규 유닛에 진화의 돌 상태 복원 실패."
+                );
+
+                if (_itemManager != null)
+                    _itemManager.RecoverMergedStone(
+                        retainedStone
+                    );
+
+                retainedStone = null;
+            }
+        }
+
+        // 유지한 돌을 제외한 나머지 돌은 모두 인벤토리로 반환한다.
+        bool skippedRetainedStone = false;
+
+        foreach (EvolutionStoneData stone in collectedStones)
+        {
+            if (stone == null)
+                continue;
+
+            if (!skippedRetainedStone &&
+                retainedStone != null &&
+                stone == retainedStone)
+            {
+                skippedRetainedStone = true;
+                continue;
+            }
+
+            if (_itemManager != null)
+            {
+                _itemManager.RecoverMergedStone(stone);
+            }
+            else
+            {
+                Debug.LogError(
+                    $"[Evolve] ItemManager가 없어 " +
+                    $"진화의 돌 '{stone.stoneName}' 반환 실패"
+                );
+            }
+        }
+
+        // 일반 아이템 순서를 무작위로 섞는다.
+        ShuffleItems(collectedItems);
+
+        // 돌이 있으면 빈 슬롯 1개, 돌이 없으면 빈 슬롯 2개.
+        int itemEquipCount = Mathf.Min(
+                PokemonUnit.MaxItemSlots - evolvedUnit.UsedSlots,
+                collectedItems.Count
+            );
+
+        for (int i = 0; i < collectedItems.Count; i++)
+        {
+            ItemData item = collectedItems[i];
+
+            if (item == null)
+                continue;
+
+            if (i < itemEquipCount)
+            {
+                bool equipped =
+                    evolvedUnit.TryEquipItem(item);
+
+                if (!equipped)
+                {
+                    Debug.LogWarning(
+                        $"[Evolve] '{item.itemName}' 재장착 실패 — " +
+                        "인벤토리로 반환합니다."
+                    );
+
+                    if (_itemManager != null)
+                        _itemManager.RecoverMergedItem(item);
+                }
+            }
+            else
+            {
+                if (_itemManager != null)
+                {
+                    _itemManager.RecoverMergedItem(item);
+                }
+                else
+                {
+                    Debug.LogError(
+                        $"[Evolve] ItemManager가 없어 " +
+                        $"아이템 '{item.itemName}' 반환 실패"
+                    );
+                }
+            }
+        }
+
+        // 신규 유닛을 선택된 위치에 등록한다.
+        if (destination.IsOnBoard)
+        {
+            _battleField[destination.BoardCoords] =
+                evolvedUnit;
+
+            evolvedUnit.isOnBoard = true;
+        }
+        else
+        {
+            _bench[destination.BenchSlot] =
+                evolvedUnit;
+
+            evolvedUnit.isOnBoard = false;
+        }
+
+        // 기존 유닛 3마리는 모두 제거한다.
+        foreach (EvolutionCandidate candidate in consumed)
+        {
+            if (candidate.Unit != null)
+                Destroy(candidate.Unit.gameObject);
+        }
+
+        evolvedUnit.ResetForBattle();
 
         _isEvolving = false;
 
-        Debug.Log($"[Evolve] {starLevel}성 3개 합체 → {survivor.data.pokemonName} {survivor.starLevel}성");
+        Debug.Log(
+            $"[Evolve] {currentSpeciesData.pokemonName} " +
+            $"{starLevel}성 3개 제거 → " +
+            $"{evolvedUnit.data.pokemonName} " +
+            $"{evolvedUnit.starLevel}성 신규 생성 / " +
+            $"돌 {(evolvedUnit.equippedStone != null ? 1 : 0)}개 / " +
+            $"일반 장비 {evolvedUnit.items.Count}개"
+        );
 
-        // 이벤트 발화(시너지 재계산/뷰 갱신 — 진화로 종이 바뀌었으니 모델 갱신도 뷰가 처리)
-        if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
-        else                 GameEvents.UnitBenched(survivor);
+        if (evolvedUnit.isOnBoard)
+            GameEvents.UnitPlaced(evolvedUnit);
+        else
+            GameEvents.UnitBenched(evolvedUnit);
 
-        // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
-        CheckEvolution(survivor.data.id, survivor.starLevel, survivor.isTradeEvolved);
+        // 같은 결과 유닛이 다시 3마리가 됐는지 연쇄 검사.
+        CheckEvolution(
+            evolvedUnit.data.id,
+            evolvedUnit.starLevel,
+            evolvedUnit.isTradeEvolved
+        );
+    }
+
+    /// <summary>
+    /// 일반 아이템 목록을 Fisher-Yates 방식으로 무작위 섞는다.
+    /// 중복 아이템도 각 항목을 개별 장비로 취급한다.
+    /// </summary>
+    private void ShuffleItems(List<ItemData> items)
+    {
+        if (items == null)
+            return;
+
+        for (int i = items.Count - 1; i > 0; i--)
+        {
+            int randomIndex = Random.Range(0, i + 1);
+
+            ItemData temp = items[i];
+            items[i] = items[randomIndex];
+            items[randomIndex] = temp;
+        }
     }
 }

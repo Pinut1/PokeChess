@@ -163,6 +163,35 @@ public class ItemManager : MonoBehaviour
         GameEvents.InventoryChanged();
     }
 
+    /// <summary>
+    /// 성급 합체 후 남은 일반 아이템을 인벤토리로 반환한다.
+    ///
+    /// 이미 플레이어가 보유하던 장착물을 돌려주는 것이므로
+    /// 판매 회수와 마찬가지로 인벤토리 20칸 제한을 무시한다.
+    /// </summary>
+    public void RecoverMergedItem(ItemData item)
+    {
+        if (item == null)
+            return;
+
+        _items.Add(item);
+        GameEvents.InventoryChanged();
+    }
+
+    /// <summary>
+    /// 성급 합체 후 중복된 진화의 돌을 인벤토리로 반환한다.
+    ///
+    /// 이미 플레이어가 보유하던 장착물을 돌려주는 것이므로
+    /// 인벤토리 제한을 무시한다.
+    /// </summary>
+    public void RecoverMergedStone(EvolutionStoneData stone)
+    {
+        if (stone == null)
+            return;
+
+        _stones.Add(stone);
+        GameEvents.InventoryChanged();
+    }
     /// <summary>판매 회수 전용 — 인벤토리 캡을 무시하고 진화의 돌을 복귀시킨다. null은 무시.</summary>
     private void RecoverToInventory(EvolutionStoneData stone)
     {
