@@ -318,10 +318,20 @@ public class ItemManager : MonoBehaviour
     /// <summary>
     /// 장착 단일 입구. 드래그&드롭 UI가 인벤토리 항목을 유닛에 드롭할 때 호출.
     /// 인벤토리에 있는 항목만 장착 가능. 성공 시 인벤토리에서 제거(슬롯 규칙은 PokemonUnit이 강제).
+    /// 전투 중 필드(보드) 유닛에게는 일반 아이템/진화의 돌 장착을 전면 거부한다(기획 확정).
+    /// 벤치 유닛은 전투 중에도 그대로 허용.
     /// </summary>
     public bool EquipToUnit(ScriptableObject equippable, PokemonUnit unit)
     {
         if (unit == null || equippable == null) return false;
+
+        if (IsBattlePhaseAndUnitOnBoard(unit))
+        {
+            Debug.Log(
+                $"[Item] 전투 중 필드 유닛 '{unit.data?.pokemonName}'에게는 " +
+                "장착할 수 없습니다(벤치 유닛만 허용).");
+            return false;
+        }
 
         switch (equippable)
         {
@@ -345,6 +355,22 @@ public class ItemManager : MonoBehaviour
                 Debug.LogWarning($"[Item] 장착 불가 타입: {equippable.GetType().Name}");
                 return false;
         }
+    }
+
+    /// <summary>
+    /// 전투 페이즈이고 대상 유닛이 보드(필드) 위에 있는지.
+    /// UnitDragController가 쓰는 것과 동일한 패턴(GamePhase.Battle 비교 +
+    /// BoardManager.GetUnitsOnBoard().Contains)을 재사용한다(새 판별 로직 없음).
+    /// </summary>
+    private static bool IsBattlePhaseAndUnitOnBoard(PokemonUnit unit)
+    {
+        GameManager gm = GameManager.Instance;
+        if (gm == null || unit == null) return false;
+
+        bool isBattlePhase = gm.Phase != null && gm.Phase.CurrentPhase == GamePhase.Battle;
+        if (!isBattlePhase) return false;
+
+        return gm.Board != null && gm.Board.GetUnitsOnBoard().Contains(unit);
     }
 
     /// <summary>장착 해제 단일 입구(되돌리기). 돌은 베이스로 원복, 일반템은 제거. 성공 시 인벤토리로 반환.</summary>

@@ -806,7 +806,14 @@ public class BoardManager : MonoBehaviour
     /// 보드와 벤치에서 현재 종 ID와 성급이 같은 유닛 3마리를 찾아
     /// 모두 제거한 뒤 다음 성급 유닛을 신규 생성한다.
     ///
-    /// 위치 선정 규칙:
+    /// 페이즈별 규칙:
+    /// - 쇼핑 페이즈: 위치 무관, 발견 순서(보드 우선) 앞쪽 3마리를 즉시 소비.
+    /// - 전투 페이즈: 보호 대상은 "필드에서 싸우는 유닛"뿐이므로, 후보 중 벤치 유닛만으로
+    ///   3마리를 채울 수 있으면 벤치 유닛 3마리를 즉시 합체한다. 벤치만으로는 3마리를
+    ///   못 채워 필드 유닛이 반드시 섞여야 하는 경우엔 AddPendingStarEvolution으로 등록해
+    ///   쇼핑 페이즈 진입 시(ApplyPendingStarEvolutions) 일괄 처리한다.
+    ///
+    /// 위치 선정 규칙(결과 유닛 배치 위치):
     /// - 소비 대상 중 보드 유닛이 있으면 보드 위치 중 무작위
     /// - 전부 벤치라면 벤치 슬롯 중 무작위
     ///
@@ -870,23 +877,47 @@ public class BoardManager : MonoBehaviour
         if (candidates.Count < 3)
             return;
 
+        // 전투 중 보호 대상은 "필드에서 싸우는 유닛"뿐이다.
+        // 후보 중 벤치 유닛만으로 3마리가 채워지면 필드 유닛을 건드리지 않고 즉시 합체하고,
+        // 벤치만으로 3마리를 못 채워 필드 유닛이 반드시 섞여야 한다면 쇼핑 페이즈까지 대기 등록한다.
+        List<EvolutionCandidate> consumed;
+
         if (_isBattlePhase)
         {
-            AddPendingStarEvolution(speciesId, starLevel);
-            return;
+            var benchOnlyCandidates = new List<EvolutionCandidate>();
+
+            foreach (EvolutionCandidate candidate in candidates)
+            {
+                if (!candidate.IsOnBoard)
+                    benchOnlyCandidates.Add(candidate);
+            }
+
+            if (benchOnlyCandidates.Count < 3)
+            {
+                AddPendingStarEvolution(speciesId, starLevel);
+                return;
+            }
+
+            // 벤치 후보를 우선 선택해 필드 유닛을 건드리지 않고 즉시 합체한다.
+            consumed = new List<EvolutionCandidate>
+            {
+                benchOnlyCandidates[0],
+                benchOnlyCandidates[1],
+                benchOnlyCandidates[2]
+            };
+        }
+        else
+        {
+            // 쇼핑 페이즈: 위치 무관, 기존과 동일하게 발견 순서(보드 우선) 앞쪽 3마리를 소비한다.
+            consumed = new List<EvolutionCandidate>
+            {
+                candidates[0],
+                candidates[1],
+                candidates[2]
+            };
         }
 
         _isEvolving = true;
-
-        // 이번 합체에서 소비할 유닛 3마리.
-        // 기존과 동일하게 보드를 먼저 찾고 벤치를 뒤에 찾았으므로
-        // 후보가 3마리를 넘으면 앞쪽 3마리를 소비한다.
-        var consumed = new List<EvolutionCandidate>
-    {
-        candidates[0],
-        candidates[1],
-        candidates[2]
-    };
 
         // 결과 유닛이 생성될 위치 후보.
         var boardDestinations = new List<EvolutionCandidate>();

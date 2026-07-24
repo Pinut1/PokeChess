@@ -749,6 +749,35 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 통신진화체 → 원본 종 역매핑만 등록한다(판매 시 풀 반환/가격 정산용).
+    /// ActivateTradeEvolution과 달리 상점 카드 변환(해금)은 발생시키지 않는다.
+    /// 이미 완성된 통신진화체를 재전송받은 경우처럼,
+    /// 진화 "사건" 없이 진화체 유닛만 소유하게 됐을 때 사용.
+    /// </summary>
+    public void RegisterEvolvedToBase(int evolvedPokemonId, int basePokemonId)
+    {
+        if (evolvedPokemonId <= 0 || basePokemonId <= 0) return;
+
+        var db = PokemonDatabase.Instance;
+        PokemonData evolvedData = db != null ? db.GetById(evolvedPokemonId) : null;
+        PokemonData baseData    = db != null ? db.GetById(basePokemonId)    : null;
+        if (evolvedData == null || baseData == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][TradeEvolution] 역매핑 등록 실패: {evolvedPokemonId} → {basePokemonId}");
+            return;
+        }
+
+        if (!_evolvedToBase.ContainsKey(evolvedData))
+        {
+            _evolvedToBase[evolvedData] = baseData;
+            Debug.Log(
+                $"[Shop][TradeEvolution] 판매 역매핑 등록: " +
+                $"{evolvedData.pokemonName} → {baseData.pokemonName}");
+        }
+    }
+
+    /// <summary>
     /// 공용 풀에서는 원본 ID를 유지하되,
     /// 현재 플레이어가 통신진화를 해금했다면 화면·구매 생성용 데이터만 진화체로 바꾼다.
     /// </summary>

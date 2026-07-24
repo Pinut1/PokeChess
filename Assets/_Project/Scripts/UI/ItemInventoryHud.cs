@@ -5,7 +5,9 @@ using UnityEngine;
 /// 인벤토리 아이템/진화의 돌을 마우스로 집어 보드 위 유닛에 드래그해서 장착하는 프로토타입 UI(IMGUI).
 /// 정식 uGUI 드래그앤드롭은 황해인 담당 — 이건 그 전까지 쓰는 임시 버전.
 /// 장착 해제는 유닛을 클릭해 목록을 펼치고 버튼으로 처리(드래그-아웃은 아님, 스코프 단순화).
-/// 쇼핑 페이즈에서만 동작(UnitDragController와 동일 제약 — 전투 중엔 유닛이 비활성/미러 좌표라 의미 없음).
+/// 장착 시도는 쇼핑·전투 페이즈 모두에서 가능하다. 전투 중 필드(보드) 유닛에 대한 실제 거부는
+/// ItemManager.EquipToUnit이 처리하므로(벤치 유닛만 허용), 여기서는 시도 자체만 열어둔다.
+/// 장착 해제는 기존과 동일하게 쇼핑 페이즈에서만 가능.
 /// </summary>
 public class ItemInventoryHud : MonoBehaviour
 {
@@ -38,9 +40,19 @@ public class ItemInventoryHud : MonoBehaviour
             gm.Phase == null ||
             gm.Phase.CurrentPhase == GamePhase.Shopping;
 
-        // 쇼핑이 아니면 진행 중이던 아이템 드래그만 취소한다.
-        // 선택된 유닛은 유지해 전투 중에도 장착 정보를 확인할 수 있게 한다.
-        if (!isShopping)
+        bool isBattlePhase =
+            gm.Phase != null &&
+            gm.Phase.CurrentPhase == GamePhase.Battle;
+
+        // 장착(드래그&드롭)은 쇼핑 중이거나 전투 중에 시도할 수 있다.
+        // 전투 중 필드 유닛에 대한 실제 거부는 ItemManager.EquipToUnit이 처리하므로
+        // 여기서는 벤치/필드를 구분하지 않고 시도 자체만 허용한다.
+        // 해제(DrawInspectPanel)는 기존과 동일하게 쇼핑 중에만 허용.
+        bool canEquip = isShopping || isBattlePhase;
+
+        // 장착 상호작용이 불가능한 페이즈(로비/결과 등)로 바뀌면 진행 중이던 드래그만 취소한다.
+        // 선택된 유닛은 유지해 다른 페이즈에서도 장착 정보를 확인할 수 있게 한다.
+        if (!canEquip)
         {
             _dragging = null;
             _dragLabel = null;
@@ -61,11 +73,11 @@ public class ItemInventoryHud : MonoBehaviour
         _panelY = Screen.height - 150f - panelH;
 
         // 클릭에 의한 유닛 선택은 모든 페이즈에서 허용한다.
-        // 아이템 드래그 및 장착은 HandleInput 내부에서 쇼핑일 때만 처리한다.
-        HandleInput(gm, isShopping);
+        // 아이템 드래그 및 장착은 HandleInput 내부에서 쇼핑·전투 중일 때만 처리한다.
+        HandleInput(gm, canEquip);
 
-        // 인벤토리는 쇼핑 중에만 표시
-        if (isShopping)
+        // 인벤토리는 쇼핑·전투 중에만 표시(전투 중 필드 유닛 장착은 EquipToUnit이 거부)
+        if (canEquip)
         {
             DrawInventory(gm);
             DrawDragGhost();
@@ -104,7 +116,7 @@ public class ItemInventoryHud : MonoBehaviour
         }
     }
 
-    private void HandleInput(GameManager gm, bool isShopping)
+    private void HandleInput(GameManager gm, bool canEquip)
     {
         Event e = Event.current;
         var item = gm.Item;
@@ -112,8 +124,8 @@ public class ItemInventoryHud : MonoBehaviour
         if (e.type == EventType.MouseDown &&
             _dragging == null)
         {
-            // 쇼핑 중에만 인벤토리 아이템을 집을 수 있다.
-            if (isShopping)
+            // 쇼핑 중이거나 전투 중일 때만 인벤토리 아이템을 집을 수 있다.
+            if (canEquip)
             {
                 int i = 0;
 
@@ -155,7 +167,7 @@ public class ItemInventoryHud : MonoBehaviour
             }
         }
         else if (
-            isShopping &&
+            canEquip &&
             e.type == EventType.MouseUp &&
             _dragging != null)
         {

@@ -523,6 +523,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         /// <summary>송신 당시 필드에 배치돼 있던 유닛인지.</summary>
         public bool wasOnBoard;
+
+        /// <summary>이미 통신진화가 완료된 유닛인지(재전송 시 ×1.4·역매핑 보존용).</summary>
+        public bool isTradeEvolved;
     }
 
     /// <summary>
@@ -678,7 +681,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             itemIds = itemIds,
             stoneId = stoneId,
             preStonePokemonId = preStonePokemonId,
-            wasOnBoard = wasOnBoard
+            wasOnBoard = wasOnBoard,
+            isTradeEvolved = unit.isTradeEvolved
         };
 
         var pendingTrade = new PendingOutgoingTrade
@@ -734,7 +738,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             packet.itemIds,
             packet.stoneId,
             packet.preStonePokemonId,
-            packet.wasOnBoard
+            packet.wasOnBoard,
+            packet.isTradeEvolved
         );
     }
 
@@ -785,7 +790,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         int[] itemIds,
         int stoneId,
         int preStonePokemonId,
-        bool wasOnBoard)
+        bool wasOnBoard,
+        bool isTradeEvolved)
     {
         PokemonData data =
             PokemonDatabase.Instance != null
@@ -815,7 +821,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             itemIds = itemIds ?? System.Array.Empty<int>(),
             stoneId = stoneId,
             preStonePokemonId = preStonePokemonId,
-            wasOnBoard = wasOnBoard
+            wasOnBoard = wasOnBoard,
+            isTradeEvolved = isTradeEvolved
         };
 
         _incomingTradeQueue.Enqueue(packet);
@@ -915,6 +922,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>
     /// FIFO Queue 맨 앞의 유닛 한 마리를 복원한다.
     /// 성공한 경우에만 Queue에서 제거하고 송신자에게 ACK를 보낸다.
+    /// 수령 유닛은 항상 수신자의 벤치에 생성되고 벤치 유닛은 전투에 영향을 주지 않으므로,
+    /// 송신자가 필드/벤치 어디서 보냈는지와 무관하게 통신진화 대상이면 무조건 즉시 진화체로 생성한다.
     /// </summary>
     private bool TryReceiveFrontTradeUnit(BoardManager board)
     {
@@ -952,11 +961,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         bool isTradeEvolution =
             !string.IsNullOrEmpty(evolvedNameEn);
 
-        bool shouldDelayTradeEvolution =
-            isTradeEvolution &&
-            _isBattlePhase &&
-            packet.wasOnBoard;
-
         PokemonData evolvedData = null;
 
         if (isTradeEvolution)
@@ -975,10 +979,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
         }
 
-        PokemonData receivedData =
-            shouldDelayTradeEvolution
-                ? originalData
-                : evolvedData ?? originalData;
+        // 통신진화 대상이면 지연 없이 항상 진화체로 생성한다.
+        PokemonData receivedData = evolvedData ?? originalData;
 
         PokemonUnit receivedUnit =
             UnitFactory.Create(receivedData, packet.starLevel);
@@ -1047,9 +1049,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             receivedUnit.preStoneData = preStoneData;
         }
 
+        // 이미 통신진화 완료 상태로 배송된 유닛은 그 상태를 그대로 복원하고,
+        // 이번 수령으로 새로 통신진화 대상이 된 경우도 즉시 반영한다(지연 없음).
         receivedUnit.isTradeEvolved =
-            isTradeEvolution &&
-            !shouldDelayTradeEvolution;
+            packet.isTradeEvolved || isTradeEvolution;
 
         receivedUnit.ResetForBattle();
 
@@ -1082,19 +1085,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (isTradeEvolution && evolvedData != null)
         {
-            if (shouldDelayTradeEvolution)
-            {
-                AddPendingTradeEvolution(
-                    originalData.id,
-                    evolvedData.id
-                );
-
-                Debug.Log(
-                    $"[TradeEvolution] 전투 중 필드 전송 유닛 — " +
-                    $"{originalData.pokemonName} 진화를 다음 쇼핑까지 대기"
-                );
-            }
-
+            // 수령 유닛은 벤치에만 생성되고 전투에 영향을 주지 않으므로 지연 없이 즉시 진화 처리한다.
             ApplyTradeEvolutionToOwnedUnits(
                 originalData,
                 evolvedData,
@@ -1106,8 +1097,40 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 evolvedData.id
             );
 
-            if (!shouldDelayTradeEvolution)
-                board.RecheckEvolution(receivedUnit);
+            board.RecheckEvolution(receivedUnit);
+        }
+        else if (packet.isTradeEvolved)
+        {
+            /*
+             * 이미 통신진화가 완료된 유닛을 재전송받은 경우:
+             * 새 진화 사건이 아니므로 해금/광역진화는 발생시키지 않고,
+             * 판매 시 원본 종 풀 반환을 위한 역매핑만 등록한다.
+             */
+            string baseNameEn =
+                tradeEvolution != null
+                    ? tradeEvolution.GetBaseOf(originalData.pokemonNameEn)
+                    : null;
+
+            PokemonData tradeBaseData =
+                !string.IsNullOrEmpty(baseNameEn) &&
+                PokemonDatabase.Instance != null
+                    ? PokemonDatabase.Instance.GetByNameEn(baseNameEn)
+                    : null;
+
+            if (tradeBaseData != null)
+            {
+                GameManager.Instance?.Shop?.RegisterEvolvedToBase(
+                    originalData.id,
+                    tradeBaseData.id
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[Trade] 통신진화체 '{originalData.pokemonNameEn}'의 " +
+                    "원본 종 역조회 실패 — 판매 풀 반환이 어긋날 수 있음"
+                );
+            }
         }
 
         /*
@@ -1122,20 +1145,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         string evolutionText =
             isTradeEvolution &&
-            !shouldDelayTradeEvolution &&
             evolvedData != null
                 ? " → " + evolvedData.pokemonName
                 : "";
 
-        string pendingText =
-            shouldDelayTradeEvolution
-                ? " / 진화 대기"
+        // 진화 판정에는 더 이상 사용하지 않고, 수령 로그 기록용으로만 남긴다.
+        string originText =
+            packet.wasOnBoard
+                ? " (필드 출신 유닛 수령)"
                 : "";
 
         Debug.Log(
             $"[Trade] 수령 완료: tradeId={packet.tradeId}, " +
             $"{originalData.pokemonName}{evolutionText} " +
-            $"★{receivedUnit.starLevel}{pendingText}, " +
+            $"★{receivedUnit.starLevel}{originText}, " +
             $"남은 대기 {_incomingTradeQueue.Count}마리"
         );
 
