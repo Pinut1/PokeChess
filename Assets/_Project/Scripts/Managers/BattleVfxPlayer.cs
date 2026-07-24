@@ -12,6 +12,9 @@ public static class BattleVfxPlayer
     /// <summary>VfxEntry.lifetime이 0 이하일 때 쓰는 자동 파괴 시간(초).</summary>
     public const float DEFAULT_LIFETIME = 2f;
 
+    /// <summary>VfxDatabase 키 접두어. 시트의 attackVfxId가 이걸 빼먹고 오는 경우를 폴백 조회로 흡수한다.</summary>
+    public const string VFX_ID_PREFIX = "VFX_";
+
     // 미등록 vfxId 경고는 id당 1회만 (매 시전마다 로그 스팸 방지).
     private static readonly HashSet<string> _warnedIds = new(System.StringComparer.OrdinalIgnoreCase);
 
@@ -87,10 +90,20 @@ public static class BattleVfxPlayer
         if (db == null) return null; // DB 에셋 자체가 없음 — Instance가 이미 에러 로그 출력
 
         var entry = db.Get(vfxId);
+
+        // 평타 attackVfxId는 시트에 접두어 없이 들어온다("Water_S"). VfxDatabase 키는 "VFX_Water_S".
+        // 스킬 vfxId는 접두어가 붙어 있어 이 폴백을 타지 않는다. 시트가 정리되면 제거 가능.
+        if ((entry == null || entry.prefab == null) &&
+            !vfxId.StartsWith(VFX_ID_PREFIX, System.StringComparison.OrdinalIgnoreCase))
+        {
+            entry = db.Get(VFX_ID_PREFIX + vfxId);
+        }
+
         if (entry == null || entry.prefab == null)
         {
             if (_warnedIds.Add(vfxId))
-                Debug.LogWarning($"[Vfx] vfxId '{vfxId}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.");
+                Debug.LogWarning($"[Vfx] vfxId '{vfxId}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요. " +
+                                 $"('{VFX_ID_PREFIX}{vfxId}' 로도 조회했으나 없음)");
             return null;
         }
         return entry;

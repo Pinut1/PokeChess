@@ -523,6 +523,7 @@ public class BattleManager : MonoBehaviour
             starLevel = Mathf.Clamp(e.starLevel, 1, 3)
         };
         ApplySkill(bu, data.skill, data.manaCost);
+        bu.attackVfxId = data.attackVfxId; // 평타 VFX(아군과 동일 규칙)
 
         // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
         // (아군은 unit.items 리스트, 적은 heldItemEn 단일 문자열을 ItemDatabase로 해석)
@@ -582,7 +583,11 @@ public class BattleManager : MonoBehaviour
             hasSitrusBerry = unit.hasHeroBerry // 파치리스 영웅증강 v2 자뭉열매
         };
         // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
-        if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+        if (unit.data != null)
+        {
+            ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+            bu.attackVfxId = unit.data.attackVfxId; // 평타 VFX는 종 데이터에서(스킬 테이블 아님)
+        }
 
         foreach (var item in unit.items)
         {
@@ -765,6 +770,9 @@ public class BattleManager : MonoBehaviour
     /// <summary>평타 1회: attack 기반 물리 피해(파이프라인). 마나는 초당 충전만(기획 확정) — 평타 획득 없음.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
+        // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
+        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target);
+
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
         foreach (var effect in attacker.effects)
