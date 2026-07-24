@@ -806,7 +806,8 @@ public class BattleManager : MonoBehaviour
         DamageType type = caster.skillEffectType == SkillEffectType.Attack ? DamageType.Physical : DamageType.Magic;
 
         var targets = GetSkillTargets(caster, primaryTarget);
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets); // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생
+        // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius);
 
         foreach (var t in targets)
         {
@@ -838,7 +839,10 @@ public class BattleManager : MonoBehaviour
         else
             targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
 
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets);
+        // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
+        bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
+                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius);
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
