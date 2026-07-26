@@ -143,10 +143,12 @@ namespace PokeChess.EditorTools
                     $"trainer_entry_data에 trainerId '{duplicateId}'가 중복 — 먼저 나온 엔트리를 유지하고 이후 엔트리는 무시했습니다."));
             }
 
+            // 누락 trainerId는 Import를 중단시키는 사유이므로 상세 메시지도 Error로 낸다.
+            // (Warning으로 두면 최종 "중단" 에러와 심각도가 어긋나 원인 줄을 놓치기 쉽다)
             foreach (var missing in _missingTrainerStages)
             {
                 messages.Add(new TrainerEntryDiagnosticMessage(
-                    TrainerEntryIssueSeverity.Warning,
+                    TrainerEntryIssueSeverity.Error,
                     $"trainer_entry_data에 trainerId '{missing.Key}' 없음 — 참조 스테이지: " +
                     $"{string.Join(", ", missing.Value)}. stage_data 인라인 enemies로 폴백했습니다."));
             }

@@ -96,6 +96,51 @@ public class BoardManager : MonoBehaviour
         // 캡 값은 ShopManager가 레벨별 테이블 기준으로 산정해 전달한다. 여기서는 그대로 반영만.
         _unitCap = Mathf.Max(1, cap);
         Debug.Log($"[BoardManager] 배치 가능 기물 수 변경 반영: {_unitCap}");
+
+        // 레벨업으로 캡이 늘면 롤체처럼 벤치 앞쪽 기물을 빈 보드로 자동 승격한다.
+        AutoPromoteBenchToBoard();
+    }
+
+    /// <summary>
+    /// 보드에 여유 슬롯(현재 배치 수 &lt; 캡)이 있으면 벤치 앞쪽(슬롯 0,1,2…) 유닛부터
+    /// 빈 보드 타일로 자동 승격한다(롤체식). 레벨업(캡 증가) 시 호출.
+    /// TryPlaceUnit을 재사용하므로 캡 검사·UnitPlaced 이벤트·합체 검사가 그대로 적용된다.
+    /// 각자 보드 각자 권위라 로컬 처리로 충분하며 파트너 미러는 UnitPlaced로 갱신된다.
+    /// </summary>
+    /// <returns>실제로 보드에 올린 유닛 수.</returns>
+    public int AutoPromoteBenchToBoard()
+    {
+        if (_bench == null) return 0;
+
+        int promoted = 0;
+        for (int slot = 0; slot < _bench.Length; slot++)
+        {
+            if (CountUnitsOnBoard() >= _unitCap) break; // 보드가 캡까지 참
+            PokemonUnit unit = _bench[slot];
+            if (unit == null) continue;
+            if (!TryGetFirstEmptyBoardCoords(out HexCoords coords)) break; // 빈 보드 타일 없음
+            if (TryPlaceUnit(unit, coords)) promoted++;
+            else break; // 예기치 못한 배치 실패 시 무한 시도 방지
+        }
+
+        if (promoted > 0)
+            Debug.Log($"[BoardManager] 벤치→보드 자동 승격 {promoted}마리 (캡 {_unitCap})");
+        return promoted;
+    }
+
+    /// <summary>보드에서 비어 있는 첫 좌표를 찾는다(_battleField 삽입 순서 = 결정적). 없으면 false.</summary>
+    private bool TryGetFirstEmptyBoardCoords(out HexCoords coords)
+    {
+        foreach (var kv in _battleField)
+        {
+            if (kv.Value == null)
+            {
+                coords = kv.Key;
+                return true;
+            }
+        }
+        coords = default;
+        return false;
     }
 
     private void Start()
