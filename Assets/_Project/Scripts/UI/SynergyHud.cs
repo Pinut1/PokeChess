@@ -11,7 +11,7 @@ using UnityEngine;
 /// </summary>
 public class SynergyHud : MonoBehaviour
 {
-    private const float X = 10f, Y = 170f, W = 200f, ROW_H = 22f, PAD = 6f;
+    private const float X = 10f, Y = 340f, W = 200f, ROW_H = 22f, PAD = 6f;
 
     // 티어별 색(롤체 동/은/금/프리즘 느낌).
     private static readonly Color[] TierColors =

@@ -387,6 +387,54 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         else photonView.RPC(nameof(RPC_RequestSharedShopReturn), RpcTarget.MasterClient, pokemonId, amount);
     }
 
+    /// <summary>
+    /// QA 패널에서 지정한 코스트의 유닛 1마리를
+    /// 현재 남아 있는 공용 풀에서 실제로 차감해 요청한다.
+    ///
+    /// 상점 슬롯 예약과는 무관하며 골드는 소비하지 않는다.
+    /// 실제 유닛 선택과 공용 풀 차감은 MasterClient가 담당한다.
+    /// </summary>
+    public bool RequestSharedDebugUnitByCost(int cost)
+    {
+        if (!UsesSharedShopPool)
+            return false;
+
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        int actorNumber =
+            PhotonNetwork.LocalPlayer != null
+                ? PhotonNetwork.LocalPlayer.ActorNumber
+                : 0;
+
+        if (actorNumber <= 0)
+            return false;
+
+        if (IsMasterClient)
+        {
+            ProcessSharedDebugUnitByCost(
+                actorNumber,
+                cost
+            );
+        }
+        else
+        {
+            photonView.RPC(
+                nameof(RPC_RequestSharedDebugUnitByCost),
+                RpcTarget.MasterClient,
+                cost
+            );
+        }
+
+        return true;
+    }
+
     [PunRPC]
     private void RPC_RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, PhotonMessageInfo info)
     {
@@ -463,12 +511,181 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (IsMasterClient) ProcessSharedShopReturn(pokemonId, amount);
     }
 
+    /// <summary>
+    /// 비마스터 클라이언트의 QA 코스트 유닛 획득 요청을
+    /// MasterClient가 수신한다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_RequestSharedDebugUnitByCost(
+        int cost,
+        PhotonMessageInfo info)
+    {
+        if (!IsMasterClient ||
+            info.Sender == null)
+        {
+            return;
+        }
+
+        ProcessSharedDebugUnitByCost(
+            info.Sender.ActorNumber,
+            cost
+        );
+    }
+
     private void ProcessSharedShopReturn(int pokemonId, int amount)
     {
         var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
         if (shop == null) return;
         shop.AuthorityReturnSharedShopCopy(pokemonId, amount);
         BroadcastSharedPoolMirror(-1, 0, System.Array.Empty<int>());
+    }
+
+    /// <summary>
+    /// MasterClient가 현재 남아 있는 공용 풀에서
+    /// 지정 코스트의 유닛 카피 1장을 선택하고 차감한다.
+    ///
+    /// 선택 확률은 ShopManager에서 남은 카피 수에 비례해 계산한다.
+    /// 성공하면 요청자에게 선택된 원본 pokemonId를 전달한다.
+    /// </summary>
+    private void ProcessSharedDebugUnitByCost(
+        int actorNumber,
+        int cost)
+    {
+        if (!IsMasterClient)
+            return;
+
+        Player target =
+            PhotonNetwork.CurrentRoom != null
+                ? PhotonNetwork.CurrentRoom.GetPlayer(actorNumber)
+                : null;
+
+        if (target == null)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 요청 플레이어를 찾을 수 없음: " +
+                $"actor={actorNumber}"
+            );
+
+            return;
+        }
+
+        if (cost < 1 || cost > 5)
+        {
+            photonView.RPC(
+                nameof(RPC_ResolveSharedDebugUnitByCost),
+                target,
+                cost,
+                0,
+                false
+            );
+
+            return;
+        }
+
+        ShopManager shop =
+            GameManager.Instance != null
+                ? GameManager.Instance.Shop
+                : null;
+
+        int pokemonId = 0;
+
+        bool success =
+            shop != null &&
+            shop.TryAuthorityTakeDebugUnitByCost(
+                cost,
+                out pokemonId
+            );
+
+        /*
+         * 먼저 요청자에게 결과를 전달한다.
+         *
+         * 요청자는 ShopManager에서 실제 벤치 생성을 시도하고,
+         * 생성이나 배치에 실패하면 기존
+         * RequestSharedShopReturn(pokemonId, 1)을 호출해
+         * 카피를 다시 공용 풀로 돌려보낸다.
+         */
+        photonView.RPC(
+            nameof(RPC_ResolveSharedDebugUnitByCost),
+            target,
+            cost,
+            success ? pokemonId : 0,
+            success
+        );
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 획득 실패 — " +
+                "남은 공용 풀 없음 또는 ShopManager 처리 실패"
+            );
+
+            return;
+        }
+
+        /*
+         * 공용 풀에서 실제로 1장이 빠졌으므로
+         * 모든 클라이언트의 풀 미러를 갱신한다.
+         *
+         * actorNumber=-1:
+         * 특정 상점 예약 변경이 아니라 풀 수량만 변경됐다는 의미.
+         */
+        BroadcastSharedPoolMirror(
+            -1,
+            0,
+            System.Array.Empty<int>()
+        );
+
+        Debug.Log(
+            $"[SharedShopPool][QA] actor={actorNumber}, " +
+            $"{cost}코스트 유닛 지급 승인, pokemonId={pokemonId}"
+        );
+    }
+
+    /// <summary>
+    /// MasterClient가 선택·차감한 QA 유닛의 원본 ID를
+    /// 요청한 클라이언트가 수신한다.
+    ///
+    /// 실제 생성과 벤치 배치는 로컬 ShopManager가 처리한다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_ResolveSharedDebugUnitByCost(
+        int cost,
+        int pokemonId,
+        bool success)
+    {
+        ShopManager shop =
+            GameManager.Instance != null
+                ? GameManager.Instance.Shop
+                : null;
+
+        if (shop == null)
+        {
+            /*
+             * 정상적인 게임 씬에서는 발생하면 안 되지만,
+             * ShopManager가 없는 상태에서 이미 풀이 차감됐다면
+             * MasterClient에 카피 반환을 요청한다.
+             */
+            if (success && pokemonId > 0)
+            {
+                RequestSharedShopReturn(
+                    pokemonId,
+                    1
+                );
+            }
+
+            Debug.LogError(
+                "[SharedShopPool][QA] ShopManager 없음 — " +
+                "QA 유닛 생성 불가"
+            );
+
+            return;
+        }
+
+        shop.ResolveSharedDebugUnitByCost(
+            cost,
+            pokemonId,
+            success
+        );
     }
 
     private void BroadcastSharedPoolMirror(int actorNumber, int revision, int[] slots)
@@ -2193,6 +2410,12 @@ public class NetworkManager : MonoBehaviour
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
     public void RequestSharedShopReturn(int pokemonId, int amount) { }
+
+    /// <summary>
+    /// 오프라인에서는 공유 풀이 없으므로 false.
+    /// ShopManager가 로컬 풀 직접 획득 방식으로 처리한다.
+    /// </summary>
+    public bool RequestSharedDebugUnitByCost(int cost) => false;
 
     /// <summary>오프라인(1인)은 씬 로드 즉시 라운드 1 시작.</summary>
     public void NotifySceneReady()              => BroadcastRoundStart(1);

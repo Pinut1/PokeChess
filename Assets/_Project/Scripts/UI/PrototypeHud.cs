@@ -23,7 +23,7 @@ public class PrototypeHud : MonoBehaviour
         if (gm.Network != null && gm.Network.IsMasterClient)
         {
             if (GUI.Button(
-                    new Rect(Screen.width - 220f, 10f, 200f, 40f),
+                    new Rect(Screen.width - 570f, 10f, 200f, 40f),
                     "게임 재시작"))
             {
                 gm.Network.RestartGame();
@@ -34,6 +34,8 @@ public class PrototypeHud : MonoBehaviour
         DrawShopProbabilityPanel(gm);
         DrawItemShopBar(gm);
         DrawShopBar(gm);
+
+        DrawQaPanel(gm);
 
         DrawReady(gm);
         DrawVictory(gm);
@@ -48,6 +50,173 @@ public class PrototypeHud : MonoBehaviour
         var rect = new Rect(Screen.width - 230f, Screen.height - 110f, 210f, 80f);
         if (GUI.Button(rect, "준비 완료", style))
             gm.Phase.PlayerReady();
+    }
+
+    // ──────────────────────────────────────────
+    // 우측 상단: QA 강제 실행 버튼
+    // ──────────────────────────────────────────
+    private void DrawQaPanel(GameManager gm)
+    {
+        const float panelWidth = 210f;
+        const float panelHeight = 360f;
+
+        float x =
+            Screen.width -
+            panelWidth -
+            370f;
+
+        float y = 60f;
+
+        GUILayout.BeginArea(
+            new Rect(
+                x,
+                y,
+                panelWidth,
+                panelHeight
+            ),
+            GUI.skin.box
+        );
+
+        GUILayout.Label("── QA 강제 실행 ──");
+
+        GUILayout.Space(4f);
+
+        if (GUILayout.Button(
+                "골드 +10",
+                GUILayout.Height(30f)))
+        {
+            DebugAddGold(gm, 10);
+        }
+
+        if (GUILayout.Button(
+                "아이템 쿠폰 +1",
+                GUILayout.Height(30f)))
+        {
+            DebugAddItemCoupon(gm, 1);
+        }
+
+        if (GUILayout.Button(
+                "아이템 상점 강제 갱신",
+                GUILayout.Height(30f)))
+        {
+            DebugRefreshItemShop(gm);
+        }
+
+        GUILayout.Space(8f);
+
+        GUILayout.Label("── 코스트별 유닛 획득 ──");
+
+        for (int cost = 1; cost <= 5; cost++)
+        {
+            int selectedCost = cost;
+
+            int remaining =
+                gm.Shop != null
+                    ? gm.Shop.GetRemainingPoolCountByCost(selectedCost)
+                    : 0;
+
+            if (GUILayout.Button(
+                    $"{selectedCost}코 유닛 획득  (남음 {remaining})",
+                    GUILayout.Height(30f)))
+            {
+                DebugGrantUnitByCost(
+                    gm,
+                    selectedCost
+                );
+            }
+        }
+
+        GUILayout.EndArea();
+    }
+
+    private void DebugAddGold(
+    GameManager gm,
+    int amount)
+    {
+        if (gm.Shop == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Shop.AddGold(amount);
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 골드 +{amount} 지급 완료"
+        );
+    }
+
+    private void DebugAddItemCoupon(
+        GameManager gm,
+        int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Item.AddItemCoupon(amount);
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 아이템 쿠폰 +{amount} 지급 완료"
+        );
+    }
+
+    private void DebugRefreshItemShop(
+        GameManager gm)
+    {
+        if (gm.Shop == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Shop.RollItemShop();
+
+        Debug.Log(
+            "[PrototypeHud][QA] 아이템 상점 강제 갱신 완료"
+        );
+    }
+
+    private void DebugGrantUnitByCost(
+        GameManager gm,
+        int cost)
+    {
+        if (gm.Shop == null ||
+            gm.Board == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager 또는 BoardManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Shop.DebugGrantUnitByCost(cost);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] {cost}코 유닛 획득 실패"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] {cost}코 유닛 획득 요청 완료"
+        );
     }
 
     // ── 중앙: 완주 표시 ──

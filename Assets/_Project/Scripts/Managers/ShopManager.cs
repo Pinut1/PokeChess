@@ -1188,6 +1188,402 @@ public class ShopManager : MonoBehaviour
         Debug.Log($"[SharedShopPool] {data.pokemonName} 풀 복귀 +{amount} / 남은 {_remainingPool[data]}");
     }
 
+    /// <summary>
+    /// MasterClient 권위로 현재 남아 있는 공용 풀에서
+    /// 지정 코스트 유닛 카피 1장을 실제로 선택하고 차감한다.
+    ///
+    /// 상점 슬롯 예약과는 별개이며 골드는 소비하지 않는다.
+    /// 같은 코스트 내에서는 남은 카피 수에 비례해 선택한다.
+    /// </summary>
+    public bool TryAuthorityTakeDebugUnitByCost(
+        int cost,
+        out int pokemonId)
+    {
+        pokemonId = 0;
+
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        EnsureChampionPoolInitialized();
+
+        if (!_poolInitialized)
+        {
+            Debug.LogWarning(
+                "[SharedShopPool][QA] 챔피언 풀이 초기화되지 않음"
+            );
+
+            return false;
+        }
+
+        PokemonData selected =
+            PickWeightedByRemaining(cost);
+
+        if (selected == null)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 남은 공용 풀 없음"
+            );
+
+            return false;
+        }
+
+        if (!HasPoolStock(selected, 1))
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {selected.pokemonName} 재고 부족"
+            );
+
+            return false;
+        }
+
+        DecreaseChampionPool(selected, 1);
+
+        pokemonId = selected.id;
+
+        Debug.Log(
+            $"[SharedShopPool][QA] {cost}코스트 선택: " +
+            $"{selected.pokemonName}, pokemonId={pokemonId}"
+        );
+
+        return true;
+    }
+
+    /// <summary>
+    /// MasterClient가 승인한 QA 유닛을 요청자의 벤치에 생성한다.
+    ///
+    /// 생성 또는 벤치 배치에 실패하면 이미 차감된 공용 풀 카피를
+    /// 기존 RequestSharedShopReturn을 통해 다시 반환한다.
+    /// </summary>
+    public void ResolveSharedDebugUnitByCost(
+        int cost,
+        int pokemonId,
+        bool success)
+    {
+        if (!success || pokemonId <= 0)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 지급 요청 실패"
+            );
+
+            return;
+        }
+
+        PokemonData poolData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(pokemonId)
+                : null;
+
+        if (poolData == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] Pokemon ID {pokemonId} 조회 실패"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        if (poolData.cost != cost)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 요청 코스트와 승인 유닛 불일치: " +
+                $"요청={cost}, 실제={poolData.cost}, " +
+                $"pokemonId={pokemonId}"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        BoardManager board =
+            GameManager.Instance != null
+                ? GameManager.Instance.Board
+                : null;
+
+        if (board == null)
+        {
+            Debug.LogError(
+                "[SharedShopPool][QA] BoardManager 없음 — 지급 실패"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        if (!board.HasBenchSpace())
+        {
+            Debug.LogWarning(
+                "[SharedShopPool][QA] 벤치가 가득 참 — 지급 취소"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        /*
+         * 현재 플레이어가 해당 원본 종의 통신진화를 해금했다면
+         * 일반 상점 구매와 동일하게 진화체로 생성한다.
+         *
+         * 공용 풀 차감과 판매 반환 기준은 여전히 poolData 원본이다.
+         */
+        PokemonData grantData =
+            ResolveTradeEvolutionShopData(poolData);
+
+        if (grantData == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] 생성 데이터 조회 실패: " +
+                $"{poolData.pokemonName}"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        PokemonUnit unit =
+            UnitFactory.Create(grantData);
+
+        if (unit == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] {grantData.pokemonName} 생성 실패"
+            );
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        unit.isTradeEvolved =
+            grantData != poolData;
+
+        unit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(unit))
+        {
+            Destroy(unit.gameObject);
+
+            GameManager.Instance?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {grantData.pokemonName} " +
+                "벤치 배치 실패 — 공용 풀 반환 요청"
+            );
+
+            return;
+        }
+
+        /*
+         * 골드는 차감하지 않는다.
+         * 유닛은 일반 유닛과 완전히 동일하므로 판매하면
+         * HandleUnitSold → ReturnToChampionPool을 통해 풀에 복귀한다.
+         */
+        Debug.Log(
+            $"[SharedShopPool][QA] {grantData.pokemonName} " +
+            $"{cost}코스트 무료 지급 완료 " +
+            $"(풀 기준 {poolData.pokemonName})"
+        );
+    }
+
+    /// <summary>
+    /// QA 패널의 1~5코 유닛 획득 버튼이 호출하는 공개 진입점.
+    ///
+    /// 공유 풀 사용 중이면 NetworkManager를 통해 MasterClient에 요청한다.
+    /// 솔로 또는 오프라인이면 현재 로컬 풀에서 직접 차감 후 생성한다.
+    /// </summary>
+    public bool DebugGrantUnitByCost(int cost)
+    {
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[Shop][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        BoardManager board =
+            GameManager.Instance != null
+                ? GameManager.Instance.Board
+                : null;
+
+        if (board == null)
+        {
+            Debug.LogWarning(
+                "[Shop][QA] BoardManager 없음 — 지급 불가"
+            );
+
+            return false;
+        }
+
+        if (!board.HasBenchSpace())
+        {
+            Debug.LogWarning(
+                "[Shop][QA] 벤치가 가득 참 — 지급 불가"
+            );
+
+            return false;
+        }
+
+        NetworkManager network =
+            GameManager.Instance != null
+                ? GameManager.Instance.Network
+                : null;
+
+        /*
+         * 멀티플레이:
+         * MasterClient가 실제 공용 풀에서 선택 및 차감하고
+         * ResolveSharedDebugUnitByCost로 결과를 돌려준다.
+         */
+        if (network != null &&
+            network.UsesSharedShopPool)
+        {
+            bool requested =
+                network.RequestSharedDebugUnitByCost(cost);
+
+            if (!requested)
+            {
+                Debug.LogWarning(
+                    $"[Shop][QA] {cost}코스트 공유 풀 요청 실패"
+                );
+            }
+
+            return requested;
+        }
+
+        /*
+         * 솔로/오프라인:
+         * 로컬 _remainingPool이 권위 풀이므로
+         * 이곳에서 직접 선택·차감 후 생성한다.
+         */
+        EnsureChampionPoolInitialized();
+
+        PokemonData selected =
+            PickWeightedByRemaining(cost);
+
+        if (selected == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][QA] {cost}코스트 남은 로컬 풀 없음"
+            );
+
+            return false;
+        }
+
+        if (!HasPoolStock(selected, 1))
+            return false;
+
+        DecreaseChampionPool(selected, 1);
+
+        PokemonData grantData =
+            ResolveTradeEvolutionShopData(selected);
+
+        if (grantData == null)
+        {
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            return false;
+        }
+
+        PokemonUnit unit =
+            UnitFactory.Create(grantData);
+
+        if (unit == null)
+        {
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            return false;
+        }
+
+        unit.isTradeEvolved =
+            grantData != selected;
+
+        unit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(unit))
+        {
+            Destroy(unit.gameObject);
+
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            Debug.LogWarning(
+                $"[Shop][QA] {grantData.pokemonName} " +
+                "벤치 배치 실패 — 로컬 풀 복귀"
+            );
+
+            return false;
+        }
+
+        Debug.Log(
+            $"[Shop][QA] {cost}코스트 무료 지급: " +
+            $"{grantData.pokemonName}, " +
+            $"풀 기준 {selected.pokemonName}"
+        );
+
+        return true;
+    }
+
+    /// <summary>
+    /// 현재 공용 풀 또는 로컬 풀에 남아 있는
+    /// 지정 코스트 전체 카피 수를 반환한다.
+    ///
+    /// 예:
+    /// 주뱃 28장 + 꼬렛 30장 + 캐터피 29장
+    /// → 1코스트 남은 수량 87장.
+    /// </summary>
+    public int GetRemainingPoolCountByCost(int cost)
+    {
+        if (cost < 1 || cost > 5)
+            return 0;
+
+        EnsureChampionPoolInitialized();
+
+        int total = 0;
+
+        foreach (var pair in _remainingPool)
+        {
+            PokemonData data = pair.Key;
+
+            if (data == null ||
+                data.cost != cost)
+            {
+                continue;
+            }
+
+            total += Mathf.Max(0, pair.Value);
+        }
+
+        return total;
+    }
+
+
     public void ApplySharedShopSnapshot(int revision, int[] pokemonIds)
     {
         _sharedRollPending = false;

@@ -23,7 +23,7 @@ public class EeveeHeroDebugTest : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null || gm.Board == null) return;
 
-        float x = 300f, y = 570f;   // GoldTransferDebugTest(x=300, y=460) 아래
+        float x = 300f, y = 20f;   // GoldTransferDebugTest(x=300, y=460) 아래
         GUI.Label(new Rect(x, y, 320, 22), "이브이 영웅증강 디버그:");
         y += 24f;
 
@@ -96,6 +96,8 @@ public class EeveeHeroDebugTest : MonoBehaviour
 
         if (GUI.Button(new Rect(x, y, 220, 24), "⑮ 각성의돌 지급"))
             _lastResult = GiveEvolutionStone("DawnStone", "각성의돌");
+
+        y += 32f;
 
         if (!string.IsNullOrEmpty(_lastResult))
             GUI.Label(new Rect(x, y, 320, 22), _lastResult);
