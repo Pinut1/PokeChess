@@ -103,9 +103,6 @@ public class ShopManager : MonoBehaviour
     /// <summary>골드 리롤 1회 비용(무료 리롤 소진 후 폴백에 사용). UI 표시용 노출.</summary>
     public int RerollCost => _rerollCost;
 
-    /// <summary>아이템 상점 무료 리롤 자원 잔여 횟수. 보상(RewardKind.ItemShopReroll)으로 누적.</summary>
-    public int ItemShopRerollCount { get; private set; }
-
     public int CurrentLevel => _currentLevel;
     public int CurrentXp { get; private set; }
     public int RequiredXp => GetRequiredXp(_currentLevel);
@@ -123,8 +120,21 @@ public class ShopManager : MonoBehaviour
     /// <summary>현재 아이템 상점에 공개된 후보(읽기 전용). null = 구매됨/빈 슬롯.</summary>
     public IReadOnlyList<ScriptableObject> CurrentItemSlots => _itemSlots;
 
+    /// <summary>
+    /// 해당 아이템 슬롯을 이번 라운드에 리롤할 수 있는지.
+    /// 슬롯당 1회이며 미사용분은 다음 라운드로 누적되지 않는다.
+    /// </summary>
+    public bool CanRerollItemSlot(int slot)
+    {
+        if (_itemSlotRerollUsed == null || slot < 0 || slot >= _itemSlotRerollUsed.Length) return false;
+        return !_itemSlotRerollUsed[slot];
+    }
+
     private PokemonData[] _slots;
     private ScriptableObject[] _itemSlots;
+
+    /// <summary>슬롯별 이번 라운드 리롤 사용 여부. RollItemShop(매 라운드 갱신)마다 전부 false로 되돌린다.</summary>
+    private bool[] _itemSlotRerollUsed;
 
     /// <summary>포켓몬별 남은 풀 수량. 구매 시 감소, 판매 시 복귀.</summary>
     private readonly Dictionary<PokemonData, int> _remainingPool = new();
@@ -149,6 +159,7 @@ public class ShopManager : MonoBehaviour
     {
         _slots = new PokemonData[_shopSize];
         _itemSlots = new ScriptableObject[_itemShopSize];
+        _itemSlotRerollUsed = new bool[_itemShopSize];
 
         Gold = _startingGold;
         CurrentXp = 0;
@@ -200,7 +211,6 @@ public class ShopManager : MonoBehaviour
         GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
         GameEvents.XpChanged(CurrentXp, RequiredXp);
         GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
-        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount); // 아이템샵 무료 리롤 자원 초기 동기화
 
         Roll();         // 초기 유닛 상점 공개
         RollItemShop(); // 초기 아이템 상점 공개
@@ -1043,38 +1053,42 @@ public class ShopManager : MonoBehaviour
         if (_itemSlots == null || _itemSlots.Length != _itemShopSize)
             _itemSlots = new ScriptableObject[_itemShopSize];
 
+        if (_itemSlotRerollUsed == null || _itemSlotRerollUsed.Length != _itemShopSize)
+            _itemSlotRerollUsed = new bool[_itemShopSize];
+
         for (int i = 0; i < _itemSlots.Length; i++)
         {
             if (i == 0)
                 _itemSlots[i] = RollOneStone();
             else
                 _itemSlots[i] = RollOneItem();
+
+            _itemSlotRerollUsed[i] = false; // 지난 라운드 사용 여부와 무관하게 리롤 권한 복구(누적 없음)
         }
 
         GameEvents.ItemShopRerolled();
     }
 
-    /// <summary>아이템 상점 무료 리롤 자원 지급(보상). 결과는 GameEvents.ItemShopRerollCountChanged로 통지.</summary>
-    public void AddItemShopReroll(int amount)
+    /// <summary>
+    /// 아이템 상점 슬롯 1칸만 다시 굴린다(카드에 붙은 개별 리롤 버튼용). 비용 없음, 슬롯당 라운드 1회.
+    /// 슬롯 규칙은 RollItemShop과 동일 — 0번은 진화의 돌, 1~3번은 일반 아이템만 나온다.
+    /// 구매로 비워진 슬롯도 리롤 대상이다. 성공 시 true.
+    /// </summary>
+    public bool RerollItemSlot(int slot)
     {
-        if (amount <= 0) return;
-        ItemShopRerollCount += amount;
-        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount);
-        Debug.Log($"[ItemShop] 무료 리롤 +{amount} => {ItemShopRerollCount}");
-    }
+        if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
 
-    /// <summary>아이템 상점을 무료 리롤 자원으로 새로 굴림(수동). 자원이 없으면 실패. 성공 시 true.</summary>
-    public bool RerollItemShop()
-    {
-        if (ItemShopRerollCount <= 0)
+        if (!CanRerollItemSlot(slot))
         {
-            Debug.Log("[ItemShop] 무료 리롤 없음 — 아이템샵 리롤 불가");
+            Debug.Log($"[ItemShop] {slot}번 슬롯은 이번 라운드 리롤을 이미 사용함");
             return false;
         }
 
-        ItemShopRerollCount--;
-        GameEvents.ItemShopRerollCountChanged(ItemShopRerollCount);
-        RollItemShop();
+        _itemSlots[slot] = slot == 0 ? (ScriptableObject)RollOneStone() : RollOneItem();
+        _itemSlotRerollUsed[slot] = true;
+
+        GameEvents.ItemShopRerolled();
+        Debug.Log($"[ItemShop] {slot}번 슬롯 리롤 완료 — 이번 라운드 재리롤 불가");
         return true;
     }
 

@@ -164,9 +164,6 @@ public static class GameEvents
     /// <summary>아이템 샵 갱신됨</summary>
     public static event Action OnItemShopRerolled;
 
-    /// <summary>아이템 상점 무료 리롤 자원 변경. 인자 = 변경 후 잔여 횟수. ShopManager가 단일 소스로 발행.</summary>
-    public static event Action<int> OnItemShopRerollCountChanged;
-
     /// <summary>아이템 상점 구매 완료. 인자 = 구매한 일반 아이템 또는 진화의 돌</summary>
     public static event Action<ScriptableObject> OnItemPurchased;
 
@@ -268,7 +265,6 @@ public static class GameEvents
     public static void RerollCountChanged(int count) => OnRerollCountChanged?.Invoke(count);
     public static void RerollSpent()                => OnRerollSpent?.Invoke();
     public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
-    public static void ItemShopRerollCountChanged(int count) => OnItemShopRerollCountChanged?.Invoke(count);
     public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
     public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);
