@@ -2733,7 +2733,7 @@ GameObject:
   - component: {fileID: 981275842}
   - component: {fileID: 981275841}
   m_Layer: 5
-  m_Name: BattleRaedy_Button
+  m_Name: BattleReady_Button
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
