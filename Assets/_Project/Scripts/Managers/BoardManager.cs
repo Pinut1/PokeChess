@@ -300,6 +300,20 @@ public class BoardManager : MonoBehaviour
         return new HexCoords(coords.q, mirroredR);
     }
 
+    /// <summary>
+    /// 적 진영을 아군 보드 "너머"(rows _rows ~ 2*_rows-1)의 연속된 좌표로 변환합니다.
+    /// GetMirroredCoords로 대칭 배치한 뒤 행을 _rows만큼 평행이동해, 아군 rows 0~(_rows-1) 과
+    /// 겹치지 않는 8행(4+4) 단일 전장을 만든다. 이러면 근접이 미들라인((_rows-1)↔_rows)을
+    /// 실제로 걸어서 넘어 적 진영으로 진입한다(TFT식). 전투 시뮬은 자유 HexCoords 기반이라 무수정.
+    /// 시각화도 CoordsToWorldPosition을 그대로 써서 별도 오프셋 없이 한 보드처럼 이어 그린다.
+    /// </summary>
+    public HexCoords GetEnemyBattleCoords(HexCoords coords)
+    {
+        HexCoords mirrored = GetMirroredCoords(coords);
+        // row = r + floor(q/2) 이므로, 같은 q에서 r을 _rows만큼 더하면 행이 정확히 _rows칸 밀린다.
+        return new HexCoords(mirrored.q, mirrored.r + _rows);
+    }
+
     // ──────────────────────────────────────────
     // 조회 API (pull)
     // ──────────────────────────────────────────
