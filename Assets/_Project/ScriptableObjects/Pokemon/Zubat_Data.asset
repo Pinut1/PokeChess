@@ -42,4 +42,4 @@ MonoBehaviour:
   evolvesIntoEn: Golbat
   shopBuyable: 1
   modelPrefab: {fileID: 7070398248371093112, guid: 2be2d2ee9e7791f4bb6aeda678e130dd, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: d756f01a667b30c4da1760faf569c3e5, type: 3}

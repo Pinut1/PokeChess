@@ -40,4 +40,4 @@ MonoBehaviour:
   evolvesIntoEn: Feraligatr
   shopBuyable: 0
   modelPrefab: {fileID: 8864838177876835957, guid: 65011b5bfb0a13c418f003c9514f1827, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 361602f04fae51f43b96914f7428108a, type: 3}

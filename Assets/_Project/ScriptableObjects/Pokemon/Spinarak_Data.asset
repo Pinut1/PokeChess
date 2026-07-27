@@ -42,4 +42,4 @@ MonoBehaviour:
   evolvesIntoEn: Ariados
   shopBuyable: 1
   modelPrefab: {fileID: 5709975880969104834, guid: 5e45f3afe32db4e43b53256ef69e87b8, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 0aafee8f2b21d9f4da1bc197e0f48fc9, type: 3}

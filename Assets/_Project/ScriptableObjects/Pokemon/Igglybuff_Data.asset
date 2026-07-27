@@ -41,4 +41,4 @@ MonoBehaviour:
   evolvesIntoEn: Jigglypuff
   shopBuyable: 1
   modelPrefab: {fileID: 2879022559521332932, guid: 3f175c1d2249dc843ad514f41f073284, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 9ee5a3e2b765fbd4ea37b3845ac537bf, type: 3}
