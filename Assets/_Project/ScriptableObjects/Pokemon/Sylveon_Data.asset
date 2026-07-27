@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Magician
-  skillId: ETHEREAL_MAGICIAN
+  skillId: DazzlingGleam
   skill:
-    skillId: ETHEREAL_MAGICIAN
-    skillName: "\uBB38\uD3EC\uC2A4"
-    description: "\uAD11\uC5ED \uC815\uB839 \uB370\uBBF8\uC9C0"
+    skillId: DazzlingGleam
+    skillName: "\uB9E4\uC9C0\uCEEC\uC0E4\uC778"
+    description: "\uB2D8\uD53C\uC544(\uBD07)"
     effectType: 1
-    targetType: 4
+    targetType: 5
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Ethereal_Magician
-  attackVfxId: Electric_L
+    vfxId: VFX_Ethereal_Magician_SPELL
+  attackVfxId: Elecric_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2070301872082320055, guid: a98180314130fca4b91b119d4e8598d3, type: 3}
   icon: {fileID: 0}

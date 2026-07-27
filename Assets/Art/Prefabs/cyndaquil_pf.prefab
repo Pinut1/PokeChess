@@ -9,6 +9,18 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -48,9 +60,13 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
       propertyPath: m_Name
-      value: Cyndaquil
+      value: cyndaquil_pf
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f95f20c53bdb7864c8c0b5e478733a6d, type: 3}
       propertyPath: m_IsActive

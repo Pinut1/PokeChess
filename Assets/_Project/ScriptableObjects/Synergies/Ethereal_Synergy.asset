@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Ethereal_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 7
+  id: 8
   synergyName: "\uC815\uB839"
   synergyNameEn: Ethereal
   tiers:
   - count: 2
-    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +20%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804 \uC18D\uB3C4 \uBE44\uC728 \uC99D\uAC00"
   - count: 4
-    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +40%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804 \uC18D\uB3C4 \uBE44\uC728 \uC99D\uAC00"
   - count: 6
-    effectDescription: "\uB9C8\uB098 \uCDA9\uC804\uC18D\uB3C4 +60%"
+    effectDescription: "\uB9C8\uB098 \uCDA9\uC804 \uC18D\uB3C4 \uBE44\uC728 \uC99D\uAC00"
   icon: {fileID: 0}

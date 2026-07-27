@@ -1,14 +1,39 @@
 {
-  "_readme": "통신교환(전송) 진화 매핑. targetPokemonEn(전송 전 base) → evolvedPokemonEn(전송 즉시 진화체). 모델A: B가 base 1마리 핸드오버 시 그 1마리만 evolved로 변환되어 A 벤치 직행(취소불가). base는 추정치 — 영욱 확인/수정 요망. pokemonNameEn은 pokemon_data.json과 정확히 일치해야 함.",
   "mappings": [
-    { "targetPokemonEn": "Golbat",   "evolvedPokemonEn": "Crobat",   "note": "크로뱃 (Golbat→Crobat, 확인)" },
-    { "targetPokemonEn": "Kadabra",  "evolvedPokemonEn": "Alakazam", "note": "후딘 (Kadabra→Alakazam)" },
-    { "targetPokemonEn": "Abra",     "evolvedPokemonEn": "Kadabra",  "note": "윤겔라 (보통 일반진화인데 DB가 trade 표기 — 확인)" },
-    { "targetPokemonEn": "Graveler", "evolvedPokemonEn": "Golem",    "note": "딱구리 (Graveler→Golem)" },
-    { "targetPokemonEn": "Geodude",  "evolvedPokemonEn": "Graveler", "note": "데구리 (보통 일반진화 — 확인)" },
-    { "targetPokemonEn": "Slowpoke", "evolvedPokemonEn": "Slowking", "note": "야도킹 (Slowpoke→Slowking, 확인)" },
-    { "targetPokemonEn": "Haunter",  "evolvedPokemonEn": "Gengar",   "note": "팬텀 (Haunter→Gengar)" },
-    { "targetPokemonEn": "Onix",     "evolvedPokemonEn": "Steelix",  "note": "강철톤 (Onix→Steelix)" },
-    { "targetPokemonEn": "Scyther",  "evolvedPokemonEn": "Scizor",   "note": "핫삼 (Scyther→Scizor)" }
+    {
+      "targetPokemonEn": "Golbat",
+      "evolvedPokemonEn": "Crobat",
+      "note": "골뱃 > 크로뱃"
+    },
+    {
+      "targetPokemonEn": "Kadabra",
+      "evolvedPokemonEn": "Alakazam",
+      "note": "윤겔라 > 후딘"
+    },
+    {
+      "targetPokemonEn": "Graveler",
+      "evolvedPokemonEn": "Golem",
+      "note": "데구리 > 딱구리"
+    },
+    {
+      "targetPokemonEn": "Slowpoke",
+      "evolvedPokemonEn": "Slowking",
+      "note": "야돈 > 야도킹"
+    },
+    {
+      "targetPokemonEn": "Haunter",
+      "evolvedPokemonEn": "Gengar",
+      "note": "고우스트 > 팬텀"
+    },
+    {
+      "targetPokemonEn": "Onix",
+      "evolvedPokemonEn": "Steelix",
+      "note": "롱스톤 > 강철톤"
+    },
+    {
+      "targetPokemonEn": "Scyther",
+      "evolvedPokemonEn": "Scizor",
+      "note": "스라크 > 핫삼"
+    }
   ]
 }

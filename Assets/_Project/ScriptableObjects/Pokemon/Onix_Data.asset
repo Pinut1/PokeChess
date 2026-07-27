@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Ground
   role: Tanker
-  skillId: GROUND_TANKER
+  skillId: Endure
   skill:
-    skillId: GROUND_TANKER
-    skillName: "\uCCA0\uBCBD\uC218\uBE44"
-    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
-    effectType: 3
+    skillId: Endure
+    skillName: "\uBC84\uD2F0\uAE30"
+    description: "\uC790\uD790 / \uB871\uC2A4\uD1A4"
+    effectType: 2
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Ground_Tanker
+    vfxId: VFX_Ground_Tanker_HP_REGEN
   attackVfxId: Ground_S
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2787212519521205133, guid: b049e61aa0ef92448a047b6d7ce0b757, type: 3}
   icon: {fileID: 0}
