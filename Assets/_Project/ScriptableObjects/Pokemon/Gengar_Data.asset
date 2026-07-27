@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Poison
   role: Tanker
-  skillId: POISON_TANKER
+  skillId: ShadowForce
   skill:
-    skillId: POISON_TANKER
-    skillName: "\uB3C4\uBC1C"
-    description: "\uC8FC\uBCC0 \uC801 \uC5B4\uADF8\uB85C \uC9D1\uC911"
+    skillId: ShadowForce
+    skillName: "\uC100\uB3C4\uB2E4\uC774\uBE0C"
+    description: "\uACE0\uC2A4\uD0C0\uC785 \uC274\uB4DC / \uD32C\uD140"
     effectType: 3
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Poison_Tanker
+    vfxId: VFX_Poison_Tanker_SHIELD
   attackVfxId: Poison_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2260254016006031915, guid: 8945f3e78d70bbc43aeba09967bee4e1, type: 3}
   icon: {fileID: 0}

@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Ethereal
   role: Tanker
-  skillId: ETHEREAL_TANKER
+  skillId: LightScreen
   skill:
-    skillId: ETHEREAL_TANKER
-    skillName: "\uC624\uB85C\uB77C\uBCA0\uC77C"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 \uBCF4\uD638\uB9C9"
+    skillId: LightScreen
+    skillName: "\uBE5B\uC758\uC7A5\uB9C9"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9 / \uB9C8\uC790"
     effectType: 3
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Ethereal_Tanker
+    vfxId: VFX_Ethereal_Tanker_SHIELD
   attackVfxId: Ethereal_S
-  evolvesIntoEn: 
+  evolvesIntoEn: Wobbuffet
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 7527871451214791655, guid: 0e0fa0932f595fe45b560f23fc025a73, type: 3}
   icon: {fileID: 0}

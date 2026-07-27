@@ -26,18 +26,19 @@ MonoBehaviour:
   synergies:
   - Mutant
   role: Supporter
-  skillId: NORMAL_SUPPORTER
+  skillId: Celebrate
   skill:
-    skillId: NORMAL_SUPPORTER
-    skillName: "\uCE58\uC720\uBC29\uC6B8"
-    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5"
-    effectType: 2
-    targetType: 1
-    areaRadius: 0
+    skillId: Celebrate
+    skillName: "\uCD95\uD558"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uACA9\uC18D\uB3C4 \uC99D\uAC00
+      / \uC774\uBE0C\uC774"
+    effectType: 5
+    targetType: 2
+    areaRadius: 2
     lineLength: 4
-    vfxId: VFX_Normal_Supporter
+    vfxId: VFX_Normal_Supporter_AS_BUFF
   attackVfxId: Normal_L
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 6384256863934420481, guid: eb420e11c8b235b438c252cfe32c204e, type: 3}
   icon: {fileID: 0}

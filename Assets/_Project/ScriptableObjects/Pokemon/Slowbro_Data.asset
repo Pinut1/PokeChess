@@ -27,18 +27,18 @@ MonoBehaviour:
   - Water
   - Ethereal
   role: Tanker
-  skillId: WATER_TANKER
+  skillId: LifeDew
   skill:
-    skillId: WATER_TANKER
-    skillName: "\uD30C\uB3C4\uD0C0\uAE30"
-    description: "\uC8FC\uBCC0 \uC801 \uAD11\uC5ED \uB370\uBBF8\uC9C0"
-    effectType: 3
+    skillId: LifeDew
+    skillName: "\uC0DD\uBA85\uC758\uBB3C\uBC29\uC6B8"
+    description: "\uC790\uD790 / \uC57C\uB3C8, \uBB3C\uC9F1\uC774"
+    effectType: 2
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Water_Tanker
+    vfxId: VFX_Water_Tanker_HP_REGEN
   attackVfxId: Water_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4841608315197254748, guid: a714d544763148b4fbf0843eabcfaa25, type: 3}
   icon: {fileID: 0}

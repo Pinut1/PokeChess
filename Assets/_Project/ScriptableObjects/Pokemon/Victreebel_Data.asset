@@ -27,18 +27,18 @@ MonoBehaviour:
   - Grass
   - Poison
   role: Tanker
-  skillId: GRASS_TANKER
+  skillId: Synthesis
   skill:
-    skillId: GRASS_TANKER
-    skillName: "\uCCA0\uBCBD"
-    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    skillId: Synthesis
+    skillName: "\uAD11\uD569\uC131"
+    description: "\uC790\uD790 / \uBAA8\uB2E4\uD53C"
     effectType: 2
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Grass_Tanker
+    vfxId: VFX_Grass_Tanker_HP_REGEN
   attackVfxId: Grass_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 9111206104934883942, guid: 0938cced622a112478192c47f6740533, type: 3}
   icon: {fileID: 0}

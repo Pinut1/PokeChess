@@ -26,18 +26,19 @@ MonoBehaviour:
   synergies:
   - Water
   role: Warrior
-  skillId: WATER_WARRIOR
+  skillId: SelfASBuff
   skill:
-    skillId: WATER_WARRIOR
-    skillName: "\uC544\uCFE0\uC544\uD14C\uC77C"
-    description: "\uADFC\uC811 \uBB3C \uC18D\uC131 \uB370\uBBF8\uC9C0"
-    effectType: 0
-    targetType: 3
+    skillId: SelfASBuff
+    skillName: "\uD3C9\uD0C0\uAE30\uBC18\uC720\uB2DB \uACF5\uC18D\uC99D\uAC00"
+    description: "\uACF5\uC18D\uC99D\uAC00 / \uD3C9\uD0C0\uAE30\uBC18 \uC5ED\uD560\uAD70
+      \uC720\uB2DB \uC804\uCCB4\uC801\uC6A9"
+    effectType: 5
+    targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Water_Warrior
+    vfxId: VFX_AS_BUFF
   attackVfxId: Water_S
   evolvesIntoEn: Poliwhirl
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 6481426262660454014, guid: a2d03244a2735064d94b6b4aa3fb4610, type: 3}
   icon: {fileID: 0}

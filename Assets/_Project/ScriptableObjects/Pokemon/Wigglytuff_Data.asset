@@ -27,18 +27,18 @@ MonoBehaviour:
   - Normal
   - Ethereal
   role: Supporter
-  skillId: NORMAL_SUPPORTER
+  skillId: HealBell
   skill:
-    skillId: NORMAL_SUPPORTER
+    skillId: HealBell
     skillName: "\uCE58\uC720\uBC29\uC6B8"
-    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5"
+    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5 / \uD478\uD478\uB9B0"
     effectType: 2
     targetType: 1
     areaRadius: 0
     lineLength: 4
-    vfxId: VFX_Normal_Supporter
+    vfxId: VFX_Normal_Supporter_HP_REGEN
   attackVfxId: Normal_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 4791902477669616741, guid: 5bc863da0df716144b88c5f2144b3f2a, type: 3}
   icon: {fileID: 0}

@@ -18,72 +18,72 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreA
-    second: {fileID: 2100000, guid: 1798aebd3b009eb408740d4abb3d2642, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreB
-    second: {fileID: 2100000, guid: f3d8d876edf83df47b53b0d3126017ff, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreC
-    second: {fileID: 2100000, guid: b5d418f175f69564c9d9665f7083f581, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreD
-    second: {fileID: 2100000, guid: c0797696cbb12d54b80eef8dbeed944b, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreE
-    second: {fileID: 2100000, guid: 494731de9110bea43ae8d6dbbf186bb6, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreF
-    second: {fileID: 2100000, guid: eff1aee281a9d3949a5782f97da43a94, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireCoreG
-    second: {fileID: 2100000, guid: 85b7e84fac9968244838c2b33db88313, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenA
-    second: {fileID: 2100000, guid: 034eb56ea32636b4596578fabfa60f4c, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenB
-    second: {fileID: 2100000, guid: 68a2d3d825fc1744e8e67af5869f0067, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenC
-    second: {fileID: 2100000, guid: a225e845848f4a0448ee1f8bbbc27900, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenD
-    second: {fileID: 2100000, guid: 8fdcdb93ca788054a9a9ffee2ad9a8b3, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenE
-    second: {fileID: 2100000, guid: d1d11bfa27e9987439c648f3898a6a82, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenF
-    second: {fileID: 2100000, guid: 6fe06b37f32e906479e44895d487adda, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: FireStenG
-    second: {fileID: 2100000, guid: 5f9b03be41c3b044caf512e635d1703c, type: 2}
+    second: {fileID: 2100000, guid: 3056018f8abb16d46a8bed2f921e67b3, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

@@ -26,19 +26,18 @@ MonoBehaviour:
   synergies:
   - Electric
   role: Supporter
-  skillId: ELECTRIC_SUPPORTER
+  skillId: Nuzzle
   skill:
-    skillId: ELECTRIC_SUPPORTER
-    skillName: "\uBC29\uC804"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 \uB9C8\uB098 \uD68C\uBCF5 (\uBCFC\uBD80\uBE44\uBD80\uBE44
-      / \uBC94\uC704)"
+    skillId: Nuzzle
+    skillName: "\uBCFC\uBD80\uBE44\uBD80\uBE44"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uC18D \uC99D\uAC00 / \uD30C\uCE58\uB9AC\uC2A4"
     effectType: 4
     targetType: 2
     areaRadius: 2
     lineLength: 4
-    vfxId: VFX_Electric_Supporter
+    vfxId: VFX_Electric_Supporter_MANA_REGEN
   attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 2421050892215214110, guid: e8268b4770a43bb449bc5d540411327d, type: 3}
   icon: {fileID: 0}

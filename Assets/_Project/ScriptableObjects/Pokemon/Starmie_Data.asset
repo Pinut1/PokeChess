@@ -27,18 +27,18 @@ MonoBehaviour:
   - Water
   - Ethereal
   role: Magician
-  skillId: WATER_MAGICIAN
+  skillId: HydroPump
   skill:
-    skillId: WATER_MAGICIAN
+    skillId: HydroPump
     skillName: "\uD558\uC774\uB4DC\uB85C\uD38C\uD504"
-    description: "\uC9C1\uC120 \uBC94\uC704 \uBB3C \uB370\uBBF8\uC9C0"
+    description: "\uC57C\uB3C4\uD0B9, \uC96C\uC96C, \uC544\uCFE0\uC2A4\uD0C0, \uB9AC\uC544\uCF54"
     effectType: 1
     targetType: 5
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Water_Magician
+    vfxId: VFX_Water_Magician_SPELL
   attackVfxId: Water_L
-  evolvesIntoEn: Mr. Mime
+  evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
+  modelPrefab: {fileID: 3372410765926221787, guid: 84bf59f58ab35594c993fa0ad9d7bda3, type: 3}
   icon: {fileID: 0}

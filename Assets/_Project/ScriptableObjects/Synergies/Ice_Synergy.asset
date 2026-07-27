@@ -17,5 +17,5 @@ MonoBehaviour:
   synergyNameEn: Ice
   tiers:
   - count: 1
-    effectDescription: "\uC801 \uC804\uCCB4 \uACF5\uACA9\uC18D\uB3C4 -20% (\uACE0\uC720)"
+    effectDescription: "\uC801 atkSpeed -20% (\uACE0\uC720)"
   icon: {fileID: 0}

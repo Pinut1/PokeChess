@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a154427dd9a013941b27d91d7d15537a, type: 3}
+  m_Name: Plusle_Data
+  m_EditorClassIdentifier: Assembly-CSharp::PokemonData
+  id: 311
+  pokemonName: "\uD50C\uB7EC\uC2DC"
+  pokemonNameEn: Plusle
+  cost: 5
+  hp: 900
+  attack: 60
+  defense: 40
+  attackSpeed: 0.8
+  range: 1
+  spellPower: 205
+  manaCost: 45
+  synergies:
+  - Cheer
+  - Electric
+  role: Supporter
+  skillId: Coaching
+  skill:
+    skillId: Coaching
+    skillName: "\uCF54\uCE6D"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uACA9\uC18D\uB3C4 \uC99D\uAC00
+      / \uD50C\uB7EC\uC2DC"
+    effectType: 5
+    targetType: 2
+    areaRadius: 2
+    lineLength: 4
+    vfxId: VFX_Cheer_Supporter_AS_BUFF
+  attackVfxId: Cheer_L
+  evolvesIntoEn: 
+  shopBuyable: 0
+  modelPrefab: {fileID: 6783940456382245631, guid: 6ac62cc2f4d4a204f8b22f5d827db7e4, type: 3}
+  icon: {fileID: 0}
