@@ -9,6 +9,10 @@ using UnityEngine;
 /// </summary>
 public class PrototypeHud : MonoBehaviour
 {
+    [Tooltip("꺼짐: 유닛/아이템 상점 디버그 텍스트 버튼 바를 숨김(실 UI 카드만 사용). " +
+             "켜짐(기본): 기존처럼 화면 하단에 디버그 바도 같이 표시.")]
+    [SerializeField] private bool _showShopDebugBar = true;
+
     private int _partnerGold = -1; // -1 = 아직 수신 전
 
     private void OnEnable() => GameEvents.OnPartnerGoldChanged += OnPartnerGold;
@@ -21,8 +25,13 @@ public class PrototypeHud : MonoBehaviour
         if (gm == null) return;
 
         DrawStatusPanel(gm);
-        DrawItemShopBar(gm);
-        DrawShopBar(gm);
+
+        if (_showShopDebugBar)
+        {
+            DrawItemShopBar(gm);
+            DrawShopBar(gm);
+        }
+
         DrawReady(gm);
         DrawVictory(gm);
     }
