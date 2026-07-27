@@ -79,6 +79,13 @@ public static class GameEvents
     /// <summary>아이템/진화의 돌 인벤토리 변경. UI 갱신용.</summary>
     public static event Action OnInventoryChanged;
 
+    /// <summary>
+    /// 통신기 골드 전송 요청.
+    /// 인자 = 전송할 골드 수량.
+    /// UI가 발행하고 NetworkManager가 구독한다.
+    /// </summary>
+    public static event Action<int> OnGoldTransferRequested;
+
     // ──────────────────────────────────────────
     // 증강
     // ──────────────────────────────────────────
@@ -294,4 +301,6 @@ public static class GameEvents
     public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
     public static void RequestServerMatches(int count) => OnServerMatchesRequested?.Invoke(count);
     public static void ServerMatchesLoaded(IReadOnlyList<MatchRecord> records, string error) => OnServerMatchesLoaded?.Invoke(records, error);
+    
+    public static void RequestGoldTransfer(int amount) => OnGoldTransferRequested?.Invoke(amount);
 }

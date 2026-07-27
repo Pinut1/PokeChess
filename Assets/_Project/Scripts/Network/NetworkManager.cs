@@ -96,11 +96,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         base.OnEnable();
 
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
+        GameEvents.OnGoldTransferRequested += HandleGoldTransferRequested;
     }
 
     public override void OnDisable()
     {
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
+        GameEvents.OnGoldTransferRequested -= HandleGoldTransferRequested;
 
         base.OnDisable();
     }
@@ -1454,6 +1456,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _pendingGoldTransfer = amount;
         Debug.Log($"[GoldTransfer] 전송 요청: {amount}G → 파트너");
         photonView.RPC(nameof(RPC_GoldReceive), RpcTarget.Others, amount);
+    }
+
+    private void HandleGoldTransferRequested(int amount)
+    {
+        SendGoldToPartner(amount);
     }
 
     [PunRPC]

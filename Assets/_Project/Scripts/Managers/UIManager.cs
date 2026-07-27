@@ -113,6 +113,10 @@ public class UIManager : MonoBehaviour
     private int _buyXpCostGold;
     private int _buyXpAmount;
 
+    // 통신기 골드 전송 UI 상태
+    private bool _isGoldTransferPending;
+    private string _goldTransferResult = "";
+
     // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
@@ -143,6 +147,10 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged += HandleLevelChanged;
         GameEvents.OnXpChanged += HandleXpChanged;
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+
+        GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
+        GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
+        GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
     }
 
     private void OnDisable()
@@ -154,6 +162,12 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged -= HandleLevelChanged;
         GameEvents.OnXpChanged -= HandleXpChanged;
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+
+        GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
+        GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
+        GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
+
+        _isGoldTransferPending = false;
     }
 
     private void Start()
@@ -215,6 +229,26 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
+    /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
+    private void HandleGoldTransferCompleted(int amount)
+    {
+        _isGoldTransferPending = false;
+        _goldTransferResult = $"전송 완료: {amount}G";
+    }
+
+    /// <summary>골드 전송 실패 시 대기 상태를 해제하고 실패 사유를 표시한다.</summary>
+    private void HandleGoldTransferRejected(string reason)
+    {
+        _isGoldTransferPending = false;
+        _goldTransferResult = $"전송 실패: {reason}";
+    }
+
+    /// <summary>파트너에게서 골드를 받은 경우 수령 문구를 표시한다.</summary>
+    private void HandlePartnerGoldReceived(int amount)
+    {
+        _goldTransferResult = $"파트너에게서 {amount}G 수령";
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -223,11 +257,88 @@ public class UIManager : MonoBehaviour
         DrawSampleDeckOpenButton();
         DrawProgressPanel();
 
+        DrawTradeGoldPanel();
+
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
 
         if (_showSampleDeck)
             DrawSampleDeckWindow();
+    }
+
+    // ──────────────────────────────────────────
+    // 통신기 골드 전송 UI
+    // ──────────────────────────────────────────
+    private void DrawTradeGoldPanel()
+    {
+        const float width = 250f;
+        const float height = 115f;
+
+        float x = 20f;
+        float y = Screen.height - 360f;
+
+        GUI.Box(
+            new Rect(x, y, width, height),
+            "통신기 골드 전송"
+        );
+
+        bool previousEnabled = GUI.enabled;
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 1;
+
+        if (GUI.Button(
+                new Rect(x + 15f, y + 30f, 65f, 28f),
+                "1G"))
+        {
+            RequestGoldTransfer(1);
+        }
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 5;
+
+        if (GUI.Button(
+                new Rect(x + 92f, y + 30f, 65f, 28f),
+                "5G"))
+        {
+            RequestGoldTransfer(5);
+        }
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 10;
+
+        if (GUI.Button(
+                new Rect(x + 169f, y + 30f, 65f, 28f),
+                "10G"))
+        {
+            RequestGoldTransfer(10);
+        }
+
+        GUI.enabled = previousEnabled;
+
+        string statusText =
+            _isGoldTransferPending
+                ? "전송 처리 중..."
+                : _goldTransferResult;
+
+        GUI.Label(
+            new Rect(x + 15f, y + 68f, 220f, 22f),
+            statusText
+        );
+    }
+
+    private void RequestGoldTransfer(int amount)
+    {
+        if (_isGoldTransferPending)
+            return;
+
+        _isGoldTransferPending = true;
+        _goldTransferResult = "";
+
+        GameEvents.RequestGoldTransfer(amount);
     }
 
 
