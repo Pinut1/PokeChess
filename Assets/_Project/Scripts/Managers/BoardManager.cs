@@ -669,6 +669,7 @@ public class BoardManager : MonoBehaviour
             else Debug.LogWarning($"[Evolve] 진화체 '{evolvedEn}' 가 PokemonDatabase에 없음 — 종 유지(별만 상승). 데이터 보강 필요");
         }
 
+        survivor.RefreshVisual();    // 진화체 모델로 교체 (data 스왑 후 호출 — BoardView는 위치만 갱신한다)
         survivor.ResetForBattle();   // 진화체 MaxHp 기준 풀회복 (data 스왑 후 호출)
         if (survivorOnBoard) { _battleField[survivorCoords] = survivor; survivor.isOnBoard = true; }
         else                 { _bench[survivorSlot] = survivor;        survivor.isOnBoard = false; }
@@ -677,7 +678,7 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"[Evolve] {starLevel}성 3개 합체 → {survivor.data.pokemonName} {survivor.starLevel}성");
 
-        // 이벤트 발화(시너지 재계산/뷰 갱신 — 진화로 종이 바뀌었으니 모델 갱신도 뷰가 처리)
+        // 이벤트 발화(시너지 재계산 + BoardView 위치 재배치. 모델 교체는 위 RefreshVisual에서 이미 처리)
         if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
         else                 GameEvents.UnitBenched(survivor);
 

@@ -523,6 +523,7 @@ public class BattleManager : MonoBehaviour
             starLevel = Mathf.Clamp(e.starLevel, 1, 3)
         };
         ApplySkill(bu, data.skill, data.manaCost);
+        bu.attackVfxId = data.attackVfxId; // 평타 VFX(아군과 동일 규칙)
 
         // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
         // (아군은 unit.items 리스트, 적은 heldItemEn 단일 문자열을 ItemDatabase로 해석)
@@ -582,7 +583,11 @@ public class BattleManager : MonoBehaviour
             hasSitrusBerry = unit.hasHeroBerry // 파치리스 영웅증강 v2 자뭉열매
         };
         // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
-        if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+        if (unit.data != null)
+        {
+            ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+            bu.attackVfxId = unit.data.attackVfxId; // 평타 VFX는 종 데이터에서(스킬 테이블 아님)
+        }
 
         foreach (var item in unit.items)
         {
@@ -765,6 +770,9 @@ public class BattleManager : MonoBehaviour
     /// <summary>평타 1회: attack 기반 물리 피해(파이프라인). 마나는 초당 충전만(기획 확정) — 평타 획득 없음.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
+        // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
+        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target);
+
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
         foreach (var effect in attacker.effects)
@@ -806,7 +814,8 @@ public class BattleManager : MonoBehaviour
         DamageType type = caster.skillEffectType == SkillEffectType.Attack ? DamageType.Physical : DamageType.Magic;
 
         var targets = GetSkillTargets(caster, primaryTarget);
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets); // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생
+        // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius);
 
         foreach (var t in targets)
         {
@@ -838,7 +847,10 @@ public class BattleManager : MonoBehaviour
         else
             targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
 
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets);
+        // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
+        bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
+                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius);
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
