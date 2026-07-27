@@ -63,10 +63,6 @@ public class AugmentOfferHud : MonoBehaviour
 
     private void DrawModal(AugmentManager augment)
     {
-        // 화면 전체 클릭 흡수(모달). 투명 스타일 버튼이라 시각 요소 없이 이벤트만 소비한다.
-        _blockerStyle ??= new GUIStyle();
-        GUI.Button(new Rect(0, 0, Screen.width, Screen.height), GUIContent.none, _blockerStyle);
-
         const float cardWidth = 240f, cardHeight = 150f, gap = 16f;
         int count = _offer.Count;
 
@@ -74,8 +70,12 @@ public class AugmentOfferHud : MonoBehaviour
         float panelW = totalWidth + 40f, panelH = cardHeight + 112f;
         float panelX = (Screen.width - panelW) * 0.5f;
         float panelY = (Screen.height - panelH) * 0.5f;
+        var panelRect = new Rect(panelX, panelY, panelW, panelH);
 
-        GUI.Box(new Rect(panelX, panelY, panelW, panelH),
+        // 패널 바깥만 클릭을 흡수해 카드/최소화 버튼이 입력을 받을 수 있게 한다.
+        AbsorbClicksOutside(panelRect);
+
+        GUI.Box(panelRect,
                 $"증강을 선택하세요 (3택1) — 남은 시간 {FormatRemaining(augment)} (초과 시 자동 선택)");
 
         for (int i = 0; i < count; i++)
@@ -100,6 +100,22 @@ public class AugmentOfferHud : MonoBehaviour
         var minimizeRect = new Rect(panelX + (panelW - 200f) * 0.5f, panelY + panelH - 34f, 200f, 26f);
         if (GUI.Button(minimizeRect, "▼ 카드 내려두기"))
             augment.SetOfferMinimized(true);
+    }
+
+    private void AbsorbClicksOutside(Rect panelRect)
+    {
+        _blockerStyle ??= new GUIStyle();
+
+        DrawClickBlocker(new Rect(0f, 0f, Screen.width, panelRect.yMin));
+        DrawClickBlocker(new Rect(0f, panelRect.yMax, Screen.width, Screen.height - panelRect.yMax));
+        DrawClickBlocker(new Rect(0f, panelRect.yMin, panelRect.xMin, panelRect.height));
+        DrawClickBlocker(new Rect(panelRect.xMax, panelRect.yMin, Screen.width - panelRect.xMax, panelRect.height));
+    }
+
+    private void DrawClickBlocker(Rect rect)
+    {
+        if (rect.width > 0f && rect.height > 0f)
+            GUI.Button(rect, GUIContent.none, _blockerStyle);
     }
 
     private static string FormatRemaining(AugmentManager augment)

@@ -166,7 +166,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1452,6 +1452,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
   _recentMatchCount: 10
+  _xpPurchaseButton: {fileID: 0}
+  _shopRerollButton: {fileID: 0}
+  _showItemStoreButton: {fileID: 0}
+  _showUnitStoreButton: {fileID: 0}
+  _unitStorePanel: {fileID: 0}
+  _itemStorePanel: {fileID: 0}
 --- !u!1 &680977925
 GameObject:
   m_ObjectHideFlags: 0
@@ -3730,7 +3736,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 60
+  field of view: 65
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -4666,7 +4672,7 @@ MonoBehaviour:
   _hexSize: 1
   _cols: 7
   _rows: 4
-  _boardPosition: {x: 0, y: 0, z: 0}
+  _boardPosition: {x: 0, y: 0, z: 3.75}
   _boardRotation: {x: 0, y: 0, z: 0}
   _boardScale: {x: 1, y: 1, z: 1}
   _benchTilePrefab: {fileID: 7911395336550594049, guid: 663dff05509f025489258cc4def03ca1, type: 3}
@@ -4864,6 +4870,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5eac3cc6472c33d4e820e5e369a6fd99, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AugmentManager
+--- !u!114 &1558058679
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1558058640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d638d62dca68c544b60157c1d3410f5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::StartingUnitGranter
+  _grantCost: 1
+  _grantCount: 1
 --- !u!1 &1620688239
 GameObject:
   m_ObjectHideFlags: 0
@@ -5481,20 +5501,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1809925360}
   m_CullTransparentMesh: 1
---- !u!114 &1558058679
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6d638d62dca68c544b60157c1d3410f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StartingUnitGranter
-  _grantCost: 1
-  _grantCount: 1
 --- !u!1 &1837747138
 GameObject:
   m_ObjectHideFlags: 0

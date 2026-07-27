@@ -175,6 +175,8 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnUnitSold += HandleUnitSold;
         GameEvents.OnLevelChanged += HandleLevelChanged;
         GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
+        GameEvents.OnXpPurchaseRequested += HandleXpPurchaseRequested;
+        GameEvents.OnShopRerollRequested += HandleShopRerollRequested;
     }
 
     private void OnDisable()
@@ -183,7 +185,13 @@ public class ShopManager : MonoBehaviour
         GameEvents.OnUnitSold -= HandleUnitSold;
         GameEvents.OnLevelChanged -= HandleLevelChanged;
         GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
+        GameEvents.OnXpPurchaseRequested -= HandleXpPurchaseRequested;
+        GameEvents.OnShopRerollRequested -= HandleShopRerollRequested;
     }
+
+    private void HandleXpPurchaseRequested() => BuyXp();
+
+    private void HandleShopRerollRequested() => Reroll();
 
     private void Start()
     {

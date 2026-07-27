@@ -141,6 +141,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
     }
 
+    private void OnEnable()
+    {
+        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+    }
+
     private void Start()
     {
         if (_soloMode)
@@ -1203,6 +1213,16 @@ public class NetworkManager : MonoBehaviour
 
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;
+
+    private void OnEnable()
+    {
+        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+    }
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글.</summary>
     public static bool DebugInfiniteTeamHealth = false;

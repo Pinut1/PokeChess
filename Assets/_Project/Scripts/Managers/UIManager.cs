@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 /// <summary>
 /// 게임 UI 표시와 입력 연결을 담당한다. 김태욱 파트.
@@ -9,7 +11,7 @@ using UnityEngine;
 /// 1. 플레이어 진행 HUD
 ///    - 골드, 레벨, XP, 배치 가능 기물 수 표시
 ///    - GameEvents 변경 이벤트를 구독해 표시값 캐시
-///    - XP 구매 입력을 ShopManager.BuyXp()에 연결
+///    - Canvas XP 구매 버튼을 GameEvents 요청으로 연결
 /// 2. 전적창 MVP
 ///    - MatchHistoryStore.LoadRecent()를 이용한 과거 전적 조회
 ///    - GameEvents.OnMatchRecorded 구독을 통한 신규 전적 실시간 반영
@@ -28,6 +30,25 @@ public class UIManager : MonoBehaviour
 {
     [Header("Match History")]
     [SerializeField] private int _recentMatchCount = 10;
+
+    [Header("Canvas Shop Controls")]
+    [Tooltip("비어 있으면 GameSceneTest의 'Level Button'을 런타임에 찾습니다.")]
+    [SerializeField] private Button _xpPurchaseButton;
+    [Tooltip("비어 있으면 GameSceneTest의 'ReRoll Button'을 런타임에 찾습니다.")]
+    [SerializeField] private Button _shopRerollButton;
+    [Tooltip("비어 있으면 GameSceneTest의 'BattleRaedy_Button'을 런타임에 찾습니다.")]
+    [SerializeField] private Button _battleReadyButton;
+    [Tooltip("비어 있으면 UnitStore_Panel 아래의 ShopChange Button을 런타임에 찾습니다.")]
+    [SerializeField] private Button _showItemStoreButton;
+    [Tooltip("비어 있으면 ItemStore_Panel 아래의 ShopChange Button을 런타임에 찾습니다.")]
+    [SerializeField] private Button _showUnitStoreButton;
+    [SerializeField] private GameObject _unitStorePanel;
+    [SerializeField] private GameObject _itemStorePanel;
+
+    private bool _canvasShopControlsReady;
+    private bool _canvasShopControlsWarningLogged;
+    private GamePhase _currentPhase = GamePhase.Lobby;
+    private bool _readyRequestSubmitted;
 
     // ──────────────────────────────────────────
     // 전적 데이터 및 전적창 상태
@@ -110,9 +131,6 @@ public class UIManager : MonoBehaviour
     private int _requiredXp;
     private int _unitCap = 1;
 
-    private int _buyXpCostGold;
-    private int _buyXpAmount;
-
     // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
@@ -143,6 +161,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged += HandleLevelChanged;
         GameEvents.OnXpChanged += HandleXpChanged;
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
+        GameEvents.OnPhaseChanged += HandlePhaseChanged;
     }
 
     private void OnDisable()
@@ -154,6 +173,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnLevelChanged -= HandleLevelChanged;
         GameEvents.OnXpChanged -= HandleXpChanged;
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
+        GameEvents.OnPhaseChanged -= HandlePhaseChanged;
     }
 
     private void Start()
@@ -161,6 +181,158 @@ public class UIManager : MonoBehaviour
         RefreshMatchHistory();
         RefreshSampleDecks();
         SyncProgressState();
+        BindCanvasShopControls();
+    }
+
+    private void OnDestroy()
+    {
+        UnbindCanvasShopControls();
+    }
+
+    private void LateUpdate()
+    {
+        // 씬 초기화 순서로 비활성 패널이 아직 검색되지 않은 프레임을 한 번 보완한다.
+        if (!_canvasShopControlsReady)
+            BindCanvasShopControls();
+    }
+
+    /// <summary>
+    /// 기존 Canvas 버튼은 persistent onClick이 비어 있으므로 UIManager가 런타임 리스너를 소유한다.
+    /// SerializeField가 연결된 씬에서는 그 참조를 우선 사용하고, 기존 GameSceneTest 씬은 이름 기반으로 보완한다.
+    /// </summary>
+    private void BindCanvasShopControls()
+    {
+        UnbindCanvasShopControls();
+
+        // UnityEngine.Object의 null 연산자는 파괴된 씬 오브젝트도 null로 취급한다.
+        // ??= 는 그 연산자를 우회하므로, 씬 재진입 뒤에는 반드시 == null로 재검색한다.
+        if (_xpPurchaseButton == null)
+            _xpPurchaseButton = FindSceneButton("Level Button");
+
+        if (_shopRerollButton == null)
+            _shopRerollButton = FindSceneButton("ReRoll Button");
+
+        if (_battleReadyButton == null)
+            _battleReadyButton = FindSceneButton("BattleRaedy_Button");
+
+        if (_unitStorePanel == null)
+            _unitStorePanel = FindSceneObject("UnitStore_Panel");
+
+        if (_itemStorePanel == null)
+            _itemStorePanel = FindSceneObject("ItemStore_Panel");
+
+        if (_showItemStoreButton == null || _unitStorePanel == null ||
+            !_showItemStoreButton.transform.IsChildOf(_unitStorePanel.transform))
+        {
+            _showItemStoreButton = FindSceneButton("ShopChange Button", _unitStorePanel);
+        }
+
+        if (_showUnitStoreButton == null || _itemStorePanel == null ||
+            !_showUnitStoreButton.transform.IsChildOf(_itemStorePanel.transform))
+        {
+            _showUnitStoreButton = FindSceneButton("ShopChange Button", _itemStorePanel);
+        }
+
+        _xpPurchaseButton?.onClick.AddListener(HandleXpPurchaseButtonClicked);
+        _shopRerollButton?.onClick.AddListener(HandleShopRerollButtonClicked);
+        _battleReadyButton?.onClick.AddListener(HandleBattleReadyButtonClicked);
+        _showItemStoreButton?.onClick.AddListener(ShowItemStore);
+        _showUnitStoreButton?.onClick.AddListener(ShowUnitStore);
+
+        _canvasShopControlsReady = _xpPurchaseButton != null && _shopRerollButton != null &&
+            _battleReadyButton != null &&
+            _showItemStoreButton != null && _showUnitStoreButton != null &&
+            _unitStorePanel != null && _itemStorePanel != null;
+
+        UpdateBattleReadyButtonState();
+
+        if (!_canvasShopControlsReady && !_canvasShopControlsWarningLogged)
+        {
+            Debug.LogWarning("[UIManager] Canvas 상점 컨트롤 일부를 찾지 못했습니다. Inspector 참조 또는 씬 오브젝트 이름을 확인하세요.");
+            _canvasShopControlsWarningLogged = true;
+        }
+    }
+
+    private void UnbindCanvasShopControls()
+    {
+        _xpPurchaseButton?.onClick.RemoveListener(HandleXpPurchaseButtonClicked);
+        _shopRerollButton?.onClick.RemoveListener(HandleShopRerollButtonClicked);
+        _battleReadyButton?.onClick.RemoveListener(HandleBattleReadyButtonClicked);
+        _showItemStoreButton?.onClick.RemoveListener(ShowItemStore);
+        _showUnitStoreButton?.onClick.RemoveListener(ShowUnitStore);
+    }
+
+    private void HandleXpPurchaseButtonClicked() => GameEvents.RequestXpPurchase();
+
+    private void HandleShopRerollButtonClicked() => GameEvents.RequestShopReroll();
+
+    private void HandleBattleReadyButtonClicked()
+    {
+        if (_currentPhase != GamePhase.Shopping || _readyRequestSubmitted)
+            return;
+
+        _readyRequestSubmitted = true;
+        UpdateBattleReadyButtonState();
+        GameEvents.RequestPlayerReady();
+    }
+
+    private void HandlePhaseChanged(GamePhase phase)
+    {
+        _currentPhase = phase;
+        if (phase == GamePhase.Shopping)
+            _readyRequestSubmitted = false;
+
+        UpdateBattleReadyButtonState();
+    }
+
+    private void UpdateBattleReadyButtonState()
+    {
+        if (_battleReadyButton != null)
+            _battleReadyButton.interactable =
+                _currentPhase == GamePhase.Shopping && !_readyRequestSubmitted;
+    }
+
+    private void ShowItemStore() => SetActiveShopPanel(showUnitStore: false);
+
+    private void ShowUnitStore() => SetActiveShopPanel(showUnitStore: true);
+
+    private void SetActiveShopPanel(bool showUnitStore)
+    {
+        if (_unitStorePanel != null)
+            _unitStorePanel.SetActive(showUnitStore);
+
+        if (_itemStorePanel != null)
+            _itemStorePanel.SetActive(!showUnitStore);
+    }
+
+    private static Button FindSceneButton(string name, GameObject requiredParent = null)
+    {
+        foreach (Button button in Resources.FindObjectsOfTypeAll<Button>())
+        {
+            if (!IsInActiveScene(button.gameObject) || button.name != name)
+                continue;
+
+            if (requiredParent == null || button.transform.IsChildOf(requiredParent.transform))
+                return button;
+        }
+
+        return null;
+    }
+
+    private static GameObject FindSceneObject(string name)
+    {
+        foreach (GameObject candidate in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (IsInActiveScene(candidate) && candidate.name == name)
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsInActiveScene(GameObject candidate)
+    {
+        return candidate != null && candidate.scene.IsValid() && candidate.scene == SceneManager.GetActiveScene();
     }
 
 
@@ -185,9 +357,6 @@ public class UIManager : MonoBehaviour
         _requiredXp = shop.RequiredXp;
         _unitCap = shop.UnitCap;
 
-        // 구매 비용과 획득량은 현재 별도 변경 이벤트가 없는 고정 설정값이므로 초기화 시 캐시한다.
-        _buyXpCostGold = shop.BuyXpCostGold;
-        _buyXpAmount = shop.BuyXpAmount;
     }
 
     /// <summary>골드 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
@@ -238,12 +407,12 @@ public class UIManager : MonoBehaviour
     /// <summary>
     /// 이벤트로 갱신된 진행 상태 캐시를 화면에 표시한다.
     /// 이 메서드는 표시 과정에서 ShopManager의 현재 상태를 직접 조회하지 않는다.
-    /// 단, 사용자가 XP 구매 버튼을 눌렀을 때만 ShopManager.BuyXp()를 호출한다.
+    /// XP 구매 입력은 Canvas 버튼이 담당하므로 여기서는 정보만 표시한다.
     /// </summary>
     private void DrawProgressPanel()
     {
         const float width = 250f;
-        const float height = 145f;
+        const float height = 100f;
 
         // PrototypeHud의 유닛 상점 배치값과 동일하게 계산한다.
         const int shopSlotCount = 5;
@@ -279,31 +448,6 @@ public class UIManager : MonoBehaviour
             xpText
         );
 
-        bool hasPurchaseConfig = _buyXpCostGold > 0 && _buyXpAmount > 0;
-
-        bool canBuyXp =
-            hasPurchaseConfig &&
-            _requiredXp > 0 &&
-            _gold >= _buyXpCostGold;
-
-        GUI.enabled = canBuyXp;
-
-        string buttonLabel = hasPurchaseConfig
-            ? $"XP 구매 ({_buyXpCostGold}G → +{_buyXpAmount}XP)"
-            : "XP 구매 준비 중";
-
-        if (GUI.Button(
-            new Rect(x + 15f, y + 100f, 220f, 32f),
-            buttonLabel
-        ))
-        {
-            var gm = GameManager.Instance;
-
-            if (gm != null && gm.Shop != null)
-                gm.Shop.BuyXp();
-        }
-
-        GUI.enabled = true;
     }
 
     // ──────────────────────────────────────────
