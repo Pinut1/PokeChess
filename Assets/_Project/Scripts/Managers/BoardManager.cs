@@ -169,8 +169,8 @@ public class BoardManager : MonoBehaviour
         _boardAnchor.SetLocalPositionAndRotation(_boardPosition, Quaternion.Euler(_boardRotation));
         _boardAnchor.localScale = _boardScale;
 
-        Vector3 sumPosition = Vector3.zero;
-        int totalTiles = 0;
+        Vector3 battleAreaPositionSum = Vector3.zero;
+        int battleAreaPositionCount = 0;
 
         // 2. 타일 생성 루프
         for (int row = 0; row < _rows; row++)
@@ -199,16 +199,17 @@ public class BoardManager : MonoBehaviour
                 _battleField.Add(coords, null);
 
                 // 평균 위치 계산을 위해 누적
-                sumPosition += worldPos;
-                totalTiles++;
+                battleAreaPositionSum += worldPos;
+                battleAreaPositionSum += GetEnemyBattleCoords(coords).ToWorldPosition(_hexSize);
+                battleAreaPositionCount += 2;
             }
         }
 
         // 3. 중앙 정렬 (Centering)
         // 타일들의 평균 무게중심(Center)을 구한 뒤, 쟁반 전체를 그 반대 방향으로 밀어줍니다.
-        if (totalTiles > 0)
+        if (battleAreaPositionCount > 0)
         {
-            _centerOffset = sumPosition / totalTiles;
+            _centerOffset = battleAreaPositionSum / battleAreaPositionCount;
             // Anchor의 인스펙터 Transform은 유지하고, 타일 묶음만 로컬 좌표에서 중앙 정렬합니다.
             foreach (Transform rowFolder in _boardAnchor)
                 foreach (Transform tile in rowFolder)

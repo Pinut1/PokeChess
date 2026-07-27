@@ -9,6 +9,7 @@ public enum BattleTeam { Ally, Enemy }
 public class BattleUnit
 {
     public PokemonUnit source;     // 아군이면 보드 위 원본 참조(시각화 토글용), 적이면 null
+    public PokemonData data;
     public BattleTeam team;
     public HexCoords coords;
 

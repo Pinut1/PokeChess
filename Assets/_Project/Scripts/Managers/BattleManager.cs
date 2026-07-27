@@ -343,6 +343,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = null,
+            data = data,
             team = BattleTeam.Ally,
             coords = coords,
             maxHp = data.hp,
@@ -509,6 +510,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = null,
+            data = data,
             team = BattleTeam.Enemy,
             coords = coords,
             maxHp = maxHp,
@@ -568,6 +570,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = team == BattleTeam.Ally ? unit : null,
+            data = unit.data,
             team = team,
             coords = coords,
             maxHp = unit.MaxHp,
@@ -605,10 +608,20 @@ public class BattleManager : MonoBehaviour
         if (bu.source != null)
             bu.source.gameObject.SetActive(false);
 
-        var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        GameObject visual;
+        if (bu.data != null && bu.data.modelPrefab != null)
+        {
+            visual = Instantiate(bu.data.modelPrefab);
+        }
+        else
+        {
+            visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
+            visual.GetComponent<Renderer>().material.color =
+                bu.team == BattleTeam.Ally ? Color.blue : Color.red;
+        }
+
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
-        visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
-        visual.GetComponent<Renderer>().material.color = bu.team == BattleTeam.Ally ? Color.blue : Color.red;
 
         bu.visual = visual;
         UpdateVisualPosition(bu);
