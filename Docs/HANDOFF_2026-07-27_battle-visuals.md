@@ -24,24 +24,31 @@
 
 원본 전장 통합 커밋은 `4be7856a`이고, 현재 브랜치에는 같은 변경이 `b0abaa0f`로 들어와 있다. 따라서 `4be7856a` 자체가 HEAD의 조상인지로 통합 여부를 판단하면 안 된다.
 
-## 후속 작업
+## B/C 구현 상태
 
 ### B. 8행 전장 센터링/카메라
 
-`BoardManager._centerOffset`은 현재 생성하는 아군 4행 타일 평균으로 계산된다. 적 rows 4~7은 전투 시 좌표 변환으로 추가되는 구조이므로, 8행 전장 전체 기준의 화면 중심/카메라가 필요하면 별도로 조정해야 한다.
+`BoardManager.GenerateBoard()`가 `_centerOffset`을 계산할 때, 생성된 아군 4행 좌표뿐 아니라 `GetEnemyBattleCoords()`로 얻은 적 4행 좌표도 함께 평균낸다. 따라서 보드 기준점은 8행 전체의 중심을 사용한다.
 
-- 상태: 미완료. 육안 및 Play 모드 확인 뒤 조정할 작업.
-- 범위: 보드 중심값, 카메라 위치/프레이밍 및 관련 씬 설정.
+- 상태: 코드 구현 및 Unity 컴파일 완료. Play 모드 육안 프레이밍 확인은 남음.
+- 범위: 보드 중심값을 8행 기준으로 조정. 카메라 씬 설정은 아직 변경하지 않음.
 - 주의: 8행 좌표 배치 자체(`GetEnemyBattleCoords`)를 되돌리는 작업이 아니다.
 
 ### C. 전투 비주얼 캡슐을 실제 모델로 교체
 
-`BattleManager.SpawnVisual(BattleUnit bu)`는 현재도 `GameObject.CreatePrimitive(PrimitiveType.Capsule)`로 전투 비주얼을 생성하고 팀별 파랑/빨강을 적용한다. 보드의 `PokemonUnit` 모델과는 별도 전투 경로다.
+`BattleUnit`이 전투 시각화용 `PokemonData`를 보존하고, `BattleManager.SpawnVisual(BattleUnit bu)`가 `data.modelPrefab`을 생성하도록 변경했다. 모델 프리팹이 없을 때만 기존 팀 색상 캡슐을 폴백으로 사용한다.
 
-- 상태: 미완료.
-- 목표: BattleUnit의 데이터에서 `data.modelPrefab`을 사용해 실제 모델을 생성하고, 기존 위치 갱신/정리 흐름과 호환되게 한다.
-- 전제: A 통합 브랜치에서 art 에셋을 사용할 수 있으므로, 이 브랜치에서 구현·테스트한다.
-- 확인 항목: 아군/적 모두 모델 생성, 프리팹 부재 시의 안전한 폴백, 전투 종료 시 정리, 기존 보드 오브젝트 비활성화/복귀 흐름.
+- 상태: 코드 구현 및 Unity 컴파일 완료. 실제 전투 Play 육안 확인은 남음.
+- 적용 범위: 아군, 스테이지 적, 돌연변이 봇 생성 경로 모두 `PokemonData`를 전달한다.
+- 유지 사항: 기존 위치 갱신/전투 종료 정리와 보드 원본 오브젝트 비활성화·복귀 흐름은 그대로 사용한다.
+- 확인 항목: 모델 크기·피벗·방향, 아군/적 실제 표시, 전투 종료 후 복귀.
+
+## 검증 결과
+
+- Unity 6000.3.8f1 스크립트 컴파일 오류 0건.
+- EditMode 테스트 16개 중 15개 통과.
+- 실패 1개: `SceneStabilityTests.GameScene_UsesNetworkMode_AndSingleOpponentBoardView` — `GameSceneTest`의 기존 Photon 네트워크 모드 설정 기대 불일치로, 이번 B/C 변경 파일과 무관.
+- 남은 검증: GameSceneTest Play 모드에서 8행 프레이밍과 모델 피벗·크기 육안 확인.
 
 ## 진화 모델 교체 — 재구현 금지
 
@@ -66,5 +73,5 @@
 ## 혼동 방지
 
 - **진화 모델 교체**: 보드/유닛의 `PokemonUnit.RefreshVisual` 경로이며 `dca63495`에서 완료됐다.
-- **전투 캡슐 교체**: `BattleManager.SpawnVisual` 경로이며 C에서 처리할 미완료 작업이다.
-- **8행 좌표 통합**: A에서 반영됐다. 남은 B는 좌표 통합이 아니라 화면 센터링/카메라 조정이다.
+- **전투 캡슐 교체**: `BattleManager.SpawnVisual` 경로이며 C 코드 구현 완료, Play 육안 확인이 남았다.
+- **8행 좌표 통합**: A에서 반영됐다. B에서 8행 전체 평균 센터링을 구현했으며 Play 프레이밍 확인이 남았다.
