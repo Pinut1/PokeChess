@@ -212,8 +212,15 @@ public class UIManager : MonoBehaviour
         if (_shopRerollButton == null)
             _shopRerollButton = FindSceneButton("ReRoll Button");
 
+        // 오브젝트명 오타는 af9955d4에서 교정됨(BattleRaedy_Button -> BattleReady_Button).
+        // 아직 교정 전 씬을 쓰는 브랜치가 남아 있어 구 이름도 폴백으로 둔다.
         if (_battleReadyButton == null)
-            _battleReadyButton = FindSceneButton("BattleRaedy_Button");
+        {
+            _battleReadyButton = FindSceneButton("BattleReady_Button");
+
+            if (_battleReadyButton == null)
+                _battleReadyButton = FindSceneButton("BattleRaedy_Button");
+        }
 
         if (_unitStorePanel == null)
             _unitStorePanel = FindSceneObject("UnitStore_Panel");
