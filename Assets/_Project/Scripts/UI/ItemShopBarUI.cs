@@ -46,19 +46,19 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
 
     protected override IReadOnlyList<ScriptableObject> GetSlots()
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         return shop != null ? shop.CurrentItemSlots : null;
     }
 
     protected override void Buy(int slotIndex)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         shop?.BuyItem(slotIndex);
     }
 
     private void RerollSlot(int slotIndex)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         shop?.RerollItemSlot(slotIndex);
     }
 
@@ -74,7 +74,7 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
     /// <summary>라운드 갱신 시 전부 다시 켜지고, 리롤을 쓴 슬롯만 꺼진다.</summary>
     private void RefreshRerollButtons()
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
 
         for (int i = 0; i < _cards.Length; i++)
             _cards[i].SetRerollAvailable(shop != null && shop.CanRerollItemSlot(i));
@@ -87,8 +87,7 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
     /// </summary>
     private void RefreshPurchasable()
     {
-        var gm = GameManager.Instance;
-        var shop = gm != null ? gm.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
 
         var slots = GetSlots();

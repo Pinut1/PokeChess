@@ -20,7 +20,7 @@ public class AugmentOfferHud : MonoBehaviour
         GameEvents.OnAugmentSelected   += HandleSelected;
 
         // 부착 전에 오퍼가 이미 떠 있던 경우(활성화 순서 역전) 복구
-        var augment = GameManager.Instance != null ? GameManager.Instance.Augment : null;
+        var augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
         if (augment != null && augment.PendingOffer.Count > 0)
             _offer = augment.PendingOffer;
     }
@@ -38,7 +38,7 @@ public class AugmentOfferHud : MonoBehaviour
     {
         if (_offer == null || _offer.Count == 0) return;
 
-        var augment = GameManager.Instance != null ? GameManager.Instance.Augment : null;
+        var augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
         if (augment == null) return;
 
         GUI.depth = -100; // 다른 OnGUI(PrototypeHud 등)보다 먼저 이벤트를 받아 모달 클릭 흡수

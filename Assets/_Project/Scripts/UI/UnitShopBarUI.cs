@@ -13,13 +13,13 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
 
     protected override IReadOnlyList<PokemonData> GetSlots()
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         return shop != null ? shop.CurrentSlots : null;
     }
 
     protected override void Buy(int slotIndex)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         shop?.Buy(slotIndex);
     }
 }

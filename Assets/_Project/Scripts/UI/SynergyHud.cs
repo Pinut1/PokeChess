@@ -28,8 +28,7 @@ public class SynergyHud : MonoBehaviour
 
     private void OnGUI()
     {
-        var gm = GameManager.Instance;
-        if (gm == null || gm.Synergy == null) return;
+        if (!GameManager.TryGet(out var gm) || gm.Synergy == null) return;
 
         var source = gm.Synergy.GetAllSynergyStatuses();
         if (source == null || source.Count == 0) return;

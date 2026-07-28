@@ -85,7 +85,7 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
                 break;
         }
 
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop != null) _priceText.text = shop.ItemPrice.ToString();
     }
 
