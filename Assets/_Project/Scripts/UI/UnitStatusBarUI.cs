@@ -15,9 +15,11 @@ public class UnitStatusBarUI : MonoBehaviour
     [SerializeField] private Image _manaFill;
     [SerializeField] private GameObject _manaRoot;
 
-    [Header("팀 색상")]
+    [Header("색상")]
     [SerializeField] private Color _allyHpColor  = new(0.35f, 0.85f, 0.35f);
     [SerializeField] private Color _enemyHpColor = new(0.9f, 0.3f, 0.3f);
+    [Tooltip("마나는 아군/적 구분 없이 한 색을 쓴다. 스프라이트가 흰색이어야 이 색이 그대로 나온다.")]
+    [SerializeField] private Color _manaColor    = new(0.3f, 0.6f, 1f);
 
     [Header("눈금 (롤 체력바식 구분선)")]
     [Tooltip("눈금 무늬를 반복해서 그리는 오버레이. 텍스처 Wrap Mode를 Repeat로 두어야 한다. " +
@@ -54,7 +56,14 @@ public class UnitStatusBarUI : MonoBehaviour
 
         bool showMana = manaRatio >= 0f;
         if (_manaRoot != null) _manaRoot.SetActive(showMana);
-        if (showMana && _manaFill != null) _manaFill.fillAmount = Mathf.Clamp01(manaRatio);
+
+        if (showMana && _manaFill != null)
+        {
+            _manaFill.fillAmount = Mathf.Clamp01(manaRatio);
+            // Graphic.color 세터가 값이 같으면 무시하므로 매 프레임 대입해도 비용이 없다.
+            // 대신 Play 중 인스펙터에서 색을 바꾸면 바로 반영된다(색 고를 때 편함).
+            _manaFill.color = _manaColor;
+        }
 
         ApplyTicks(maxHp);
     }
