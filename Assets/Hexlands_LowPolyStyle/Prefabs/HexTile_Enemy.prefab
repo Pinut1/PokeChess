@@ -10,9 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 4116196927331254}
   - component: {fileID: -7703714704682604493}
-  - component: {fileID: 7911395336550594049}
+  - component: {fileID: 5824591497658974836}
   m_Layer: 0
-  m_Name: HexTile_Bench
+  m_Name: HexTile_Enemy
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -26,15 +26,15 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1388657164994780}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.2, y: 1.2, z: 1.2}
+  m_LocalScale: {x: 1.6, y: 1.6, z: 1.6}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 4920593272444950}
   - {fileID: 4434843405929684}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &-7703714704682604493
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -84,7 +84,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &7911395336550594049
+--- !u!114 &5824591497658974836
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -93,11 +93,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 1388657164994780}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 06e3833a63d919e4192fe3ca58e384c9, type: 3}
+  m_Script: {fileID: 11500000, guid: 5b8ce3f49e18a394797371c82a892c60, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BenchTile
-  _defaultColor: {r: 0.8, g: 0.8, b: 0.6, a: 1}
-  _hoverColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  m_EditorClassIdentifier: Assembly-CSharp::HexTile
+  _defaultColor: {r: 1, g: 1, b: 1, a: 1}
+  _hoverColor: {r: 0, g: 1, b: 1, a: 1}
 --- !u!1 &1920513786959524
 GameObject:
   m_ObjectHideFlags: 0
@@ -165,7 +165,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: ead2ced0796592041afacb3cb3f26770, type: 2}
+  - {fileID: 2100000, guid: 0a39b7827968e3141b3f8911d259beca, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -279,7 +279,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a2da37528f93ec744ba83aa1ab8d777e, type: 2}
+  - {fileID: 2100000, guid: cd138b609b29d7047b3ec506bb553493, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
