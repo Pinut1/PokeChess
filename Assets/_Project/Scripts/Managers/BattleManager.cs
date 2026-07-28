@@ -659,6 +659,11 @@ public class BattleManager : MonoBehaviour
 
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
 
+        // 적은 아군 진영을 바라보게 뒤집는다. 보드가 점대칭 미러라 정확히 180도.
+        // rotation을 대입하지 않고 Rotate로 돌려, 모델 프리팹이 가진 기본 자세(기울기 등)를 유지한다.
+        if (bu.team == BattleTeam.Enemy)
+            visual.transform.Rotate(0f, 180f, 0f, Space.World);
+
         bu.visual = visual;
         UpdateVisualPosition(bu);
     }
