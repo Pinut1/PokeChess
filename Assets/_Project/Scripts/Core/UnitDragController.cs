@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// 마우스로 유닛을 집어 IDropTarget(보드 타일/벤치 슬롯)에 놓는 드래그앤드롭 컨트롤러.
@@ -26,9 +27,19 @@ public class UnitDragController : MonoBehaviour
     [SerializeField] private InputAction _clickAction =
         new InputAction("Click", InputActionType.Button, "<Pointer>/press");
 
+    [Header("상점 판매 영역 (Canvas UI)")]
+    [Tooltip("여기에 유닛을 놓으면 판매된다. 비어 있으면 활성 상점 패널(UnitStore_Panel / ItemStore_Panel)을 런타임에 찾는다.")]
+    [SerializeField] private RectTransform _shopSellArea;
+    [SerializeField] private Color _sellHoverColor = new Color(1f, 0.45f, 0.45f);
+
     private PokemonUnit _held;
     private IDropTarget _hovered;
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
+
+    // 판매 영역 하이라이트 복원용. 색을 바꾼 대상과 원래 색을 함께 들고 있어야
+    // 드래그 도중 상점 탭이 전환돼 대상이 바뀌어도 이전 대상을 되돌릴 수 있다.
+    private Graphic _sellHighlightTarget;
+    private Color _sellHighlightDefaultColor;
 
     private void Awake()
     {
@@ -52,7 +63,7 @@ public class UnitDragController : MonoBehaviour
         if (_camera == null) return;
 
         // 쇼핑 페이즈에서만 드래그 허용
-        var phase = GameManager.Instance != null ? GameManager.Instance.Phase : null;
+        var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
         if (phase != null && phase.CurrentPhase != GamePhase.Shopping)
         {
             if (_held != null) CancelDrag();
@@ -97,15 +108,27 @@ public class UnitDragController : MonoBehaviour
             _hovered = target;
             _hovered?.OnHoverEnter();
         }
+
+        SetSellHighlight(target == null && IsPointerOverShopSellArea());
     }
 
     private void Drop()
     {
         _hovered?.OnHoverExit();
+        SetSellHighlight(false);
+
         IDropTarget target = RaycastDropTarget();
 
         if (target != null)
+        {
             target.OnDropUnit(_held);
+        }
+        else if (IsPointerOverShopSellArea())
+        {
+            // 놓을 타일이 없고 포인터가 상점 위일 때만 판매한다.
+            // 타일을 우선하므로 상점 패널이 벤치와 겹쳐도 실수로 팔리지 않는다.
+            SellHeldUnit();
+        }
 
         // BoardManager가 배치를 거부하면 갱신 이벤트가 발생하지 않는다.
         // 성공/실패와 관계없이 논리 상태를 다시 그려 실패한 기물을 원래 슬롯으로 돌린다.
@@ -119,9 +142,120 @@ public class UnitDragController : MonoBehaviour
     private void CancelDrag()
     {
         _hovered?.OnHoverExit();
+        SetSellHighlight(false);
         if (BoardView.Instance != null) BoardView.Instance.Resync();
         _held = null;
         _hovered = null;
+    }
+
+    // ──────────────────────────────────────────
+    // 상점 드롭 판매 (TFT 방식)
+    //
+    // 상점은 Canvas(ScreenSpaceOverlay) UI라 3D 물리 레이캐스트로는 잡히지 않는다.
+    // 따라서 IDropTarget이 아니라 포인터의 스크린 좌표가 상점 패널 Rect 안인지로 판정한다.
+    // ──────────────────────────────────────────
+
+    private void SellHeldUnit()
+    {
+        if (_held == null) return;
+
+        var board = GameManager.TryGet(out var gm) ? gm.Board : null;
+        if (board != null) board.SellUnit(_held);
+    }
+
+    /// <summary>
+    /// 포인터가 상점 판매 영역 위에 있는지. 유닛을 들고 있지 않으면 항상 false.
+    ///
+    /// 상점 패널의 Rect는 실제로 보이는 바보다 훨씬 커서(1600x400) 위로는 벤치 행,
+    /// 옆으로는 전투시작 버튼까지 덮는다. 그래서 상점 패널과 하단 바(Bottom_PanelGroup)의
+    /// 교집합만 판매 영역으로 인정한다. 벤치는 하단 바 위쪽이라, 버튼은 하단 바 오른쪽
+    /// 끝이라 각각 자연히 빠진다.
+    /// </summary>
+    private bool IsPointerOverShopSellArea()
+    {
+        if (_held == null) return false;
+
+        RectTransform area = ResolveShopSellArea();
+        if (area == null) return false;
+
+        Vector3 pointer = PointerScreenPos();
+        if (!ContainsPointer(area, pointer)) return false;
+
+        RectTransform bar = ResolveShopBar();
+        return bar == null || ContainsPointer(bar, pointer);
+    }
+
+    private static bool ContainsPointer(RectTransform rect, Vector3 screenPoint)
+    {
+        // ScreenSpaceOverlay 캔버스는 카메라를 null로 넘겨야 좌표가 맞는다.
+        var canvas = rect.GetComponentInParent<Canvas>();
+        Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera
+            : null;
+
+        return RectTransformUtility.RectangleContainsScreenPoint(rect, screenPoint, uiCamera);
+    }
+
+    /// <summary>실제로 화면에 보이는 하단 상점 바. 판매 영역을 이 안으로 제한한다.</summary>
+    private RectTransform ResolveShopBar()
+    {
+        RectTransform area = ResolveShopSellArea();
+        if (area == null) return null;
+
+        var parent = area.parent as RectTransform;
+        return parent != null && parent.name == "Bottom_PanelGroup" ? parent : null;
+    }
+
+    /// <summary>
+    /// 인스펙터 지정 영역이 있으면 그것을, 없으면 현재 활성 상점 패널을 쓴다.
+    /// 유닛/아이템 탭이 전환되므로 매번 활성 쪽을 다시 찾는다.
+    /// 전투시작 버튼은 상점 패널의 형제라 자연히 판매 영역에서 제외된다.
+    /// </summary>
+    private RectTransform ResolveShopSellArea()
+    {
+        if (_shopSellArea != null && _shopSellArea.gameObject.activeInHierarchy)
+            return _shopSellArea;
+
+        foreach (RectTransform t in Resources.FindObjectsOfTypeAll<RectTransform>())
+        {
+            if (!t.gameObject.activeInHierarchy) continue;
+            if (t.name == "UnitStore_Panel" || t.name == "ItemStore_Panel")
+                return t;
+        }
+
+        return null;
+    }
+
+    /// <summary>판매 가능 상태를 색으로 알린다. 대상이 바뀌면 이전 대상을 먼저 되돌린다.</summary>
+    private void SetSellHighlight(bool active)
+    {
+        Graphic target = active ? ResolveSellHighlightGraphic() : null;
+
+        if (!ReferenceEquals(target, _sellHighlightTarget))
+        {
+            if (_sellHighlightTarget != null)
+                _sellHighlightTarget.color = _sellHighlightDefaultColor;
+
+            _sellHighlightTarget = target;
+
+            if (_sellHighlightTarget != null)
+            {
+                _sellHighlightDefaultColor = _sellHighlightTarget.color;
+                _sellHighlightTarget.color = _sellHoverColor;
+            }
+        }
+    }
+
+    private Graphic ResolveSellHighlightGraphic()
+    {
+        RectTransform area = ResolveShopSellArea();
+        if (area == null) return null;
+
+        // 상점 패널 자체에 Graphic이 없으면 상위 바(Bottom_PanelGroup)의 배경을 물들인다.
+        var graphic = area.GetComponent<Graphic>();
+        if (graphic != null) return graphic;
+
+        return area.parent != null ? area.parent.GetComponent<Graphic>() : null;
     }
 
     /// <summary>포인터 아래의 가장 가까운 IDropTarget(들고 있는 유닛 자신은 제외).</summary>
