@@ -20,4 +20,4 @@ MonoBehaviour:
   mappings:
   - targetPokemon: Gloom
     evolvedPokemon: Bellossom
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 21e058ef8dd3df44cb3fba6d7d757a73, type: 3}

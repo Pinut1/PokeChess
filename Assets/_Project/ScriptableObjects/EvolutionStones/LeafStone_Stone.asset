@@ -22,4 +22,4 @@ MonoBehaviour:
     evolvedPokemon: Vileplume
   - targetPokemon: Eevee
     evolvedPokemon: Leafeon
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 26014c91f5947b54c8ddd3199424a335, type: 3}

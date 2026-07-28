@@ -40,4 +40,4 @@ MonoBehaviour:
   evolvesIntoEn: Dewgong
   shopBuyable: 1
   modelPrefab: {fileID: 5577006054290153720, guid: 9ac8dde068f6beb45b366c9b3f8c75fd, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: bb4be40f9a306e648839e10fd84d57b0, type: 3}

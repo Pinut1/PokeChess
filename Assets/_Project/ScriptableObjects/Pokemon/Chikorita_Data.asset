@@ -41,4 +41,4 @@ MonoBehaviour:
   evolvesIntoEn: Bayleef
   shopBuyable: 1
   modelPrefab: {fileID: 7243501375990545681, guid: de0143cb87ddb9e43893591873966d10, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 5a0dd5cb997888344af194772a5b1c20, type: 3}

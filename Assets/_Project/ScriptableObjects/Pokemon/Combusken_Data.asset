@@ -41,4 +41,4 @@ MonoBehaviour:
   evolvesIntoEn: Blaziken
   shopBuyable: 0
   modelPrefab: {fileID: 5984360995316229706, guid: ac6f6ee066c9796488a93e10f15b9761, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: e8deb7b47e58a3e4aa281d50cf96f287, type: 3}

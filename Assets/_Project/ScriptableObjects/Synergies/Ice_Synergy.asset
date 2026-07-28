@@ -18,4 +18,4 @@ MonoBehaviour:
   tiers:
   - count: 1
     effectDescription: "\uC801 atkSpeed -20% (\uACE0\uC720)"
-  icon: {fileID: 0}
+  icon: {fileID: -1572895185, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}

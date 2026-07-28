@@ -9,6 +9,10 @@ using UnityEngine;
 /// </summary>
 public class PrototypeHud : MonoBehaviour
 {
+    [Tooltip("꺼짐: 유닛/아이템 상점 디버그 텍스트 버튼 바를 숨김(실 UI 카드만 사용). " +
+             "켜짐(기본): 기존처럼 화면 하단에 디버그 바도 같이 표시.")]
+    [SerializeField] private bool _showShopDebugBar = true;
+
     private int _partnerGold = -1; // -1 = 아직 수신 전
 
     private void OnEnable() => GameEvents.OnPartnerGoldChanged += OnPartnerGold;
@@ -21,8 +25,14 @@ public class PrototypeHud : MonoBehaviour
         if (gm == null) return;
 
         DrawStatusPanel(gm);
-        DrawItemShopBar(gm);
-        DrawShopBar(gm);
+
+        // Ready 버튼은 Canvas의 전투시작 버튼으로 이관되어 이 HUD에서 제거됐다(DrawReady 삭제).
+        if (_showShopDebugBar)
+        {
+            DrawItemShopBar(gm);
+            DrawShopBar(gm);
+        }
+
         DrawVictory(gm);
     }
 

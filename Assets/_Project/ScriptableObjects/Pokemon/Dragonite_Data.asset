@@ -40,4 +40,4 @@ MonoBehaviour:
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 8856685201396606562, guid: c1c5ef11e6667664e860ebe6151adcef, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: fdaf21b33cce9c94f930005541087728, type: 3}
