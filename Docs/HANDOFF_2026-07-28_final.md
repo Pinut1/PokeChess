@@ -65,14 +65,34 @@ origin/haein_UI : behind 23 / ahead 0
 - **씬 파일 미변경** — `.cs` 3개만 바뀌므로 다른 브랜치와 충돌하지 않는다
 - 남은 것: 판매 영역이 눈에 보이는 상점 바와 정확히 일치하지 않는다. `UnitDragController`의 `Shop Sell Area`에 RectTransform(예: `Main_BackPanel`)을 인스펙터로 지정하면 코드 수정 없이 해결된다
 
-### PR #54 `feat: 통신교환 기능 연결 및 증강 선택 흐름 개선` (**CONFLICTING**)
+### PR #54 `feat: 통신교환 기능 연결 및 증강 선택 흐름 개선` — **충돌 해결본 준비 완료**
+
+PR #54 자체는 여전히 CONFLICTING이지만, **7/28에 충돌을 해결한 브랜치를 올려두었다.**
 
 ```
-origin/feature/trade-ui-integration : behind 49 / ahead 8
-충돌: GameSceneTest.unity / Core/PokemonUnit.cs / Managers/BoardManager.cs
+해결본: Pinut1/trade-ui-merge-0728   (origin/master 대비 behind 0 / ahead 9)
+원본  : feature/trade-ui-integration (behind 49 / ahead 8, CONFLICTING)
 ```
 
-**재구현하지 말 것.** 통신교환 UI·골드 전송은 이 브랜치에 이미 구현돼 있다. 8행 전장 작업에서 `BoardManager` 좌표계를 건드렸으므로 `BoardManager.cs` 충돌은 단순 텍스트 병합으로 끝나지 않을 가능성이 크다 — 좌표 변환 부분을 읽고 판단해야 한다. 씬 충돌은 아래 §4 절차를 쓸 것.
+**재구현하지 말 것.** 이 브랜치를 그대로 쓰거나 #54에 머지하면 된다. 해결 내역은 PR #54 코멘트에도 남겼다.
+
+**해결한 충돌 16곳** (스크립트 15 + 씬 1). 씬은 §4의 fileID 블록 단위 병합으로 처리 — 741 blocks / 중복 fileID 0 / 끊어진 참조 0 / 구조 이상 0. `SceneRoots`는 양쪽 추가분 합집합.
+
+| 파일 | 처리 |
+|---|---|
+| `PokemonUnit` 성급 배율 | master 확정표 채택(일반 `1.0/1.8/2.8`, 특수 `1.0/2.0/3.0`). 브랜치의 구 모델(`SPECIAL_EVOLUTION_MULTIPLIER` ×1.4)은 폐기 |
+| `RoundPhaseManager` 준비 요청 | 브랜치의 **증강 블로킹 가드는 유지**, 브로드캐스트만 `GameEvents.ApprovePlayerReady` 경로로 교체 |
+| `PrototypeHud` | QA 패널·확률 패널 유지 + `_showShopDebugBar` 게이트. `DrawReady` 제거(`gm.Phase.PlayerReady()`가 이벤트 방식으로 바뀌며 사라져 두면 컴파일 실패) |
+| `UIManager` / `NetworkManager` 구독 | 양쪽 합집합 |
+
+**⚠️ git이 자동 병합으로 통과시켰지만 실제로 깨져 있던 2건** — 자동 병합 성공이 안전을 뜻하지 않는다는 사례다.
+
+- `NetworkManager`: 브랜치의 `override OnEnable/OnDisable`과 master의 `private` 버전이 **중복 정의**(CS0111)
+- `AugmentOfferHud`: `AbsorbClicksOutside`는 남았는데 `_blockerStyle` 선언이 **유실**(CS0103)
+
+**검증(Play)**: 컴파일 0 / Missing Script 0 / Broken Prefab 0 / Play 에러 0, 합체 진화 후 모델 정상 교체(콘팡→도나리 2성, `childCount=1`), 전투 진입 시 아군 `r=0` / 적 `r=4,6`으로 8행 유지, 모델 3/3 폴백 0.
+
+**남은 것**: 2클라이언트 Photon 실사(통신교환 유닛 전송·수령, 골드 전송 ACK, 증강 블로킹 중 준비 거부).
 
 ---
 
@@ -145,11 +165,17 @@ UI 호출부 8개는 정리했다. **매니저 내부 호출부 30여 곳은 아
 
 `UnitStore_Panel` / `ItemStore_Panel`의 Rect는 1600×400이라 **벤치 행(화면 y=326)과 전투시작 버튼까지 덮는다.** 이 Rect로 화면 영역 판정을 하면 오탐이 난다. PR #58은 `Bottom_PanelGroup`과의 교집합으로 잘라 해결했다.
 
-### 5-5. Play 중 리컴파일 금지
+### 5-5. `PokemonUnit._visual`은 반드시 `[SerializeField]`여야 한다
+
+합체 진화는 기존 유닛을 `Instantiate`로 복제해 새 유닛을 만든다. `_visual`이 직렬화되지 않으면 **복제본의 `_visual`이 null**이 되고, `RefreshVisual()`이 이전 모델을 지우지 못한 채 새 모델만 덧붙여 **두 모델이 겹친다**(실측: 늪짱이 2성에 `mudkip_pf(Clone)` + `marshtomp_pf(Clone)` 동시 존재, `childCount=2`).
+
+직렬화하면 Unity가 복제된 자식으로 참조를 remap해 정상 동작한다. 7/28에 `[SerializeField]` 추가 + 구 데이터 대비 안전망을 넣었다(`Pinut1/trade-ui-merge-0728`).
+
+### 5-6. Play 중 리컴파일 금지
 
 Play 상태에서 스크립트를 저장하면 도메인 리로드가 걸려 세션이 깨진다. 코드 수정 전에 반드시 Play를 멈출 것. (7/17에 한 번 날렸다)
 
-### 5-6. TMP 폰트 아틀라스는 커밋하지 말 것
+### 5-7. TMP 폰트 아틀라스는 커밋하지 말 것
 
 `NEXON Lv2 Gothic OTF SDF.asset`은 다이나믹 아틀라스라 Play로 한글을 그릴 때마다 글리프가 추가돼 diff가 생긴다. 실내용 변경이 아니면 되돌릴 것.
 
@@ -160,7 +186,9 @@ Play 상태에서 스크립트를 저장하면 도메인 리로드가 걸려 세
 | 브랜치 | ahead | 처리 |
 |---|---|---|
 | `Pinut1/shop-progress-ui-and-sell-drop` | 2 | **PR #58** — 병합 대상 |
-| `feature/trade-ui-integration` | 8 | **PR #54** — 병합 대상 (§3) |
+| `Pinut1/trade-ui-merge-0728` | 9 | **PR #54 충돌 해결본** — 이걸 병합 (§3) |
+| `feature/trade-ui-integration` | 8 | PR #54 원본. 위 해결본으로 대체 |
+| `Pinut1/handoff-final-0728` | 1 | **PR #59** — 이 문서 |
 | `haein_UI` | 0 | **삭제 가능** (전부 흡수됨) |
 | `feature/trade-evolution-frozen-0722` | 2 | 통신교환 동결본. #54 병합 후 삭제 판단 |
 | `feature/taewook-item-inventory-flow` | 8 | behind 310. 태욱님 확인 필요 |
@@ -187,7 +215,7 @@ Play 상태에서 스크립트를 저장하면 도메인 리로드가 걸려 세
 - [ ] PR #58의 `Shop Sell Area` 인스펙터 정렬
 
 ### Core/전투/보드 (인수자)
-- [ ] **PR #54 충돌 해결·병합** — 최우선. 방치하면 통신교환 기능이 통째로 유실된다
+- [x] ~~PR #54 충돌 해결~~ — **7/28 완료.** `Pinut1/trade-ui-merge-0728` 병합만 하면 된다(§3). 재구현·재해결 금지
 - [ ] `RoundPhaseManager` preReward 훅 연결
 - [ ] 나인이볼부스트 v2 풀 연출 (진화체 8종 순차 소환+종별 버프) — 별도 티켓, 규모 큼
 - [ ] 파치리스 적 전체 2초 어그로

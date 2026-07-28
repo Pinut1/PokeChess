@@ -24,6 +24,7 @@ Unity URP 기반 포켓몬 TFT 스타일 오토배틀 게임.
 ## 🚨 건드리기 전에 읽을 것 (지뢰)
 - **`RewardKind` enum 순서 변경 금지** — Unity가 enum을 int로 직렬화한다. `AugmentChoice(7)`/`ItemShopReroll(8)`/`Reforger(9)`에서 `ItemShopReroll`을 지우면 `Reforger`가 9→8로 밀려 임포트된 `RewardDatabase.asset`의 재련기 보상이 깨진다. **아이템 리롤이 카드별 모델로 바뀌어 안 쓰이더라도 멤버는 유지.** `ParseRewardKind` 폴백이 `_ => Gold`라 매핑을 지우면 기존 행이 경고 없이 골드 2로 둔갑한다
 - **`GameSceneTest.unity` 충돌은 텍스트 3-way로 풀지 말 것** — fileID 기준 블록 단위 병합 절차: `Docs/HANDOFF_2026-07-28_final.md` §4. 디스크에서 씬을 덮어썼는데 Unity가 열어둔 상태면 반드시 **Reload**(Save 누르면 병합 결과 유실)
+- **`PokemonUnit._visual`에서 `[SerializeField]` 떼지 말 것** — 합체 진화가 기존 유닛을 `Instantiate`로 복제하므로, 직렬화되지 않으면 복제본의 `_visual`이 null이 되고 `RefreshVisual()`이 이전 모델을 못 지운 채 새 모델을 덧붙여 **두 모델이 겹친다**
 - **Play 중 스크립트 저장 금지** — 도메인 리로드로 세션이 깨진다
 - **TMP 폰트 아틀라스(`NEXON *SDF.asset`) 커밋 금지** — 다이나믹 아틀라스라 Play할 때마다 글리프가 추가돼 diff가 생긴다
 - **`CoinText` 이름 중복** — `Coin_Panel`(골드)과 `Coupon_Panel`(쿠폰) 두 곳. 이름만으로 찾으면 오작동
