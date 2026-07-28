@@ -27,6 +27,7 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     private RectTransform _dragLayer;
     private Transform _iconHome;      // 아이콘의 원래 부모(이 칸)
     private int _iconHomeSiblingIndex;
+    private bool _iconRaycastDefault; // 프리팹에서 지정한 값 — 드래그가 끝나면 이대로 되돌린다
     private bool _dragging;
 
     /// <summary>컨트롤러가 드래그 레이어를 주입한다. 없으면 드래그 시 아이콘이 다른 UI에 가려질 수 있다.</summary>
@@ -38,6 +39,7 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         {
             _iconHome = _icon.transform.parent;
             _iconHomeSiblingIndex = _icon.transform.GetSiblingIndex();
+            _iconRaycastDefault = _icon.raycastTarget;
         }
     }
 
@@ -113,7 +115,7 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         _icon.transform.SetParent(_iconHome, false);
         _icon.transform.SetSiblingIndex(_iconHomeSiblingIndex);
-        _icon.raycastTarget = true;
+        _icon.raycastTarget = _iconRaycastDefault;
 
         var rect = _icon.transform as RectTransform;
         if (rect != null) rect.anchoredPosition = Vector2.zero;
