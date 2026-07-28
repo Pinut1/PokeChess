@@ -13,10 +13,21 @@ Unity URP 기반 포켓몬 TFT 스타일 오토배틀 게임.
 
 > 김기욱이 팀에서 빠지면서 전투/보드 파트는 김영욱이 전담한다. (2인 체제)
 
+> **2026-07-28 기준 최신 인수인계는 `Docs/HANDOFF_2026-07-28_final.md`.** 이전 인수인계 문서와 충돌하면 그 문서가 우선한다.
+
 ## 핵심 규칙
 - **매니저끼리 직접 참조 금지** — 반드시 `GameEvents`를 통해 통신
 - 새 이벤트는 `GameEvents.cs`에만 추가
 - 다른 파트 매니저 건드릴 때는 담당자에게 먼저 확인 (Core/Network/전투/보드 = 영욱, 상점/아이템/UI = 태욱)
+- **`Singleton.Instance`로 널 검사 금지** — 게터가 null일 때 `LogError`를 찍으므로 검사 자체가 에러 로그가 된다. `GameManager.TryGet(out var gm)` / `HasInstance`를 쓸 것
+
+## 🚨 건드리기 전에 읽을 것 (지뢰)
+- **`RewardKind` enum 순서 변경 금지** — Unity가 enum을 int로 직렬화한다. `AugmentChoice(7)`/`ItemShopReroll(8)`/`Reforger(9)`에서 `ItemShopReroll`을 지우면 `Reforger`가 9→8로 밀려 임포트된 `RewardDatabase.asset`의 재련기 보상이 깨진다. **아이템 리롤이 카드별 모델로 바뀌어 안 쓰이더라도 멤버는 유지.** `ParseRewardKind` 폴백이 `_ => Gold`라 매핑을 지우면 기존 행이 경고 없이 골드 2로 둔갑한다
+- **`GameSceneTest.unity` 충돌은 텍스트 3-way로 풀지 말 것** — fileID 기준 블록 단위 병합 절차: `Docs/HANDOFF_2026-07-28_final.md` §4. 디스크에서 씬을 덮어썼는데 Unity가 열어둔 상태면 반드시 **Reload**(Save 누르면 병합 결과 유실)
+- **Play 중 스크립트 저장 금지** — 도메인 리로드로 세션이 깨진다
+- **TMP 폰트 아틀라스(`NEXON *SDF.asset`) 커밋 금지** — 다이나믹 아틀라스라 Play할 때마다 글리프가 추가돼 diff가 생긴다
+- **`CoinText` 이름 중복** — `Coin_Panel`(골드)과 `Coupon_Panel`(쿠폰) 두 곳. 이름만으로 찾으면 오작동
+- **상점 패널 Rect(1600×400)는 보이는 바보다 크다** — 벤치 행·전투시작 버튼까지 덮으므로 화면 영역 판정에 그대로 쓰면 오탐
 
 ## 폴더 구조
 ```
@@ -55,6 +66,8 @@ Assets/_Project/Scripts/
 - `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
 
 **🟡 타 담당 영역**
+- ✅ 상점 카드 UI(유닛 5칸/아이템 4칸) — `haein_UI` 병합으로 master 반영 완료(7/28, PR #57). 아이템 리롤은 **카드별 슬롯 1회·무료** 모델(`RerollItemSlot`). 구 모델(`RerollItemShop`·`AddItemShopReroll`·`OnItemShopRerollCountChanged`)은 제거됨
+- 레벨/확률/골드/쿠폰 텍스트 바인딩 + 유닛 드롭 판매 — PR #58 (씬 미변경). 판매 영역 시각 정렬은 `UnitDragController.Shop Sell Area` 인스펙터 지정으로 조정
 - ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=확정 2회 오픈, 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 자뭉열매는 7/17 완료. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — 나인이볼부스트(8종 소환+버프)·`SK_` 스킬행(전투 신규 메커니즘)
 - ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
 - ✅ `Managers/RewardManager` `AugmentChoice` 지급 — 연결 완료(7/16). preReward(StageData)와 RewardKind 두 경로 모두 지원
