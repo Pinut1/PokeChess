@@ -19,6 +19,8 @@ public class PrototypeHud : MonoBehaviour
     private void OnDisable() => GameEvents.OnPartnerGoldChanged -= OnPartnerGold;
     private void OnPartnerGold(int gold) => _partnerGold = gold;
 
+    private Vector2 _qaScroll;
+
     private void OnGUI()
     {
         if (!GameManager.TryGet(out var gm)) return;
@@ -49,7 +51,7 @@ public class PrototypeHud : MonoBehaviour
     }
 
     // ──────────────────────────────────────────
-    // 우측 상단: QA 강제 실행 버튼
+    // QA 강제 실행 버튼
     // ──────────────────────────────────────────
     private void DrawQaPanel(GameManager gm)
     {
@@ -71,6 +73,12 @@ public class PrototypeHud : MonoBehaviour
                 panelHeight
             ),
             GUI.skin.box
+        );
+
+        _qaScroll = GUILayout.BeginScrollView(
+            _qaScroll,
+            false,
+            true
         );
 
         GUILayout.Label("── QA 강제 실행 ──");
@@ -100,6 +108,37 @@ public class PrototypeHud : MonoBehaviour
 
         GUILayout.Space(8f);
 
+        // ─────────────────────────────
+        // 도구 디버그
+        // ─────────────────────────────
+
+        GUILayout.Label("── 도구 디버그 ──");
+
+        int reforgerCount =
+            gm.Item != null
+                ? gm.Item.ReforgerCount
+                : 0;
+
+        if (GUILayout.Button(
+                $"재조합기 +1  (보유 {reforgerCount})",
+                GUILayout.Height(30f)))
+        {
+            DebugAddReforger(gm, 1);
+        }
+
+        if (GUILayout.Button(
+                $"재조합기 -1  (보유 {reforgerCount})",
+                GUILayout.Height(30f)))
+        {
+            DebugSpendReforger(gm, 1);
+        }
+
+        GUILayout.Space(8f);
+
+        // ─────────────────────────────
+        // 코스트별 유닛 획득
+        // ─────────────────────────────
+
         GUILayout.Label("── 코스트별 유닛 획득 ──");
 
         for (int cost = 1; cost <= 5; cost++)
@@ -122,7 +161,73 @@ public class PrototypeHud : MonoBehaviour
             }
         }
 
+        GUILayout.Space(4f);
+
+        GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    private void DebugAddReforger(
+    GameManager gm,
+    int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Item.AddReforger(amount);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] 재조합기 +{amount} 획득 실패"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 재조합기 +{amount} 지급 완료 — " +
+            $"보유 {gm.Item.ReforgerCount}개"
+        );
+    }
+
+    private void DebugSpendReforger(
+        GameManager gm,
+        int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Item.SpendReforger(amount);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] 재조합기 -{amount} 실패 — " +
+                $"보유 {gm.Item.ReforgerCount}개"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 재조합기 -{amount} 처리 완료 — " +
+            $"보유 {gm.Item.ReforgerCount}개"
+        );
     }
 
     private void DebugAddGold(

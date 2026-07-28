@@ -29,8 +29,20 @@ public class ItemInventoryHud : MonoBehaviour
     // 인벤토리는 화면 하단 왼쪽에서 위쪽으로 확장한다.
     private float _panelY;
 
+    private enum DragToolType
+    {
+        None,
+        Remover,
+        Reforger
+    }
+
     private ScriptableObject _dragging;
+    private DragToolType _draggingTool;
     private string _dragLabel;
+
+    private bool IsDragging =>
+        _dragging != null ||
+        _draggingTool != DragToolType.None;
 
     private PokemonUnit _inspectUnit;
 
@@ -72,8 +84,7 @@ public class ItemInventoryHud : MonoBehaviour
         // 진행 중이던 아이템 드래그만 취소한다.
         if (!canEquip)
         {
-            _dragging = null;
-            _dragLabel = null;
+            ClearDragging();
         }
 
         // ─────────────────────────────
@@ -106,6 +117,13 @@ public class ItemInventoryHud : MonoBehaviour
         );
     }
 
+    private void ClearDragging()
+    {
+        _dragging = null;
+        _draggingTool = DragToolType.None;
+        _dragLabel = null;
+    }
+
     /// <summary>
     /// 인벤토리 스크롤 콘텐츠 내부의 슬롯 위치.
     /// 화면 절대 좌표가 아니라 스크롤 영역 기준 로컬 좌표다.
@@ -132,7 +150,16 @@ public class ItemInventoryHud : MonoBehaviour
     {
         ItemManager itemManager = gm.Item;
 
+        int toolCount = 0;
+
+        if (itemManager.HasRemover)
+            toolCount++;
+
+        if (itemManager.ReforgerCount > 0)
+            toolCount++;
+
         int total =
+            toolCount +
             itemManager.Items.Count +
             itemManager.Stones.Count;
 
@@ -157,7 +184,7 @@ public class ItemInventoryHud : MonoBehaviour
 
         GUI.Box(
             panelRect,
-            "인벤토리 (드래그해서 유닛에 장착)"
+            $"인벤토리 {itemManager.InventoryCount}/20"
         );
 
         Rect scrollViewRect =
@@ -193,6 +220,38 @@ public class ItemInventoryHud : MonoBehaviour
 
         int index = 0;
 
+        // ─────────────────────────────
+        // 제거기
+        // ─────────────────────────────
+
+        if (itemManager.HasRemover)
+        {
+            GUI.Box(
+                InventorySlotRect(index),
+                "[도구] 제거기"
+            );
+
+            index++;
+        }
+
+        // ─────────────────────────────
+        // 재조합기
+        // ─────────────────────────────
+
+        if (itemManager.ReforgerCount > 0)
+        {
+            GUI.Box(
+                InventorySlotRect(index),
+                $"[도구] 재조합기\n×{itemManager.ReforgerCount}"
+            );
+
+            index++;
+        }
+
+        // ─────────────────────────────
+        // 일반 장비
+        // ─────────────────────────────
+
         foreach (ItemData item in itemManager.Items)
         {
             string label =
@@ -207,6 +266,10 @@ public class ItemInventoryHud : MonoBehaviour
 
             index++;
         }
+
+        // ─────────────────────────────
+        // 진화의 돌
+        // ─────────────────────────────
 
         foreach (EvolutionStoneData stone in itemManager.Stones)
         {
@@ -247,25 +310,62 @@ public class ItemInventoryHud : MonoBehaviour
             _inventoryScroll;
 
         if (currentEvent.type == EventType.MouseDown &&
-            _dragging == null)
+            !IsDragging)
         {
             // ─────────────────────────────
-            // 인벤토리 아이템 선택
+            // 인벤토리 슬롯 선택
             // ─────────────────────────────
 
             if (canEquip &&
                 inventoryScrollRect.Contains(
-                    currentEvent.mousePosition
-                ))
+                    currentEvent.mousePosition))
             {
                 int index = 0;
 
+                // 제거기
+                if (itemManager.HasRemover)
+                {
+                    if (InventorySlotRect(index).Contains(
+                            inventoryMousePosition))
+                    {
+                        _dragging = null;
+                        _draggingTool = DragToolType.Remover;
+                        _dragLabel = "제거기";
+
+                        currentEvent.Use();
+                        return;
+                    }
+
+                    index++;
+                }
+
+                // 재조합기
+                if (itemManager.ReforgerCount > 0)
+                {
+                    if (InventorySlotRect(index).Contains(
+                            inventoryMousePosition))
+                    {
+                        _dragging = null;
+                        _draggingTool = DragToolType.Reforger;
+                        _dragLabel =
+                            $"재조합기 ×{itemManager.ReforgerCount}";
+
+                        currentEvent.Use();
+                        return;
+                    }
+
+                    index++;
+                }
+
+                // 일반 장비
                 foreach (ItemData item in itemManager.Items)
                 {
                     if (InventorySlotRect(index).Contains(
                             inventoryMousePosition))
                     {
                         _dragging = item;
+                        _draggingTool = DragToolType.None;
+
                         _dragLabel =
                             item != null
                                 ? item.itemName
@@ -278,12 +378,15 @@ public class ItemInventoryHud : MonoBehaviour
                     index++;
                 }
 
+                // 진화의 돌
                 foreach (EvolutionStoneData stone in itemManager.Stones)
                 {
                     if (InventorySlotRect(index).Contains(
                             inventoryMousePosition))
                     {
                         _dragging = stone;
+                        _draggingTool = DragToolType.None;
+
                         _dragLabel =
                             stone != null
                                 ? stone.stoneName
@@ -306,7 +409,6 @@ public class ItemInventoryHud : MonoBehaviour
 
             if (clickedUnit != null)
             {
-                // 다른 유닛을 선택하면 스크롤을 맨 위로 초기화한다.
                 if (_inspectUnit != clickedUnit)
                     _inspectScroll = Vector2.zero;
 
@@ -318,33 +420,52 @@ public class ItemInventoryHud : MonoBehaviour
         else if (
             canEquip &&
             currentEvent.type == EventType.MouseUp &&
-            _dragging != null)
+            IsDragging)
         {
-            // ─────────────────────────────
-            // 아이템 장착 시도
-            // ─────────────────────────────
-
             PokemonUnit targetUnit =
                 RaycastUnit(currentEvent.mousePosition);
 
+            bool success = false;
+
             if (targetUnit != null)
             {
-                bool success =
-                    itemManager.EquipToUnit(
-                        _dragging,
-                        targetUnit
-                    );
+                switch (_draggingTool)
+                {
+                    case DragToolType.Remover:
+                        success =
+                            itemManager.UseRemover(
+                                targetUnit
+                            );
+                        break;
+
+                    case DragToolType.Reforger:
+                        success =
+                            itemManager.UseReforger(
+                                targetUnit
+                            );
+                        break;
+
+                    case DragToolType.None:
+                        if (_dragging != null)
+                        {
+                            success =
+                                itemManager.EquipToUnit(
+                                    _dragging,
+                                    targetUnit
+                                );
+                        }
+                        break;
+                }
 
                 Debug.Log(
-                    $"[ItemHud] 장착 " +
-                    $"{(success ? "성공" : "실패")}: " +
+                    $"[ItemHud] " +
+                    $"{(success ? "사용 성공" : "사용 실패")}: " +
                     $"{_dragLabel} → " +
                     $"{targetUnit.data?.pokemonName}"
                 );
             }
 
-            _dragging = null;
-            _dragLabel = null;
+            ClearDragging();
 
             currentEvent.Use();
         }
@@ -352,7 +473,7 @@ public class ItemInventoryHud : MonoBehaviour
 
     private void DrawDragGhost()
     {
-        if (_dragging == null)
+        if (!IsDragging)
             return;
 
         Vector2 mousePosition =
@@ -360,10 +481,10 @@ public class ItemInventoryHud : MonoBehaviour
 
         GUI.Box(
             new Rect(
-                mousePosition.x - 40f,
-                mousePosition.y - 15f,
-                80f,
-                30f
+                mousePosition.x - 45f,
+                mousePosition.y - 18f,
+                90f,
+                36f
             ),
             _dragLabel
         );
@@ -825,6 +946,26 @@ public class ItemInventoryHud : MonoBehaviour
             "0"
         );
 
+        DrawStatRow(
+            "치명타율",
+            evolvedStats.critChance * 100f,
+            0f,
+            0f,
+            evolvedStats.critChance * 100f,
+            finalStats.critChance * 100f,
+            "0.#"
+        );
+
+        DrawStatRow(
+            "치명타 피해",
+            evolvedStats.critMultiplier * 100f,
+            0f,
+            0f,
+            evolvedStats.critMultiplier * 100f,
+            finalStats.critMultiplier * 100f,
+            "0.#"
+        );
+
         GUILayout.Space(6f);
 
         string evolutionType;
@@ -880,6 +1021,10 @@ public class ItemInventoryHud : MonoBehaviour
     /// <summary>
     /// 현재 장착된 일반 아이템과 주요 스탯 효과를 QA용으로 표시한다.
     /// </summary>
+    /// <summary>
+    /// 현재 장착된 일반 아이템과 진화의 돌을
+    /// QA용 장비 정보로 표시한다.
+    /// </summary>
     private static void DrawEquipmentSummary(
         PokemonUnit unit)
     {
@@ -887,103 +1032,180 @@ public class ItemInventoryHud : MonoBehaviour
 
         GUILayout.Label("── 장착 장비 효과 ──");
 
-        if (unit.items == null ||
-            unit.items.Count == 0)
+        bool hasItems =
+            unit.items != null &&
+            unit.items.Count > 0;
+
+        bool hasStone =
+            unit.equippedStone != null;
+
+        if (!hasItems && !hasStone)
         {
             GUILayout.Label(
-                "장착된 일반 아이템 없음"
+                "장착된 장비 및 진화의 돌 없음"
             );
 
             return;
         }
 
-        foreach (ItemData item in unit.items)
+        // ─────────────────────────────
+        // 일반 장비
+        // ─────────────────────────────
+
+        if (hasItems)
         {
-            if (item == null)
-                continue;
+            foreach (ItemData item in unit.items)
+            {
+                if (item == null)
+                    continue;
+
+                GUILayout.Label(
+                    $"• [일반 장비] {item.itemName}"
+                );
+
+                List<string> effects =
+                    new List<string>();
+
+                if (Mathf.Abs(item.hpBonus) > 0.0001f)
+                {
+                    effects.Add(
+                        $"체력 +{item.hpBonus:0}"
+                    );
+                }
+
+                if (Mathf.Abs(item.maxHpPct) > 0.0001f)
+                {
+                    effects.Add(
+                        $"최대 체력 +{item.maxHpPct:0.#}%"
+                    );
+                }
+
+                if (Mathf.Abs(item.attackBonus) > 0.0001f)
+                {
+                    effects.Add(
+                        $"공격력 +{item.attackBonus:0}"
+                    );
+                }
+
+                if (Mathf.Abs(item.defenseBonus) > 0.0001f)
+                {
+                    effects.Add(
+                        $"방어력 +{item.defenseBonus:0}"
+                    );
+                }
+
+                if (Mathf.Abs(item.spDefBonus) > 0.0001f)
+                {
+                    effects.Add(
+                        $"방어력 +{item.spDefBonus:0}"
+                    );
+                }
+
+                if (Mathf.Abs(item.attackSpeedBonus) > 0.0001f)
+                {
+                    effects.Add(
+                        $"공격속도 +{item.attackSpeedBonus:0.#}%"
+                    );
+                }
+
+                if (Mathf.Abs(item.spAtkPct) > 0.0001f)
+                {
+                    effects.Add(
+                        $"스킬 위력 +{item.spAtkPct:0.#}%"
+                    );
+                }
+
+                if (Mathf.Abs(item.criPct) > 0.0001f)
+                {
+                    effects.Add(
+                        $"치명타율 +{item.criPct:0.#}%"
+                    );
+                }
+
+                if (Mathf.Abs(item.criDmgPct) > 0.0001f)
+                {
+                    effects.Add(
+                        $"치명타 피해 +{item.criDmgPct:0.#}%"
+                    );
+                }
+
+                GUILayout.Label("  기본 능력치");
+
+                if (effects.Count == 0)
+                {
+                    GUILayout.Label("  - 없음");
+                }
+                else
+                {
+                    foreach (string effect in effects)
+                    {
+                        GUILayout.Label(
+                            $"  - {effect}"
+                        );
+                    }
+                }
+
+                GUILayout.Label("  아이템 효과");
+
+                string effectDescription =
+                    item.description;
+
+                if (string.IsNullOrWhiteSpace(
+                        effectDescription))
+                {
+                    GUILayout.Label("  - 없음");
+                }
+                else
+                {
+                    effectDescription =
+                        effectDescription
+                            .Replace("\\n", "\n")
+                            .Replace("\r\n", "\n");
+
+                    GUILayout.Label(
+                        $"  {effectDescription}"
+                    );
+                }
+
+                GUILayout.Space(4f);
+            }
+        }
+
+        // ─────────────────────────────
+        // 진화의 돌
+        // ─────────────────────────────
+
+        if (hasStone)
+        {
+            EvolutionStoneData stone =
+                unit.equippedStone;
 
             GUILayout.Label(
-                $"• {item.itemName}"
+                $"• [진화의 돌] {stone.stoneName}"
             );
 
-            List<string> effects =
-                new List<string>();
+            GUILayout.Label(
+                $"  현재 포켓몬: " +
+                $"{unit.data?.pokemonName}"
+            );
 
-            if (Mathf.Abs(item.hpBonus) > 0.0001f)
-            {
-                effects.Add(
-                    $"체력 +{item.hpBonus:0}"
-                );
-            }
-
-            if (Mathf.Abs(item.maxHpPct) > 0.0001f)
-            {
-                effects.Add(
-                    $"최대 체력 +{item.maxHpPct:0.#}%"
-                );
-            }
-
-            if (Mathf.Abs(item.attackBonus) > 0.0001f)
-            {
-                effects.Add(
-                    $"공격력 +{item.attackBonus:0}"
-                );
-            }
-
-            if (Mathf.Abs(item.defenseBonus) > 0.0001f)
-            {
-                effects.Add(
-                    $"방어력 +{item.defenseBonus:0}"
-                );
-            }
-
-            if (Mathf.Abs(item.spDefBonus) > 0.0001f)
-            {
-                effects.Add(
-                    $"방어력 +{item.spDefBonus:0}"
-                );
-            }
-
-            if (Mathf.Abs(item.attackSpeedBonus) > 0.0001f)
-            {
-                effects.Add(
-                    $"공격속도 +{item.attackSpeedBonus:0.#}%"
-                );
-            }
-
-            if (Mathf.Abs(item.spAtkPct) > 0.0001f)
-            {
-                effects.Add(
-                    $"스킬 위력 +{item.spAtkPct:0.#}%"
-                );
-            }
-
-            if (Mathf.Abs(item.criPct) > 0.0001f)
-            {
-                effects.Add(
-                    $"치명타율 +{item.criPct:0.#}%"
-                );
-            }
-
-            if (Mathf.Abs(item.criDmgPct) > 0.0001f)
-            {
-                effects.Add(
-                    $"치명타 피해 +{item.criDmgPct:0.#}%"
-                );
-            }
-
-            if (effects.Count == 0)
+            if (unit.preStoneData != null)
             {
                 GUILayout.Label(
-                    "  표시 가능한 기본 스탯 효과 없음"
+                    $"  진화 전 포켓몬: " +
+                    $"{unit.preStoneData.pokemonName}"
                 );
-            }
-            else
-            {
+
                 GUILayout.Label(
-                    $"  {string.Join(", ", effects)}"
+                    $"  진화 결과: " +
+                    $"{unit.preStoneData.pokemonName} → " +
+                    $"{unit.data?.pokemonName}"
                 );
             }
+
+            GUILayout.Label(
+                "  특수진화 성급 배율 적용"
+            );
         }
     }
 
@@ -1078,7 +1300,8 @@ public class ItemInventoryHud : MonoBehaviour
         float specialValue,
         float preEquipmentValue,
         float finalValue,
-        string format)
+        string format,
+        string suffix = "")
     {
         const float rowHeight = 42f;
 
@@ -1100,25 +1323,26 @@ public class ItemInventoryHud : MonoBehaviour
 
             equipmentText =
                 sign +
-                equipmentBonus.ToString(format);
+                equipmentBonus.ToString(format) +
+                suffix;
         }
 
         GUILayout.BeginHorizontal();
 
         DrawTableCell(
-            $"{statName}\n{dbValue.ToString(format)}",
+    $"{statName}\n{dbValue.ToString(format)}{suffix}",
+    122f,
+    rowHeight
+);
+
+        DrawTableCell(
+            $"{normalValue.ToString(format)}{suffix}",
             122f,
             rowHeight
         );
 
         DrawTableCell(
-            normalValue.ToString(format),
-            122f,
-            rowHeight
-        );
-
-        DrawTableCell(
-            specialValue.ToString(format),
+            $"{specialValue.ToString(format)}{suffix}",
             122f,
             rowHeight
         );
@@ -1130,7 +1354,7 @@ public class ItemInventoryHud : MonoBehaviour
         );
 
         DrawTableCell(
-            finalValue.ToString(format),
+            $"{finalValue.ToString(format)}{suffix}",
             122f,
             rowHeight
         );

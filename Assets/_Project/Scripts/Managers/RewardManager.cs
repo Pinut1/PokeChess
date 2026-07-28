@@ -11,8 +11,8 @@ using UnityEngine;
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage. StageEntered 인자로 직접 받으므로 pull도 불필요.
 /// 매니저 간 직접 참조 금지 — 트리거는 GameEvents 구독, 지급은 GameManager.Instance.X pull로만.
 ///
-/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품/재련기(Reforger)/증강(AugmentChoice) 전부 실제 지급 연결됨.
-/// 증강 3택1은 두 경로 모두 지원: StageData.preReward=AugmentChoice(현재 R2가 사용) + RewardKind.AugmentChoice(보상 테이블용).
+/// 골드/리롤/아이템쿠폰/아이템샵리롤/유닛/아이템/진화의 돌/소모품/
+/// 재조합기(Reforger)/증강(AugmentChoice) 전부 실제 지급 연결됨.
 /// </summary>
 public class RewardManager : MonoBehaviour
 {
@@ -131,17 +131,18 @@ public class RewardManager : MonoBehaviour
                 break;
 
             case RewardKind.Reforger:
-                // 재련기(아이템 재련) 보유량 지급. ItemManager.AddReforger → InventoryChanged로 HUD 동기화.
+                // 재조합기 보유량 지급.
+                // 코드 식별자 Reforger는 기존 직렬화 호환을 위해 유지한다.
                 if (amount <= 0) break;
 
                 if (GameManager.Instance.Item == null)
                 {
-                    Debug.LogWarning("[Reward] ItemManager 없음 — 재련기 지급 실패");
+                    Debug.LogWarning("[Reward] ItemManager 없음 — 재조합기 지급 실패");
                     break;
                 }
 
                 GameManager.Instance.Item.AddReforger(amount);
-                Debug.Log($"[Reward] +{amount} 재련기");
+                Debug.Log($"[Reward] +{amount} 재조합기");
                 break;
 
             case RewardKind.AugmentChoice:

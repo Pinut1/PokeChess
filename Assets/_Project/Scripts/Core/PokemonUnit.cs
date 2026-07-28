@@ -53,8 +53,11 @@ public class PokemonUnit : MonoBehaviour
     /// <see cref="BoardManager"/>.CheckEvolution이 참조. 이 플래그가 이브이 3성 봇소환의 판정 기준이기도 함(BattleManager).</summary>
     public bool evolutionLocked;
 
-    /// /// 영웅증강 전용 스탯 배수(이브이 ×1.4).
-    /// MaxHp/Attack/SpellPower에 곱해지며 특수진화 ×1.4와 독립적으로 누적.
+    /// <summary>
+    /// 영웅증강 전용 스탯 배수.
+    /// 현재 종의 PokemonData 기본값에 먼저 적용한 뒤,
+    /// 일반진화 또는 특수진화 상태에 맞는 성급 배율을 적용한다.
+    /// </summary>
     public float heroStatMultiplier = 1f;
 
     /// <summary>파치리스 영웅증강: 비어있지 않으면 <see cref="Role"/>이 이 값을 반환(서포터→탱커). 시너지는 data.synergies 그대로 유지.</summary>
@@ -138,14 +141,53 @@ public class PokemonUnit : MonoBehaviour
     }
 
     // ──────────────────────────────────────────
-    // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
+    // 유효 스탯 (영웅증강 → 진화 유형별 성급 배율 반영)
+    // 전투/스냅샷이 읽는 장비 적용 전 실제 값
     // ──────────────────────────────────────────
 
-    public float MaxHp        => data != null ? data.hp * StarMultiplier * heroStatMultiplier : 0f;
-    public float Attack       => data != null ? data.attack * StarMultiplier * heroStatMultiplier : 0f;
-    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * heroStatMultiplier : 0f;
-    public float Defense      => data != null ? data.defense : 0f;
-    public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
+    /// <summary>
+    /// 현재 종의 기본 능력치에 확정된 순서로 배율을 적용한다.
+    /// PokemonData 기본값
+    /// → 영웅증강 배율
+    /// → 일반/특수진화 상태에 맞는 성급 배율
+    /// 특수진화는 일반 성급 배율과 별도로 곱하지 않고,
+    /// 특수진화 전용 성급표를 선택해 적용한다.
+    /// </summary>
+    private float ApplyEffectiveStatMultiplier(float baseStat)
+    {
+        float heroAugmentApplied =
+            baseStat * heroStatMultiplier;
+
+        float starEvolutionApplied =
+            heroAugmentApplied * StarMultiplier;
+
+        return starEvolutionApplied;
+    }
+
+    public float MaxHp =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.hp)
+            : 0f;
+
+    public float Attack =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.attack)
+            : 0f;
+
+    public float SpellPower =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.spellPower)
+            : 0f;
+
+    public float Defense =>
+        data != null
+            ? data.defense
+            : 0f;
+
+    public float AttackSpeed =>
+        data != null
+            ? data.attackSpeed
+            : 0f;
     public int   Range        => data != null ? data.range : 0;
     public int   ManaCost     => data != null ? data.manaCost : 0;
     public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");

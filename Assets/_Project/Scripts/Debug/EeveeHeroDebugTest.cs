@@ -74,10 +74,6 @@ public class EeveeHeroDebugTest : MonoBehaviour
             _lastResult = GiveEvolutionStone("LeafStone", "리프의돌");
         y += 26f;
 
-        if (GUI.Button(new Rect(x, y, 220, 24), "⑩ 얼음의돌 지급"))
-            _lastResult = GiveEvolutionStone("IceStone", "얼음의돌");
-        y += 26f;
-
         if (GUI.Button(new Rect(x, y, 220, 24), "⑪ 달의돌 지급"))
             _lastResult = GiveEvolutionStone("MoonStone", "달의돌");
         y += 26f;
@@ -85,19 +81,6 @@ public class EeveeHeroDebugTest : MonoBehaviour
         if (GUI.Button(new Rect(x, y, 220, 24), "⑫ 태양의돌 지급"))
             _lastResult = GiveEvolutionStone("SunStone", "태양의돌");
         y += 26f;
-
-        if (GUI.Button(new Rect(x, y, 220, 24), "⑬ 빛의돌 지급"))
-            _lastResult = GiveEvolutionStone("ShinyStone", "빛의돌");
-        y += 26f;
-
-        if (GUI.Button(new Rect(x, y, 220, 24), "⑭ 어둠의돌 지급"))
-            _lastResult = GiveEvolutionStone("DuskStone", "어둠의돌");
-        y += 26f;
-
-        if (GUI.Button(new Rect(x, y, 220, 24), "⑮ 각성의돌 지급"))
-            _lastResult = GiveEvolutionStone("DawnStone", "각성의돌");
-
-        y += 32f;
 
         if (!string.IsNullOrEmpty(_lastResult))
             GUI.Label(new Rect(x, y, 320, 22), _lastResult);
