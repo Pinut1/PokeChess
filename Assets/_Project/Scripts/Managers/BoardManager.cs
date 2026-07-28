@@ -693,11 +693,13 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"[Evolve] {starLevel}성 3개 합체 → {survivor.data.pokemonName} {survivor.starLevel}성");
 
-        GameEvents.UnitEvolved(survivor, true); // 연출용(성급 상승)
-
         // 이벤트 발화(시너지 재계산 + BoardView 위치 재배치. 모델 교체는 위 RefreshVisual에서 이미 처리)
         if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
         else                 GameEvents.UnitBenched(survivor);
+
+        // 연출은 재배치 뒤에 — UnitPlaced가 BoardView 위치를 갱신하므로, 그 전에 발화하면
+        // 이펙트와 성급 팝업이 합체 전 옛 좌표에 뜬다(연쇄 진화에서 생존자가 이동할 때 드러남).
+        GameEvents.UnitEvolved(survivor, true);
 
         // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
         CheckEvolution(survivor.data.id, survivor.starLevel);
