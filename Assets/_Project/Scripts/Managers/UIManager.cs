@@ -548,7 +548,7 @@ public class UIManager : MonoBehaviour
         // 작은 해상도에서는 화면 밖으로 나가지 않도록 최소 10px을 보장한다.
         float x = Mathf.Max(10f, shopStartX - width - 20f);
         
-        float y = Screen.height - 225f;
+        float y = Screen.height - 160f;
 
         GUI.Box(new Rect(x, y, width, height), "플레이어 정보");
 

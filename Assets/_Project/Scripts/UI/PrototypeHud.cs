@@ -59,9 +59,9 @@ public class PrototypeHud : MonoBehaviour
         float x =
             Screen.width -
             panelWidth -
-            370f;
+            1400f;
 
-        float y = 60f;
+        float y = 530f;
 
         GUILayout.BeginArea(
             new Rect(

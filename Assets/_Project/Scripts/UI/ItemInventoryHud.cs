@@ -15,11 +15,15 @@ public class ItemInventoryHud : MonoBehaviour
     [SerializeField] private Camera _camera;
     [SerializeField] private LayerMask _raycastMask = ~0;
 
-    private const float SLOT_W = 90f;
-    private const float SLOT_H = 40f;
-    private const float SLOT_GAP = 4f;
-    private const int COLS = 4;
+    private const float SLOT_W = 82f;
+    private const float SLOT_H = 36f;
+    private const float SLOT_GAP = 3f;
+    private const int COLS = 3;
     private const float PANEL_X = 10f;
+
+    private const float INVENTORY_PANEL_W = 280f;
+    private const float INVENTORY_PANEL_H = 170f;
+    private const float INVENTORY_BOTTOM_MARGIN = 40f;
 
     // 좌측 상단은 SynergyHud가 사용하므로
     // 인벤토리는 화면 하단 왼쪽에서 위쪽으로 확장한다.
@@ -33,6 +37,9 @@ public class ItemInventoryHud : MonoBehaviour
     // 유닛 정보 패널 스크롤 위치
     private Vector2 _inspectScroll;
 
+    // 인벤토리 패널 스크롤 위치
+    private Vector2 _inventoryScroll;
+
     private void Awake()
     {
         if (_camera == null)
@@ -43,6 +50,10 @@ public class ItemInventoryHud : MonoBehaviour
     {
         if (!GameManager.TryGet(out var gm) || gm.Item == null) return;
 
+        bool isLobby =
+            gm.Phase != null &&
+            gm.Phase.CurrentPhase == GamePhase.Lobby;
+
         bool isShopping =
             gm.Phase == null ||
             gm.Phase.CurrentPhase == GamePhase.Shopping;
@@ -51,8 +62,11 @@ public class ItemInventoryHud : MonoBehaviour
             gm.Phase != null &&
             gm.Phase.CurrentPhase == GamePhase.Battle;
 
-        // 쇼핑 또는 전투 중에만 인벤토리 장착 입력을 허용한다.
-        bool canEquip = isShopping || isBattlePhase;
+        // QA 편의를 위해 초기 Lobby에서도 아이템 장착 입력을 허용한다.
+        bool canEquip =
+            isLobby ||
+            isShopping ||
+            isBattlePhase;
 
         // 장착 불가능한 페이즈로 변경되면
         // 진행 중이던 아이템 드래그만 취소한다.
@@ -66,30 +80,21 @@ public class ItemInventoryHud : MonoBehaviour
         // 인벤토리 패널 위치 계산
         // ─────────────────────────────
 
-        int total =
-            gm.Item.Items.Count +
-            gm.Item.Stones.Count;
-
-        int rowCount = Mathf.Max(
-            1,
-            Mathf.CeilToInt(total / (float)COLS)
-        );
-
-        float panelHeight =
-            24f +
-            rowCount * (SLOT_H + SLOT_GAP) +
-            6f;
-
+        // 인벤토리 패널은 화면 하단에 고정하고,
+        // 보유 항목이 많아지면 패널 내부에서 스크롤한다.
         _panelY =
             Screen.height -
-            150f -
-            panelHeight;
+            INVENTORY_BOTTOM_MARGIN -
+            INVENTORY_PANEL_H;
 
         HandleInput(gm, canEquip);
 
+        // 인벤토리 목록은 모든 페이즈에서 표시한다.
+        // 실제 장착 입력만 canEquip 조건으로 제한한다.
+        DrawInventory(gm);
+
         if (canEquip)
         {
-            DrawInventory(gm);
             DrawDragGhost();
         }
 
@@ -101,16 +106,19 @@ public class ItemInventoryHud : MonoBehaviour
         );
     }
 
-    private Rect SlotRect(int index)
+    /// <summary>
+    /// 인벤토리 스크롤 콘텐츠 내부의 슬롯 위치.
+    /// 화면 절대 좌표가 아니라 스크롤 영역 기준 로컬 좌표다.
+    /// </summary>
+    private Rect InventorySlotRect(int index)
     {
         float x =
-            PANEL_X +
-            index % COLS * (SLOT_W + SLOT_GAP);
+            index % COLS *
+            (SLOT_W + SLOT_GAP);
 
         float y =
-            _panelY +
-            24f +
-            index / COLS * (SLOT_H + SLOT_GAP);
+            index / COLS *
+            (SLOT_H + SLOT_GAP);
 
         return new Rect(
             x,
@@ -133,24 +141,55 @@ public class ItemInventoryHud : MonoBehaviour
             Mathf.CeilToInt(total / (float)COLS)
         );
 
-        float width =
-            COLS * (SLOT_W + SLOT_GAP) +
-            6f;
+        float contentWidth =
+            COLS * (SLOT_W + SLOT_GAP);
 
-        float height =
-            24f +
-            rows * (SLOT_H + SLOT_GAP) +
-            6f;
+        float contentHeight =
+            rows * (SLOT_H + SLOT_GAP);
+
+        Rect panelRect =
+            new Rect(
+                PANEL_X,
+                _panelY,
+                INVENTORY_PANEL_W,
+                INVENTORY_PANEL_H
+            );
 
         GUI.Box(
-            new Rect(
-                PANEL_X - 5f,
-                _panelY,
-                width,
-                height
-            ),
+            panelRect,
             "인벤토리 (드래그해서 유닛에 장착)"
         );
+
+        Rect scrollViewRect =
+            new Rect(
+                panelRect.x + 6f,
+                panelRect.y + 24f,
+                panelRect.width - 12f,
+                panelRect.height - 30f
+            );
+
+        Rect contentRect =
+            new Rect(
+                0f,
+                0f,
+                Mathf.Max(
+                    contentWidth,
+                    scrollViewRect.width - 16f
+                ),
+                Mathf.Max(
+                    contentHeight,
+                    scrollViewRect.height
+                )
+            );
+
+        _inventoryScroll =
+            GUI.BeginScrollView(
+                scrollViewRect,
+                _inventoryScroll,
+                contentRect,
+                false,
+                true
+            );
 
         int index = 0;
 
@@ -162,14 +201,14 @@ public class ItemInventoryHud : MonoBehaviour
                     : "?";
 
             GUI.Box(
-                SlotRect(index),
+                InventorySlotRect(index),
                 label
             );
 
             index++;
         }
 
-        foreach (var stone in itemManager.Stones)
+        foreach (EvolutionStoneData stone in itemManager.Stones)
         {
             string label =
                 stone != null
@@ -177,20 +216,35 @@ public class ItemInventoryHud : MonoBehaviour
                     : "?";
 
             GUI.Box(
-                SlotRect(index),
+                InventorySlotRect(index),
                 label
             );
 
             index++;
         }
+
+        GUI.EndScrollView();
     }
 
     private void HandleInput(
-        GameManager gm,
-        bool canEquip)
+    GameManager gm,
+    bool canEquip)
     {
         Event currentEvent = Event.current;
         ItemManager itemManager = gm.Item;
+
+        Rect inventoryScrollRect =
+            new Rect(
+                PANEL_X + 6f,
+                _panelY + 24f,
+                INVENTORY_PANEL_W - 12f,
+                INVENTORY_PANEL_H - 30f
+            );
+
+        Vector2 inventoryMousePosition =
+            currentEvent.mousePosition -
+            inventoryScrollRect.position +
+            _inventoryScroll;
 
         if (currentEvent.type == EventType.MouseDown &&
             _dragging == null)
@@ -199,14 +253,17 @@ public class ItemInventoryHud : MonoBehaviour
             // 인벤토리 아이템 선택
             // ─────────────────────────────
 
-            if (canEquip)
+            if (canEquip &&
+                inventoryScrollRect.Contains(
+                    currentEvent.mousePosition
+                ))
             {
                 int index = 0;
 
                 foreach (ItemData item in itemManager.Items)
                 {
-                    if (SlotRect(index).Contains(
-                            currentEvent.mousePosition))
+                    if (InventorySlotRect(index).Contains(
+                            inventoryMousePosition))
                     {
                         _dragging = item;
                         _dragLabel =
@@ -223,8 +280,8 @@ public class ItemInventoryHud : MonoBehaviour
 
                 foreach (EvolutionStoneData stone in itemManager.Stones)
                 {
-                    if (SlotRect(index).Contains(
-                            currentEvent.mousePosition))
+                    if (InventorySlotRect(index).Contains(
+                            inventoryMousePosition))
                     {
                         _dragging = stone;
                         _dragLabel =
@@ -331,13 +388,13 @@ public class ItemInventoryHud : MonoBehaviour
         PokemonUnit unit = _inspectUnit;
         PokemonData data = unit.data;
 
-        const float panelWidth = 350f;
+        const float panelWidth = 690f;
 
         // 화면 높이를 넘지 않도록 제한한다.
         float panelHeight = Mathf.Clamp(
             Screen.height - 20f,
             300f,
-            900f
+            770f
         );
 
         GUILayout.BeginArea(
@@ -393,45 +450,7 @@ public class ItemInventoryHud : MonoBehaviour
 
         GUILayout.Space(8f);
 
-        // ─────────────────────────────
-        // 능력치
-        // ─────────────────────────────
-
-        GUILayout.Label("── 능력치 ──");
-
-        GUILayout.Label(
-            $"기본 체력: {data.hp:0}"
-        );
-
-        GUILayout.Label(
-            $"기본 공격력: {data.attack:0}"
-        );
-
-        GUILayout.Label(
-            $"기본 방어력: {data.defense:0}"
-        );
-
-        GUILayout.Label(
-            $"기본 공격속도: {data.attackSpeed:0.00}"
-        );
-
-        GUILayout.Label(
-            $"공격 사거리: {data.range}"
-        );
-
-        GUILayout.Label(
-            $"스킬 위력: {data.spellPower:0}"
-        );
-
-        GUILayout.Label(
-            $"기본 마나 비용: {data.manaCost}"
-        );
-
-        GUILayout.Label(
-            $"적용 마나 비용: {unit.EffectiveManaCost}"
-        );
-
-        GUILayout.Space(8f);
+        DrawStatComparisonTable(unit, data);
 
         // ─────────────────────────────
         // 스킬 / 증강
@@ -672,12 +691,464 @@ public class ItemInventoryHud : MonoBehaviour
     }
 
     /// <summary>
+    /// QA 정보창에서 사용하는 능력치 묶음.
+    /// </summary>
+    private struct UnitStatSnapshot
+    {
+        public float hp;
+        public float attack;
+        public float defense;
+        public float attackSpeed;
+        public float spellPower;
+        public float critChance;
+        public float critMultiplier;
+    }
+
+    /// <summary>
+    /// DB 기본값, 일반진화 적용값, 특수진화 적용값,
+    /// 장비 증가량, 장비 포함 최종 능력치를
+    /// 한 화면에서 가로로 비교한다.
+    /// </summary>
+    private static void DrawStatComparisonTable(PokemonUnit unit, PokemonData data)
+    {
+        bool isSpecialEvolution =
+            unit.isTradeEvolved ||
+            unit.equippedStone != null;
+
+        bool isNormalEvolution =
+            !isSpecialEvolution &&
+            unit.starLevel > 1;
+
+        UnitStatSnapshot evolvedStats =
+            CreateCurrentUnitStats(unit);
+
+        UnitStatSnapshot finalStats =
+            ApplyEquipmentStats(
+                evolvedStats,
+                unit.items
+            );
+
+        GUILayout.Label("── 능력치 비교 QA ──");
+
+        GUILayout.Space(4f);
+
+        // 헤더
+        GUILayout.BeginHorizontal();
+
+        DrawTableCell(
+            "능력치\nDB 기본값",
+            122f,
+            54f
+        );
+
+        DrawTableCell(
+            "일반진화",
+            122f,
+            54f
+        );
+
+        DrawTableCell(
+            "특수진화\n진화의 돌 / 통신진화",
+            122f,
+            54f
+        );
+
+        DrawTableCell(
+            "장비\n증가량",
+            122f,
+            54f
+        );
+
+        DrawTableCell(
+            "최종능력치\n장비 포함",
+            122f,
+            54f
+        );
+
+        GUILayout.EndHorizontal();
+
+        DrawStatRow(
+    "체력",
+    data.hp,
+    isNormalEvolution ? evolvedStats.hp : 0f,
+    isSpecialEvolution ? evolvedStats.hp : 0f,
+    evolvedStats.hp,
+    finalStats.hp,
+    "0"
+);
+
+        DrawStatRow(
+            "공격력",
+            data.attack,
+            isNormalEvolution ? evolvedStats.attack : 0f,
+            isSpecialEvolution ? evolvedStats.attack : 0f,
+            evolvedStats.attack,
+            finalStats.attack,
+            "0"
+        );
+
+        DrawStatRow(
+            "방어력",
+            data.defense,
+            isNormalEvolution ? evolvedStats.defense : 0f,
+            isSpecialEvolution ? evolvedStats.defense : 0f,
+            evolvedStats.defense,
+            finalStats.defense,
+            "0"
+        );
+
+        DrawStatRow(
+            "공격속도",
+            data.attackSpeed,
+            isNormalEvolution
+                ? evolvedStats.attackSpeed
+                : 0f,
+            isSpecialEvolution
+                ? evolvedStats.attackSpeed
+                : 0f,
+            evolvedStats.attackSpeed,
+            finalStats.attackSpeed,
+            "0.00"
+        );
+
+        DrawStatRow(
+            "스킬 위력",
+            data.spellPower,
+            isNormalEvolution
+                ? evolvedStats.spellPower
+                : 0f,
+            isSpecialEvolution
+                ? evolvedStats.spellPower
+                : 0f,
+            evolvedStats.spellPower,
+            finalStats.spellPower,
+            "0"
+        );
+
+        GUILayout.Space(6f);
+
+        string evolutionType;
+
+        if (isSpecialEvolution)
+        {
+            evolutionType =
+                unit.isTradeEvolved
+                    ? "통신진화"
+                    : "진화의 돌";
+        }
+        else if (isNormalEvolution)
+        {
+            evolutionType = "일반진화";
+        }
+        else
+        {
+            evolutionType = "미진화";
+        }
+
+        GUILayout.Label(
+            $"현재 진화 분류: {evolutionType}"
+        );
+
+        GUILayout.Label(
+            $"성급: {unit.starLevel}성"
+        );
+
+        GUILayout.Label(
+            $"장착 일반 아이템: " +
+            $"{(unit.items != null ? unit.items.Count : 0)}개"
+        );
+
+        DrawEquipmentSummary(unit);
+
+        GUILayout.Label(
+            $"공격 사거리: {unit.Range}"
+        );
+
+        GUILayout.Label(
+            $"마나 비용: " +
+            $"{data.manaCost} → {unit.EffectiveManaCost}"
+        );
+
+        GUILayout.Label(
+            "※ 일반진화·특수진화·장비는 각각의 적용값을 표시하며, " +
+            "현재 유닛에 적용되지 않은 항목은 0으로 표시"
+        );
+
+        GUILayout.Space(8f);
+    }
+
+    /// <summary>
+    /// 현재 장착된 일반 아이템과 주요 스탯 효과를 QA용으로 표시한다.
+    /// </summary>
+    private static void DrawEquipmentSummary(
+        PokemonUnit unit)
+    {
+        GUILayout.Space(6f);
+
+        GUILayout.Label("── 장착 장비 효과 ──");
+
+        if (unit.items == null ||
+            unit.items.Count == 0)
+        {
+            GUILayout.Label(
+                "장착된 일반 아이템 없음"
+            );
+
+            return;
+        }
+
+        foreach (ItemData item in unit.items)
+        {
+            if (item == null)
+                continue;
+
+            GUILayout.Label(
+                $"• {item.itemName}"
+            );
+
+            List<string> effects =
+                new List<string>();
+
+            if (Mathf.Abs(item.hpBonus) > 0.0001f)
+            {
+                effects.Add(
+                    $"체력 +{item.hpBonus:0}"
+                );
+            }
+
+            if (Mathf.Abs(item.maxHpPct) > 0.0001f)
+            {
+                effects.Add(
+                    $"최대 체력 +{item.maxHpPct:0.#}%"
+                );
+            }
+
+            if (Mathf.Abs(item.attackBonus) > 0.0001f)
+            {
+                effects.Add(
+                    $"공격력 +{item.attackBonus:0}"
+                );
+            }
+
+            if (Mathf.Abs(item.defenseBonus) > 0.0001f)
+            {
+                effects.Add(
+                    $"방어력 +{item.defenseBonus:0}"
+                );
+            }
+
+            if (Mathf.Abs(item.spDefBonus) > 0.0001f)
+            {
+                effects.Add(
+                    $"방어력 +{item.spDefBonus:0}"
+                );
+            }
+
+            if (Mathf.Abs(item.attackSpeedBonus) > 0.0001f)
+            {
+                effects.Add(
+                    $"공격속도 +{item.attackSpeedBonus:0.#}%"
+                );
+            }
+
+            if (Mathf.Abs(item.spAtkPct) > 0.0001f)
+            {
+                effects.Add(
+                    $"스킬 위력 +{item.spAtkPct:0.#}%"
+                );
+            }
+
+            if (Mathf.Abs(item.criPct) > 0.0001f)
+            {
+                effects.Add(
+                    $"치명타율 +{item.criPct:0.#}%"
+                );
+            }
+
+            if (Mathf.Abs(item.criDmgPct) > 0.0001f)
+            {
+                effects.Add(
+                    $"치명타 피해 +{item.criDmgPct:0.#}%"
+                );
+            }
+
+            if (effects.Count == 0)
+            {
+                GUILayout.Label(
+                    "  표시 가능한 기본 스탯 효과 없음"
+                );
+            }
+            else
+            {
+                GUILayout.Label(
+                    $"  {string.Join(", ", effects)}"
+                );
+            }
+        }
+    }
+
+    /// <summary>
+    /// PokemonUnit에서 성급·진화·영웅증강까지 적용된
+    /// 장비 적용 전 전투 기초 능력치를 가져온다.
+    /// 일반 아이템 효과는 ApplyEquipmentStats에서 별도로 적용한다.
+    /// </summary>
+    private static UnitStatSnapshot CreateCurrentUnitStats(
+        PokemonUnit unit)
+    {
+        return new UnitStatSnapshot
+        {
+            hp = unit.MaxHp,
+            attack = unit.Attack,
+            defense = unit.Defense,
+            attackSpeed = unit.AttackSpeed,
+            spellPower = unit.SpellPower,
+
+            // QA 표시용 기본값.
+            // 현재 프로젝트 BattleUnit 기본값이 다르면
+            // 그 값에 맞춰 변경한다.
+            critChance = 0f,
+            critMultiplier = 1.5f
+        };
+    }
+
+    /// <summary>
+    /// 장비 적용 전 능력치에 일반 아이템 효과를
+    /// ItemStatEffect.OnCombatStart와 동일한 순서로 적용하여
+    /// 장비 포함 최종 능력치를 반환한다.
+    /// </summary>
+    private static UnitStatSnapshot ApplyEquipmentStats(
+        UnitStatSnapshot stats,
+        List<ItemData> items)
+    {
+        if (items == null)
+            return stats;
+
+        foreach (ItemData item in items)
+        {
+            if (item == null)
+                continue;
+
+            // 최대 체력:
+            // 고정 증가량 + 현재 최대 체력 기준 퍼센트 증가
+            float bonusHp =
+                item.hpBonus +
+                stats.hp *
+                (item.maxHpPct * 0.01f);
+
+            stats.hp += bonusHp;
+
+            // 공격력 고정 증가
+            stats.attack +=
+                item.attackBonus;
+
+            // 스킬 위력 퍼센트 증가
+            stats.spellPower +=
+                stats.spellPower *
+                (item.spAtkPct * 0.01f);
+
+            // 공격속도 퍼센트 증가
+            stats.attackSpeed +=
+                stats.attackSpeed *
+                (item.attackSpeedBonus * 0.01f);
+
+            // 특수방어 폐지 후 일반 방어력으로 통합
+            stats.defense +=
+                item.defenseBonus +
+                item.spDefBonus;
+
+            // 치명타율 및 치명타 피해
+            stats.critChance +=
+                item.criPct * 0.01f;
+
+            stats.critMultiplier +=
+                item.criDmgPct * 0.01f;
+        }
+
+        return stats;
+    }
+
+    /// <summary>
+    /// DB 기본값, 일반진화, 특수진화,
+    /// 장비 증가량, 최종능력치를 한 행에 표시한다.
+    /// </summary>
+    private static void DrawStatRow(
+        string statName,
+        float dbValue,
+        float normalValue,
+        float specialValue,
+        float preEquipmentValue,
+        float finalValue,
+        string format)
+    {
+        const float rowHeight = 42f;
+
+        float equipmentBonus =
+            finalValue - preEquipmentValue;
+
+        string equipmentText;
+
+        if (Mathf.Abs(equipmentBonus) < 0.0001f)
+        {
+            equipmentText = "0";
+        }
+        else
+        {
+            string sign =
+                equipmentBonus > 0f
+                    ? "+"
+                    : "";
+
+            equipmentText =
+                sign +
+                equipmentBonus.ToString(format);
+        }
+
+        GUILayout.BeginHorizontal();
+
+        DrawTableCell(
+            $"{statName}\n{dbValue.ToString(format)}",
+            122f,
+            rowHeight
+        );
+
+        DrawTableCell(
+            normalValue.ToString(format),
+            122f,
+            rowHeight
+        );
+
+        DrawTableCell(
+            specialValue.ToString(format),
+            122f,
+            rowHeight
+        );
+
+        DrawTableCell(
+            equipmentText,
+            122f,
+            rowHeight
+        );
+
+        DrawTableCell(
+            finalValue.ToString(format),
+            122f,
+            rowHeight
+        );
+
+        GUILayout.EndHorizontal();
+    }
+
+    private static void DrawTableCell(string text, float width, float height)
+    {
+        GUILayout.Box(text, GUILayout.Width(width), GUILayout.Height(height));
+    }
+
+    /// <summary>
     /// 포인터 아래 모든 Collider를 검사하여
     /// 가장 가까운 PokemonUnit을 찾는다.
     /// 필드 타일 Collider가 먼저 맞아도 유닛 선택이 가능하다.
     /// </summary>
-    private PokemonUnit RaycastUnit(
-        Vector2 guiMousePosition)
+    private PokemonUnit RaycastUnit(Vector2 guiMousePosition)
     {
         if (_camera == null)
             return null;
