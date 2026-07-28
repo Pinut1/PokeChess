@@ -5,7 +5,7 @@ using UnityEngine;
 /// 표시만 담당하고 등장·상승·페이드 진행은 StarUpPopupHud가 준다(위치 계산과 같은 곳에서 다뤄야
 /// 유닛을 따라다니면서 사라지는 연출이 어긋나지 않는다).
 ///
-/// HP바의 상시 성급 표식(UnitStatusBarUI._star2/_star3)과는 별개다. 이쪽은 "방금 진화했다"는 순간 연출.
+/// HP바의 상시 성급 표식(UnitStatusBarUI.SetStar)과는 별개다. 이쪽은 "방금 진화했다"는 순간 연출.
 /// </summary>
 public class StarUpPopupUI : MonoBehaviour
 {
