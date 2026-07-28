@@ -13,8 +13,12 @@ using UnityEngine.UI;
 /// </summary>
 public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    [Tooltip("아이템 아이콘. 드래그 중에는 이 오브젝트가 드래그 레이어로 옮겨져 커서를 따라간다.")]
+    [Tooltip("아이템 일러스트. 스프라이트는 Bind에서 데이터로 갈아끼운다.")]
     [SerializeField] private Image _icon;
+
+    [Tooltip("테두리처럼 일러스트와 함께 켜지고 꺼져야 하는 묶음의 루트. " +
+             "비워두면 _icon 오브젝트만 토글한다. 드래그 시 커서를 따라가는 것도 이 오브젝트다.")]
+    [SerializeField] private GameObject _itemView;
 
     /// <summary>이 칸이 들고 있는 항목. 비어 있으면 null.</summary>
     public ScriptableObject CurrentData { get; private set; }
@@ -25,75 +29,90 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     public event Action<ItemSlotUI, PointerEventData> Dropped;
 
     private RectTransform _dragLayer;
-    private Transform _iconHome;      // 아이콘의 원래 부모(이 칸)
-    private int _iconHomeSiblingIndex;
+    private Transform _viewHome;      // 아이템 표시부의 원래 부모(이 칸)
+    private int _viewHomeSiblingIndex;
     private bool _iconRaycastDefault; // 프리팹에서 지정한 값 — 드래그가 끝나면 이대로 되돌린다
     private bool _dragging;
+
+    /// <summary>테두리까지 묶어서 옮기고 토글해야 하므로, 지정돼 있으면 _itemView가 기준이 된다.</summary>
+    private GameObject ViewObject => _itemView != null ? _itemView : _icon?.gameObject;
 
     /// <summary>컨트롤러가 드래그 레이어를 주입한다. 없으면 드래그 시 아이콘이 다른 UI에 가려질 수 있다.</summary>
     public void Initialize(RectTransform dragLayer)
     {
         _dragLayer = dragLayer;
 
-        if (_icon != null)
+        var view = ViewObject;
+        if (view != null)
         {
-            _iconHome = _icon.transform.parent;
-            _iconHomeSiblingIndex = _icon.transform.GetSiblingIndex();
-            _iconRaycastDefault = _icon.raycastTarget;
+            _viewHome = view.transform.parent;
+            _viewHomeSiblingIndex = view.transform.GetSiblingIndex();
         }
+
+        if (_icon != null) _iconRaycastDefault = _icon.raycastTarget;
     }
 
     public void Bind(ScriptableObject data)
     {
         CurrentData = data;
 
-        if (_icon == null) return;
-
-        // 아이템과 진화의 돌은 표시 방식이 같고 아이콘 필드만 각자 타입에 있다.
-        _icon.sprite = data switch
+        if (_icon != null)
         {
-            ItemData item            => item.icon,
-            EvolutionStoneData stone => stone.icon,
-            _                        => null
-        };
+            // 아이템과 진화의 돌은 표시 방식이 같고 아이콘 필드만 각자 타입에 있다.
+            _icon.sprite = data switch
+            {
+                ItemData item            => item.icon,
+                EvolutionStoneData stone => stone.icon,
+                _                        => null
+            };
 
-        _icon.enabled = _icon.sprite != null;
-        _icon.gameObject.SetActive(true);
+            _icon.enabled = _icon.sprite != null;
+        }
+
+        var view = ViewObject;
+        if (view != null) view.SetActive(true);
     }
 
-    /// <summary>빈 칸으로 되돌린다. 칸 배경은 그대로 두고 아이콘만 숨긴다.</summary>
+    /// <summary>빈 칸으로 되돌린다. 칸 배경은 그대로 두고 아이템 표시부(테두리 포함)만 숨긴다.</summary>
     public void Clear()
     {
         CurrentData = null;
 
-        if (_icon == null) return;
-
         ReturnIconHome();
-        _icon.sprite = null;
-        _icon.enabled = false;
-        _icon.gameObject.SetActive(false);
+
+        if (_icon != null)
+        {
+            _icon.sprite = null;
+            _icon.enabled = false;
+        }
+
+        var view = ViewObject;
+        if (view != null) view.SetActive(false);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (IsEmpty || _icon == null) return;
+        var view = ViewObject;
+        if (IsEmpty || view == null) return;
 
         _dragging = true;
 
-        // 아이콘을 칸 밖으로 꺼내 최상위에 올린다 — 원래 칸은 빈 상태로 보인다.
-        if (_dragLayer != null) _icon.transform.SetParent(_dragLayer, true);
-        _icon.transform.SetAsLastSibling();
+        // 표시부(테두리 포함)를 칸 밖으로 꺼내 최상위에 올린다 — 원래 칸은 빈 상태로 보인다.
+        if (_dragLayer != null) view.transform.SetParent(_dragLayer, true);
+        view.transform.SetAsLastSibling();
 
-        // 드래그 중인 아이콘이 자기 자신을 가려 드롭 판정을 방해하지 않도록 한다.
-        _icon.raycastTarget = false;
+        // 끌고 있는 아이템이 커서 아래를 가려 드롭 판정을 방해하지 않도록 한다.
+        if (_icon != null) _icon.raycastTarget = false;
 
-        _icon.transform.position = eventData.position;
+        view.transform.position = eventData.position;
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (!_dragging || _icon == null) return;
-        _icon.transform.position = eventData.position;
+        if (!_dragging) return;
+
+        var view = ViewObject;
+        if (view != null) view.transform.position = eventData.position;
     }
 
     public void OnEndDrag(PointerEventData eventData)
@@ -102,7 +121,7 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         _dragging = false;
 
-        // 성공하든 실패하든 아이콘은 일단 제자리로 돌려놓는다.
+        // 성공하든 실패하든 일단 제자리로 돌려놓는다.
         // 장착에 성공하면 GameEvents.OnInventoryChanged로 목록이 다시 그려지면서 이 칸이 비워진다.
         ReturnIconHome();
 
@@ -111,13 +130,15 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     private void ReturnIconHome()
     {
-        if (_icon == null || _iconHome == null) return;
+        var view = ViewObject;
+        if (view == null || _viewHome == null) return;
 
-        _icon.transform.SetParent(_iconHome, false);
-        _icon.transform.SetSiblingIndex(_iconHomeSiblingIndex);
-        _icon.raycastTarget = _iconRaycastDefault;
+        view.transform.SetParent(_viewHome, false);
+        view.transform.SetSiblingIndex(_viewHomeSiblingIndex);
 
-        var rect = _icon.transform as RectTransform;
+        if (_icon != null) _icon.raycastTarget = _iconRaycastDefault;
+
+        var rect = view.transform as RectTransform;
         if (rect != null) rect.anchoredPosition = Vector2.zero;
     }
 }
