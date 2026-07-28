@@ -58,6 +58,11 @@ MonoBehaviour:
   - RPC_RequestSharedShopReturn
   - RPC_RequestSharedShopRoll
   - RPC_ResolveSharedShopPurchase
+  - RPC_RequestSharedDebugUnitByCost
+  - RPC_ResolveSharedDebugUnitByCost
+  - RPC_RestartGame
+  - RPC_TradeQueueAck
+  - RPC_TradeQueueReceive
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
