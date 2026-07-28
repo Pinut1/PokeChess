@@ -707,6 +707,15 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 현재 레벨의 코스트별 등장 확률(1~5코스트 순, 합 100). UI 표시용 읽기 전용 사본.
+    /// 내부 배열을 그대로 넘기면 호출부가 확률표를 변경할 수 있으므로 복사해서 반환한다.
+    /// </summary>
+    public int[] GetCurrentCostRates()
+    {
+        return (int[])GetCostRates(CurrentLevel).Clone();
+    }
+
+    /// <summary>
     /// 레벨별 코스트 등장 확률. Lv5~10은 밸런스 기획서 §2.4 확정값.
     /// Lv1~4는 문서 미명시라 초반 진입 곡선용 임시값 유지.
     /// </summary>
