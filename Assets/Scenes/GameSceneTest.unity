@@ -2596,6 +2596,7 @@ GameObject:
   - component: {fileID: 660287459}
   - component: {fileID: 660287458}
   - component: {fileID: 660287457}
+  - component: {fileID: 660287460}
   m_Layer: 5
   m_Name: Unit_StarVfx
   m_TagString: Untagged
@@ -2635,8 +2636,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StarUpPopupHud
   _popupPrefab: {fileID: 7239051653090850056, guid: 0d95b23c55904ee4d8df31e6c8517b43, type: 3}
-  _popupRoot: {fileID: 8545216560702625983, guid: 0d95b23c55904ee4d8df31e6c8517b43, type: 3}
-  _camera: {fileID: 0}
+  _popupRoot: {fileID: 660287456}
+  _camera: {fileID: 1293587738}
   _heightOffset: 2.8
   _riseDistance: 40
   _duration: 1.2
@@ -2679,6 +2680,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 660287455}
   m_CullTransparentMesh: 1
+--- !u!114 &660287460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 660287455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3309840b8674c464596f7e557e19e54d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UnitEvolveVfx
+  _vfxId: VFX_Evolve
+  _offset: {x: 0, y: 0, z: 0}
+  _starUpScale: 1
 --- !u!1001 &662571079
 PrefabInstance:
   m_ObjectHideFlags: 0

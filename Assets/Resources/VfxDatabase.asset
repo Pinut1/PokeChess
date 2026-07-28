@@ -315,6 +315,6 @@ MonoBehaviour:
     scaleWithRadius: 0
   - vfxId: VFX_Evolve
     prefab: {fileID: 1948089231559134301, guid: 3fa54182cfbad2843815635a8ffb30c9, type: 3}
-    lifetime: 0
+    lifetime: 2
     spawnMode: 0
     scaleWithRadius: 0
