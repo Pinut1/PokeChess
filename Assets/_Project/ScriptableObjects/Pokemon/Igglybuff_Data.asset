@@ -27,18 +27,18 @@ MonoBehaviour:
   - Normal
   - Ethereal
   role: Supporter
-  skillId: NORMAL_SUPPORTER
+  skillId: HealBell
   skill:
-    skillId: NORMAL_SUPPORTER
+    skillId: HealBell
     skillName: "\uCE58\uC720\uBC29\uC6B8"
-    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5"
+    description: "\uB2E8\uC77C \uC544\uAD70 HP \uD68C\uBCF5 / \uD478\uD478\uB9B0"
     effectType: 2
     targetType: 1
     areaRadius: 0
     lineLength: 4
-    vfxId: VFX_Normal_Supporter
+    vfxId: VFX_Normal_Supporter_HP_REGEN
   attackVfxId: Normal_L
-  evolvesIntoEn: 
+  evolvesIntoEn: Jigglypuff
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 2879022559521332932, guid: 3f175c1d2249dc843ad514f41f073284, type: 3}
+  icon: {fileID: 21300000, guid: 9ee5a3e2b765fbd4ea37b3845ac537bf, type: 3}

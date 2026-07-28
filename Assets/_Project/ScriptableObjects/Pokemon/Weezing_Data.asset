@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Poison
   role: Tanker
-  skillId: POISON_TANKER
+  skillId: Poison_Tanker
   skill:
-    skillId: POISON_TANKER
-    skillName: "\uB3C4\uBC1C"
-    description: "\uC8FC\uBCC0 \uC801 \uC5B4\uADF8\uB85C \uC9D1\uC911"
-    effectType: 3
+    skillId: 
+    skillName: 
+    description: 
+    effectType: 0
     targetType: 0
     areaRadius: 0
-    lineLength: 1
-    vfxId: VFX_Poison_Tanker
+    lineLength: 0
+    vfxId: 
   attackVfxId: Poison_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 7549978404929835224, guid: 3b49cbc10f9237b4c932cadf5f0455ac, type: 3}
+  icon: {fileID: 21300000, guid: a01887b2a34fd8c4782ab145a4579931, type: 3}

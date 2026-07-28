@@ -104,34 +104,46 @@ public class PokemonUnit : MonoBehaviour
     // ──────────────────────────────────────────
     // 별 강화 스케일링
     // ──────────────────────────────────────────
-    // 별 등급 배율: 1성=1.0배, 2성=1.8배, 3성=2.8배.
-    // HP/공격/특수공격에만 적용. 방어/특수방어/공속/사거리는 성과 무관(원본 그대로).
+    // 기획 확정(2026-07-23, 해인 작성가이드 07.23판): 일반 진화와 특수 진화는
+    // "곱하는 계수"가 아니라 서로 다른 배율표를 쓴다.
+    //   일반 진화(3마리 합체)        : 1.0 / 1.8 / 2.8
+    //   특수 진화(진화의 돌·통신교환): 1.0 / 2.0 / 3.0
+    // HP/공격/주문력에만 적용. 방어/공속/사거리는 성과 무관(원본 그대로).
     // 인덱스 = starLevel - 1.
-    private static readonly float[] STAR_MULTIPLIER = { 1f, 1.8f, 2.8f };
+    private static readonly float[] STAR_MULTIPLIER         = { 1f, 1.8f, 2.8f };
+    private static readonly float[] SPECIAL_STAR_MULTIPLIER = { 1f, 2.0f, 3.0f };
 
-    /// <summary>지정 별 등급의 스탯 배수. (BattleManager가 적 유닛 스탯 계산에 재사용)</summary>
+    /// <summary>
+    /// 지정 별 등급의 일반 진화 배수. (BattleManager가 적 유닛 스탯 계산에 재사용 —
+    /// 적은 특수진화 상태를 갖지 않으므로 항상 일반 표를 쓴다.)
+    /// </summary>
     public static float StarMultiplierFor(int starLevel)
     {
         int idx = Mathf.Clamp(starLevel - 1, 0, STAR_MULTIPLIER.Length - 1);
         return STAR_MULTIPLIER[idx];
     }
 
-    /// <summary>현재 별 등급의 스탯 배수.</summary>
-    public float StarMultiplier => StarMultiplierFor(starLevel);
-
-    // 진화의 돌·통신교환으로 얻은 특수진화체는 별 배율에 ×1.4 추가.
-    // 돌은 장착 중에만 적용되고, 통신진화는 영구 적용된다.
-    private const float SPECIAL_EVOLUTION_MULTIPLIER = 1.4f;
+    /// <summary>진화의 돌·통신교환으로 얻은 "특수진화체"인지. 돌은 장착 중에만(해제 시 자동 해소), 통신교환은 영구.</summary>
     public bool IsSpecialEvolved => IsStoneEvolved || isTradeEvolved;
-    public float SpecialEvolutionMultiplier => IsSpecialEvolved ? SPECIAL_EVOLUTION_MULTIPLIER : 1f;
+
+    /// <summary>현재 별 등급의 스탯 배수. 특수진화체면 전용 배율표를 쓴다(일반 배수에 곱하지 않음).</summary>
+    public float StarMultiplier
+    {
+        get
+        {
+            if (!IsSpecialEvolved) return StarMultiplierFor(starLevel);
+            int idx = Mathf.Clamp(starLevel - 1, 0, SPECIAL_STAR_MULTIPLIER.Length - 1);
+            return SPECIAL_STAR_MULTIPLIER[idx];
+        }
+    }
 
     // ──────────────────────────────────────────
     // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
     // ──────────────────────────────────────────
 
-    public float MaxHp        => data != null ? data.hp * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
-    public float Attack       => data != null ? data.attack * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
-    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * SpecialEvolutionMultiplier * heroStatMultiplier : 0f;
+    public float MaxHp        => data != null ? data.hp * StarMultiplier * heroStatMultiplier : 0f;
+    public float Attack       => data != null ? data.attack * StarMultiplier * heroStatMultiplier : 0f;
+    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * heroStatMultiplier : 0f;
     public float Defense      => data != null ? data.defense : 0f;
     public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
     public int   Range        => data != null ? data.range : 0;
@@ -141,6 +153,62 @@ public class PokemonUnit : MonoBehaviour
     private void Start()
     {
         ResetForBattle();
+    }
+
+    // ──────────────────────────────────────────
+    // 시각 요소 (모델 프리팹)
+    // ──────────────────────────────────────────
+    // data는 진화(합체/돌/통신교환)로 런타임에 스왑되므로 모델도 그때마다 다시 붙여야 한다.
+    // 생성 시점 1회 Instantiate로 두면 2성이 돼도 1성 모델이 남는다.
+
+    // [SerializeField] 필수 — 합체 진화는 기존 유닛을 Instantiate로 복제해 새 유닛을 만든다.
+    // 직렬화되지 않으면 복제본의 _visual이 null이 되고, RefreshVisual이 이전 모델을 못 지운 채
+    // 새 모델만 덧붙여 두 모델이 겹친다. 직렬화하면 Unity가 복제된 자식으로 참조를 remap한다.
+    [SerializeField] private GameObject _visual;
+
+    /// <summary>현재 data의 modelPrefab으로 시각 요소를 (재)생성. 없으면 placeholder 캡슐.</summary>
+    public void RefreshVisual()
+    {
+        // 복제본이 아직 _visual을 못 물고 있을 때(구 씬 데이터 등)의 안전망 —
+        // 이 컴포넌트가 만든 시각 자식은 하나뿐이므로 남은 자식을 먼저 정리한다.
+        if (_visual == null && transform.childCount > 0)
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                GameObject stale = transform.GetChild(i).gameObject;
+                stale.transform.SetParent(null);
+                if (Application.isPlaying) Destroy(stale);
+                else                       DestroyImmediate(stale);
+            }
+        }
+
+        if (_visual != null)
+        {
+            // Destroy는 프레임 끝에 처리되므로 즉시 분리 — 안 그러면 아래 Collider 검사가 옛 모델을 본다.
+            _visual.transform.SetParent(null);
+            // 에디트 모드에서 Destroy는 에러를 낸다(에디터 하네스/테스트에서 호출될 수 있음).
+            if (Application.isPlaying) Destroy(_visual);
+            else                       DestroyImmediate(_visual);
+            _visual = null;
+        }
+
+        if (data != null && data.modelPrefab != null)
+        {
+            _visual = Instantiate(data.modelPrefab, transform);
+        }
+        else
+        {
+            _visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            _visual.transform.SetParent(transform);
+            _visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
+        }
+
+        _visual.transform.localPosition = Vector3.zero;
+        _visual.transform.localRotation = Quaternion.identity;
+
+        // 드래그 레이캐스트 픽업용 콜라이더 보장 (모델 프리팹에 없을 수도 있음)
+        if (GetComponentInChildren<Collider>() == null)
+            gameObject.AddComponent<CapsuleCollider>();
     }
 
     /// <summary>
@@ -199,6 +267,7 @@ public class PokemonUnit : MonoBehaviour
         equippedStone = stone;
         currentHp     = Mathf.Min(currentHp, MaxHp);    // 진화체 MaxHp로 상한(준비단계 전투시작 시 풀회복됨)
 
+        RefreshVisual();                                // 진화체 모델로 교체
         GameEvents.UnitChanged(this);                   // 시너지 재계산용(머지 트리거는 진화체라 무의미)
         return true;
     }
@@ -217,6 +286,7 @@ public class PokemonUnit : MonoBehaviour
         equippedStone = null;
         currentHp     = Mathf.Min(currentHp, MaxHp);
 
+        RefreshVisual();                                // 베이스 종 모델로 원복
         GameEvents.UnitChanged(this);                   // ★ BoardManager가 구독→CheckEvolution 재실행
         return removed;
     }

@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Ethereal
   role: Supporter
-  skillId: ETHEREAL_SUPPORTER
+  skillId: MagicCoat
   skill:
-    skillId: ETHEREAL_SUPPORTER
+    skillId: MagicCoat
     skillName: "\uB9E4\uC9C1\uCF54\uD2B8"
     description: "\uC804\uCCB4 \uC544\uAD70 \uBCF4\uD638\uB9C9 / \uD749\uB0B4\uB0B4"
     effectType: 3
     targetType: 2
-    areaRadius: 4
+    areaRadius: 0
     lineLength: 4
     vfxId: VFX_Ethereal_Supporter_SHIELD
   attackVfxId: Ethereal_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 8814595640199787736, guid: 69ed8bde94ad89d49b27b95f6d7956a2, type: 3}
+  icon: {fileID: 21300000, guid: 7f2d5eb8395f4264db966f6068b0dcc5, type: 3}

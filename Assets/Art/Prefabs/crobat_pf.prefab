@@ -9,16 +9,28 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.006
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.006
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.006
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 35.85944
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -10.37219
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
       propertyPath: m_LocalRotation.w
@@ -48,9 +60,13 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 23fae5caa1f949d40886287eb5bae2e2, type: 3}
       propertyPath: m_Name
-      value: crobat
+      value: crobat_pf
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

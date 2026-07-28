@@ -21,6 +21,21 @@ public abstract class Singleton<T> : MonoBehaviour where T : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 로그를 남기지 않고 인스턴스 존재만 확인한다.
+    /// Instance 게터는 null일 때 LogError를 찍으므로 "있으면 쓰고 없으면 넘어간다"는
+    /// 호출부가 Instance로 널 검사를 하면 검사 자체가 에러 로그가 된다.
+    /// 초기화 순서를 보장할 수 없는 곳(UI의 OnEnable 등)에서는 이쪽을 쓸 것.
+    /// </summary>
+    public static bool HasInstance => _instance != null;
+
+    /// <summary>로그 없이 인스턴스를 가져온다. 없으면 false.</summary>
+    public static bool TryGet(out T instance)
+    {
+        instance = _instance;
+        return _instance != null;
+    }
+
     /// <summary>true면 DontDestroyOnLoad로 씬 전환에도 유지. 씬 로컬이면 false로 오버라이드.</summary>
     protected virtual bool KeepAcrossScenes => true;
 

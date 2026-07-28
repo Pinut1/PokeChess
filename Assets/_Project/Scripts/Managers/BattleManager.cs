@@ -51,8 +51,8 @@ public class BattleManager : MonoBehaviour
     };
     private const int DEFAULT_ROLE_PRIORITY = 2; // 미지정/알 수 없는 role 폴백
 
-    // 상대 보드를 시각적으로 분리해서 보여주기 위한 월드 오프셋. 전투 좌표 계산에는 영향 없음(시각화 전용).
-    private static readonly Vector3 ENEMY_BOARD_OFFSET = new Vector3(0f, 0f, 10f);
+    // 적 진영은 BoardManager.GetEnemyBattleCoords로 아군 보드 너머(rows 4~7) 연속 좌표에 배치한다.
+    // 논리·시각 좌표가 동일해져 근접이 미들라인을 걸어 넘는다(구 ENEMY_BOARD_OFFSET 시각분리 방식 폐기).
 
     // 현재 스테이지는 RoundPhaseManager(Phase.CurrentStage)가 라운드별로 확정해 제공.
     // 적 영문명 → PokemonData 해석은 중앙 PokemonDatabase.Instance가 담당.
@@ -343,6 +343,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = null,
+            data = data,
             team = BattleTeam.Ally,
             coords = coords,
             maxHp = data.hp,
@@ -434,8 +435,8 @@ public class BattleManager : MonoBehaviour
             PokemonData data = ResolvePokemon(e.pokemonNameEn);
             if (data == null) continue; // DUMMY/미해결 슬롯은 건너뜀
 
-            // 기획은 적 자기 진영 로컬좌표(0~3행)로 작성 → 미러해서 플레이어 앞에 배치.
-            HexCoords coords = board.GetMirroredCoords(new HexCoords(e.q, e.r));
+            // 기획은 적 자기 진영 로컬좌표(0~3행)로 작성 → 아군 보드 너머(rows 4~7)에 이어 배치.
+            HexCoords coords = board.GetEnemyBattleCoords(new HexCoords(e.q, e.r));
             _units.Add(CreateEnemyUnit(data, e, coords));
             count++;
         }
@@ -463,7 +464,7 @@ public class BattleManager : MonoBehaviour
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
-            HexCoords enemyCoords = board.GetMirroredCoords(kv.Key);
+            HexCoords enemyCoords = board.GetEnemyBattleCoords(kv.Key);
             _units.Add(CreateBattleUnit(unit, BattleTeam.Enemy, enemyCoords));
         }
     }
@@ -476,13 +477,13 @@ public class BattleManager : MonoBehaviour
     {
         foreach (var coords in board.GetBoardSnapshot().Keys)
         {
-            HexCoords mirrored = board.GetMirroredCoords(coords);
+            HexCoords enemyCoords = board.GetEnemyBattleCoords(coords);
 
             var tile = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            tile.name = $"MirrorBoardTile_{mirrored}";
+            tile.name = $"EnemyBoardTile_{enemyCoords}";
             tile.transform.localScale = new Vector3(0.95f, 0.05f, 0.95f);
-            tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 상대 보드 표시(연빨강)
-            tile.transform.position = board.CoordsToWorldPosition(mirrored) + ENEMY_BOARD_OFFSET;
+            tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 적 진영 바닥(연빨강)
+            tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
 
             _mirrorTiles.Add(tile);
         }
@@ -509,6 +510,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = null,
+            data = data,
             team = BattleTeam.Enemy,
             coords = coords,
             maxHp = maxHp,
@@ -523,6 +525,7 @@ public class BattleManager : MonoBehaviour
             starLevel = Mathf.Clamp(e.starLevel, 1, 3)
         };
         ApplySkill(bu, data.skill, data.manaCost);
+        bu.attackVfxId = data.attackVfxId; // 평타 VFX(아군과 동일 규칙)
 
         // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
         // (아군은 unit.items 리스트, 적은 heldItemEn 단일 문자열을 ItemDatabase로 해석)
@@ -567,6 +570,7 @@ public class BattleManager : MonoBehaviour
         var bu = new BattleUnit
         {
             source = team == BattleTeam.Ally ? unit : null,
+            data = unit.data,
             team = team,
             coords = coords,
             maxHp = unit.MaxHp,
@@ -582,7 +586,11 @@ public class BattleManager : MonoBehaviour
             hasSitrusBerry = unit.hasHeroBerry // 파치리스 영웅증강 v2 자뭉열매
         };
         // 주입 스킬(파치리스 도발 등) 우선, 없으면 원본 종 스킬. Role도 오버라이드 반영(unit.Role).
-        if (unit.data != null) ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+        if (unit.data != null)
+        {
+            ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
+            bu.attackVfxId = unit.data.attackVfxId; // 평타 VFX는 종 데이터에서(스킬 테이블 아님)
+        }
 
         foreach (var item in unit.items)
         {
@@ -600,10 +608,20 @@ public class BattleManager : MonoBehaviour
         if (bu.source != null)
             bu.source.gameObject.SetActive(false);
 
-        var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        GameObject visual;
+        if (bu.data != null && bu.data.modelPrefab != null)
+        {
+            visual = Instantiate(bu.data.modelPrefab);
+        }
+        else
+        {
+            visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
+            visual.GetComponent<Renderer>().material.color =
+                bu.team == BattleTeam.Ally ? Color.blue : Color.red;
+        }
+
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
-        visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
-        visual.GetComponent<Renderer>().material.color = bu.team == BattleTeam.Ally ? Color.blue : Color.red;
 
         bu.visual = visual;
         UpdateVisualPosition(bu);
@@ -612,8 +630,9 @@ public class BattleManager : MonoBehaviour
     private void UpdateVisualPosition(BattleUnit bu)
     {
         if (bu.visual == null) return;
+        // 적도 아군과 동일한 좌표 변환으로 그린다 — 적 좌표가 이미 rows 4~7(아군 너머)라
+        // 한 보드의 먼 절반으로 자연스럽게 이어진다. 별도 시각 오프셋 불필요.
         Vector3 pos = GameManager.Instance.Board.CoordsToWorldPosition(bu.coords);
-        if (bu.team == BattleTeam.Enemy) pos += ENEMY_BOARD_OFFSET;
         bu.visual.transform.position = pos + Vector3.up * 0.5f;
     }
 
@@ -765,6 +784,9 @@ public class BattleManager : MonoBehaviour
     /// <summary>평타 1회: attack 기반 물리 피해(파이프라인). 마나는 초당 충전만(기획 확정) — 평타 획득 없음.</summary>
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
+        // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
+        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target);
+
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
         foreach (var effect in attacker.effects)
@@ -806,7 +828,8 @@ public class BattleManager : MonoBehaviour
         DamageType type = caster.skillEffectType == SkillEffectType.Attack ? DamageType.Physical : DamageType.Magic;
 
         var targets = GetSkillTargets(caster, primaryTarget);
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets); // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생
+        // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius);
 
         foreach (var t in targets)
         {
@@ -838,7 +861,10 @@ public class BattleManager : MonoBehaviour
         else
             targets = isSupport ? GetAllyTargets(caster) : GetSkillTargets(caster, primaryTarget);
 
-        BattleVfxPlayer.PlayOnUnits(caster.skillVfxId, targets);
+        // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
+        bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
+                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius);
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *

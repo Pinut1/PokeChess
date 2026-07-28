@@ -55,6 +55,7 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnRoundChanged   += HandleRoundChanged;
         GameEvents.OnBattleEnd      += HandleBattleEnd;
         GameEvents.OnAllPlayersReady += HandleAllPlayersReady;
+        GameEvents.OnPlayerReadyRequested += HandlePlayerReadyRequested;
         GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
         GameEvents.OnOpponentReconnected  += HandleOpponentReconnected;
         GameEvents.OnGracePeriodExpired   += HandleGracePeriodExpired;
@@ -68,6 +69,7 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnRoundChanged   -= HandleRoundChanged;
         GameEvents.OnBattleEnd      -= HandleBattleEnd;
         GameEvents.OnAllPlayersReady -= HandleAllPlayersReady;
+        GameEvents.OnPlayerReadyRequested -= HandlePlayerReadyRequested;
         GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
         GameEvents.OnOpponentReconnected  -= HandleOpponentReconnected;
         GameEvents.OnGracePeriodExpired   -= HandleGracePeriodExpired;
@@ -311,29 +313,24 @@ public class RoundPhaseManager : MonoBehaviour
     // ─────────────────────────────────────────
 
     /// <summary>
-    /// 쇼핑 페이즈에서 준비 완료 버튼 누를 때 호출.
+    /// 쇼핑 페이즈에서 UI의 준비 요청을 검증한다.
     /// 2인 모두 준비되면 GameEvents.OnAllPlayersReady를 통해 전투 페이즈로 전환됨.
     /// </summary>
-    public void PlayerReady()
+    private void HandlePlayerReadyRequested()
     {
-        if (CurrentPhase != GamePhase.Shopping)
-            return;
+        if (CurrentPhase != GamePhase.Shopping) return;
 
-        AugmentManager augment =
-            GameManager.Instance != null
-                ? GameManager.Instance.Augment
-                : null;
-
+        // 증강 3택1이 떠 있는 동안은 준비를 막는다(블로킹 UX).
+        AugmentManager augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
         if (augment != null && augment.HasPendingChoice)
         {
-            Debug.LogWarning(
-                "[Phase] 증강을 먼저 선택해야 준비할 수 있습니다."
-            );
+            Debug.LogWarning("[Phase] 증강을 먼저 선택해야 준비할 수 있습니다.");
             return;
         }
 
-        GameManager.Instance.Network.BroadcastPlayerReady();
+        // 실제 브로드캐스트는 이벤트를 구독한 NetworkManager가 담당한다.
+        GameEvents.ApprovePlayerReady();
     }
 
-    // Ready 버튼 / Victory 표시는 PrototypeHud(통합 HUD)로 이관됨.
+    // Ready 입력은 UIManager, Victory 표시는 PrototypeHud가 담당한다.
 }

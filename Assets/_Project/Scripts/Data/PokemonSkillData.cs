@@ -26,7 +26,7 @@ public enum SkillTargetType
     AllySingle,   // 아군 단일 (effectType별 우선순위 — HP_REGEN=최저HP, SHIELD=탱커)
     AllyArea,     // 시전자 기준 areaRadius 내 모든 아군
     EnemySingle,  // 현재 어그로 대상
-    EnemyArea,    // 시전자 기준 areaRadius 내 모든 적
+    EnemyArea,    // 피격 대상 기준 areaRadius 내 모든 적 (시전자 기준 아님 — 기획 확인 2026-07-24)
     EnemyLine     // 전방 직선 lineLength칸 내 모든 적
 }
 

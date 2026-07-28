@@ -17,15 +17,15 @@ MonoBehaviour:
   synergyNameEn: Water
   tiers:
   - count: 3
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC \uBCF4\uD638\uB9C9 (\uC8FC\uBB38\uB825\uC758
-      20%)"
+    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
+      \uBCF4\uD638\uB9C9"
   - count: 5
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC \uBCF4\uD638\uB9C9 (\uC8FC\uBB38\uB825\uC758
-      35%)"
+    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
+      \uBCF4\uD638\uB9C9"
   - count: 7
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC \uBCF4\uD638\uB9C9 (\uC8FC\uBB38\uB825\uC758
-      50%)"
+    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
+      \uBCF4\uD638\uB9C9"
   - count: 9
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC \uBCF4\uD638\uB9C9 (\uC8FC\uBB38\uB825\uC758
-      70%)"
-  icon: {fileID: 0}
+    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
+      \uBCF4\uD638\uB9C9"
+  icon: {fileID: 350731544, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}

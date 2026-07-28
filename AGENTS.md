@@ -48,7 +48,7 @@ Assets/_Project/Scripts/
 - 스킬용 STUN: 스코프 아웃(7/10, 증강 6종에 없음 — 메커니즘만 유지), SLOW: 보류(유닛/아이템 미구현)
 - `BattleManager` role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
 - `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
-- `Core/PokemonUnit` 특수진화체 별배율 ×1.5
+- ~~`Core/PokemonUnit` 특수진화체 별배율 ×1.5~~ ✅ 확정(7/23, 해인 작성가이드 07.23판): 곱하는 계수가 아니라 **별도 배율표**. 일반 진화 `1.0/1.8/2.8`, 특수 진화(돌·통신교환) `1.0/2.0/3.0`. `SPECIAL_EVOLUTION_MULTIPLIER` 제거됨
 - `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`
 - `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
 

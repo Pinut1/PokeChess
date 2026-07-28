@@ -9,6 +9,7 @@ public enum BattleTeam { Ally, Enemy }
 public class BattleUnit
 {
     public PokemonUnit source;     // 아군이면 보드 위 원본 참조(시각화 토글용), 적이면 null
+    public PokemonData data;
     public BattleTeam team;
     public HexCoords coords;
 
@@ -33,6 +34,10 @@ public class BattleUnit
     public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
     public int   skillLineLength;    // EnemyLine: 시전자 기준 직선(칸)
     public string skillVfxId;        // 시전 시 재생할 VFX(VfxDatabase 키). 비어있으면 재생 없음.
+
+    // 평타 VFX는 스킬과 달리 PokemonData.attackVfxId에서 온다(스킬 테이블이 아님).
+    // 프리팹이 "대상 머리 위에서 떨어지는" 연출을 자체적으로 갖고 있어, 코드는 피격자 위치에 생성만 한다(해인 확인 7/24).
+    public string attackVfxId;
 
     public bool HasSkill => maxMana > 0f;
 

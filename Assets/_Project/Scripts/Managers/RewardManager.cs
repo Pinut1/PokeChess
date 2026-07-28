@@ -123,12 +123,11 @@ public class RewardManager : MonoBehaviour
                 }
                 break;
             case RewardKind.ItemShopReroll:
-                // 아이템 상점 무료 리롤 자원 지급(밸런스 기획서 §7.3, 라운드당 2개).
-                if (amount > 0)
-                {
-                    GameManager.Instance.Shop.AddItemShopReroll(amount);
-                    Debug.Log($"[Reward] +{amount} 아이템샵 리롤");
-                }
+                // 폐기(2026-07-28, 기획디렉터 확정). 아이템 상점 리롤이 "공용 자원 라운드당 2개"에서
+                // "카드별 라운드 1회, 누적 없음"(ShopManager.RerollItemSlot)으로 바뀌면서 지급할 자원이 없어졌다.
+                // reward_data.json에는 기존 itemShopReroll 행이 그대로 남아 있으나 여기서 무시한다
+                // — 데이터(구글 시트)는 손대지 않고 호출만 끊는 방식. enum/임포터 매핑도 그대로 둔다
+                // (RewardKind는 int로 직렬화돼서 멤버를 지우면 Reforger가 밀려 기존 SO가 깨짐).
                 break;
 
             case RewardKind.Reforger:

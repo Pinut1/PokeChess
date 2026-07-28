@@ -13,13 +13,16 @@ public class AugmentOfferHud : MonoBehaviour
 {
     private IReadOnlyList<AugmentData> _offer;
 
+    // 모달 바깥 클릭 흡수용 투명 스타일. 병합 과정에서 선언이 유실돼 다시 둔다.
+    private GUIStyle _blockerStyle;
+
     private void OnEnable()
     {
         GameEvents.OnAugmentOfferReady += HandleOfferReady;
         GameEvents.OnAugmentSelected   += HandleSelected;
 
         // 부착 전에 오퍼가 이미 떠 있던 경우(활성화 순서 역전) 복구
-        var augment = GameManager.Instance != null ? GameManager.Instance.Augment : null;
+        var augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
         if (augment != null && augment.PendingOffer.Count > 0)
             _offer = augment.PendingOffer;
     }
@@ -37,7 +40,7 @@ public class AugmentOfferHud : MonoBehaviour
     {
         if (_offer == null || _offer.Count == 0) return;
 
-        var augment = GameManager.Instance != null ? GameManager.Instance.Augment : null;
+        var augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
         if (augment == null) return;
 
         GUI.depth = -100; // 다른 OnGUI(PrototypeHud 등)보다 먼저 이벤트를 받아 모달 클릭 흡수
@@ -62,10 +65,7 @@ public class AugmentOfferHud : MonoBehaviour
 
     private void DrawModal(AugmentManager augment)
     {
-        const float cardWidth = 240f;
-        const float cardHeight = 150f;
-        const float gap = 16f;
-
+        const float cardWidth = 240f, cardHeight = 150f, gap = 16f;
         int count = _offer.Count;
 
         float totalWidth = count * cardWidth + (count - 1) * gap;
@@ -73,13 +73,13 @@ public class AugmentOfferHud : MonoBehaviour
         float panelH = cardHeight + 112f;
         float panelX = (Screen.width - panelW) * 0.5f;
         float panelY = (Screen.height - panelH) * 0.5f;
+        var panelRect = new Rect(panelX, panelY, panelW, panelH);
 
-        Rect panelRect = new Rect(panelX, panelY, panelW, panelH);
+        // 패널 바깥만 클릭을 흡수해 카드/최소화 버튼이 입력을 받을 수 있게 한다.
+        AbsorbClicksOutside(panelRect);
 
-        GUI.Box(
-            panelRect,
-            $"증강을 선택하세요 (3택1) — 남은 시간 {FormatRemaining(augment)} (초과 시 자동 선택)"
-        );
+        GUI.Box(panelRect,
+                $"증강을 선택하세요 (3택1) — 남은 시간 {FormatRemaining(augment)} (초과 시 자동 선택)");
 
         for (int i = 0; i < count; i++)
         {
@@ -128,6 +128,22 @@ public class AugmentOfferHud : MonoBehaviour
         {
             currentEvent.Use();
         }
+    }
+
+    private void AbsorbClicksOutside(Rect panelRect)
+    {
+        _blockerStyle ??= new GUIStyle();
+
+        DrawClickBlocker(new Rect(0f, 0f, Screen.width, panelRect.yMin));
+        DrawClickBlocker(new Rect(0f, panelRect.yMax, Screen.width, Screen.height - panelRect.yMax));
+        DrawClickBlocker(new Rect(0f, panelRect.yMin, panelRect.xMin, panelRect.height));
+        DrawClickBlocker(new Rect(panelRect.xMax, panelRect.yMin, Screen.width - panelRect.xMax, panelRect.height));
+    }
+
+    private void DrawClickBlocker(Rect rect)
+    {
+        if (rect.width > 0f && rect.height > 0f)
+            GUI.Button(rect, GUIContent.none, _blockerStyle);
     }
 
     private static string FormatRemaining(AugmentManager augment)

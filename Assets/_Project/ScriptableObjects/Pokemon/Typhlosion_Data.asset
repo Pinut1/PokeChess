@@ -26,18 +26,19 @@ MonoBehaviour:
   synergies:
   - Fire
   role: Warrior
-  skillId: FIRE_WARRIOR
+  skillId: SelfASBuff
   skill:
-    skillId: FIRE_WARRIOR
-    skillName: "\uBD88\uAF43\uBCA0\uAE30"
-    description: "\uADFC\uC811 \uBD88\uAF43 \uB370\uBBF8\uC9C0"
-    effectType: 0
-    targetType: 3
+    skillId: SelfASBuff
+    skillName: "\uD3C9\uD0C0\uAE30\uBC18\uC720\uB2DB \uACF5\uC18D\uC99D\uAC00"
+    description: "\uACF5\uC18D\uC99D\uAC00 / \uD3C9\uD0C0\uAE30\uBC18 \uC5ED\uD560\uAD70
+      \uC720\uB2DB \uC804\uCCB4\uC801\uC6A9"
+    effectType: 5
+    targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Fire_Warrior
+    vfxId: VFX_AS_BUFF
   attackVfxId: Fire_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 1370877814432458580, guid: f3c0622846bd7c5459d9e513cdfcacc1, type: 3}
+  icon: {fileID: 21300000, guid: 9b9c217d42f237c4ca426a08d52097ed, type: 3}

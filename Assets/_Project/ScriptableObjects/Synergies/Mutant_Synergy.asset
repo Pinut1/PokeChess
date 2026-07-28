@@ -12,16 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Mutant_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 13
+  id: 4
   synergyName: "\uB3CC\uC5F0\uBCC0\uC774"
   synergyNameEn: Mutant
   tiers:
   - count: 2
-    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uC5D0\uBE0C\uC774"
+    effectDescription: "\uB2E8\uACC4\uB9C8\uB2E4 \uBD07 \uC720\uB2DB \uCD94\uAC00
+      (\uC5D0\uBE0C\uC774\u2192\uBE0C\uB798\uD0A4\u2192\uAE00\uB808\uC774\uC2DC\uC544\u2192\uB2D8\uD53C\uC544)"
   - count: 3
-    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uBE0C\uB798\uD0A4"
+    effectDescription: "\uB2E8\uACC4\uB9C8\uB2E4 \uBD07 \uC720\uB2DB \uCD94\uAC00
+      (\uC5D0\uBE0C\uC774\u2192\uBE0C\uB798\uD0A4\u2192\uAE00\uB808\uC774\uC2DC\uC544\u2192\uB2D8\uD53C\uC544)"
   - count: 4
-    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uAE00\uB808\uC774\uC2DC\uC544"
+    effectDescription: "\uB2E8\uACC4\uB9C8\uB2E4 \uBD07 \uC720\uB2DB \uCD94\uAC00
+      (\uC5D0\uBE0C\uC774\u2192\uBE0C\uB798\uD0A4\u2192\uAE00\uB808\uC774\uC2DC\uC544\u2192\uB2D8\uD53C\uC544)"
   - count: 5
-    effectDescription: "\uBD07 \uC720\uB2DB \uCD94\uAC00 \u2014 \uB2D8\uD53C\uC544"
-  icon: {fileID: 0}
+    effectDescription: "\uB2E8\uACC4\uB9C8\uB2E4 \uBD07 \uC720\uB2DB \uCD94\uAC00
+      (\uC5D0\uBE0C\uC774\u2192\uBE0C\uB798\uD0A4\u2192\uAE00\uB808\uC774\uC2DC\uC544\u2192\uB2D8\uD53C\uC544)"
+  icon: {fileID: -1623254767, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}

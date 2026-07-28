@@ -5,10 +5,22 @@
       "name": "풀",
       "nameEn": "Grass",
       "tiers": [
-        { "count": 3, "effect": "공격속도 +0.1" },
-        { "count": 5, "effect": "공격속도 +0.2" },
-        { "count": 7, "effect": "공격속도 +0.3" },
-        { "count": 9, "effect": "공격속도 +0.4" }
+        {
+          "count": 3,
+          "effect": "atkSpeed 고정값 증가"
+        },
+        {
+          "count": 5,
+          "effect": "atkSpeed 고정값 증가"
+        },
+        {
+          "count": 7,
+          "effect": "atkSpeed 고정값 증가"
+        },
+        {
+          "count": 9,
+          "effect": "atkSpeed 고정값 증가"
+        }
       ]
     },
     {
@@ -16,10 +28,22 @@
       "name": "독",
       "nameEn": "Poison",
       "tiers": [
-        { "count": 3, "effect": "방어력 +15" },
-        { "count": 5, "effect": "방어력 +30" },
-        { "count": 7, "effect": "방어력 +50" },
-        { "count": 9, "effect": "방어력 +70" }
+        {
+          "count": 3,
+          "effect": "defense 고정값 증가"
+        },
+        {
+          "count": 5,
+          "effect": "defense 고정값 증가"
+        },
+        {
+          "count": 7,
+          "effect": "defense 고정값 증가"
+        },
+        {
+          "count": 9,
+          "effect": "defense 고정값 증가"
+        }
       ]
     },
     {
@@ -27,111 +51,216 @@
       "name": "물",
       "nameEn": "Water",
       "tiers": [
-        { "count": 3, "effect": "전투 시작 시 보호막 (주문력의 20%)" },
-        { "count": 5, "effect": "전투 시작 시 보호막 (주문력의 35%)" },
-        { "count": 7, "effect": "전투 시작 시 보호막 (주문력의 50%)" },
-        { "count": 9, "effect": "전투 시작 시 보호막 (주문력의 70%)" }
+        {
+          "count": 3,
+          "effect": "전투 시작 시 spellPower 기반 보호막"
+        },
+        {
+          "count": 5,
+          "effect": "전투 시작 시 spellPower 기반 보호막"
+        },
+        {
+          "count": 7,
+          "effect": "전투 시작 시 spellPower 기반 보호막"
+        },
+        {
+          "count": 9,
+          "effect": "전투 시작 시 spellPower 기반 보호막"
+        }
       ]
     },
     {
       "id": 4,
-      "name": "불꽃",
-      "nameEn": "Fire",
+      "name": "돌연변이",
+      "nameEn": "Mutant",
       "tiers": [
-        { "count": 2, "effect": "방어력 +10%" },
-        { "count": 4, "effect": "방어력 +25%" },
-        { "count": 6, "effect": "방어력 +40%" }
+        {
+          "count": 2,
+          "effect": "단계마다 봇 유닛 추가 (에브이→브래키→글레이시아→님피아)"
+        },
+        {
+          "count": 3,
+          "effect": "단계마다 봇 유닛 추가 (에브이→브래키→글레이시아→님피아)"
+        },
+        {
+          "count": 4,
+          "effect": "단계마다 봇 유닛 추가 (에브이→브래키→글레이시아→님피아)"
+        },
+        {
+          "count": 5,
+          "effect": "단계마다 봇 유닛 추가 (에브이→브래키→글레이시아→님피아)"
+        }
       ]
     },
     {
       "id": 5,
-      "name": "비행",
-      "nameEn": "Flying",
+      "name": "불꽃",
+      "nameEn": "Fire",
       "tiers": [
-        { "count": 2, "effect": "공격속도 +10%" },
-        { "count": 4, "effect": "공격속도 +20%" },
-        { "count": 6, "effect": "공격속도 +35%" }
+        {
+          "count": 2,
+          "effect": "defense 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "defense 비율 증가"
+        },
+        {
+          "count": 6,
+          "effect": "defense 비율 증가"
+        }
       ]
     },
     {
       "id": 6,
-      "name": "노말",
-      "nameEn": "Normal",
+      "name": "비행",
+      "nameEn": "Flying",
       "tiers": [
-        { "count": 2, "effect": "치명타 확률 +5%" },
-        { "count": 4, "effect": "치명타 확률 +10%" },
-        { "count": 6, "effect": "치명타 확률 +15%" }
+        {
+          "count": 2,
+          "effect": "atkSpeed 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "atkSpeed 비율 증가"
+        },
+        {
+          "count": 6,
+          "effect": "atkSpeed 비율 증가"
+        }
       ]
     },
     {
       "id": 7,
-      "name": "정령",
-      "nameEn": "Ethereal",
+      "name": "노말",
+      "nameEn": "Normal",
       "tiers": [
-        { "count": 2, "effect": "마나 충전속도 +20%" },
-        { "count": 4, "effect": "마나 충전속도 +40%" },
-        { "count": 6, "effect": "마나 충전속도 +60%" }
+        {
+          "count": 2,
+          "effect": "치명타 확률 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "치명타 확률 비율 증가"
+        },
+        {
+          "count": 6,
+          "effect": "치명타 확률 비율 증가"
+        }
       ]
     },
     {
       "id": 8,
-      "name": "대지",
-      "nameEn": "Ground",
+      "name": "정령",
+      "nameEn": "Ethereal",
       "tiers": [
-        { "count": 2, "effect": "체력 +15%" },
-        { "count": 3, "effect": "체력 +30%" },
-        { "count": 4, "effect": "체력 +50%" }
+        {
+          "count": 2,
+          "effect": "마나 충전 속도 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "마나 충전 속도 비율 증가"
+        },
+        {
+          "count": 6,
+          "effect": "마나 충전 속도 비율 증가"
+        }
       ]
     },
     {
       "id": 9,
-      "name": "전기",
-      "nameEn": "Electric",
+      "name": "대지",
+      "nameEn": "Ground",
       "tiers": [
-        { "count": 2, "effect": "주문력 +20" },
-        { "count": 3, "effect": "주문력 +40" },
-        { "count": 4, "effect": "주문력 +65" }
+        {
+          "count": 2,
+          "effect": "hp 비율 증가"
+        },
+        {
+          "count": 3,
+          "effect": "hp 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "hp 비율 증가"
+        }
       ]
     },
     {
       "id": 10,
-      "name": "벌레",
-      "nameEn": "Bug",
+      "name": "전기",
+      "nameEn": "Electric",
       "tiers": [
-        { "count": 2, "effect": "공격력 +10" },
-        { "count": 3, "effect": "공격력 +20" },
-        { "count": 4, "effect": "공격력 +35" }
+        {
+          "count": 2,
+          "effect": "spellPower 고정값 증가"
+        },
+        {
+          "count": 3,
+          "effect": "spellPower 고정값 증가"
+        },
+        {
+          "count": 4,
+          "effect": "spellPower 고정값 증가"
+        }
       ]
     },
     {
       "id": 11,
-      "name": "파괴",
-      "nameEn": "Breaker",
+      "name": "벌레",
+      "nameEn": "Bug",
       "tiers": [
-        { "count": 2, "effect": "공격력 +10%" },
-        { "count": 3, "effect": "공격력 +20%" },
-        { "count": 4, "effect": "공격력 +35%" }
+        {
+          "count": 2,
+          "effect": "attack 고정값 증가"
+        },
+        {
+          "count": 3,
+          "effect": "attack 고정값 증가"
+        },
+        {
+          "count": 4,
+          "effect": "attack 고정값 증가"
+        }
       ]
     },
     {
       "id": 12,
-      "name": "드래곤",
-      "nameEn": "Dragon",
+      "name": "파괴",
+      "nameEn": "Breaker",
       "tiers": [
-        { "count": 2, "effect": "주문력 +15%" },
-        { "count": 3, "effect": "주문력 +30%" },
-        { "count": 4, "effect": "주문력 +50%" }
+        {
+          "count": 2,
+          "effect": "attack 비율 증가"
+        },
+        {
+          "count": 3,
+          "effect": "attack 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "attack 비율 증가"
+        }
       ]
     },
     {
       "id": 13,
-      "name": "돌연변이",
-      "nameEn": "Mutant",
+      "name": "드래곤",
+      "nameEn": "Dragon",
       "tiers": [
-        { "count": 2, "effect": "봇 유닛 추가 — 에브이" },
-        { "count": 3, "effect": "봇 유닛 추가 — 브래키" },
-        { "count": 4, "effect": "봇 유닛 추가 — 글레이시아" },
-        { "count": 5, "effect": "봇 유닛 추가 — 님피아" }
+        {
+          "count": 2,
+          "effect": "spellPower 비율 증가"
+        },
+        {
+          "count": 3,
+          "effect": "spellPower 비율 증가"
+        },
+        {
+          "count": 4,
+          "effect": "spellPower 비율 증가"
+        }
       ]
     },
     {
@@ -139,7 +268,10 @@
       "name": "얼음",
       "nameEn": "Ice",
       "tiers": [
-        { "count": 1, "effect": "적 전체 공격속도 -20% (고유)" }
+        {
+          "count": 1,
+          "effect": "적 atkSpeed -20% (고유)"
+        }
       ]
     },
     {
@@ -147,15 +279,21 @@
       "name": "악",
       "nameEn": "Dark",
       "tiers": [
-        { "count": 1, "effect": "전투 시작 후 첫 스킬 사용 시 스턴 1.5초 (고유)" }
+        {
+          "count": 1,
+          "effect": "전투 시작 후 첫 스킬 사용 시 STUN 1.5초 (고유)"
+        }
       ]
     },
     {
       "id": 16,
       "name": "치어리더",
-      "nameEn": "Cheerleader",
+      "nameEn": "Cheer",
       "tiers": [
-        { "count": 1, "effect": "공격속도 +15% 또는 마나 충전속도 +30% 선택 (고유)" }
+        {
+          "count": 1,
+          "effect": "atkSpeed +15% or manaRegen +30% 선택 (고유)"
+        }
       ]
     }
   ]

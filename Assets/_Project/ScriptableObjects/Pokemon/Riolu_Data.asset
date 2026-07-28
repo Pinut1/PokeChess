@@ -26,18 +26,19 @@ MonoBehaviour:
   synergies:
   - Breaker
   role: Warrior
-  skillId: BREAKER_WARRIOR
+  skillId: SelfASBuff
   skill:
-    skillId: 
-    skillName: 
-    description: 
-    effectType: 0
+    skillId: SelfASBuff
+    skillName: "\uD3C9\uD0C0\uAE30\uBC18\uC720\uB2DB \uACF5\uC18D\uC99D\uAC00"
+    description: "\uACF5\uC18D\uC99D\uAC00 / \uD3C9\uD0C0\uAE30\uBC18 \uC5ED\uD560\uAD70
+      \uC720\uB2DB \uC804\uCCB4\uC801\uC6A9"
+    effectType: 5
     targetType: 0
     areaRadius: 0
-    lineLength: 0
-    vfxId: 
+    lineLength: 1
+    vfxId: VFX_AS_BUFF
   attackVfxId: Breaker_S
   evolvesIntoEn: Lucario
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 5652155190952240467, guid: deb53040ef3dabe4d8e98f2d2e7db687, type: 3}
+  icon: {fileID: 21300000, guid: 9c3c088bded17f94fbb3752f39e92dea, type: 3}

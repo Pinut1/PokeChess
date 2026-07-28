@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdcdedd7606753a4abd6d57346c891b8, type: 3}
   m_Name: Normal_Synergy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  id: 6
+  id: 7
   synergyName: "\uB178\uB9D0"
   synergyNameEn: Normal
   tiers:
   - count: 2
-    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 +5%"
+    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 \uBE44\uC728 \uC99D\uAC00"
   - count: 4
-    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 +10%"
+    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 \uBE44\uC728 \uC99D\uAC00"
   - count: 6
-    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 +15%"
-  icon: {fileID: 0}
+    effectDescription: "\uCE58\uBA85\uD0C0 \uD655\uB960 \uBE44\uC728 \uC99D\uAC00"
+  icon: {fileID: -131210640, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}

@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Ground
   role: Tanker
-  skillId: GROUND_TANKER
+  skillId: MudSport
   skill:
-    skillId: GROUND_TANKER
-    skillName: "\uCCA0\uBCBD\uC218\uBE44"
-    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9"
+    skillId: MudSport
+    skillName: "\uD759\uB180\uC774"
+    description: "\uC790\uC2E0 \uBCF4\uD638\uB9C9 / \uB514\uADF8\uB2E4, \uB531\uAD6C\uB9AC"
     effectType: 3
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Ground_Tanker
+    vfxId: VFX_Ground_Tanker_SHIELD
   attackVfxId: Ground_S
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 1302901500846610223, guid: 9d47b7512cae6c742bafc0717b6a8d17, type: 3}
+  icon: {fileID: 21300000, guid: d5f93fb59840dbc418882c9f354c00cf, type: 3}

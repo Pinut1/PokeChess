@@ -17,11 +17,11 @@ MonoBehaviour:
   synergyNameEn: Poison
   tiers:
   - count: 3
-    effectDescription: "\uBC29\uC5B4\uB825 +15"
+    effectDescription: "defense \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 5
-    effectDescription: "\uBC29\uC5B4\uB825 +30"
+    effectDescription: "defense \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 7
-    effectDescription: "\uBC29\uC5B4\uB825 +50"
+    effectDescription: "defense \uACE0\uC815\uAC12 \uC99D\uAC00"
   - count: 9
-    effectDescription: "\uBC29\uC5B4\uB825 +70"
-  icon: {fileID: 0}
+    effectDescription: "defense \uACE0\uC815\uAC12 \uC99D\uAC00"
+  icon: {fileID: -1032460738, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}

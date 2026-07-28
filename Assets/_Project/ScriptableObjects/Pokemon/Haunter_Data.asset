@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Poison
   role: Magician
-  skillId: POISON_MAGICIAN
+  skillId: GunkShot
   skill:
-    skillId: POISON_MAGICIAN
-    skillName: "\uB3C5\uAC00\uC2A4"
-    description: "\uAD11\uC5ED \uB3C5 \uB370\uBBF8\uC9C0"
+    skillId: GunkShot
+    skillName: "\uB354\uC2A4\uD2B8\uC288\uD2B8"
+    description: "\uACE0\uC624\uC2A4"
     effectType: 1
     targetType: 4
     areaRadius: 1
     lineLength: 4
-    vfxId: VFX_Poison_Magician
+    vfxId: VFX_Poison_Magician_SPELL
   attackVfxId: Poison_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 3362991714799904907, guid: 684f661a4ade6784999311722fa5271c, type: 3}
+  icon: {fileID: 21300000, guid: 8a91984e13a896048b32908893ca445d, type: 3}

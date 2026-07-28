@@ -35,4 +35,4 @@ MonoBehaviour:
   criDmgPct: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 919dbee5cfe50c1418c302776998e845, type: 3}

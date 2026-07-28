@@ -27,18 +27,19 @@ MonoBehaviour:
   - Grass
   - Poison
   role: Supporter
-  skillId: GRASS_SUPPORTER
+  skillId: GrassWhistle
   skill:
-    skillId: GRASS_SUPPORTER
-    skillName: "\uC528\uBFCC\uB9AC\uAE30"
-    description: "\uC8FC\uBCC0 \uC544\uAD70 HP \uD68C\uBCF5"
+    skillId: GrassWhistle
+    skillName: "\uD480\uD53C\uB9AC"
+    description: "\uC8FC\uBCC0 \uC544\uAD70 HP \uD68C\uBCF5 / \uB69C\uBC85\uCD78,
+      \uD574\uB108\uCE20"
     effectType: 2
     targetType: 2
     areaRadius: 2
     lineLength: 4
-    vfxId: VFX_Grass_Supporter
+    vfxId: VFX_Grass_Supporter_HP_REGEN
   attackVfxId: Grass_L
   evolvesIntoEn: 
   shopBuyable: 0
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 7500470685504244186, guid: ead807fb63228d04cbdec487ec70255a, type: 3}
+  icon: {fileID: 21300000, guid: 47b5a46a3c833cc47af16a1d6dd672d6, type: 3}

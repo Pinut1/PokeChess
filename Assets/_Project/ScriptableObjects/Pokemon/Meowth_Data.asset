@@ -26,18 +26,18 @@ MonoBehaviour:
   synergies:
   - Normal
   role: Assassin
-  skillId: NORMAL_ASSASSIN
+  skillId: CrushClaw
   skill:
-    skillId: NORMAL_ASSASSIN
-    skillName: "\uCE7C\uB85C\uC798\uB77C"
-    description: "\uB2E8\uC77C \uC801 \uACE0\uB370\uBBF8\uC9C0"
+    skillId: CrushClaw
+    skillName: "\uBE0C\uB808\uC774\uD06C\uD074\uB85C"
+    description: "\uB098\uC639"
     effectType: 1
     targetType: 3
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Normal_Assassin
+    vfxId: VFX_Normal_Assassin_SPELL
   attackVfxId: Normal_S
   evolvesIntoEn: Persian
   shopBuyable: 1
-  modelPrefab: {fileID: 0}
-  icon: {fileID: 0}
+  modelPrefab: {fileID: 890747016085531506, guid: 5550d33509f91e242b4b76fe19866088, type: 3}
+  icon: {fileID: 21300000, guid: 24da129163870f349b79b1d99ad20af1, type: 3}

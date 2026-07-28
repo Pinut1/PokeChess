@@ -97,12 +97,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
         GameEvents.OnGoldTransferRequested += HandleGoldTransferRequested;
+        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
     }
 
     public override void OnDisable()
     {
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
         GameEvents.OnGoldTransferRequested -= HandleGoldTransferRequested;
+        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
 
         base.OnDisable();
     }
@@ -2370,6 +2372,16 @@ public class NetworkManager : MonoBehaviour
 
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;
+
+    private void OnEnable()
+    {
+        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+    }
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글.</summary>
     public static bool DebugInfiniteTeamHealth = false;
