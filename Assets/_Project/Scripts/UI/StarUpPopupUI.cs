@@ -9,8 +9,9 @@ using UnityEngine;
 /// </summary>
 public class StarUpPopupUI : MonoBehaviour
 {
-    [SerializeField] private GameObject _star2;
-    [SerializeField] private GameObject _star3;
+    [Tooltip("별 아이콘들. 왼쪽부터 성급만큼 켜진다(2성=2개, 3성=3개). 3개를 배치해두면 된다. " +
+             "Horizontal Layout Group 아래 두면 꺼진 아이콘이 자리를 비워 자동으로 가운데 정렬된다.")]
+    [SerializeField] private GameObject[] _starIcons;
 
     [Tooltip("페이드용. 없으면 알파 처리 없이 표시/숨김만 한다.")]
     [SerializeField] private CanvasGroup _canvasGroup;
@@ -19,11 +20,15 @@ public class StarUpPopupUI : MonoBehaviour
 
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
 
-    /// <summary>2성/3성 표식 선택. 그 외 값이면 둘 다 끈다.</summary>
+    /// <summary>배치된 아이콘 중 앞에서부터 성급만큼 켠다. 1성이면 전부 끈다.</summary>
     public void SetStar(int starLevel)
     {
-        if (_star2 != null) _star2.SetActive(starLevel == 2);
-        if (_star3 != null) _star3.SetActive(starLevel >= 3);
+        if (_starIcons == null) return;
+
+        int show = starLevel >= 2 ? starLevel : 0;
+
+        for (int i = 0; i < _starIcons.Length; i++)
+            if (_starIcons[i] != null) _starIcons[i].SetActive(i < show);
     }
 
     public void SetAlpha(float alpha)
