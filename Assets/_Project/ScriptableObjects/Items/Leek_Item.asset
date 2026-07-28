@@ -10,18 +10,29 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
-  m_Name: Enigma Berry_Item
+  m_Name: Leek_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 10
-  itemName: "\uC758\uBB38\uC5F4\uB9E4"
-  itemNameEn: Enigma Berry
-  description: "\uCE58\uBA85\uC801 \uD53C\uD574 \uBC1B\uC744 \uC2DC \uCD5C\uB300
-    HP 30% \uBCF4\uD638\uB9C9 \uBC1C\uB3D9(1\uD68C)"
+  id: 5
+  itemName: "\uB300\uD30C"
+  itemNameEn: Leek
+  description: "\uC815\uBC00\uC744 \uC5BB\uC2B5\uB2C8\uB2E4\n\n\uC815\uBC00: \uC2A4\uD0AC
+    \uD53C\uD574\uC5D0 \uCE58\uBA85\uD0C0\uAC00 \uC801\uC6A9\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.
+    \uCD94\uAC00 \uC815\uBC00 \uD68D\uB4DD \uC2DC \uCE58\uBA85\uD0C0 \uD53C\uD574\uB7C9\uC774
+    10% \uC99D\uAC00\uD569\uB2C8\uB2E4"
+  sourceStats:
+  - key: AP
+    value: 35
+    isPercent: 0
+    hasValue: 1
+  - key: CRT
+    value: 35
+    isPercent: 1
+    hasValue: 1
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
-  shieldPctOnFatalHit: 30
+  shieldPctOnFatalHit: 0
   attackBonus: 0
   spAtkPct: 0
   attackSpeedBonus: 0
@@ -31,7 +42,7 @@ MonoBehaviour:
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
-  criPct: 0
+  criPct: 35
   criDmgPct: 0
   burnNearOnPhysHit: 0
   ccImmune: 0

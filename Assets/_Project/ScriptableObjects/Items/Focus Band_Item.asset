@@ -10,16 +10,29 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
-  m_Name: Leppa Berry_Item
+  m_Name: Focus Band_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 11
-  itemName: "\uACFC\uC0AC\uC5F4\uB9E4"
-  itemNameEn: Leppa Berry
-  description: "\uCD5C\uB300 HP +200, \uD53C\uACA9 \uD53C\uD574\uC758 10% HP \uD761\uC218"
-  hpBonus: 200
+  id: 4
+  itemName: "\uAE30\uD569\uC758\uBA38\uB9AC\uB760"
+  itemNameEn: Focus Band
+  description: "2\uAC00\uC9C0 \uD6A8\uACFC \uD68D\uB4DD:\n\n\uC8FC\uBB38\uB825 15%\n\n\uBAA8\uB4E0
+    \uD53C\uD574 \uD761\uD608 12%\n\n\uCCB4\uB825\uC774 50%\uB97C \uB118\uC744 \uB54C
+    \uC8FC\uBB38\uB825 \uB450 \uBC30\uB85C \uC99D\uAC00\n\n\uCCB4\uB825\uC774 50%
+    \uC544\uB798\uC77C \uB54C \uBAA8\uB4E0 \uD53C\uD574 \uD761\uD608 \uB450 \uBC30\uB85C
+    \uC99D\uAC00"
+  sourceStats:
+  - key: CRT
+    value: 20
+    isPercent: 1
+    hasValue: 1
+  - key: MP
+    value: 1
+    isPercent: 0
+    hasValue: 1
+  hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
-  healTakenDmgPct: 10
+  healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
   spAtkPct: 0
@@ -30,7 +43,7 @@ MonoBehaviour:
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
-  criPct: 0
+  criPct: 20
   criDmgPct: 0
   burnNearOnPhysHit: 0
   ccImmune: 0

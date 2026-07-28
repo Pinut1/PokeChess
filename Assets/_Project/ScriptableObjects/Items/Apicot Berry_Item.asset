@@ -12,12 +12,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Apicot Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 9
+  id: 6
   itemName: "\uADDC\uC0B4\uC5F4\uB9E4"
   itemNameEn: Apicot Berry
-  description: "\uD2B9\uC218\uBC29\uC5B4 +30, \uD2B9\uC218 \uD53C\uACA9 \uC2DC \uBC1B\uC740
-    \uD53C\uD574\uC758 15% \uBC18\uC0AC"
-  hpBonus: 0
+  description: "\uC804\uD22C \uC2DC\uC791: 8\uCD08 \uB3D9\uC548 \uCD5C\uB300 \uCCB4\uB825\uC758
+    25%\uC5D0 \uD574\uB2F9\uD558\uB294 \uBCF4\uD638\uB9C9 \uD68D\uB4DD\n\n\uBCF4\uD638\uB9C9\uC774
+    \uC0AC\uB77C\uC9C0\uBA74 \uC8FC\uBB38\uB825 25% \uC99D\uAC00"
+  sourceStats:
+  - key: HP
+    value: 100
+    isPercent: 0
+    hasValue: 1
+  - key: AP
+    value: 20
+    isPercent: 0
+    hasValue: 1
+  - key: DEF
+    value: 20
+    isPercent: 0
+    hasValue: 1
+  hpBonus: 100
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
@@ -26,10 +40,10 @@ MonoBehaviour:
   spAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
-  defenseBonus: 0
-  spDefBonus: 30
+  defenseBonus: 20
+  spDefBonus: 0
   reflectPhysPct: 0
-  reflectSpPct: 15
+  reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0

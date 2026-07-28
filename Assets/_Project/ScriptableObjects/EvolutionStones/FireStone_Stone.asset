@@ -16,10 +16,13 @@ MonoBehaviour:
   stoneName: "\uBD88\uAF43\uC758\uB3CC"
   stoneNameEn: FireStone
   stoneType: fire
-  description: "\uBD88\uAF43 \uD0C0\uC785 \uC9C4\uD654"
+  description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
+    \uC774\uC0C1\uD55C \uB3CC. \uC8FC\uD669\uC0C9\uC744 \uB760\uACE0 \uC788\uB2E4."
   mappings:
-  - targetPokemon: Vulpix
-    evolvedPokemon: Ninetales
   - targetPokemon: Eevee
     evolvedPokemon: Flareon
+  - targetPokemon: Growlithe
+    evolvedPokemon: Arcanine
+  - targetPokemon: Vulpix
+    evolvedPokemon: Ninetales
   icon: {fileID: 21300000, guid: 998da5513641ad34089c7bc6e6322190, type: 3}

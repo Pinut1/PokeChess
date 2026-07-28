@@ -12,16 +12,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Liechi Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 4
+  id: 9
   itemName: "\uCE58\uB9AC\uC5F4\uB9E4"
   itemNameEn: Liechi Berry
-  description: "\uBB3C\uB9AC \uACF5\uACA9\uB825 +45"
+  description: "\uC774 \uAC80\uC758 \uC8FC\uC778\uC740 \uB354\uC5C6\uB294 \uD3C9\uD654\uC640
+    \uC548\uC815\uC744 \uCC3E\uAC8C \uB429\uB2C8\uB2E4. \uC8FC\uC778\uC758 \uC801\uB4E4\uB3C4
+    \uB9C8\uCC2C\uAC00\uC9C0\uACE0\uC694.\n\n\uACF5\uACA9\uB825 55% \uC99D\uAC00,
+    \uD53C\uD574 \uC99D\uD3ED 15% \uC99D\uAC00"
+  sourceStats:
+  - key: AD
+    value: 55
+    isPercent: 1
+    hasValue: 1
+  - key: DEF
+    value: 10
+    isPercent: 1
+    hasValue: 1
+  - key: AMP
+    value: 0
+    isPercent: 0
+    hasValue: 0
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
-  attackBonus: 45
+  attackBonus: 0
   spAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0

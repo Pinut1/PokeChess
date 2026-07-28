@@ -12,10 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Lansat Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 6
+  id: 16
   itemName: "\uB791\uC0AC\uC5F4\uB9E4"
   itemNameEn: Lansat Berry
-  description: "\uCE58\uBA85\uD0C0\uC728 +25%, \uCE58\uBA85\uD0C0 \uD53C\uD574 +30%"
+  description: "\uC815\uBC00\uC744 \uC5BB\uC2B5\uB2C8\uB2E4.\n\n\uC815\uBC00: \uC2A4\uD0AC
+    \uD53C\uD574\uC5D0 \uCE58\uBA85\uD0C0\uAC00 \uC801\uC6A9\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.
+    \uCD94\uAC00 \uC815\uBC00 \uD68D\uB4DD \uC2DC \uCE58\uBA85\uD0C0 \uD53C\uD574\uB7C9\uC774
+    10% \uC99D\uAC00\uD569\uB2C8\uB2E4"
+  sourceStats:
+  - key: AD
+    value: 35
+    isPercent: 1
+    hasValue: 1
+  - key: CRT
+    value: 35
+    isPercent: 1
+    hasValue: 1
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
@@ -30,8 +42,8 @@ MonoBehaviour:
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
-  criPct: 25
-  criDmgPct: 30
+  criPct: 35
+  criDmgPct: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 80056d0d909b8b043a60eddcc971b0c8, type: 3}

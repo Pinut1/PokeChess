@@ -16,10 +16,14 @@ MonoBehaviour:
   stoneName: "\uBB3C\uC758\uB3CC"
   stoneNameEn: WaterStone
   stoneType: water
-  description: "\uBB3C \uD0C0\uC785 \uC9C4\uD654"
+  description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
+    \uC774\uC0C1\uD55C \uB3CC. \uD22C\uBA85\uD55C \uD478\uB978\uC0C9\uC744 \uB760\uACE0
+    \uC788\uB2E4."
   mappings:
-  - targetPokemon: Poliwhirl
-    evolvedPokemon: Poliwrath
   - targetPokemon: Eevee
     evolvedPokemon: Vaporeon
+  - targetPokemon: Poliwhirl
+    evolvedPokemon: Poliwrath
+  - targetPokemon: Staryu
+    evolvedPokemon: Starmie
   icon: {fileID: 21300000, guid: 0f41cb47452291d469b54cdf6c49a1f3, type: 3}

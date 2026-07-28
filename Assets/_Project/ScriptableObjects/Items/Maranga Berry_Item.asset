@@ -12,12 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Maranga Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 13
-  itemName: "\uD0C0\uB77C\uD504\uC5F4\uB9E4"
+  id: 1
+  itemName: "\uD2F0\uB77C\uD504\uC5F4\uB9E4"
   itemNameEn: Maranga Berry
-  description: "\uC790\uC2E0\uC744 \uACF5\uACA9 \uC911\uC778 \uC801 1\uBA85\uB2F9
-    \uBC29\uC5B4\uB825/\uD2B9\uC218\uBC29\uC5B4 +X"
-  hpBonus: 0
+  description: "\uC801\uC758 \uACF5\uACA9 \uB300\uC0C1\uC774 \uB418\uBA74 \uBC29\uC5B4\uB825\uC774
+    10, \uB0B4\uAD6C\uB825\uC774 10 \uC99D\uAC00. \uACF5\uACA9\uD558\uB294 \uC801\uC774
+    \uB298\uC5B4\uB098\uBA74 \uC911\uCCA9\uB418\uC5B4 \uC801\uC6A9"
+  sourceStats:
+  - key: HP
+    value: 100
+    isPercent: 0
+    hasValue: 1
+  - key: DEF
+    value: 30
+    isPercent: 0
+    hasValue: 1
+  hpBonus: 100
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
@@ -26,7 +36,7 @@ MonoBehaviour:
   spAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
-  defenseBonus: 0
+  defenseBonus: 30
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0

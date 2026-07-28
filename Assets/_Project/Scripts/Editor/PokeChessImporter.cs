@@ -67,6 +67,16 @@ public static class PokeChessImporter
         public string name, nameEn, description;
         public string statKey, statKey2;
         public float  statValue, statValue2;
+        public List<ItemStatEntry> stats;
+    }
+
+    [Serializable]
+    private class ItemStatEntry
+    {
+        public string key;
+        public float value;
+        public bool isPercent;
+        public bool hasValue = true;
     }
 
     [Serializable]
@@ -296,8 +306,43 @@ public static class PokeChessImporter
             so.itemNameEn  = e.nameEn;
             so.description = e.description;
 
-            if (!string.IsNullOrEmpty(e.statKey))  ApplyItemStat(so, e.statKey,  e.statValue);
-            if (!string.IsNullOrEmpty(e.statKey2)) ApplyItemStat(so, e.statKey2, e.statValue2);
+            ResetItemStats(so);
+            so.sourceStats.Clear();
+
+            if (e.stats != null && e.stats.Count > 0)
+            {
+                foreach (var stat in e.stats)
+                {
+                    if (stat == null || string.IsNullOrWhiteSpace(stat.key)) continue;
+
+                    so.sourceStats.Add(new ItemStatModifier
+                    {
+                        key       = stat.key.Trim(),
+                        value     = stat.value,
+                        isPercent = stat.isPercent,
+                        hasValue  = stat.hasValue,
+                    });
+
+                    if (stat.hasValue)
+                        ApplyGeneralItemStat(so, stat.key.Trim(), stat.value, stat.isPercent);
+                    else
+                        Debug.LogWarning($"[PokeChess] Item id={e.id} '{e.nameEn}'의 {stat.key} 값이 비어 있음");
+                }
+            }
+            else
+            {
+                // 구형 item_data.json 호환.
+                if (!string.IsNullOrEmpty(e.statKey))
+                {
+                    so.sourceStats.Add(new ItemStatModifier { key = e.statKey, value = e.statValue });
+                    ApplyItemStat(so, e.statKey, e.statValue);
+                }
+                if (!string.IsNullOrEmpty(e.statKey2))
+                {
+                    so.sourceStats.Add(new ItemStatModifier { key = e.statKey2, value = e.statValue2 });
+                    ApplyItemStat(so, e.statKey2, e.statValue2);
+                }
+            }
 
             EditorUtility.SetDirty(so);
             imported.Add(so);
@@ -994,6 +1039,51 @@ public static class PokeChessImporter
             case "burnNearOnPhysHit":   so.burnNearOnPhysHit    = value > 0; break;
             case "ccImmune":            so.ccImmune             = value > 0; break;
             default: Debug.LogWarning($"[PokeChess] 알 수 없는 statKey: {key}"); break;
+        }
+    }
+
+    private static void ResetItemStats(ItemData so)
+    {
+        so.hpBonus = 0f;
+        so.maxHpPct = 0f;
+        so.hpRegenPercent = 0f;
+        so.healTakenDmgPct = 0f;
+        so.shieldPctOnFatalHit = 0f;
+        so.attackBonus = 0f;
+        so.spAtkPct = 0f;
+        so.attackSpeedBonus = 0f;
+        so.moveSpdPctOnKill = 0f;
+        so.defenseBonus = 0f;
+        so.spDefBonus = 0f;
+        so.reflectPhysPct = 0f;
+        so.reflectSpPct = 0f;
+        so.defSpDefPerAttacker = 0f;
+        so.criPct = 0f;
+        so.criDmgPct = 0f;
+        so.burnNearOnPhysHit = false;
+        so.ccImmune = false;
+    }
+
+    /// <summary>
+    /// GeneralItem 시트의 공통 약어를 현재 런타임 스탯에 안전하게 투영한다.
+    /// 현재 런타임에 대응 필드가 없거나 단위가 맞지 않는 값은 sourceStats에만 보존한다.
+    /// </summary>
+    private static void ApplyGeneralItemStat(ItemData so, string key, float value, bool isPercent)
+    {
+        switch (key.ToUpperInvariant())
+        {
+            case "HP" when !isPercent:  so.hpBonus += value; break;
+            case "AD" when !isPercent:  so.attackBonus += value; break;
+            case "AP" when isPercent:   so.spAtkPct += value; break;
+            case "AS" when isPercent:   so.attackSpeedBonus += value; break;
+            case "DEF" when !isPercent: so.defenseBonus += value; break;
+            case "CRT" when isPercent:  so.criPct += value; break;
+
+            // MP(시작 마나), VMP(모든 피해 흡혈), AMP(피해 증폭),
+            // flat AP 및 % AD/DEF는 현재 ItemData/BattleUnit에 대응 필드가 없다.
+            default:
+                Debug.LogWarning($"[PokeChess] 현재 런타임 미지원 GeneralItem 스탯: {key}={value}{(isPercent ? "%" : "")}");
+                break;
         }
     }
 

@@ -10,13 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
-  m_Name: Lum Berry_Item
+  m_Name: Choice Band_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 2
-  itemName: "\uB9AC\uC0D8\uC5F4\uB9E4"
-  itemNameEn: Lum Berry
-  description: "\uCCAB CC\uBB34\uD6A8\uD654"
-  hpBonus: 0
+  id: 18
+  itemName: "\uAD6C\uC560\uBA38\uB9AC\uB760"
+  itemNameEn: Choice Band
+  description: "\uC804\uD22C \uC2DC\uC791: \uC7A5\uCC29 \uC720\uB2DB\uACFC 2\uCE78
+    \uB0B4\uC5D0 \uC788\uB294 \uAC19\uC740 \uC5F4\uC758 \uC544\uAD70\uC774 \uACF5\uACA9
+    \uC18D\uB3C4 30% \uD68D\uB4DD"
+  sourceStats:
+  - key: HP
+    value: 250
+    isPercent: 0
+    hasValue: 1
+  hpBonus: 250
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
@@ -33,5 +40,5 @@ MonoBehaviour:
   criPct: 0
   criDmgPct: 0
   burnNearOnPhysHit: 0
-  ccImmune: 1
+  ccImmune: 0
   icon: {fileID: 0}

@@ -12,17 +12,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Petaya Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 5
+  id: 12
   itemName: "\uC57C\uD0C0\uBE44\uC5F4\uB9E4"
   itemNameEn: Petaya Berry
-  description: "\uD2B9\uC218 \uACF5\uACA9\uB825 +50%"
+  description: "\uD3C9\uBC94\uD574 \uBCF4\uC774\uC9C0\uB9CC \uC6B0\uC8FC\uB97C \uCC3D\uC870\uD558\uAC70\uB098
+    \uD30C\uAD34\uD560 \uC218 \uC788\uB294 \uBAA8\uC790\uC785\uB2C8\uB2E4.\n\n\uC8FC\uBB38\uB825
+    50% \uC99D\uAC00, \uD53C\uD574 \uC99D\uD3ED 15% \uC99D\uAC00"
+  sourceStats:
+  - key: AP
+    value: 50
+    isPercent: 0
+    hasValue: 1
+  - key: AMP
+    value: 15
+    isPercent: 1
+    hasValue: 1
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
-  spAtkPct: 50
+  spAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 0

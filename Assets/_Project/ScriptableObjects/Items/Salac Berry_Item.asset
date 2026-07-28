@@ -12,10 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c778845d67e330d48b7b8393a4e6bb44, type: 3}
   m_Name: Salac Berry_Item
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  id: 3
+  id: 14
   itemName: "\uCE84\uB77C\uC5F4\uB9E4"
   itemNameEn: Salac Berry
-  description: "\uACF5\uACA9\uC18D\uB3C4 +40%"
+  description: "\uB9E4\uCD08 \uACF5\uACA9 \uC18D\uB3C4 7% \uD68D\uB4DD (\uC911\uCCA9
+    \uAC00\uB2A5)"
+  sourceStats:
+  - key: AS
+    value: 10
+    isPercent: 1
+    hasValue: 1
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
@@ -23,7 +29,7 @@ MonoBehaviour:
   shieldPctOnFatalHit: 0
   attackBonus: 0
   spAtkPct: 0
-  attackSpeedBonus: 40
+  attackSpeedBonus: 10
   moveSpdPctOnKill: 0
   defenseBonus: 0
   spDefBonus: 0

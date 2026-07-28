@@ -16,8 +16,11 @@ MonoBehaviour:
   stoneName: "\uD0DC\uC591\uC758\uB3CC"
   stoneNameEn: SunStone
   stoneType: sun
-  description: "\uD480 \uD0C0\uC785 \uC9C4\uD654"
+  description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
+    \uC774\uC0C1\uD55C \uB3CC. \uD0DC\uC591\uCC98\uB7FC \uBE68\uAC1B\uB2E4."
   mappings:
+  - targetPokemon: Sunkern
+    evolvedPokemon: Sunflora
   - targetPokemon: Gloom
     evolvedPokemon: Bellossom
   icon: {fileID: 21300000, guid: 21e058ef8dd3df44cb3fba6d7d757a73, type: 3}

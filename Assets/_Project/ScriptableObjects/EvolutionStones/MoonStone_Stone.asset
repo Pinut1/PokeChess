@@ -16,10 +16,13 @@ MonoBehaviour:
   stoneName: "\uB2EC\uC758\uB3CC"
   stoneNameEn: MoonStone
   stoneType: moon
-  description: "\uD398\uC5B4\uB9AC \uC9C4\uD654"
+  description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
+    \uC774\uC0C1\uD55C \uB3CC. \uBC24\uD558\uB298\uCC98\uB7FC \uAE4C\uB9E3\uB2E4."
   mappings:
-  - targetPokemon: Clefairy
-    evolvedPokemon: Clefable
   - targetPokemon: Jigglypuff
     evolvedPokemon: Wigglytuff
+  - targetPokemon: Clefairy
+    evolvedPokemon: Clefable
+  - targetPokemon: Skitty
+    evolvedPokemon: Delcatty
   icon: {fileID: 21300000, guid: 1e0305fd8bffad94a98f7b750aeb9c5d, type: 3}

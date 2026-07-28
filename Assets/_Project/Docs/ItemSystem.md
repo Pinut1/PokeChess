@@ -10,20 +10,21 @@
 
 ---
 
-## Item 시트 컬럼
+## Item JSON (GeneralItem 시트)
 ```
-id | name | nameEn | description | statKey | statValue | statKey2 | statValue2
+id | name | nameEn | description | stats[]
 ```
-- 레시피/조합 없음 — 단일 아이템
-- 스탯 1개면 statKey2 / statValue2 비워두기
+- `stats[]`: `{ key, value, isPercent, hasValue }`
+- GeneralItem 원본의 복합 스탯을 개수 제한 없이 보존한다.
+- 구형 `statKey/statValue/statKey2/statValue2` JSON도 임포터에서 계속 지원한다.
 
-### 사용 가능한 statKey 목록
+### GeneralItem 공통 약어
 ```
-hp, maxHpPct, hpRegenPercent, healTakenDmgPct, shieldPctOnFatalHit
-atk, spAtkPct, atkSpdPct, moveSpdPctOnKill
-def, spDef, reflectPhysPct, reflectSpPct, defSpDefPerAttacker
-criPct, criDmgPct, burnNearOnPhysHit
+HP, AD, AP, AS, DEF, MP, VMP, CRT, AMP
 ```
+
+현재 전투 런타임에 바로 반영되는 조합은 flat `HP/AD/DEF`, percent `AP/AS/CRT`다.
+`MP/VMP/AMP`, flat AP, percent AD/DEF는 `sourceStats`에 보존되지만 효과 구현은 별도 작업이다.
 
 ---
 

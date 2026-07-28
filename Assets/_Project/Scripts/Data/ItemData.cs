@@ -1,4 +1,15 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
+
+[Serializable]
+public class ItemStatModifier
+{
+    public string key;
+    public float value;
+    public bool isPercent;
+    public bool hasValue = true;
+}
 
 [CreateAssetMenu(menuName = "PokeChess/Item", fileName = "NewItem_Data")]
 public class ItemData : ScriptableObject
@@ -10,6 +21,9 @@ public class ItemData : ScriptableObject
 
     [TextArea]
     public string description;
+
+    [Header("원본 스탯 (GeneralItem 시트)")]
+    public List<ItemStatModifier> sourceStats = new();
 
     [Header("스탯 효과")]
     public float hpBonus;               // hp

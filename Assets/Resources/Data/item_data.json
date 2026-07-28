@@ -1,118 +1,195 @@
 [
   {
     "id": 1,
-    "name": "자뭉열매",
-    "nameEn": "Sitrus Berry",
-    "description": "최대체력 +18%",
-    "statKey": "maxHpPct",
-    "statValue": 18
+    "name": "티라프열매",
+    "nameEn": "Maranga Berry",
+    "description": "적의 공격 대상이 되면 방어력이 10, 내구력이 10 증가. 공격하는 적이 늘어나면 중첩되어 적용",
+    "stats": [
+      { "key": "HP", "value": 100, "isPercent": false, "hasValue": true },
+      { "key": "DEF", "value": 30, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 2,
-    "name": "리샘열매",
-    "nameEn": "Lum Berry",
-    "description": "첫 CC무효화",
-    "statKey": "ccImmune",
-    "statValue": 1
+    "name": "자뭉열매",
+    "nameEn": "Sitrus Berry",
+    "description": "최대 체력 18% 획득",
+    "stats": [
+      { "key": "HP", "value": 500, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 3,
-    "name": "캄라열매",
-    "nameEn": "Salac Berry",
-    "description": "공격속도 +40%",
-    "statKey": "atkSpdPct",
-    "statValue": 40
+    "name": "먹다남은음식",
+    "nameEn": "Leftovers",
+    "description": "매초 잃은 체력의 2%만큼 체력 회복",
+    "stats": [
+      { "key": "HP", "value": 300, "isPercent": false, "hasValue": true },
+      { "key": "DEF", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "MP", "value": 2, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 4,
-    "name": "치리열매",
-    "nameEn": "Liechi Berry",
-    "description": "물리 공격력 +45",
-    "statKey": "atk",
-    "statValue": 45
+    "name": "기합의머리띠",
+    "nameEn": "Focus Band",
+    "description": "2가지 효과 획득:\n\n주문력 15%\n\n모든 피해 흡혈 12%\n\n체력이 50%를 넘을 때 주문력 두 배로 증가\n\n체력이 50% 아래일 때 모든 피해 흡혈 두 배로 증가",
+    "stats": [
+      { "key": "CRT", "value": 20, "isPercent": true, "hasValue": true },
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 5,
-    "name": "야타비열매",
-    "nameEn": "Petaya Berry",
-    "description": "특수 공격력 +50%",
-    "statKey": "spAtkPct",
-    "statValue": 50
+    "name": "대파",
+    "nameEn": "Leek",
+    "description": "정밀을 얻습니다\n\n정밀: 스킬 피해에 치명타가 적용될 수 있습니다. 추가 정밀 획득 시 치명타 피해량이 10% 증가합니다",
+    "stats": [
+      { "key": "AP", "value": 35, "isPercent": false, "hasValue": true },
+      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true }
+    ]
   },
   {
     "id": 6,
-    "name": "랑사열매",
-    "nameEn": "Lansat Berry",
-    "description": "치명타율 +25%, 치명타 피해 +30%",
-    "statKey": "criPct",
-    "statValue": 25,
-    "statKey2": "criDmgPct",
-    "statValue2": 30
+    "name": "규살열매",
+    "nameEn": "Apicot Berry",
+    "description": "전투 시작: 8초 동안 최대 체력의 25%에 해당하는 보호막 획득\n\n보호막이 사라지면 주문력 25% 증가",
+    "stats": [
+      { "key": "HP", "value": 100, "isPercent": false, "hasValue": true },
+      { "key": "AP", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 7,
-    "name": "미클열매",
-    "nameEn": "Micle Berry",
-    "description": "공격속도 +30%, 적 처치시 이동속도 +30%",
-    "statKey": "atkSpdPct",
-    "statValue": 30,
-    "statKey2": "moveSpdPctOnKill",
-    "statValue2": 30
+    "name": "조개껍질방울",
+    "nameEn": "Shell Bell",
+    "description": "전투당 한 번, 체력이 40%일 때 최대 체력의 25%에 해당하는 보호막 획득 후 최대 5초까지 유지",
+    "stats": [
+      { "key": "AD", "value": 15, "isPercent": true, "hasValue": true },
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "VMP", "value": 20, "isPercent": true, "hasValue": true }
+    ]
   },
   {
     "id": 8,
-    "name": "용아열매",
-    "nameEn": "Ganlon Berry",
-    "description": "방어력 +30, 물리 피격 시 받은 피해의 15% 반사",
-    "statKey": "def",
-    "statValue": 30,
-    "statKey2": "reflectPhysPct",
-    "statValue2": 15
+    "name": "의문열매",
+    "nameEn": "Micle Berry",
+    "description": "체력이 60%일 때, 장착 유닛 최대 체력의 40%에 해당하는 보호막 획득. 보호막은 4초에 걸쳐 빠르게 사라짐",
+    "stats": [
+      { "key": "HP", "value": 300, "isPercent": false, "hasValue": true },
+      { "key": "AD", "value": 40, "isPercent": true, "hasValue": true }
+    ]
   },
   {
     "id": 9,
-    "name": "규살열매",
-    "nameEn": "Apicot Berry",
-    "description": "특수방어 +30, 특수 피격 시 받은 피해의 15% 반사",
-    "statKey": "spDef",
-    "statValue": 30,
-    "statKey2": "reflectSpPct",
-    "statValue2": 15
+    "name": "치리열매",
+    "nameEn": "Liechi Berry",
+    "description": "이 검의 주인은 더없는 평화와 안정을 찾게 됩니다. 주인의 적들도 마찬가지고요.\n\n공격력 55% 증가, 피해 증폭 15% 증가",
+    "stats": [
+      { "key": "AD", "value": 55, "isPercent": true, "hasValue": true },
+      { "key": "DEF", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "AMP", "value": 0, "isPercent": false, "hasValue": false }
+    ]
   },
   {
     "id": 10,
-    "name": "의문열매",
-    "nameEn": "Enigma Berry",
-    "description": "치명적 피해 받을 시 최대 HP 30% 보호막 발동(1회)",
-    "statKey": "shieldPctOnFatalHit",
-    "statValue": 30
+    "name": "왕의징표석",
+    "nameEn": "King's Rock",
+    "description": "공격하거나 피해를 받으면 공격력 2%, 주문력 2% 증가 (최대 25회 중첩)\n\n최대 중첩 시 피해 증폭 10% 획득 및 군중 제어 효과에 면역이 됨",
+    "stats": [
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true }
+    ]
   },
   {
     "id": 11,
-    "name": "과사열매",
-    "nameEn": "Leppa Berry",
-    "description": "최대 HP +200, 피격 피해의 10% HP 흡수",
-    "statKey": "hp",
-    "statValue": 200,
-    "statKey2": "healTakenDmgPct",
-    "statValue2": 10
+    "name": "삐삐인형",
+    "nameEn": "Poké Doll",
+    "description": "모든 요소로부터 얻는 주문력 10% 증가",
+    "stats": [
+      { "key": "AP", "value": 15, "isPercent": false, "hasValue": true },
+      { "key": "MP", "value": 5, "isPercent": false, "hasValue": true }
+    ]
   },
   {
     "id": 12,
-    "name": "악키열매",
-    "nameEn": "Kee Berry",
-    "description": "방어력 +40, 물리 피격 시 1칸내 적에게 화상",
-    "statKey": "def",
-    "statValue": 40,
-    "statKey2": "burnNearOnPhysHit",
-    "statValue2": 1
+    "name": "야타비열매",
+    "nameEn": "Petaya Berry",
+    "description": "평범해 보이지만 우주를 창조하거나 파괴할 수 있는 모자입니다.\n\n주문력 50% 증가, 피해 증폭 15% 증가",
+    "stats": [
+      { "key": "AP", "value": 50, "isPercent": false, "hasValue": true },
+      { "key": "AMP", "value": 15, "isPercent": true, "hasValue": true }
+    ]
   },
   {
     "id": 13,
-    "name": "타라프열매",
-    "nameEn": "Maranga Berry",
-    "description": "자신을 공격 중인 적 1명당 방어력/특수방어 +X",
-    "statKey": "defSpDefPerAttacker",
-    "statValue": 0
+    "name": "초점렌즈",
+    "nameEn": "Scope Lens",
+    "description": "전투 시작: 전투 중 5초마다 주문력 20% 증가",
+    "stats": [
+      { "key": "AP", "value": 30, "isPercent": false, "hasValue": true },
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "캄라열매",
+    "nameEn": "Salac Berry",
+    "description": "매초 공격 속도 7% 획득 (중첩 가능)",
+    "stats": [
+      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "선제공격손톱",
+    "nameEn": "Quick Claw",
+    "description": "기본 공격 시 공격력 3.5% (최대 15회 중첩) 획득.\n\n기본 공격 15회 후 공격 속도 15% 획득",
+    "stats": [
+      { "key": "AD", "value": 10, "isPercent": false, "hasValue": true },
+      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true }
+    ]
+  },
+  {
+    "id": 16,
+    "name": "랑사열매",
+    "nameEn": "Lansat Berry",
+    "description": "정밀을 얻습니다.\n\n정밀: 스킬 피해에 치명타가 적용될 수 있습니다. 추가 정밀 획득 시 치명타 피해량이 10% 증가합니다",
+    "stats": [
+      { "key": "AD", "value": 35, "isPercent": true, "hasValue": true },
+      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true }
+    ]
+  },
+  {
+    "id": 17,
+    "name": "큰뿌리",
+    "nameEn": "Big Root",
+    "description": "입힌 피해량의 20%만큼 체력 비율이 가장 낮은 아군의 체력 회복",
+    "stats": [
+      { "key": "AD", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "AP", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "VMP", "value": 15, "isPercent": true, "hasValue": true },
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+    ]
+  },
+  {
+    "id": 18,
+    "name": "구애머리띠",
+    "nameEn": "Choice Band",
+    "description": "전투 시작: 장착 유닛과 2칸 내에 있는 같은 열의 아군이 공격 속도 30% 획득",
+    "stats": [
+      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true }
+    ]
+  },
+  {
+    "id": 19,
+    "name": "라즈열매",
+    "nameEn": "Razz Berry",
+    "description": "전투 시작: 장착 유닛과 2칸 내에 있는 같은 열의 아군이 주문력 25와 마나 10 획득",
+    "stats": [
+      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true }
+    ]
   }
 ]
