@@ -19,6 +19,16 @@ public class UnitStatusBarUI : MonoBehaviour
     [SerializeField] private Color _allyHpColor  = new(0.35f, 0.85f, 0.35f);
     [SerializeField] private Color _enemyHpColor = new(0.9f, 0.3f, 0.3f);
 
+    [Header("눈금 (롤 체력바식 구분선)")]
+    [Tooltip("눈금 무늬를 반복해서 그리는 오버레이. 텍스처 Wrap Mode를 Repeat로 두어야 한다. " +
+             "비워두면 눈금 없이 동작한다.")]
+    [SerializeField] private RawImage _tickOverlay;
+    [Tooltip("눈금 하나가 나타내는 최대 체력. 바 폭은 고정이라 체력이 많을수록 눈금이 촘촘해진다. " +
+             "이 프로젝트 HP 범위(1성 300~1500, 3성 최대 약 4200) 기준 100~150이 적당하다.")]
+    [SerializeField] private float _hpPerTick = 150f;
+    [Tooltip("눈금이 과하게 촘촘해지는 것을 막는 상한. 0이면 제한 없음.")]
+    [SerializeField] private int _maxTicks = 30;
+
     private RectTransform _rect;
 
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
@@ -26,8 +36,9 @@ public class UnitStatusBarUI : MonoBehaviour
     /// <summary>
     /// 표시값 갱신. 비율은 0~1로 클램프한다.
     /// manaRatio가 음수면 마나 바를 숨긴다(스킬이 없거나 마나 개념이 없는 상태).
+    /// maxHp는 눈금 개수 계산에만 쓴다.
     /// </summary>
-    public void SetValues(float hpRatio, float manaRatio, bool isAlly)
+    public void SetValues(float hpRatio, float manaRatio, bool isAlly, float maxHp)
     {
         if (_hpFill != null)
         {
@@ -38,6 +49,30 @@ public class UnitStatusBarUI : MonoBehaviour
         bool showMana = manaRatio >= 0f;
         if (_manaRoot != null) _manaRoot.SetActive(showMana);
         if (showMana && _manaFill != null) _manaFill.fillAmount = Mathf.Clamp01(manaRatio);
+
+        ApplyTicks(maxHp);
+    }
+
+    /// <summary>
+    /// 눈금 개수 = maxHp / _hpPerTick. 바 폭이 고정이므로 텍스처를 그 횟수만큼 반복시켜
+    /// 균등한 간격의 구분선을 만든다. 소수점이 남으면 마지막 칸이 잘려 보이는데,
+    /// 이는 "눈금 하나 = 일정 체력"이라는 규칙상 올바른 표현이다.
+    /// </summary>
+    private void ApplyTicks(float maxHp)
+    {
+        if (_tickOverlay == null) return;
+
+        if (_hpPerTick <= 0f || maxHp <= 0f)
+        {
+            _tickOverlay.enabled = false;
+            return;
+        }
+
+        float ticks = maxHp / _hpPerTick;
+        if (_maxTicks > 0) ticks = Mathf.Min(ticks, _maxTicks);
+
+        _tickOverlay.enabled = true;
+        _tickOverlay.uvRect = new Rect(0f, 0f, ticks, 1f);
     }
 
     public void SetVisible(bool visible)

@@ -58,7 +58,7 @@ public class UnitStatusBarHud : MonoBehaviour
             float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
             float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
 
-            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally))
+            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally, bu.maxHp))
                 used++;
         }
 
@@ -85,7 +85,7 @@ public class UnitStatusBarHud : MonoBehaviour
             float maxMana = unit.data.manaCost;
             float mana = maxMana > 0f ? unit.currentMana / maxMana : -1f;
 
-            if (Place(used, unit.transform.position, hp, mana, true))
+            if (Place(used, unit.transform.position, hp, mana, true, maxHp))
                 used++;
         }
 
@@ -93,7 +93,7 @@ public class UnitStatusBarHud : MonoBehaviour
     }
 
     /// <summary>index번째 바를 월드 위치 위에 배치. 카메라 뒤면 건너뛴다(false 반환).</summary>
-    private bool Place(int index, Vector3 worldPos, float hpRatio, float manaRatio, bool isAlly)
+    private bool Place(int index, Vector3 worldPos, float hpRatio, float manaRatio, bool isAlly, float maxHp)
     {
         Vector3 screenPos = _camera.WorldToScreenPoint(worldPos + Vector3.up * _heightOffset);
         if (screenPos.z <= 0f) return false; // 카메라 뒤 — 화면 반대편에 그려지는 것을 막는다
@@ -101,7 +101,7 @@ public class UnitStatusBarHud : MonoBehaviour
         var bar = GetBar(index);
         bar.SetVisible(true);
         bar.Rect.position = screenPos;
-        bar.SetValues(hpRatio, manaRatio, isAlly);
+        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
         return true;
     }
 
