@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -44,6 +45,25 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button _showUnitStoreButton;
     [SerializeField] private GameObject _unitStorePanel;
     [SerializeField] private GameObject _itemStorePanel;
+
+    [Header("Canvas Progress Texts")]
+    [Tooltip("비어 있으면 Level_Panel 아래의 LevelText를 런타임에 찾습니다.")]
+    [SerializeField] private TMP_Text _levelText;
+    [Tooltip("비어 있으면 Level_Panel 아래의 LevelSubText를 런타임에 찾습니다.")]
+    [SerializeField] private TMP_Text _levelSubText;
+    [Tooltip("비어 있으면 Coin_Panel 아래의 CoinText를 런타임에 찾습니다.")]
+    [SerializeField] private TMP_Text _goldText;
+    [Tooltip("비어 있으면 Coupon_Panel 아래의 CoinText를 런타임에 찾습니다.")]
+    [SerializeField] private TMP_Text _couponText;
+    [Tooltip("비어 있으면 RateText_Group 아래의 RateText1~5를 런타임에 찾습니다. 1~5코스트 순.")]
+    [SerializeField] private TMP_Text[] _costRateTexts = new TMP_Text[CostTierCount];
+
+    /// <summary>상점 코스트 등급 수(1~5코스트). RateText_Group의 자식 수와 같아야 한다.</summary>
+    private const int CostTierCount = 5;
+
+    private bool _canvasProgressTextsReady;
+    private bool _canvasProgressTextsWarningLogged;
+    private int _itemCoupon;
 
     private bool _canvasShopControlsReady;
     private bool _canvasShopControlsWarningLogged;
@@ -162,6 +182,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnXpChanged += HandleXpChanged;
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
+        GameEvents.OnItemCouponChanged += HandleItemCouponChanged;
     }
 
     private void OnDisable()
@@ -174,6 +195,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnXpChanged -= HandleXpChanged;
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
+        GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
     }
 
     private void Start()
@@ -182,6 +204,8 @@ public class UIManager : MonoBehaviour
         RefreshSampleDecks();
         SyncProgressState();
         BindCanvasShopControls();
+        BindCanvasProgressTexts();
+        RefreshCanvasProgressTexts();
     }
 
     private void OnDestroy()
@@ -194,6 +218,111 @@ public class UIManager : MonoBehaviour
         // 씬 초기화 순서로 비활성 패널이 아직 검색되지 않은 프레임을 한 번 보완한다.
         if (!_canvasShopControlsReady)
             BindCanvasShopControls();
+
+        if (!_canvasProgressTextsReady && BindCanvasProgressTexts())
+            RefreshCanvasProgressTexts();
+    }
+
+    // ──────────────────────────────────────────
+    // Canvas 진행 표시(레벨 / XP / 골드 / 쿠폰 / 코스트 확률)
+    //
+    // 이 텍스트들은 아트가 배치한 순수 TMP 오브젝트라 소유 스크립트가 없었다.
+    // 인스펙터 배선을 요구하면 같은 씬을 건드리는 다른 브랜치와 충돌하므로,
+    // 버튼과 동일하게 이름 기반으로 찾아 붙인다(SerializeField가 채워져 있으면 그쪽 우선).
+    // ──────────────────────────────────────────
+
+    /// <summary>진행 표시용 TMP 참조를 확보한다. 전부 찾았으면 true.</summary>
+    private bool BindCanvasProgressTexts()
+    {
+        // UnityEngine.Object의 null 연산자는 파괴된 씬 오브젝트도 null로 취급하므로
+        // 씬 재진입 뒤에는 ??= 가 아니라 == null 로 재검색해야 한다.
+        if (_levelText == null)
+            _levelText = FindSceneText("LevelText", "Level_Panel");
+
+        if (_levelSubText == null)
+            _levelSubText = FindSceneText("LevelSubText", "Level_Panel");
+
+        // CoinText는 Coin_Panel(골드)과 Coupon_Panel(아이템 쿠폰)에 같은 이름으로 둘 있다.
+        // 이름만으로는 구분되지 않으므로 반드시 부모까지 지정해 찾는다.
+        if (_goldText == null)
+            _goldText = FindSceneText("CoinText", "Coin_Panel");
+
+        if (_couponText == null)
+            _couponText = FindSceneText("CoinText", "Coupon_Panel");
+
+        if (_costRateTexts == null || _costRateTexts.Length != CostTierCount)
+            _costRateTexts = new TMP_Text[CostTierCount];
+
+        for (int i = 0; i < CostTierCount; i++)
+        {
+            if (_costRateTexts[i] == null)
+                _costRateTexts[i] = FindSceneText("RateText" + (i + 1), "RateText_Group");
+        }
+
+        bool ratesReady = true;
+        for (int i = 0; i < CostTierCount; i++)
+            if (_costRateTexts[i] == null) ratesReady = false;
+
+        _canvasProgressTextsReady = _levelText != null && _levelSubText != null &&
+            _goldText != null && _couponText != null && ratesReady;
+
+        if (!_canvasProgressTextsReady && !_canvasProgressTextsWarningLogged)
+        {
+            Debug.LogWarning("[UIManager] Canvas 진행 표시 텍스트 일부를 찾지 못했습니다. " +
+                             "Inspector 참조 또는 씬 오브젝트 이름을 확인하세요.");
+            _canvasProgressTextsWarningLogged = true;
+        }
+
+        return _canvasProgressTextsReady;
+    }
+
+    /// <summary>캐시된 진행 상태를 Canvas 텍스트에 반영한다. 값이 바뀔 때만 호출한다.</summary>
+    private void RefreshCanvasProgressTexts()
+    {
+        if (_levelText != null) _levelText.text = $"{_currentLevel}레벨";
+
+        // 최대 레벨에서는 필요 XP가 0으로 내려오므로 분수 대신 MAX로 표기한다.
+        if (_levelSubText != null)
+            _levelSubText.text = _requiredXp > 0 ? $"{_currentXp}/{_requiredXp}" : "MAX";
+
+        if (_goldText != null) _goldText.text = _gold.ToString();
+        if (_couponText != null) _couponText.text = _itemCoupon.ToString();
+
+        RefreshCostRateTexts();
+    }
+
+    /// <summary>현재 레벨의 코스트별 등장 확률을 1~5코스트 순으로 표시한다.</summary>
+    private void RefreshCostRateTexts()
+    {
+        if (_costRateTexts == null) return;
+
+        int[] rates = GameManager.TryGet(out var gm) && gm.Shop != null
+            ? gm.Shop.GetCurrentCostRates()
+            : null;
+
+        for (int i = 0; i < _costRateTexts.Length; i++)
+        {
+            if (_costRateTexts[i] == null) continue;
+
+            int rate = rates != null && i < rates.Length ? rates[i] : 0;
+            _costRateTexts[i].text = $"· {rate}%";
+        }
+    }
+
+    /// <summary>이름과 부모 이름으로 씬 안의 TMP 텍스트를 찾는다. 동명 오브젝트 구분용.</summary>
+    private static TMP_Text FindSceneText(string name, string parentName)
+    {
+        foreach (TMP_Text text in Resources.FindObjectsOfTypeAll<TMP_Text>())
+        {
+            if (!IsInActiveScene(text.gameObject) || text.name != name)
+                continue;
+
+            var parent = text.transform.parent;
+            if (parent != null && parent.name == parentName)
+                return text;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -352,8 +481,7 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void SyncProgressState()
     {
-        var gm = GameManager.Instance;
-        if (gm == null || gm.Shop == null)
+        if (!GameManager.TryGet(out var gm) || gm.Shop == null)
             return;
 
         var shop = gm.Shop;
@@ -364,18 +492,23 @@ public class UIManager : MonoBehaviour
         _requiredXp = shop.RequiredXp;
         _unitCap = shop.UnitCap;
 
+        if (gm.Item != null)
+            _itemCoupon = gm.Item.ItemCoupon;
     }
 
     /// <summary>골드 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
     private void HandleGoldChanged(int gold)
     {
         _gold = gold;
+        RefreshCanvasProgressTexts();
     }
 
     /// <summary>레벨 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
     private void HandleLevelChanged(int level)
     {
         _currentLevel = level;
+        // 코스트 등장 확률은 레벨에 종속되므로 여기서 같이 다시 그린다.
+        RefreshCanvasProgressTexts();
     }
 
     /// <summary>XP 변경 이벤트를 받아 현재 XP와 다음 레벨 필요 XP를 함께 갱신한다.</summary>
@@ -383,6 +516,14 @@ public class UIManager : MonoBehaviour
     {
         _currentXp = currentXp;
         _requiredXp = requiredXp;
+        RefreshCanvasProgressTexts();
+    }
+
+    /// <summary>아이템 쿠폰 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
+    private void HandleItemCouponChanged(int coupon)
+    {
+        _itemCoupon = coupon;
+        RefreshCanvasProgressTexts();
     }
 
     /// <summary>레벨에 따른 보드 배치 가능 기물 수 변경을 HUD 캐시에 반영한다.</summary>
@@ -397,7 +538,10 @@ public class UIManager : MonoBehaviour
 
         DrawOpenButton();
         DrawSampleDeckOpenButton();
-        DrawProgressPanel();
+
+        // 골드/레벨/XP는 Canvas 하단 바(RefreshCanvasProgressTexts)가 표시한다.
+        // IMGUI 진행 패널은 같은 값을 중복 표시하며 상점 카드 위를 덮으므로 호출하지 않는다.
+        // 메서드는 Canvas 미배선 씬을 위한 폴백으로 남겨둔다.
 
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
