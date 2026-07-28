@@ -36,6 +36,12 @@ public class UnitStatusBarUI : MonoBehaviour
     [Tooltip("마나바 눈금 개수(고정). 0이면 눈금 없음.")]
     [SerializeField] private int _manaTicks = 4;
 
+    [Header("성급 표시 (성급 진화한 유닛만)")]
+    [Tooltip("2성 표식. 1성이거나 돌/통신교환 진화만 한 유닛은 표시하지 않는다.")]
+    [SerializeField] private GameObject _star2;
+    [Tooltip("3성 표식.")]
+    [SerializeField] private GameObject _star3;
+
     private RectTransform _rect;
     private float _appliedHpTicks = -1f;   // 마지막으로 uvRect에 반영한 눈금 개수
 
@@ -112,6 +118,17 @@ public class UnitStatusBarUI : MonoBehaviour
             _appliedHpTicks = ticks;
             _tickOverlay.uvRect = new Rect(0f, 0f, ticks, 1f);
         }
+    }
+
+    /// <summary>
+    /// 성급 표식 갱신. 1성은 둘 다 끈다 — 별이 오른 유닛만 눈에 띄게 하는 게 목적이라
+    /// 기본 성급까지 표시하면 변별력이 없다.
+    /// 돌·통신교환 진화는 종만 바뀌고 starLevel은 그대로라 여기에 걸리지 않는다.
+    /// </summary>
+    public void SetStar(int starLevel)
+    {
+        if (_star2 != null) _star2.SetActive(starLevel == 2);
+        if (_star3 != null) _star3.SetActive(starLevel >= 3);
     }
 
     public void SetVisible(bool visible)

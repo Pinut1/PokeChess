@@ -548,6 +548,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 매핑이 적중해 베이스가 아닌 진화체를 받았을 때만 특수진화 배율(×1.5) 대상.
         unit.isTradeEvolved = !string.IsNullOrEmpty(evolved);
 
+        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다.
+        if (unit.isTradeEvolved) GameEvents.UnitEvolved(unit, false);
+
         Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
         GameEvents.TradeUnitReceived(unit);
         photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);

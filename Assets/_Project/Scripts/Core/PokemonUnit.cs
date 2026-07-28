@@ -252,6 +252,7 @@ public class PokemonUnit : MonoBehaviour
 
         RefreshVisual();                                // 진화체 모델로 교체
         GameEvents.UnitChanged(this);                   // 시너지 재계산용(머지 트리거는 진화체라 무의미)
+        GameEvents.UnitEvolved(this, false);            // 연출용(별은 그대로, 종만 진화)
         return true;
     }
 

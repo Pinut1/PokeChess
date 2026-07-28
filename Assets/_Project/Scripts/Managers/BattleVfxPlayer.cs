@@ -82,6 +82,17 @@ public static class BattleVfxPlayer
         Spawn(entry, target.visual.transform.position);
     }
 
+    /// <summary>
+    /// 임의 월드 좌표에 VFX 생성. BattleUnit이 없는 연출(상점 단계 진화 등)에서 쓴다.
+    /// 조회·미등록 경고 처리는 전투 VFX와 동일하다.
+    /// </summary>
+    public static void PlayAt(string vfxId, Vector3 position, float scale = 1f)
+    {
+        var entry = Resolve(vfxId);
+        if (entry == null) return;
+        Spawn(entry, position, scale);
+    }
+
     private static VfxEntry Resolve(string vfxId)
     {
         if (string.IsNullOrEmpty(vfxId)) return null; // vfxId 미지정 스킬 — 정상 케이스
