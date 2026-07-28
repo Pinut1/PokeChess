@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 프로토타입 HUD (IMGUI). 내 골드 / 파트너 골드 / 팀 라이프 / 라운드·페이즈 / 상점(구매·리롤)을 한 곳에 표시.
+/// 프로토타입 HUD (IMGUI). 내 골드 / 파트너 골드 / 팀 라이프 / 라운드·페이즈 / 남은 상점 기능을 한 곳에 표시.
 /// 진행 정보와 XP 구매 UI는 UIManager가 담당하며,
 /// 이 컴포넌트는 남은 프로토타입 기능의 플레이 검증용 HUD다.
 /// 값은 GameManager.Instance.X에서 pull, 파트너 골드만 이벤트(OnPartnerGoldChanged)로 캐시.
@@ -9,6 +9,10 @@ using UnityEngine;
 /// </summary>
 public class PrototypeHud : MonoBehaviour
 {
+    [Tooltip("꺼짐: 유닛/아이템 상점 디버그 텍스트 버튼 바를 숨김(실 UI 카드만 사용). " +
+             "켜짐(기본): 기존처럼 화면 하단에 디버그 바도 같이 표시.")]
+    [SerializeField] private bool _showShopDebugBar = true;
+
     private int _partnerGold = -1; // -1 = 아직 수신 전
 
     private void OnEnable() => GameEvents.OnPartnerGoldChanged += OnPartnerGold;
@@ -17,25 +21,18 @@ public class PrototypeHud : MonoBehaviour
 
     private void OnGUI()
     {
-        var gm = GameManager.Instance;
-        if (gm == null) return;
+        if (!GameManager.TryGet(out var gm)) return;
 
         DrawStatusPanel(gm);
-        DrawItemShopBar(gm);
-        DrawShopBar(gm);
-        DrawReady(gm);
+
+        // Ready 버튼은 Canvas의 전투시작 버튼으로 이관되어 이 HUD에서 제거됐다(DrawReady 삭제).
+        if (_showShopDebugBar)
+        {
+            DrawItemShopBar(gm);
+            DrawShopBar(gm);
+        }
+
         DrawVictory(gm);
-    }
-
-    // ── 우측 하단: 준비 완료(쇼핑 중에만) ──
-    private void DrawReady(GameManager gm)
-    {
-        if (gm.Phase == null || gm.Phase.CurrentPhase != GamePhase.Shopping) return;
-
-        var style = new GUIStyle(GUI.skin.button) { fontSize = 24 };
-        var rect = new Rect(Screen.width - 230f, Screen.height - 110f, 210f, 80f);
-        if (GUI.Button(rect, "준비 완료", style))
-            gm.Phase.PlayerReady();
     }
 
     // ── 중앙: 완주 표시 ──
@@ -82,7 +79,7 @@ public class PrototypeHud : MonoBehaviour
         GUILayout.EndArea();
     }
 
-    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 리롤 + 판매 ──
+    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 판매 ──
     private void DrawShopBar(GameManager gm)
     {
         var shop = gm.Shop;
@@ -111,15 +108,8 @@ public class PrototypeHud : MonoBehaviour
 
         float by = y + h + gap;
 
-        // 유닛 상점 리롤 — 무료 리롤 자원 우선, 없으면 골드.
-        string rerollLabel = shop.RerollCount > 0
-            ? $"리롤 (무료 {shop.RerollCount})"
-            : $"리롤 ({shop.RerollCost}G)";
-        if (GUI.Button(new Rect(startX, by, w, 30), rerollLabel))
-            shop.Reroll();
-
         // 첫 벤치 유닛 판매
-        if (GUI.Button(new Rect(startX + (w + gap), by, w, 30), "첫 벤치 판매"))
+        if (GUI.Button(new Rect(startX, by, w, 30), "첫 벤치 판매"))
         {
             var bench = gm.Board.GetBenchSnapshot();
 
@@ -132,7 +122,7 @@ public class PrototypeHud : MonoBehaviour
                 }
             }
         }
-        // 준비 완료는 우측 하단(DrawReady)으로 분리.
+        // 준비 완료 입력은 Canvas의 BattleRaedy_Button이 담당한다.
     }
 
     // ── 유닛 상점 위쪽: 아이템 상점 슬롯(쿠폰 구매). 0번 슬롯=진화의 돌, 1~3번 슬롯=일반 아이템 ──

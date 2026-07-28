@@ -41,4 +41,4 @@ MonoBehaviour:
   evolvesIntoEn: Magneton
   shopBuyable: 1
   modelPrefab: {fileID: 5747464548766857799, guid: 07f926a0e1ae08c4589f6805a1000ef5, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: fffdfe281aff7ac4e832f2b631ee91d7, type: 3}

@@ -51,6 +51,12 @@ public static class GameEvents
     /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
     public static event Action OnAllPlayersReady;
 
+    /// <summary>UI requests that the local player be marked ready.</summary>
+    public static event Action OnPlayerReadyRequested;
+
+    /// <summary>RoundPhaseManager approves a ready request during Shopping.</summary>
+    public static event Action OnPlayerReadyApproved;
+
     // ──────────────────────────────────────────
     // 골드 / 레벨
     // ──────────────────────────────────────────
@@ -152,6 +158,12 @@ public static class GameEvents
     // 샵
     // ──────────────────────────────────────────
 
+    /// <summary>UI가 XP 구매를 요청. ShopManager가 골드/최대 레벨을 검증한 뒤 처리한다.</summary>
+    public static event Action OnXpPurchaseRequested;
+
+    /// <summary>UI가 유닛 상점 리롤을 요청. ShopManager가 무료 리롤/골드를 검증한 뒤 처리한다.</summary>
+    public static event Action OnShopRerollRequested;
+
     /// <summary>유닛 샵 리롤됨</summary>
     public static event Action OnShopRerolled;
 
@@ -163,9 +175,6 @@ public static class GameEvents
 
     /// <summary>아이템 샵 갱신됨</summary>
     public static event Action OnItemShopRerolled;
-
-    /// <summary>아이템 상점 무료 리롤 자원 변경. 인자 = 변경 후 잔여 횟수. ShopManager가 단일 소스로 발행.</summary>
-    public static event Action<int> OnItemShopRerollCountChanged;
 
     /// <summary>아이템 상점 구매 완료. 인자 = 구매한 일반 아이템 또는 진화의 돌</summary>
     public static event Action<ScriptableObject> OnItemPurchased;
@@ -243,6 +252,8 @@ public static class GameEvents
     public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
+    public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();
+    public static void ApprovePlayerReady()    => OnPlayerReadyApproved?.Invoke();
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void XpChanged(int current, int required) => OnXpChanged?.Invoke(current, required);
@@ -264,11 +275,12 @@ public static class GameEvents
     public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
     public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);
     public static void GoldTransferRejected(string reason) => OnGoldTransferRejected?.Invoke(reason);
+    public static void RequestXpPurchase()          => OnXpPurchaseRequested?.Invoke();
+    public static void RequestShopReroll()          => OnShopRerollRequested?.Invoke();
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RerollCountChanged(int count) => OnRerollCountChanged?.Invoke(count);
     public static void RerollSpent()                => OnRerollSpent?.Invoke();
     public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
-    public static void ItemShopRerollCountChanged(int count) => OnItemShopRerollCountChanged?.Invoke(count);
     public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
     public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);
     public static void PhaseChanged(GamePhase phase) => OnPhaseChanged?.Invoke(phase);

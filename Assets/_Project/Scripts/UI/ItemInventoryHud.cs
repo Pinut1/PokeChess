@@ -30,8 +30,7 @@ public class ItemInventoryHud : MonoBehaviour
 
     private void OnGUI()
     {
-        var gm = GameManager.Instance;
-        if (gm == null || gm.Item == null) return;
+        if (!GameManager.TryGet(out var gm) || gm.Item == null) return;
 
         if (gm.Phase != null && gm.Phase.CurrentPhase != GamePhase.Shopping)
         {

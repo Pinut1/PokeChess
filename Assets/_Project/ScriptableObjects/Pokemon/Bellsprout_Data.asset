@@ -41,4 +41,4 @@ MonoBehaviour:
   evolvesIntoEn: Weepinbell
   shopBuyable: 1
   modelPrefab: {fileID: 789298986326286678, guid: 5780e9c51cc9d7c42b89365063109d11, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: a66ebf86fbbaf694f83f9400167d1165, type: 3}

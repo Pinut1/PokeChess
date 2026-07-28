@@ -169,8 +169,8 @@ public class BoardManager : MonoBehaviour
         _boardAnchor.SetLocalPositionAndRotation(_boardPosition, Quaternion.Euler(_boardRotation));
         _boardAnchor.localScale = _boardScale;
 
-        Vector3 sumPosition = Vector3.zero;
-        int totalTiles = 0;
+        Vector3 battleAreaPositionSum = Vector3.zero;
+        int battleAreaPositionCount = 0;
 
         // 2. 타일 생성 루프
         for (int row = 0; row < _rows; row++)
@@ -199,16 +199,17 @@ public class BoardManager : MonoBehaviour
                 _battleField.Add(coords, null);
 
                 // 평균 위치 계산을 위해 누적
-                sumPosition += worldPos;
-                totalTiles++;
+                battleAreaPositionSum += worldPos;
+                battleAreaPositionSum += GetEnemyBattleCoords(coords).ToWorldPosition(_hexSize);
+                battleAreaPositionCount += 2;
             }
         }
 
         // 3. 중앙 정렬 (Centering)
         // 타일들의 평균 무게중심(Center)을 구한 뒤, 쟁반 전체를 그 반대 방향으로 밀어줍니다.
-        if (totalTiles > 0)
+        if (battleAreaPositionCount > 0)
         {
-            _centerOffset = sumPosition / totalTiles;
+            _centerOffset = battleAreaPositionSum / battleAreaPositionCount;
             // Anchor의 인스펙터 Transform은 유지하고, 타일 묶음만 로컬 좌표에서 중앙 정렬합니다.
             foreach (Transform rowFolder in _boardAnchor)
                 foreach (Transform tile in rowFolder)
@@ -298,6 +299,20 @@ public class BoardManager : MonoBehaviour
         int mirroredRow = (_rows - 1) - row;
         int mirroredR = mirroredRow - Mathf.FloorToInt(coords.q / 2f);
         return new HexCoords(coords.q, mirroredR);
+    }
+
+    /// <summary>
+    /// 적 진영을 아군 보드 "너머"(rows _rows ~ 2*_rows-1)의 연속된 좌표로 변환합니다.
+    /// GetMirroredCoords로 대칭 배치한 뒤 행을 _rows만큼 평행이동해, 아군 rows 0~(_rows-1) 과
+    /// 겹치지 않는 8행(4+4) 단일 전장을 만든다. 이러면 근접이 미들라인((_rows-1)↔_rows)을
+    /// 실제로 걸어서 넘어 적 진영으로 진입한다(TFT식). 전투 시뮬은 자유 HexCoords 기반이라 무수정.
+    /// 시각화도 CoordsToWorldPosition을 그대로 써서 별도 오프셋 없이 한 보드처럼 이어 그린다.
+    /// </summary>
+    public HexCoords GetEnemyBattleCoords(HexCoords coords)
+    {
+        HexCoords mirrored = GetMirroredCoords(coords);
+        // row = r + floor(q/2) 이므로, 같은 q에서 r을 _rows만큼 더하면 행이 정확히 _rows칸 밀린다.
+        return new HexCoords(mirrored.q, mirrored.r + _rows);
     }
 
     // ──────────────────────────────────────────

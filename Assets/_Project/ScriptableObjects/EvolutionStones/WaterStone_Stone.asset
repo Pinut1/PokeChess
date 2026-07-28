@@ -22,4 +22,4 @@ MonoBehaviour:
     evolvedPokemon: Poliwrath
   - targetPokemon: Eevee
     evolvedPokemon: Vaporeon
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 0f41cb47452291d469b54cdf6c49a1f3, type: 3}

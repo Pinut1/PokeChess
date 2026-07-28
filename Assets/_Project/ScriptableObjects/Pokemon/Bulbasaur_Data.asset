@@ -42,4 +42,4 @@ MonoBehaviour:
   evolvesIntoEn: Ivysaur
   shopBuyable: 1
   modelPrefab: {fileID: 1995434781755328906, guid: 553690da2cecaed4cab387ff343646fe, type: 3}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 75ce74841b94cdd45b1bb00f2a18a55c, type: 3}
