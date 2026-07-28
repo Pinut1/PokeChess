@@ -31,7 +31,6 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     private RectTransform _dragLayer;
     private Transform _viewHome;      // 아이템 표시부의 원래 부모(이 칸)
     private int _viewHomeSiblingIndex;
-    private bool _iconRaycastDefault; // 프리팹에서 지정한 값 — 드래그가 끝나면 이대로 되돌린다
     private bool _dragging;
 
     /// <summary>테두리까지 묶어서 옮기고 토글해야 하므로, 지정돼 있으면 _itemView가 기준이 된다.</summary>
@@ -48,8 +47,6 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
             _viewHome = view.transform.parent;
             _viewHomeSiblingIndex = view.transform.GetSiblingIndex();
         }
-
-        if (_icon != null) _iconRaycastDefault = _icon.raycastTarget;
     }
 
     public void Bind(ScriptableObject data)
@@ -101,9 +98,6 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (_dragLayer != null) view.transform.SetParent(_dragLayer, true);
         view.transform.SetAsLastSibling();
 
-        // 끌고 있는 아이템이 커서 아래를 가려 드롭 판정을 방해하지 않도록 한다.
-        if (_icon != null) _icon.raycastTarget = false;
-
         view.transform.position = eventData.position;
     }
 
@@ -135,8 +129,6 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         view.transform.SetParent(_viewHome, false);
         view.transform.SetSiblingIndex(_viewHomeSiblingIndex);
-
-        if (_icon != null) _icon.raycastTarget = _iconRaycastDefault;
 
         var rect = view.transform as RectTransform;
         if (rect != null) rect.anchoredPosition = Vector2.zero;
