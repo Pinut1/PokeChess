@@ -90,7 +90,13 @@ public class StarUpPopupHud : MonoBehaviour
             }
 
             a.popup.SetVisible(true);
-            a.popup.Rect.position = screenPos + Vector3.up * (_riseDistance * t);
+
+            // HP바와 같은 이유로 정수 픽셀 스냅 — 소수점 좌표면 아이콘 가장자리가 프레임마다 흔들린다.
+            Vector3 pos = screenPos + Vector3.up * (_riseDistance * t);
+            pos.x = Mathf.Round(pos.x);
+            pos.y = Mathf.Round(pos.y);
+
+            a.popup.Rect.position = pos;
             a.popup.SetAlpha(FadeAlpha(t));
         }
     }

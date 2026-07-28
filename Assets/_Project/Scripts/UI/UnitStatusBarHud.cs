@@ -111,6 +111,11 @@ public class UnitStatusBarHud : MonoBehaviour
         Vector3 screenPos = _camera.WorldToScreenPoint(worldPos + Vector3.up * _heightOffset);
         if (screenPos.z <= 0f) return false; // 카메라 뒤 — 화면 반대편에 그려지는 것을 막는다
 
+        // 정수 픽셀로 스냅. 소수점 좌표로 움직이면 눈금처럼 얇은 선이 프레임마다 다른 텍셀에 걸려
+        // 두꺼워졌다 사라졌다 하며 흔들린다(유닛을 드래그할 때 특히 눈에 띈다).
+        screenPos.x = Mathf.Round(screenPos.x);
+        screenPos.y = Mathf.Round(screenPos.y);
+
         var bar = GetBar(index);
         bar.SetVisible(true);
         bar.Rect.position = screenPos;
