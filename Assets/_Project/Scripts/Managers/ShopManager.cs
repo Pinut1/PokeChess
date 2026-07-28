@@ -571,9 +571,13 @@ public class ShopManager : MonoBehaviour
     private bool _cost4ForceOpen;
 
     /// <summary>
-    /// ECONOMY_SHOP(구독서비스) 증강 seam: 상점을 "서로 다른" 4코스트 5마리로 1회 무료 갱신.
-    /// v2 확정 — 지속 확률 등장 없음, 발동 시점(즉시 1회 + 1~3R 중 1회)은 EconomyShopAugment가 관리.
-    /// ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
+    /// ECONOMY_SHOP 증강 효과.
+    /// 증강 선택 즉시 현재 상점을 서로 다른 4코스트 유닛으로
+    /// 한 번만 무료 갱신한다.
+    ///
+    /// 호출 완료와 동시에 효과가 종료되며,
+    /// 이후 수동 리롤과 다음 라운드 자동 갱신은
+    /// 현재 레벨의 기본 상점 확률을 사용한다.
     /// </summary>
     public void OpenCostFourShopOnce()
     {
