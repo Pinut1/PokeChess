@@ -25,6 +25,9 @@ public class UnitStatusBarHud : MonoBehaviour
     [Tooltip("유닛 발밑 기준 월드 높이(머리 위로 띄우는 정도).")]
     [SerializeField] private float _heightOffset = 2f;
 
+    [Tooltip("벤치 유닛에도 바를 표시할지. 전투 중에는 벤치가 참전하지 않아 이 값과 무관하게 표시되지 않는다.")]
+    [SerializeField] private bool _includeBench = true;
+
     private readonly List<UnitStatusBarUI> _pool = new();
 
     private void Awake()
@@ -65,16 +68,26 @@ public class UnitStatusBarHud : MonoBehaviour
         return used;
     }
 
-    /// <summary>전투 외 — 보드에 올라간 유닛. 벤치는 제외(전투에 나가지 않아 상태 표시 의미가 적다).</summary>
+    /// <summary>전투 외 — 보드 유닛과 벤치 유닛. 벤치도 배치 전에 상태를 비교할 수 있어야 한다.</summary>
     private int DrawBoardBars(GameManager gm)
     {
         var board = gm.Board;
         if (board == null) return 0;
 
-        var units = board.GetUnitsOnBoard();
-        if (units == null) return 0;
+        int used = DrawUnitList(board.GetUnitsOnBoard(), 0);
 
-        int used = 0;
+        if (_includeBench)
+            used = DrawUnitList(board.GetUnitsInBench(), used);
+
+        return used;
+    }
+
+    /// <summary>PokemonUnit 목록을 startIndex부터 이어서 그린다. 반환값은 다음에 쓸 인덱스.</summary>
+    private int DrawUnitList(IReadOnlyList<PokemonUnit> units, int startIndex)
+    {
+        if (units == null) return startIndex;
+
+        int used = startIndex;
         foreach (var unit in units)
         {
             if (unit == null || unit.data == null) continue;
