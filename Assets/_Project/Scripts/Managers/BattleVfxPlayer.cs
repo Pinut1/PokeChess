@@ -19,12 +19,12 @@ public static class BattleVfxPlayer
     private static readonly HashSet<string> _warnedIds = new(System.StringComparer.OrdinalIgnoreCase);
 
     /// <summary>대상 유닛들 위치에 VFX 생성. vfxId가 비었거나 미등록이면 조용히 무시(경고 1회).</summary>
-    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets)
+    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets, BattleUnit from = null)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
 
-        SpawnPerTarget(entry, targets);
+        SpawnPerTarget(entry, targets, from);
     }
 
     /// <summary>
@@ -42,23 +42,34 @@ public static class BattleVfxPlayer
 
         if (entry.spawnMode == VfxSpawnMode.PerTarget || center?.visual == null)
         {
-            SpawnPerTarget(entry, targets);
+            SpawnPerTarget(entry, targets, center);
             return;
         }
 
         // Center: 대상이 0기여도 시전 연출은 보여준다(빗나감도 연출의 일부).
+        // 방향은 시전자가 바라보는 쪽 — 적 시각화는 이미 180도 돌려두어 아군 진영을 향한다.
         float scale = entry.scaleWithRadius ? RadiusScale(areaRadiusInTiles) : 1f;
-        Spawn(entry, center.visual.transform.position, scale);
+        Spawn(entry, center.visual.transform.position, scale, center.visual.transform.forward);
     }
 
-    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets)
+    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets, BattleUnit from)
     {
         if (targets == null) return;
         foreach (var t in targets)
         {
             if (t?.visual == null) continue;
-            Spawn(entry, t.visual.transform.position, 1f);
+            Spawn(entry, t.visual.transform.position, 1f, DirectionTo(from, t));
         }
+    }
+
+    /// <summary>시전자→대상 수평 방향. 둘 중 하나라도 없거나 같은 자리면 null(회전 없음).</summary>
+    private static Vector3? DirectionTo(BattleUnit from, BattleUnit to)
+    {
+        if (from?.visual == null || to?.visual == null) return null;
+
+        Vector3 d = to.visual.transform.position - from.visual.transform.position;
+        d.y = 0f;
+        return d.sqrMagnitude > 0.0001f ? d.normalized : (Vector3?)null;
     }
 
     /// <summary>
@@ -75,11 +86,11 @@ public static class BattleVfxPlayer
     }
 
     /// <summary>단일 유닛 위치에 VFX 생성(시전자 플래시 등).</summary>
-    public static void PlayOnUnit(string vfxId, BattleUnit target)
+    public static void PlayOnUnit(string vfxId, BattleUnit target, BattleUnit from = null)
     {
         var entry = Resolve(vfxId);
         if (entry == null || target?.visual == null) return;
-        Spawn(entry, target.visual.transform.position);
+        Spawn(entry, target.visual.transform.position, 1f, DirectionTo(from, target));
     }
 
     /// <summary>
@@ -120,9 +131,14 @@ public static class BattleVfxPlayer
         return entry;
     }
 
-    private static void Spawn(VfxEntry entry, Vector3 position, float scale = 1f)
+    private static void Spawn(VfxEntry entry, Vector3 position, float scale = 1f, Vector3? forward = null)
     {
-        var go = Object.Instantiate(entry.prefab, position, Quaternion.identity);
+        // orientToDirection이 꺼져 있으면 기존 그대로 identity — 등록된 기존 VFX의 연출이 변하지 않는다.
+        Quaternion rot = entry.orientToDirection && forward.HasValue
+            ? Quaternion.LookRotation(forward.Value, Vector3.up)
+            : Quaternion.identity;
+
+        var go = Object.Instantiate(entry.prefab, position, rot);
         if (!Mathf.Approximately(scale, 1f)) go.transform.localScale *= scale;
         float lifetime = entry.lifetime > 0f ? entry.lifetime : DEFAULT_LIFETIME;
         Object.Destroy(go, lifetime);

@@ -826,7 +826,7 @@ public class BattleManager : MonoBehaviour
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
-        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target);
+        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target, attacker);
 
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
