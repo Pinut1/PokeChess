@@ -626,10 +626,15 @@ public class BoardManager : MonoBehaviour
     /// 1성→2성→3성, 3성이 상한. 진화 대상이 없으면(최종형/데이터 미비) 종은 유지하고 별만 올림.
     /// 생존 위치: 셋 중 보드에 있던 게 있으면 보드(첫 좌표), 아니면 벤치(첫 슬롯).
     /// </summary>
-    private void CheckEvolution(int speciesId, int starLevel)
+    /// <summary>
+    /// 합체 가능하면 3개를 합쳐 별을 올린다. 반환값 = 이번 호출에서 실제로 합체가 일어났는지.
+    /// 연쇄 진화(1성×3 → 2성 → 그 결과 2성이 3마리 → 3성)에서 중간 단계를 건너뛰고
+    /// 최종 결과만 연출하기 위해 호출측이 이 값을 본다.
+    /// </summary>
+    private bool CheckEvolution(int speciesId, int starLevel)
     {
-        if (_isEvolving) return;
-        if (starLevel >= 3) return;
+        if (_isEvolving) return false;
+        if (starLevel >= 3) return false;
 
         var boardMatches = new List<HexCoords>();
         var benchMatches = new List<int>();
@@ -646,7 +651,7 @@ public class BoardManager : MonoBehaviour
                 _bench[i].data.id == speciesId && _bench[i].starLevel == starLevel)
                 benchMatches.Add(i);
 
-        if (boardMatches.Count + benchMatches.Count < 3) return;
+        if (boardMatches.Count + benchMatches.Count < 3) return false;
 
         _isEvolving = true;
 
@@ -697,11 +702,15 @@ public class BoardManager : MonoBehaviour
         if (survivorOnBoard) GameEvents.UnitPlaced(survivor);
         else                 GameEvents.UnitBenched(survivor);
 
-        // 연출은 재배치 뒤에 — UnitPlaced가 BoardView 위치를 갱신하므로, 그 전에 발화하면
-        // 이펙트와 성급 팝업이 합체 전 옛 좌표에 뜬다(연쇄 진화에서 생존자가 이동할 때 드러남).
-        GameEvents.UnitEvolved(survivor, true);
-
         // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
-        CheckEvolution(survivor.data.id, survivor.starLevel);
+        bool chained = CheckEvolution(survivor.data.id, survivor.starLevel);
+
+        // 연출은 (1) 재배치 뒤에, (2) 연쇄가 끝난 뒤에 한 번만.
+        //  (1) UnitPlaced가 BoardView 위치를 갱신하므로 그 전에 발화하면 합체 전 좌표에 뜬다.
+        //  (2) 연쇄가 더 이어졌다면 더 깊은 호출이 최종 결과로 이미 발화했다.
+        //      여기서 또 발화하면 3성 달성 시 중간 2성 자리에서도 이펙트가 난다.
+        if (!chained) GameEvents.UnitEvolved(survivor, true);
+
+        return true;
     }
 }
