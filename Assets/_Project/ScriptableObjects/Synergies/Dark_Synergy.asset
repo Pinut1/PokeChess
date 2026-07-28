@@ -19,4 +19,4 @@ MonoBehaviour:
   - count: 1
     effectDescription: "\uC804\uD22C \uC2DC\uC791 \uD6C4 \uCCAB \uC2A4\uD0AC \uC0AC\uC6A9
       \uC2DC STUN 1.5\uCD08 (\uACE0\uC720)"
-  icon: {fileID: 490668993, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}
+  icon: {fileID: 405411562, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

@@ -18,4 +18,4 @@ MonoBehaviour:
   tiers:
   - count: 1
     effectDescription: "atkSpeed +15% or manaRegen +30% \uC120\uD0DD (\uACE0\uC720)"
-  icon: {fileID: 854820697, guid: 6248dd0684b2829459d55be0ea4576e2, type: 3}
+  icon: {fileID: -1534906200, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}
