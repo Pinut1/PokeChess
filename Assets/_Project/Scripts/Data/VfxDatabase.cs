@@ -37,14 +37,6 @@ public class VfxEntry
     /// 기본 false — 기존 프리팹 크기를 건드리지 않는다.
     /// </summary>
     public bool scaleWithRadius;
-
-    /// <summary>
-    /// 생성 시 진행 방향으로 회전시킬지. 투사체·베기처럼 방향이 있는 프리팹에만 켠다.
-    /// PerTarget이면 시전자→대상 방향, Center면 시전자가 바라보는 방향을 쓴다.
-    /// 끄면 기존처럼 Quaternion.identity로 생성된다(폭발·오라 등 방향 없는 연출).
-    /// 켤 거면 프리팹을 +Z(정면) 기준으로 제작해야 한다.
-    /// </summary>
-    public bool orientToDirection;
 }
 
 /// <summary>

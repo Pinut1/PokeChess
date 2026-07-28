@@ -19,12 +19,12 @@ public static class BattleVfxPlayer
     private static readonly HashSet<string> _warnedIds = new(System.StringComparer.OrdinalIgnoreCase);
 
     /// <summary>대상 유닛들 위치에 VFX 생성. vfxId가 비었거나 미등록이면 조용히 무시(경고 1회).</summary>
-    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets, BattleUnit from = null)
+    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
 
-        SpawnPerTarget(entry, targets, from);
+        SpawnPerTarget(entry, targets);
     }
 
     /// <summary>
@@ -42,23 +42,22 @@ public static class BattleVfxPlayer
 
         if (entry.spawnMode == VfxSpawnMode.PerTarget || center?.visual == null)
         {
-            SpawnPerTarget(entry, targets, center);
+            SpawnPerTarget(entry, targets);
             return;
         }
 
         // Center: 대상이 0기여도 시전 연출은 보여준다(빗나감도 연출의 일부).
-        // 방향은 시전자가 바라보는 쪽 — 적 시각화는 이미 180도 돌려두어 아군 진영을 향한다.
         float scale = entry.scaleWithRadius ? RadiusScale(areaRadiusInTiles) : 1f;
-        Spawn(entry, center.visual.transform.position, scale, center.visual.transform.forward);
+        Spawn(entry, center.visual.transform.position, scale);
     }
 
-    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets, BattleUnit from)
+    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets)
     {
         if (targets == null) return;
         foreach (var t in targets)
         {
             if (t?.visual == null) continue;
-            Spawn(entry, t.visual.transform.position, 1f, DirectionTo(from, t));
+            Spawn(entry, t.visual.transform.position, 1f);
         }
     }
 
@@ -85,7 +84,12 @@ public static class BattleVfxPlayer
         return (n * SQRT3 + 1f) / (SQRT3 + 1f);
     }
 
-    /// <summary>단일 유닛 위치에 VFX 생성(시전자 플래시 등).</summary>
+    /// <summary>
+    /// 평타 VFX. 대상 위치에 생성하되 <paramref name="from"/>→대상 방향으로 회전시킨다.
+    /// 원거리 평타는 출발지와 도착지가 눈에 보이는 유일한 연출이라, 방향이 맞지 않으면
+    /// 적의 공격이 엉뚱한 쪽으로 날아가는 것처럼 보인다.
+    /// (스킬은 시전 위치에서 터지는 형태라 회전이 필요 없어 PlaySkill은 회전을 걸지 않는다.)
+    /// </summary>
     public static void PlayOnUnit(string vfxId, BattleUnit target, BattleUnit from = null)
     {
         var entry = Resolve(vfxId);
@@ -133,8 +137,8 @@ public static class BattleVfxPlayer
 
     private static void Spawn(VfxEntry entry, Vector3 position, float scale = 1f, Vector3? forward = null)
     {
-        // orientToDirection이 꺼져 있으면 기존 그대로 identity — 등록된 기존 VFX의 연출이 변하지 않는다.
-        Quaternion rot = entry.orientToDirection && forward.HasValue
+        // 방향이 주어진 경우(평타)만 회전. 나머지는 기존대로 identity.
+        Quaternion rot = forward.HasValue
             ? Quaternion.LookRotation(forward.Value, Vector3.up)
             : Quaternion.identity;
 
