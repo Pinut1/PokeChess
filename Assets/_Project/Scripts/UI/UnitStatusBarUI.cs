@@ -29,7 +29,13 @@ public class UnitStatusBarUI : MonoBehaviour
     [Tooltip("눈금이 과하게 촘촘해지는 것을 막는 상한. 0이면 제한 없음.")]
     [SerializeField] private int _maxTicks = 30;
 
+    [Tooltip("마나바 눈금 오버레이. 마나는 종별 편차가 작아(40~100) 개수를 고정한다.")]
+    [SerializeField] private RawImage _manaTickOverlay;
+    [Tooltip("마나바 눈금 개수(고정). 0이면 눈금 없음.")]
+    [SerializeField] private int _manaTicks = 4;
+
     private RectTransform _rect;
+    private float _appliedHpTicks = -1f;   // 마지막으로 uvRect에 반영한 눈금 개수
 
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
 
@@ -54,6 +60,23 @@ public class UnitStatusBarUI : MonoBehaviour
     }
 
     /// <summary>
+    /// 마나 눈금은 고정 개수라 값이 바뀌어도 다시 계산할 필요가 없다.
+    /// 매 프레임 uvRect를 대입하면 불필요한 머티리얼 갱신이 생기므로 시작할 때 한 번만 설정한다.
+    /// </summary>
+    private void Awake()
+    {
+        if (_manaTickOverlay == null) return;
+
+        if (_manaTicks <= 0)
+        {
+            _manaTickOverlay.enabled = false;
+            return;
+        }
+
+        _manaTickOverlay.uvRect = new Rect(0f, 0f, _manaTicks, 1f);
+    }
+
+    /// <summary>
     /// 눈금 개수 = maxHp / _hpPerTick. 바 폭이 고정이므로 텍스처를 그 횟수만큼 반복시켜
     /// 균등한 간격의 구분선을 만든다. 소수점이 남으면 마지막 칸이 잘려 보이는데,
     /// 이는 "눈금 하나 = 일정 체력"이라는 규칙상 올바른 표현이다.
@@ -72,7 +95,14 @@ public class UnitStatusBarUI : MonoBehaviour
         if (_maxTicks > 0) ticks = Mathf.Min(ticks, _maxTicks);
 
         _tickOverlay.enabled = true;
-        _tickOverlay.uvRect = new Rect(0f, 0f, ticks, 1f);
+
+        // 최대 체력은 전투 중 거의 변하지 않는다. 매 프레임 uvRect를 대입하면
+        // 값이 같아도 머티리얼이 갱신되므로, 달라졌을 때만 쓴다.
+        if (!Mathf.Approximately(_appliedHpTicks, ticks))
+        {
+            _appliedHpTicks = ticks;
+            _tickOverlay.uvRect = new Rect(0f, 0f, ticks, 1f);
+        }
     }
 
     public void SetVisible(bool visible)
