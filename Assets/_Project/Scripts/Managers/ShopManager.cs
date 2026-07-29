@@ -133,6 +133,13 @@ public class ShopManager : MonoBehaviour
     private PokemonData[] _slots;
     private ScriptableObject[] _itemSlots;
 
+    /// <summary>
+    /// 0번 진화의 돌 슬롯에 마지막으로 표시된 상품.
+    /// 구매로 슬롯이 비워져도 유지하며,
+    /// 개별 리롤 시 같은 돌이 다시 등장하지 않도록 제외 기준으로 사용한다.
+    /// </summary>
+    private EvolutionStoneData _lastDisplayedStone;
+
     /// <summary>슬롯별 이번 라운드 리롤 사용 여부. RollItemShop(매 라운드 갱신)마다 전부 false로 되돌린다.</summary>
     private bool[] _itemSlotRerollUsed;
 
@@ -1963,67 +1970,183 @@ public class ShopManager : MonoBehaviour
         for (int i = 0; i < _itemSlots.Length; i++)
         {
             if (i == 0)
-                _itemSlots[i] = RollOneStone();
-            else
-                _itemSlots[i] = RollOneItem();
+            {
+                EvolutionStoneData stone =
+                    RollOneStone();
 
-            _itemSlotRerollUsed[i] = false; // 지난 라운드 사용 여부와 무관하게 리롤 권한 복구(누적 없음)
+                _itemSlots[i] = stone;
+                _lastDisplayedStone = stone;
+            }
+            else
+            {
+                _itemSlots[i] = RollOneItem();
+            }
+
+            // 지난 라운드 사용 여부와 무관하게
+            // 리롤 권한 복구. 미사용 횟수는 누적되지 않는다.
+            _itemSlotRerollUsed[i] = false;
         }
 
         GameEvents.ItemShopRerolled();
     }
 
     /// <summary>
-    /// 아이템 상점 슬롯 1칸만 다시 굴린다(카드에 붙은 개별 리롤 버튼용). 비용 없음, 슬롯당 라운드 1회.
-    /// 슬롯 규칙은 RollItemShop과 동일 — 0번은 진화의 돌, 1~3번은 일반 아이템만 나온다.
-    /// 구매로 비워진 슬롯도 리롤 대상이다. 성공 시 true.
+    /// 아이템 상점 슬롯 1칸만 다시 굴린다.
+    /// 비용 없음, 슬롯당 라운드 1회.
+    ///
+    /// 0번 진화의 돌 슬롯:
+    /// 구매 여부와 관계없이 마지막으로 표시됐던 돌을 제외한다.
+    ///
+    /// 1~3번 일반 아이템 슬롯:
+    /// 현재 슬롯에 상품이 있을 때만 해당 상품을 제외한다.
+    /// 구매 후 빈 슬롯을 리롤하면 전체 일반 아이템이 후보가 된다.
     /// </summary>
     public bool RerollItemSlot(int slot)
     {
-        if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
-
-        if (!CanRerollItemSlot(slot))
+        if (_itemSlots == null ||
+            slot < 0 ||
+            slot >= _itemSlots.Length)
         {
-            Debug.Log($"[ItemShop] {slot}번 슬롯은 이번 라운드 리롤을 이미 사용함");
             return false;
         }
 
-        _itemSlots[slot] = slot == 0 ? (ScriptableObject)RollOneStone() : RollOneItem();
+        if (!CanRerollItemSlot(slot))
+        {
+            Debug.Log(
+                $"[ItemShop] {slot}번 슬롯은 " +
+                "이번 라운드 리롤을 이미 사용함"
+            );
+
+            return false;
+        }
+
+        ScriptableObject previousProduct =
+            _itemSlots[slot];
+
+        ScriptableObject rerolledProduct;
+
+        if (slot == 0)
+        {
+            /*
+             * 진화의 돌 슬롯은 구매로 비워져도
+             * 마지막으로 표시됐던 돌을 제외한다.
+             */
+            EvolutionStoneData stone =
+                RollOneStone(_lastDisplayedStone);
+
+            rerolledProduct = stone;
+            _lastDisplayedStone = stone;
+        }
+        else
+        {
+            /*
+             * 일반 아이템 슬롯은 현재 상품만 제외한다.
+             * 구매 후 슬롯이 비어 있으면 previousProduct가 null이므로
+             * 전체 아이템에서 무작위로 선택한다.
+             */
+            rerolledProduct =
+                RollOneItem(previousProduct as ItemData);
+        }
+
+        _itemSlots[slot] = rerolledProduct;
         _itemSlotRerollUsed[slot] = true;
 
         GameEvents.ItemShopRerolled();
-        Debug.Log($"[ItemShop] {slot}번 슬롯 리롤 완료 — 이번 라운드 재리롤 불가");
+
+        Debug.Log(
+            $"[ItemShop] {slot}번 슬롯 리롤 완료: " +
+            $"{GetItemShopName(previousProduct)} → " +
+            $"{GetItemShopName(rerolledProduct)} " +
+            "(이번 라운드 재리롤 불가)"
+        );
+
         return true;
     }
 
-    private EvolutionStoneData RollOneStone()
+    /// <summary>
+    /// 진화의 돌을 무작위로 선택한다.
+    /// excludedStone이 있으면 해당 돌은 후보에서 제외한다.
+    /// 제외 후 후보가 없으면 같은 돌을 다시 표시하지 않고 null을 반환한다.
+    /// </summary>
+    private EvolutionStoneData RollOneStone(
+        EvolutionStoneData excludedStone = null)
     {
         var db = EvolutionStoneDatabase.Instance;
-        if (db == null || db.all == null || db.all.Count == 0)
+
+        if (db == null ||
+            db.all == null ||
+            db.all.Count == 0)
         {
-            Debug.LogWarning("[ItemShop] EvolutionStoneDatabase 비어있음 — 진화의 돌 슬롯 비움");
+            Debug.LogWarning(
+                "[ItemShop] EvolutionStoneDatabase 비어있음 — " +
+                "진화의 돌 슬롯 비움"
+            );
+
             return null;
         }
 
-        var candidates = db.all.FindAll(s => s != null);
-        if (candidates.Count == 0) return null;
+        var candidates = db.all.FindAll(
+            stone =>
+                stone != null &&
+                stone != excludedStone
+        );
 
-        return candidates[Random.Range(0, candidates.Count)];
+        if (candidates.Count == 0)
+        {
+            Debug.LogWarning(
+                "[ItemShop] 이전 진화의 돌을 제외한 후보가 없음 — " +
+                "진화의 돌 슬롯 비움"
+            );
+
+            return null;
+        }
+
+        return candidates[
+            Random.Range(0, candidates.Count)
+        ];
     }
 
-    private ItemData RollOneItem()
+    /// <summary>
+    /// 일반 아이템을 무작위로 선택한다.
+    /// excludedItem이 있으면 해당 아이템은 후보에서 제외한다.
+    /// 제외 후 후보가 없으면 기존 아이템을 반환한다.
+    /// </summary>
+    private ItemData RollOneItem(
+        ItemData excludedItem = null)
     {
         var db = ItemDatabase.Instance;
-        if (db == null || db.all == null || db.all.Count == 0)
+
+        if (db == null ||
+            db.all == null ||
+            db.all.Count == 0)
         {
-            Debug.LogWarning("[ItemShop] ItemDatabase 비어있음 — 아이템 슬롯 비움");
+            Debug.LogWarning(
+                "[ItemShop] ItemDatabase 비어있음 — " +
+                "아이템 슬롯 비움"
+            );
+
             return null;
         }
 
-        var candidates = db.all.FindAll(i => i != null);
-        if (candidates.Count == 0) return null;
+        var candidates = db.all.FindAll(
+            item =>
+                item != null &&
+                item != excludedItem
+        );
 
-        return candidates[Random.Range(0, candidates.Count)];
+        if (candidates.Count == 0)
+        {
+            Debug.LogWarning(
+                "[ItemShop] 이전 아이템을 제외한 후보가 없음 — " +
+                "아이템 슬롯 비움"
+            );
+
+            return null;
+        }
+
+        return candidates[
+            Random.Range(0, candidates.Count)
+        ];
     }
 
     /// <summary>아이템 상점 슬롯의 상품을 아이템 쿠폰으로 구매해 인벤토리에 추가. 성공 시 true.</summary>
