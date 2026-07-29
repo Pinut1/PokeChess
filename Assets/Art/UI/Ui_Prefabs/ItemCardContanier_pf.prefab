@@ -141,7 +141,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6d7fc3b9c04d6dd4490a56fcbd651331, type: 3}
+  m_Sprite: {fileID: 21300000, guid: b95de5a4e07d5f745858d4d272bb83e9, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -180,8 +180,8 @@ MonoBehaviour:
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
-    m_HighlightedSprite: {fileID: 21300000, guid: 3a3a5c8f8e2b27448825f1295ba17470, type: 3}
-    m_PressedSprite: {fileID: 21300000, guid: 6d7fc3b9c04d6dd4490a56fcbd651331, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: ff96e6475e4e3084eb1cde10b899d8ef, type: 3}
+    m_PressedSprite: {fileID: 21300000, guid: b95de5a4e07d5f745858d4d272bb83e9, type: 3}
     m_SelectedSprite: {fileID: 0}
     m_DisabledSprite: {fileID: 0}
   m_AnimationTriggers:
@@ -918,3 +918,7 @@ MonoBehaviour:
   _ticketImage: {fileID: 7019289061416258497}
   _priceText: {fileID: 2869464035450548416}
   _soldOverlay: {fileID: 1902931671935945466}
+  _purchaseBlocker: {fileID: 0}
+  _blockerButton: {fileID: 0}
+  _blockReasonText: {fileID: 0}
+  _blockReasonDuration: 2
