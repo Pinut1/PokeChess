@@ -477,14 +477,24 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 판매 환급액 = 투자한 골드(코스트 × 합성에 들어간 1성 마리 수). 1성=×1, 2성=×3, 3성=×9.
-    /// (= 산 만큼 그대로 돌려줌. TFT는 2코스트+ 고성에 -1 패널티가 있으나 여기선 단순 전액 환급 기본값.)
+    /// 판매 환급액 = 투자한 골드(코스트 × 합성에 들어간 1성 마리 수, 1성=×1 / 2성=×3 / 3성=×9)에서
+    /// 합성 유닛 패널티를 뺀 값.
+    ///
+    /// 패널티(2026-07-29 기획 확정): 1코스트를 제외한 모든 코스트에 -1.
+    /// 성급과 무관하게 항상 1만 깎는다(3성이라고 -2가 되지 않는다).
+    /// 예) 2코스트 2성 = 2×3 - 1 = 5골드, 2코스트 3성 = 2×9 - 1 = 17골드, 1코스트 2성 = 3골드(패널티 없음).
+    ///
+    /// 1성은 산 가격 그대로 환급한다 — 사자마자 팔아도 손해가 없어야 상점 탐색이 위축되지 않는다.
     /// </summary>
     public int SellValue(PokemonUnit unit)
     {
         if (unit == null || unit.data == null) return 0;
+
         int baseUnits = GetBaseUnitCount(unit.starLevel);
-        return unit.data.cost * baseUnits;
+        int invested = unit.data.cost * baseUnits;
+
+        bool hasPenalty = unit.data.cost >= 2 && unit.starLevel >= 2;
+        return hasPenalty ? Mathf.Max(0, invested - 1) : invested;
     }
 
     // ──────────────────────────────────────────

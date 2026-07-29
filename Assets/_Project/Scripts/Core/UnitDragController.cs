@@ -1,6 +1,6 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 /// <summary>
 /// 마우스로 유닛을 집어 IDropTarget(보드 타일/벤치 슬롯)에 놓는 드래그앤드롭 컨트롤러.
@@ -30,16 +30,16 @@ public class UnitDragController : MonoBehaviour
     [Header("상점 판매 영역 (Canvas UI)")]
     [Tooltip("여기에 유닛을 놓으면 판매된다. 비어 있으면 활성 상점 패널(UnitStore_Panel / ItemStore_Panel)을 런타임에 찾는다.")]
     [SerializeField] private RectTransform _shopSellArea;
-    [SerializeField] private Color _sellHoverColor = new Color(1f, 0.45f, 0.45f);
+    [Tooltip("판매 가능할 때만 켜지는 안내 이미지. 평소엔 꺼둔 채로 저장한다.")]
+    [SerializeField] private GameObject _sellHighlightImage;
+    [Tooltip("안내 이미지 안의 판매가 표시 텍스트. 비워두면 금액 없이 이미지만 켜진다.")]
+    [SerializeField] private TextMeshProUGUI _sellPriceText;
+    [Tooltip("판매가 표시 형식. {0}에 환급 골드가 들어간다.")]
+    [SerializeField] private string _sellPriceFormat = "판매 가격: {0}골드";
 
     private PokemonUnit _held;
     private IDropTarget _hovered;
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
-
-    // 판매 영역 하이라이트 복원용. 색을 바꾼 대상과 원래 색을 함께 들고 있어야
-    // 드래그 도중 상점 탭이 전환돼 대상이 바뀌어도 이전 대상을 되돌릴 수 있다.
-    private Graphic _sellHighlightTarget;
-    private Color _sellHighlightDefaultColor;
 
     private void Awake()
     {
@@ -226,36 +226,26 @@ public class UnitDragController : MonoBehaviour
         return null;
     }
 
-    /// <summary>판매 가능 상태를 색으로 알린다. 대상이 바뀌면 이전 대상을 먼저 되돌린다.</summary>
+    /// <summary>
+    /// 판매 가능 상태를 안내 이미지로 알린다. 드롭·취소 시 반드시 꺼진다.
+    /// 켜질 때 들고 있는 유닛의 환급액을 함께 표시한다(합성 단계에 따라 달라져 고정값이 아님).
+    /// </summary>
     private void SetSellHighlight(bool active)
     {
-        Graphic target = active ? ResolveSellHighlightGraphic() : null;
+        if (active && _sellPriceText != null)
+            _sellPriceText.text = string.Format(_sellPriceFormat, HeldSellValue());
 
-        if (!ReferenceEquals(target, _sellHighlightTarget))
-        {
-            if (_sellHighlightTarget != null)
-                _sellHighlightTarget.color = _sellHighlightDefaultColor;
-
-            _sellHighlightTarget = target;
-
-            if (_sellHighlightTarget != null)
-            {
-                _sellHighlightDefaultColor = _sellHighlightTarget.color;
-                _sellHighlightTarget.color = _sellHoverColor;
-            }
-        }
+        if (_sellHighlightImage != null && _sellHighlightImage.activeSelf != active)
+            _sellHighlightImage.SetActive(active);
     }
 
-    private Graphic ResolveSellHighlightGraphic()
+    /// <summary>들고 있는 유닛의 판매 환급액. 상점을 못 찾거나 든 게 없으면 0.</summary>
+    private int HeldSellValue()
     {
-        RectTransform area = ResolveShopSellArea();
-        if (area == null) return null;
+        if (_held == null) return 0;
 
-        // 상점 패널 자체에 Graphic이 없으면 상위 바(Bottom_PanelGroup)의 배경을 물들인다.
-        var graphic = area.GetComponent<Graphic>();
-        if (graphic != null) return graphic;
-
-        return area.parent != null ? area.parent.GetComponent<Graphic>() : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        return shop != null ? shop.SellValue(_held) : 0;
     }
 
     /// <summary>포인터 아래의 가장 가까운 IDropTarget(들고 있는 유닛 자신은 제외).</summary>

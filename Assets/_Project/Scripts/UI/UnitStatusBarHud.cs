@@ -28,6 +28,11 @@ public class UnitStatusBarHud : MonoBehaviour
     [Tooltip("벤치 유닛에도 바를 표시할지. 전투 중에는 벤치가 참전하지 않아 이 값과 무관하게 표시되지 않는다.")]
     [SerializeField] private bool _includeBench = true;
 
+    [Tooltip("장착 아이템이 있을 때 바 전체를 위로 올리는 양(화면 픽셀). " +
+             "아이템 줄이 바 아래에 붙으므로 그만큼 올려야 유닛을 가리지 않는다. " +
+             "슬롯이 가로 배치라 아이템 1개든 2개든 이동량은 같다.")]
+    [SerializeField] private float _itemLiftPixels = 20f;
+
     private readonly List<UnitStatusBarUI> _pool = new();
 
     private void Awake()
@@ -61,7 +66,9 @@ public class UnitStatusBarHud : MonoBehaviour
             float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
             float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
 
-            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally, bu.maxHp))
+            // 전투 중에는 원본 PokemonUnit이 아니라 스냅샷을 그리므로 displayItems/displayStone을 쓴다(적도 동일).
+            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally, bu.maxHp,
+                      bu.displayItems, bu.displayStone))
                 used++;
         }
 
@@ -98,7 +105,8 @@ public class UnitStatusBarHud : MonoBehaviour
             float maxMana = unit.data.manaCost;
             float mana = maxMana > 0f ? unit.currentMana / maxMana : -1f;
 
-            if (Place(used, unit.transform.position, hp, mana, true, maxHp))
+            if (Place(used, unit.transform.position, hp, mana, true, maxHp,
+                      unit.items, unit.equippedStone))
                 used++;
         }
 
@@ -106,18 +114,25 @@ public class UnitStatusBarHud : MonoBehaviour
     }
 
     /// <summary>index번째 바를 월드 위치 위에 배치. 카메라 뒤면 건너뛴다(false 반환).</summary>
-    private bool Place(int index, Vector3 worldPos, float hpRatio, float manaRatio, bool isAlly, float maxHp)
+    private bool Place(int index, Vector3 worldPos, float hpRatio, float manaRatio, bool isAlly, float maxHp,
+                       IReadOnlyList<ItemData> items, EvolutionStoneData stone)
     {
         Vector3 screenPos = _camera.WorldToScreenPoint(worldPos + Vector3.up * _heightOffset);
         if (screenPos.z <= 0f) return false; // 카메라 뒤 — 화면 반대편에 그려지는 것을 막는다
+
+        var bar = GetBar(index);
+        bar.SetVisible(true);
+
+        // 아이템 갱신이 먼저다 — 아이템이 있으면 바를 그만큼 올려야 하는데,
+        // 그 판단(HasVisibleItems)이 SetItems 안에서 정해지기 때문.
+        bar.SetItems(items, stone);
+        if (bar.HasVisibleItems) screenPos.y += _itemLiftPixels;
 
         // 정수 픽셀로 스냅. 소수점 좌표로 움직이면 눈금처럼 얇은 선이 프레임마다 다른 텍셀에 걸려
         // 두꺼워졌다 사라졌다 하며 흔들린다(유닛을 드래그할 때 특히 눈에 띈다).
         screenPos.x = Mathf.Round(screenPos.x);
         screenPos.y = Mathf.Round(screenPos.y);
 
-        var bar = GetBar(index);
-        bar.SetVisible(true);
         bar.Rect.position = screenPos;
         bar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
         return true;

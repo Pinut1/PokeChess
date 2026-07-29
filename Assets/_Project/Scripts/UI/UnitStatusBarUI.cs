@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -36,6 +37,16 @@ public class UnitStatusBarUI : MonoBehaviour
     [Tooltip("마나바 눈금 개수(고정). 0이면 눈금 없음.")]
     [SerializeField] private int _manaTicks = 4;
 
+    [Header("장착 아이템 (HP바 아래)")]
+    [Tooltip("아이템 슬롯 묶음(Unit_ItemSlot_pf). 아이템이 하나도 없으면 통째로 꺼진다.")]
+    [SerializeField] private GameObject _itemSlotsRoot;
+    [Tooltip("슬롯 테두리. 장착 개수만큼만 켜진다. 인덱스 순서 = 왼쪽부터.")]
+    [SerializeField] private GameObject[] _itemSlots;
+    [Tooltip("슬롯 안의 아이콘. _itemSlots와 같은 순서로 물려야 한다.")]
+    [SerializeField] private Image[] _itemIcons;
+
+    /// <summary>이번 갱신에서 아이템이 하나라도 표시됐는지. Hud가 바를 위로 올릴지 판단할 때 읽는다.</summary>
+    public bool HasVisibleItems { get; private set; }
 
     private RectTransform _rect;
     private float _appliedHpTicks = -1f;   // 마지막으로 uvRect에 반영한 눈금 개수
@@ -67,6 +78,43 @@ public class UnitStatusBarUI : MonoBehaviour
         }
 
         ApplyTicks(maxHp);
+    }
+
+    /// <summary>
+    /// 장착 아이템 아이콘 갱신. 슬롯 수(2)를 넘는 아이템은 표시하지 않는다.
+    /// 진화의 돌은 아이템과 슬롯을 공유하므로(PokemonUnit.UsedSlots) 함께 넘겨 앞쪽에 표시한다.
+    /// 하나도 없으면 묶음을 통째로 꺼서 HP바만 남긴다.
+    /// </summary>
+    public void SetItems(IReadOnlyList<ItemData> items, EvolutionStoneData stone)
+    {
+        int shown = 0;
+        int capacity = _itemSlots != null ? _itemSlots.Length : 0;
+
+        if (stone != null && shown < capacity)
+            ApplySlot(shown++, stone.icon);
+
+        if (items != null)
+        {
+            for (int i = 0; i < items.Count && shown < capacity; i++)
+            {
+                if (items[i] == null) continue;
+                ApplySlot(shown++, items[i].icon);
+            }
+        }
+
+        for (int i = shown; i < capacity; i++)
+            if (_itemSlots[i] != null) _itemSlots[i].SetActive(false);
+
+        HasVisibleItems = shown > 0;
+        if (_itemSlotsRoot != null) _itemSlotsRoot.SetActive(HasVisibleItems);
+    }
+
+    private void ApplySlot(int index, Sprite icon)
+    {
+        if (_itemSlots[index] != null) _itemSlots[index].SetActive(true);
+
+        if (_itemIcons != null && index < _itemIcons.Length && _itemIcons[index] != null)
+            _itemIcons[index].sprite = icon;
     }
 
     /// <summary>

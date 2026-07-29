@@ -573,6 +573,7 @@ public class BattleManager : MonoBehaviour
             {
                 bu.effects.Add(new ItemStatEffect(item));
                 bu.effects.Add(new ItemConditionalEffect(item, this));
+                bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
                 if (item.ccImmune) bu.HasCcImmuneItem = true;
             }
             else
@@ -632,8 +633,12 @@ public class BattleManager : MonoBehaviour
         {
             bu.effects.Add(new ItemStatEffect(item));
             bu.effects.Add(new ItemConditionalEffect(item, this));
+            bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
             if (item.ccImmune) bu.HasCcImmuneItem = true;
         }
+
+        // 돌은 이미 종족 교체로 반영돼 있어 효과 훅이 없다 — 아이콘 표시용으로만 넘긴다.
+        bu.displayStone = unit.equippedStone;
 
         return bu;
     }
