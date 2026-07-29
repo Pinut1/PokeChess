@@ -159,6 +159,8 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
 
     /// <summary>
     /// 리롤 버튼은 여기서 제외한다 — 구매로 비워진 슬롯도 리롤 대상이라 Sold 상태에서 살아있어야 한다.
+    /// 구매 버튼은 오브젝트째 끈다. ItemCard_Button에 Image가 붙어 있어서
+    /// interactable만 꺼두면 버튼 프레임이 그대로 남아 Sold 표시 위에 겹친다.
     /// </summary>
     private void SetContentActive(bool on)
     {
@@ -167,5 +169,6 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
         _itemImage.gameObject.SetActive(on);
         _nameText.gameObject.SetActive(on);
         _priceText.gameObject.SetActive(on);
+        _buyButton.gameObject.SetActive(on);
     }
 }

@@ -43,6 +43,12 @@ public abstract class ShopBarUIBase<TData, TCard> : MonoBehaviour
     /// <summary>슬롯 클릭 시 실제 구매 처리. ShopManager.Buy / BuyItem 등.</summary>
     protected abstract void Buy(int slotIndex);
 
+    /// <summary>
+    /// 카드 바인딩 직후 훅. 데이터만으로는 알 수 없는 상태(구매 가능 여부 등)를
+    /// 상점별로 덧입힐 때 쓴다. 기본 동작 없음.
+    /// </summary>
+    protected virtual void AfterBind(TCard card, TData data) { }
+
     protected void Refresh()
     {
         var slots = GetSlots();
@@ -51,7 +57,11 @@ public abstract class ShopBarUIBase<TData, TCard> : MonoBehaviour
         for (int i = 0; i < _cards.Length; i++)
         {
             var data = i < slots.Count ? slots[i] : null;
-            if (data != null) _cards[i].Bind(data);
+            if (data != null)
+            {
+                _cards[i].Bind(data);
+                AfterBind(_cards[i], data);
+            }
             else _cards[i].SetSold();
         }
     }

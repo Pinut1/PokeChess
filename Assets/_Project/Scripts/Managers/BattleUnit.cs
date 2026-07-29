@@ -47,6 +47,21 @@ public class BattleUnit
     // ── 효과 훅(기둥B) — 아이템/스킬/시너지가 전투 틱에 꽂히는 진입점 ──
     public readonly List<ICombatEffect> effects = new();
 
+    /// <summary>
+    /// 표시 전용 장착 아이템 목록(HP바 아래 아이콘). effects는 ICombatEffect로 변환돼 있어
+    /// 어떤 아이템이었는지 되짚을 수 없으므로 원본 ItemData를 따로 들고 있는다.
+    /// 아군은 PokemonUnit.items, 적은 트레이너 heldItemEn을 해석한 결과가 들어온다.
+    /// 전투 로직은 이 목록을 읽지 않는다 — 효과는 전부 effects가 담당.
+    /// </summary>
+    public readonly List<ItemData> displayItems = new();
+
+    /// <summary>
+    /// 표시 전용 장착 진화의 돌. 돌은 효과가 아니라 종족 교체(data 스왑)로 반영되므로
+    /// effects에도 displayItems에도 남지 않는다 — 아이콘을 띄우려면 따로 들고 있어야 한다.
+    /// 아군만 값이 들어오고(적은 트레이너 데이터에 돌 개념이 없음) 전투 로직은 읽지 않는다.
+    /// </summary>
+    public EvolutionStoneData displayStone;
+
     // ── 조건부 아이템 효과 상태(기둥B 2단계) ──
     public float shield;                  // 보호막 흡수량. 0 이하면 없음(shieldPctOnFatalHit).
     public float burnDamagePerTick;       // 화상 중 매틱 고정(True) 피해. 0이면 화상 없음.

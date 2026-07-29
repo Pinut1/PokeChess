@@ -750,6 +750,10 @@ MonoBehaviour:
   _synergyIcon2: {fileID: 8619640640650650042}
   _choiceCardFrame: {fileID: 8740862321647062742}
   _soldOverlay: {fileID: 7849897196362474908}
+  _grayscaleTargets:
+  - {fileID: 4365812645288770273}
+  - {fileID: 4749285603049123172}
+  _grayscaleMaterial: {fileID: 2100000, guid: 14260e36e5de75342936f31c2cfa1414, type: 2}
 --- !u!1 &5483102625669460447
 GameObject:
   m_ObjectHideFlags: 0

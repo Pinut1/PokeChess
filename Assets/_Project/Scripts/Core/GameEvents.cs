@@ -143,6 +143,13 @@ public static class GameEvents
     /// </summary>
     public static event Action<PokemonUnit> OnUnitChanged;
 
+    /// <summary>
+    /// 유닛 진화 완료(연출용). 성급 합체·진화의 돌·통신교환 모두 발화한다.
+    /// 인자 isStarUp = 성급이 오른 진화인지 여부(돌/통신교환은 false — 종만 바뀌고 별은 그대로).
+    /// 상태 변경 통지는 OnUnitChanged/OnUnitPlaced가 담당하고, 이 이벤트는 뷰 전용이다.
+    /// </summary>
+    public static event Action<PokemonUnit, bool> OnUnitEvolved;
+
     /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
     public static event Action OnSynergyUpdated;
 
@@ -286,6 +293,7 @@ public static class GameEvents
     public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
+    public static void UnitEvolved(PokemonUnit unit, bool isStarUp) => OnUnitEvolved?.Invoke(unit, isStarUp);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
 

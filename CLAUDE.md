@@ -65,6 +65,7 @@ Assets/_Project/Scripts/
 - ~~`Core/PokemonUnit` 특수진화체 별배율 ×1.5~~ ✅ 확정(7/23, 해인 작성가이드 07.23판): 곱하는 계수가 아니라 **별도 배율표**. 일반 진화 `1.0/1.8/2.8`, 특수 진화(돌·통신교환) `1.0/2.0/3.0`. `SPECIAL_EVOLUTION_MULTIPLIER` 제거됨
 - `Managers/ItemManager` 인벤토리 상한 `MAX_INVENTORY_SIZE=20`
 - `Managers/ShopManager` 라운드 결과(outcome)별 XP 차등
+- ~~유닛 판매 환급액~~ ✅ 확정(7/29, 해인 기획디렉터): 투자 골드(코스트 × 1성 환산 마리 수, 1성=×1/2성=×3/3성=×9)에서 **합성 패널티 −1**. 패널티는 **1코스트를 제외한 모든 코스트**에 붙고, **2성·3성 모두 −1 고정**(3성이라고 −2 아님). **1성은 패널티 없음**(사자마자 팔아도 본전 — 상점 탐색 위축 방지). 예: 2코스트 2성=5, 2코스트 3성=17, 1코스트 2성=3. `ShopManager.SellValue()` 단일 소스라 UI 표시와 실지급액이 자동 일치
 
 **🟡 타 담당 영역**
 - ✅ 상점 카드 UI(유닛 5칸/아이템 4칸) — `haein_UI` 병합으로 master 반영 완료(7/28, PR #57). 아이템 리롤은 **카드별 슬롯 1회·무료** 모델(`RerollItemSlot`). 구 모델(`RerollItemShop`·`AddItemShopReroll`·`OnItemShopRerollCountChanged`)은 제거됨

@@ -1270,6 +1270,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         receivedUnit.isTradeEvolved =
             packet.isTradeEvolved || isTradeEvolution;
 
+        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다.
+        if (receivedUnit.isTradeEvolved) GameEvents.UnitEvolved(receivedUnit, false);
+
         receivedUnit.ResetForBattle();
 
         if (!board.TryPlaceInBench(receivedUnit))

@@ -42,6 +42,13 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     [Header("구매완료 오버레이 (미배치 시 비워둬도 동작)")]
     [SerializeField] private GameObject _soldOverlay;
 
+    [Header("골드 부족 표시")]
+    [Tooltip("골드가 모자랄 때 흑백으로 만들 이미지들(Pokemon_Illust, Price_CoinImg 등). " +
+             "TMP 텍스트는 넣지 말 것 — SDF 렌더링이 깨진다.")]
+    [SerializeField] private Image[] _grayscaleTargets;
+    [Tooltip("PokeChess/UI/Grayscale 셰이더로 만든 머티리얼. 비워두면 흑백 없이 클릭만 막힌다.")]
+    [SerializeField] private Material _grayscaleMaterial;
+
     public PokemonData CurrentData { get; private set; }
 
     private void Awake()
@@ -58,7 +65,12 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     {
         CurrentData = data;
 
+        // 흑백/버튼 상태는 골드에 따라 결정되므로 여기서는 기본값으로 되돌리고,
+        // 실제 판정은 컨트롤러가 바인딩 직후 SetAffordable로 덮는다.
+        _buyButton.enabled = true;
         _buyButton.interactable = true;
+        ApplyGrayscale(false);
+
         _cardFrame.gameObject.SetActive(true);
         _illustration.gameObject.SetActive(true);
         _nameText.gameObject.SetActive(true);
@@ -87,12 +99,42 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
         _choiceCardFrame.SetActive(false);
     }
 
+    /// <summary>
+    /// 골드로 살 수 있는지 반영. 못 사면 일러스트를 흑백으로 바꾸고 버튼을 끈다.
+    /// interactable=false면 클릭뿐 아니라 Hover(Highlighted) 전환도 함께 막힌다 —
+    /// Selectable이 비활성 상태에서는 상태 전환 자체를 하지 않기 때문에 Hover는 따로 처리할 게 없다.
+    /// </summary>
+    public void SetAffordable(bool affordable)
+    {
+        // interactable을 끄지 않는 이유: SpriteSwap의 Disabled 슬롯에는 "구매완료" 이미지가 들어 있어
+        // 골드 부족 상태에서 이미 산 것처럼 보이게 된다. Button 컴포넌트를 통째로 끄면
+        // Unity가 상태를 Normal로 되돌린 뒤 포인터 이벤트를 받지 않으므로,
+        // 스프라이트는 그대로 두고 클릭·Hover만 막을 수 있다.
+        _buyButton.enabled = affordable;
+        ApplyGrayscale(!affordable);
+    }
+
+    /// <summary>지정된 이미지들만 흑백 머티리얼로 바꾼다. null을 넣으면 기본 UI 머티리얼로 돌아간다.</summary>
+    private void ApplyGrayscale(bool gray)
+    {
+        if (_grayscaleMaterial == null || _grayscaleTargets == null) return;
+
+        Material target = gray ? _grayscaleMaterial : null;
+        foreach (var image in _grayscaleTargets)
+            if (image != null) image.material = target;
+    }
+
     /// <summary>슬롯이 비었을 때(구매 직후, 다음 리롤 전까지) 카드 콘텐츠를 숨기고 Sold 오버레이를 노출.</summary>
     public void SetSold()
     {
         CurrentData = null;
 
+        // 골드 부족으로 컴포넌트를 꺼둔 상태일 수 있어 되살린 뒤 interactable로 막는다
+        // (Sold는 Disabled 스프라이트를 쓰는 정상 경로).
+        _buyButton.enabled = true;
         _buyButton.interactable = false;
+        ApplyGrayscale(false);
+
         _cardFrame.gameObject.SetActive(false);
         _illustration.gameObject.SetActive(false);
         _nameText.gameObject.SetActive(false);

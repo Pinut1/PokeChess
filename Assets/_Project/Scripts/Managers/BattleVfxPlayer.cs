@@ -74,12 +74,87 @@ public static class BattleVfxPlayer
         return (n * SQRT3 + 1f) / (SQRT3 + 1f);
     }
 
-    /// <summary>단일 유닛 위치에 VFX 생성(시전자 플래시 등).</summary>
+    /// <summary>단일 유닛 위치에 VFX 생성(시전자 플래시 등). 회전 없음.</summary>
     public static void PlayOnUnit(string vfxId, BattleUnit target)
     {
         var entry = Resolve(vfxId);
         if (entry == null || target?.visual == null) return;
         Spawn(entry, target.visual.transform.position);
+    }
+
+    /// <summary>
+    /// 평타 VFX. 사거리에 따라 연출 형태가 다르다.
+    ///   근접(range &lt;= 1): 대상 위치에서 터지는 타격 이펙트 — 기존과 동일.
+    ///   원거리(range &gt; 1): 공격자에서 출발해 대상까지 날아가는 투사체.
+    ///
+    /// 원거리를 대상 위치에 생성하면 투사체가 도착지에서 출발해 그 너머로 지나가 버린다.
+    /// 그래서 출발점을 공격자로 옮기고, 파티클 수명을 실제 거리에 맞춰 대상에서 멈추게 한다.
+    /// </summary>
+    public static void PlayBasicAttack(string vfxId, BattleUnit attacker, BattleUnit target)
+    {
+        var entry = Resolve(vfxId);
+        if (entry == null || target?.visual == null) return;
+
+        Vector3 hit = target.visual.transform.position;
+
+        bool ranged = attacker != null && attacker.visual != null && attacker.range > 1;
+        if (!ranged)
+        {
+            Spawn(entry, hit);
+            return;
+        }
+
+        Vector3 d = hit - attacker.visual.transform.position;
+        d.y = 0f;
+        float distance = d.magnitude;
+
+        // 같은 자리(예외)면 투사체가 의미 없으니 타격 이펙트로 폴백.
+        if (distance < 0.01f) { Spawn(entry, hit); return; }
+
+        var go = Create(entry, attacker.visual.transform.position,
+                             Quaternion.LookRotation(d / distance, Vector3.up), 1f);
+
+        float travel = FitProjectileTravel(go, distance);
+        ScheduleDestroy(go, entry, travel);
+    }
+
+    /// <summary>
+    /// 파티클이 정확히 distance만큼 날아가고 멈추도록 수명을 맞춘다(수명 = 거리 / 속도).
+    /// 프리팹이 Start Speed로 전진하는 형태를 전제한다. 속도가 0이면 제자리 연출이라 건드리지 않는다.
+    /// </summary>
+    /// <returns>가장 긴 이동 시간(초). 파괴 시점을 이보다 짧게 잡지 않기 위해 쓴다.</returns>
+    private static float FitProjectileTravel(GameObject go, float distance)
+    {
+        float longest = 0f;
+
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+
+            // MinMaxCurve라 상수/범위 모두 올 수 있다. 범위면 최대값 기준으로 잡아 덜 날아가는 쪽을 허용.
+            float speed = main.startSpeed.mode == ParticleSystemCurveMode.Constant
+                ? main.startSpeed.constant
+                : main.startSpeed.constantMax;
+
+            if (speed <= 0.01f) continue; // 전진하지 않는 파티클(잔불·플래시 등)은 그대로 둔다
+
+            float travel = distance / speed;
+            main.startLifetime = travel;
+            if (travel > longest) longest = travel;
+        }
+
+        return longest;
+    }
+
+    /// <summary>
+    /// 임의 월드 좌표에 VFX 생성. BattleUnit이 없는 연출(상점 단계 진화 등)에서 쓴다.
+    /// 조회·미등록 경고 처리는 전투 VFX와 동일하다.
+    /// </summary>
+    public static void PlayAt(string vfxId, Vector3 position, float scale = 1f)
+    {
+        var entry = Resolve(vfxId);
+        if (entry == null) return;
+        Spawn(entry, position, scale);
     }
 
     private static VfxEntry Resolve(string vfxId)
@@ -111,9 +186,24 @@ public static class BattleVfxPlayer
 
     private static void Spawn(VfxEntry entry, Vector3 position, float scale = 1f)
     {
-        var go = Object.Instantiate(entry.prefab, position, Quaternion.identity);
+        var go = Create(entry, position, Quaternion.identity, scale);
+        ScheduleDestroy(go, entry, 0f);
+    }
+
+    private static GameObject Create(VfxEntry entry, Vector3 position, Quaternion rotation, float scale)
+    {
+        var go = Object.Instantiate(entry.prefab, position, rotation);
         if (!Mathf.Approximately(scale, 1f)) go.transform.localScale *= scale;
+        return go;
+    }
+
+    /// <summary>
+    /// 자동 파괴 예약. 투사체는 도착 전에 지워지면 안 되므로 이동 시간보다 짧게 잡지 않는다.
+    /// </summary>
+    private static void ScheduleDestroy(GameObject go, VfxEntry entry, float minLifetime)
+    {
         float lifetime = entry.lifetime > 0f ? entry.lifetime : DEFAULT_LIFETIME;
+        if (minLifetime > 0f) lifetime = Mathf.Max(lifetime, minLifetime + 0.3f); // 도착 직후 잔여 연출 여유
         Object.Destroy(go, lifetime);
     }
 }

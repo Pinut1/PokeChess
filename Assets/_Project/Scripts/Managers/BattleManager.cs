@@ -58,6 +58,11 @@ public class BattleManager : MonoBehaviour
     // 적 영문명 → PokemonData 해석은 중앙 PokemonDatabase.Instance가 담당.
     // 스테이지/DB 둘 중 하나라도 없으면 "내 보드 미러"로 폴백(씬/디버그 호환).
 
+    [Tooltip("적 진영 바닥 한 칸에 사용할 HexTile 프리팹입니다. 아군 보드(BoardManager._tilePrefab)와 같은 것을 " +
+             "넣으면 양쪽 바닥이 이어져 보입니다. 비어 있으면 기존 원기둥 임시 타일을 생성합니다. " +
+             "적 진영은 장식 전용이라 드롭 처리와 콜라이더는 자동으로 꺼집니다.")]
+    [SerializeField] private HexTile _enemyTilePrefab;
+
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
@@ -470,8 +475,8 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 보드 전체 칸을 점대칭 미러 좌표에 깔아 "상대 보드"를 임시로 시각화.
-    /// 실제 타일 프리팹이 아닌 디버그용 평면 — 전투 종료 시 제거.
+    /// 보드 전체 칸을 점대칭 미러 좌표에 깔아 "상대 보드"를 시각화. 전투 종료 시 제거.
+    /// _enemyTilePrefab이 연결돼 있으면 아군 보드와 같은 아트를 쓰고, 없으면 기존 원기둥 임시 타일로 폴백한다.
     /// </summary>
     private void SpawnMirrorBoard(BoardManager board)
     {
@@ -479,14 +484,45 @@ public class BattleManager : MonoBehaviour
         {
             HexCoords enemyCoords = board.GetEnemyBattleCoords(coords);
 
-            var tile = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            GameObject tile = _enemyTilePrefab != null
+                ? CreateEnemyTileFromPrefab()
+                : CreateFallbackEnemyTile();
+
             tile.name = $"EnemyBoardTile_{enemyCoords}";
-            tile.transform.localScale = new Vector3(0.95f, 0.05f, 0.95f);
-            tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 적 진영 바닥(연빨강)
             tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
 
             _mirrorTiles.Add(tile);
         }
+    }
+
+    /// <summary>
+    /// 아트 타일 생성. 적 진영은 장식 전용이라 드롭 처리와 콜라이더를 끈다.
+    /// HexTile은 IDropTarget이라 그대로 두면 적 진영에 유닛이 놓이고,
+    /// 콜라이더가 살아 있으면 아이템 드래그 등 다른 레이캐스트도 가로챈다.
+    /// </summary>
+    private GameObject CreateEnemyTileFromPrefab()
+    {
+        HexTile hex = Instantiate(_enemyTilePrefab);
+        hex.enabled = false;
+
+        foreach (var col in hex.GetComponentsInChildren<Collider>(true))
+            col.enabled = false;
+
+        return hex.gameObject;
+    }
+
+    /// <summary>프리팹 미연결 시 쓰는 임시 평면(연빨강 원기둥).</summary>
+    private static GameObject CreateFallbackEnemyTile()
+    {
+        var tile = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        tile.transform.localScale = new Vector3(0.95f, 0.05f, 0.95f);
+        tile.GetComponent<Renderer>().material.color = new Color(1f, 0.7f, 0.7f); // 적 진영 바닥
+
+        // 임시 타일도 드롭·레이캐스트를 방해하지 않도록 콜라이더를 제거한다.
+        var col = tile.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+
+        return tile;
     }
 
     /// <summary>내 보드 위 PokemonUnit에서 아군 BattleUnit 생성(원본 참조 유지 → 전투 후 복원).</summary>
@@ -537,6 +573,7 @@ public class BattleManager : MonoBehaviour
             {
                 bu.effects.Add(new ItemStatEffect(item));
                 bu.effects.Add(new ItemConditionalEffect(item, this));
+                bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
                 if (item.ccImmune) bu.HasCcImmuneItem = true;
             }
             else
@@ -596,8 +633,12 @@ public class BattleManager : MonoBehaviour
         {
             bu.effects.Add(new ItemStatEffect(item));
             bu.effects.Add(new ItemConditionalEffect(item, this));
+            bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
             if (item.ccImmune) bu.HasCcImmuneItem = true;
         }
+
+        // 돌은 이미 종족 교체로 반영돼 있어 효과 훅이 없다 — 아이콘 표시용으로만 넘긴다.
+        bu.displayStone = unit.equippedStone;
 
         return bu;
     }
@@ -622,6 +663,11 @@ public class BattleManager : MonoBehaviour
         }
 
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
+
+        // 적은 아군 진영을 바라보게 뒤집는다. 보드가 점대칭 미러라 정확히 180도.
+        // rotation을 대입하지 않고 Rotate로 돌려, 모델 프리팹이 가진 기본 자세(기울기 등)를 유지한다.
+        if (bu.team == BattleTeam.Enemy)
+            visual.transform.Rotate(0f, 180f, 0f, Space.World);
 
         bu.visual = visual;
         UpdateVisualPosition(bu);
@@ -785,7 +831,7 @@ public class BattleManager : MonoBehaviour
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
-        BattleVfxPlayer.PlayOnUnit(attacker.attackVfxId, target);
+        BattleVfxPlayer.PlayBasicAttack(attacker.attackVfxId, attacker, target);
 
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 

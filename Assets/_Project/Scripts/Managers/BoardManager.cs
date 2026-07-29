@@ -837,17 +837,21 @@ public class BoardManager : MonoBehaviour
     /// - 중복 진화의 돌은 인벤토리 반환
     /// - 남은 슬롯에 일반 아이템을 무작위 장착
     /// - 장착되지 않은 일반 아이템은 인벤토리 반환
+    ///
+    /// 반환값 = 이번 호출에서 실제로 합체가 일어났는지. 연쇄 진화(1성×3 → 2성 →
+    /// 그 결과 2성이 3마리 → 3성)에서 중간 단계를 건너뛰고 최종 결과만 연출하기
+    /// 위해 호출측이 이 값을 본다.
     /// </summary>
-    private void CheckEvolution(
+    private bool CheckEvolution(
         int speciesId,
         int starLevel,
         bool isTradeEvolved)
     {
         if (_isEvolving)
-            return;
+            return false;
 
         if (starLevel >= 3)
-            return;
+            return false;
 
         var candidates = new List<EvolutionCandidate>();
 
@@ -890,7 +894,7 @@ public class BoardManager : MonoBehaviour
         }
 
         if (candidates.Count < 3)
-            return;
+            return false;
 
         // 전투 중 보호 대상은 "필드에서 싸우는 유닛"뿐이다.
         // 후보 중 벤치 유닛만으로 3마리가 채워지면 필드 유닛을 건드리지 않고 즉시 합체하고,
@@ -910,7 +914,7 @@ public class BoardManager : MonoBehaviour
             if (benchOnlyCandidates.Count < 3)
             {
                 AddPendingStarEvolution(speciesId, starLevel);
-                return;
+                return false;
             }
 
             // 벤치 후보를 우선 선택해 필드 유닛을 건드리지 않고 즉시 합체한다.
@@ -1282,12 +1286,20 @@ public class BoardManager : MonoBehaviour
         else
             GameEvents.UnitBenched(evolvedUnit);
 
-        // 같은 결과 유닛이 다시 3마리가 됐는지 연쇄 검사.
-        CheckEvolution(
+        // 연쇄(예: 데구리 2성 3개 → 딱구리 3성). 진화로 바뀐 새 종 id로 재검사.
+        bool chained = CheckEvolution(
             evolvedUnit.data.id,
             evolvedUnit.starLevel,
             evolvedUnit.isTradeEvolved
         );
+
+        // 연출은 (1) 재배치 뒤에, (2) 연쇄가 끝난 뒤에 한 번만.
+        //  (1) UnitPlaced가 BoardView 위치를 갱신하므로 그 전에 발화하면 합체 전 좌표에 뜬다.
+        //  (2) 연쇄가 더 이어졌다면 더 깊은 호출이 최종 결과로 이미 발화했다.
+        //      여기서 또 발화하면 3성 달성 시 중간 2성 자리에서도 이펙트가 난다.
+        if (!chained) GameEvents.UnitEvolved(evolvedUnit, true);
+
+        return true;
     }
 
     /// <summary>
