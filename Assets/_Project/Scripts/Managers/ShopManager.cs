@@ -133,6 +133,13 @@ public class ShopManager : MonoBehaviour
     private PokemonData[] _slots;
     private ScriptableObject[] _itemSlots;
 
+    /// <summary>
+    /// 0번 진화의 돌 슬롯에 마지막으로 표시된 상품.
+    /// 구매로 슬롯이 비워져도 유지하며,
+    /// 개별 리롤 시 같은 돌이 다시 등장하지 않도록 제외 기준으로 사용한다.
+    /// </summary>
+    private EvolutionStoneData _lastDisplayedStone;
+
     /// <summary>슬롯별 이번 라운드 리롤 사용 여부. RollItemShop(매 라운드 갱신)마다 전부 false로 되돌린다.</summary>
     private bool[] _itemSlotRerollUsed;
 
@@ -155,9 +162,23 @@ public class ShopManager : MonoBehaviour
     /// <summary>진화체 → 기본종(풀 관리 대상) 역매핑. 진화 유닛 판매 시 소비된 기본종 카피를 올바른 풀로 되돌리기 위함.</summary>
     private readonly Dictionary<PokemonData, PokemonData> _evolvedToBase = new();
 
+    /// <summary>
+    /// 현재 플레이어가 통신진화를 해금한 원본 ID → 통신진화체 ID.
+    /// 플레이어별 로컬 상태이며, 파트너에게는 적용되지 않는다.
+    /// </summary>
+    private readonly Dictionary<int, int> _activeTradeEvolutions = new();
+
+    /// <summary>
+    /// 현재 상점 슬롯이 실제 공용 풀에서 예약한 원본 포켓몬 ID.
+    /// 화면에는 통신진화체가 표시되더라도 풀 계산과 구매 승인은 이 ID를 사용한다.
+    /// 0 = 구매됨/빈 슬롯.
+    /// </summary>
+    private int[] _slotPoolPokemonIds;
+
     private void Awake()
     {
         _slots = new PokemonData[_shopSize];
+        _slotPoolPokemonIds = new int[_shopSize];
         _itemSlots = new ScriptableObject[_itemShopSize];
         _itemSlotRerollUsed = new bool[_itemShopSize];
 
@@ -482,9 +503,20 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public int SellValue(PokemonUnit unit)
     {
-        if (unit == null || unit.data == null) return 0;
+        if (unit == null || unit.data == null)
+            return 0;
+
+        // 통신진화/일반 진화 유닛은 공용 풀의 원본 종 가격으로 환급한다.
+        PokemonData priceData =
+            _evolvedToBase.TryGetValue(
+                unit.data,
+                out PokemonData baseData)
+                ? baseData
+                : unit.data;
+
         int baseUnits = GetBaseUnitCount(unit.starLevel);
-        return unit.data.cost * baseUnits;
+
+        return priceData.cost * baseUnits;
     }
 
     // ──────────────────────────────────────────
@@ -494,7 +526,7 @@ public class ShopManager : MonoBehaviour
     /// <summary>샵 풀에서 레벨별 코스트 확률과 남은 풀 수량을 기준으로 _shopSize개를 다시 공개.</summary>
     public void Roll()
     {
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
@@ -506,7 +538,11 @@ public class ShopManager : MonoBehaviour
 
         if (_pool == null || _pool.Count == 0)
         {
-            for (int i = 0; i < _slots.Length; i++) _slots[i] = null;
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                _slots[i] = null;
+                _slotPoolPokemonIds[i] = 0;
+            }
             GameEvents.ShopRerolled();
             return;
         }
@@ -514,8 +550,22 @@ public class ShopManager : MonoBehaviour
         ReturnLocalShopSlotsToPool();
         for (int i = 0; i < _slots.Length; i++)
         {
-            _slots[i] = RollOnePokemonWeighted(_currentLevel, _cost4ForceOpen);
-            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+            // 실제 공용 풀에서 예약되는 원본 데이터.
+            PokemonData poolData =
+                RollOnePokemonWeighted(
+                    _currentLevel,
+                    _cost4ForceOpen
+                );
+
+            _slotPoolPokemonIds[i] =
+                poolData != null ? poolData.id : 0;
+
+            // 화면에는 활성화된 통신진화체를 표시.
+            _slots[i] =
+                ResolveTradeEvolutionShopData(poolData);
+
+            if (poolData != null)
+                DecreaseChampionPool(poolData, 1);
         }
 
         GameEvents.ShopRerolled();
@@ -528,13 +578,17 @@ public class ShopManager : MonoBehaviour
     private bool _cost4ForceOpen;
 
     /// <summary>
-    /// ECONOMY_SHOP(구독서비스) 증강 seam: 상점을 "서로 다른" 4코스트 5마리로 1회 무료 갱신.
-    /// v2 확정 — 지속 확률 등장 없음, 발동 시점(즉시 1회 + 1~3R 중 1회)은 EconomyShopAugment가 관리.
-    /// ⚠️ 증강 시스템(영욱 대행) 추가 — 태욱님 확인 필요.
+    /// ECONOMY_SHOP 증강 효과.
+    /// 증강 선택 즉시 현재 상점을 서로 다른 4코스트 유닛으로
+    /// 한 번만 무료 갱신한다.
+    ///
+    /// 호출 완료와 동시에 효과가 종료되며,
+    /// 이후 수동 리롤과 다음 라운드 자동 갱신은
+    /// 현재 레벨의 기본 상점 확률을 사용한다.
     /// </summary>
     public void OpenCostFourShopOnce()
     {
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
@@ -546,26 +600,49 @@ public class ShopManager : MonoBehaviour
 
         ReturnLocalShopSlotsToPool();
 
-        // "서로 다른 4단계 포켓몬" — 종 중복 없이 우선 채우고, 종 수가 모자라면 중복 허용 폴백.
+        // 서로 다른 4코스트 원본 유닛을 우선 선택한다.
         var distinct = new List<PokemonData>();
+
         foreach (var pair in _remainingPool)
-            if (pair.Key != null && pair.Key.cost == 4 && pair.Value > 0)
+        {
+            if (pair.Key != null &&
+                pair.Key.cost == 4 &&
+                pair.Value > 0)
+            {
                 distinct.Add(pair.Key);
+            }
+        }
 
         for (int i = 0; i < _slots.Length; i++)
         {
+            PokemonData poolData;
+
             if (distinct.Count > 0)
             {
-                int pick = Random.Range(0, distinct.Count);
-                _slots[i] = distinct[pick];
+                int pick =
+                    Random.Range(0, distinct.Count);
+
+                poolData = distinct[pick];
                 distinct.RemoveAt(pick);
             }
             else
             {
-                _slots[i] = RollOnePokemonOfCostWeighted(4, _currentLevel, false);
+                poolData =
+                    RollOnePokemonOfCostWeighted(
+                        4,
+                        _currentLevel,
+                        false
+                    );
             }
 
-            if (_slots[i] != null) DecreaseChampionPool(_slots[i], 1);
+            _slotPoolPokemonIds[i] =
+                poolData != null ? poolData.id : 0;
+
+            _slots[i] =
+                ResolveTradeEvolutionShopData(poolData);
+
+            if (poolData != null)
+                DecreaseChampionPool(poolData, 1);
         }
 
         GameEvents.ShopRerolled();
@@ -672,6 +749,204 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 받는 플레이어가 통신진화 유닛을 실제로 수령했을 때 호출한다.
+    /// 이후 상점 갱신부터 원본 대신 통신진화체를 표시하고,
+    /// 현재 상점의 원본 카드도 구매 시 진화체로 생성한다.
+    /// </summary>
+    public void ActivateTradeEvolution(int basePokemonId, int evolvedPokemonId)
+    {
+        if (basePokemonId <= 0 || evolvedPokemonId <= 0)
+            return;
+
+        PokemonDatabase db = PokemonDatabase.Instance;
+
+        PokemonData baseData =
+            db != null ? db.GetById(basePokemonId) : null;
+
+        PokemonData evolvedData =
+            db != null ? db.GetById(evolvedPokemonId) : null;
+
+        if (baseData == null || evolvedData == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][TradeEvolution] 데이터 조회 실패: " +
+                $"{basePokemonId} → {evolvedPokemonId}"
+            );
+            return;
+        }
+
+        _activeTradeEvolutions[basePokemonId] = evolvedPokemonId;
+
+        // 핫삼 판매 시 스라크 공용 풀로 반환하기 위한 역매핑.
+        _evolvedToBase[evolvedData] = baseData;
+
+        Debug.Log(
+            $"[Shop][TradeEvolution] 상점 변환 활성화: " +
+            $"{baseData.pokemonName} → {evolvedData.pokemonName}"
+        );
+    }
+
+    /// <summary>
+    /// 통신진화체 → 원본 종 역매핑만 등록한다(판매 시 풀 반환/가격 정산용).
+    /// ActivateTradeEvolution과 달리 상점 카드 변환(해금)은 발생시키지 않는다.
+    /// 이미 완성된 통신진화체를 재전송받은 경우처럼,
+    /// 진화 "사건" 없이 진화체 유닛만 소유하게 됐을 때 사용.
+    /// </summary>
+    public void RegisterEvolvedToBase(int evolvedPokemonId, int basePokemonId)
+    {
+        if (evolvedPokemonId <= 0 || basePokemonId <= 0) return;
+
+        var db = PokemonDatabase.Instance;
+        PokemonData evolvedData = db != null ? db.GetById(evolvedPokemonId) : null;
+        PokemonData baseData    = db != null ? db.GetById(basePokemonId)    : null;
+        if (evolvedData == null || baseData == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][TradeEvolution] 역매핑 등록 실패: {evolvedPokemonId} → {basePokemonId}");
+            return;
+        }
+
+        if (!_evolvedToBase.ContainsKey(evolvedData))
+        {
+            _evolvedToBase[evolvedData] = baseData;
+            Debug.Log(
+                $"[Shop][TradeEvolution] 판매 역매핑 등록: " +
+                $"{evolvedData.pokemonName} → {baseData.pokemonName}");
+        }
+    }
+
+    /// <summary>
+    /// 공용 풀에서는 원본 ID를 유지하되,
+    /// 현재 플레이어가 통신진화를 해금했다면 화면·구매 생성용 데이터만 진화체로 바꾼다.
+    /// </summary>
+    private PokemonData ResolveTradeEvolutionShopData(PokemonData poolData)
+    {
+        if (poolData == null)
+            return null;
+
+        if (!_activeTradeEvolutions.TryGetValue(
+                poolData.id,
+                out int evolvedPokemonId))
+        {
+            return poolData;
+        }
+
+        PokemonData evolvedData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(evolvedPokemonId)
+                : null;
+
+        if (evolvedData == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][TradeEvolution] 진화체 ID {evolvedPokemonId} 조회 실패 — " +
+                $"{poolData.pokemonName} 그대로 표시"
+            );
+
+            return poolData;
+        }
+
+        return evolvedData;
+    }
+
+    // ──────────────────────────────────────────
+    // 공용 풀 / 상점 확률 UI 조회 API
+    // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 현재 플레이어 레벨의 1~5코스트 등장 확률을 반환한다.
+    /// index 0 = 1코스트, index 4 = 5코스트.
+    /// </summary>
+    public int[] GetCurrentCostRatesForDebug()
+    {
+        return GetCostRates(_currentLevel);
+    }
+
+    /// <summary>
+    /// 상점 카드에 표시할 포켓몬별 풀 잔여 수량과
+    /// 다음 상점 한 슬롯에서의 등장 확률을 계산한다.
+    ///
+    /// 등장 확률 =
+    /// 해당 코스트 등장 확률
+    /// × 해당 포켓몬 남은 수량
+    /// ÷ 같은 코스트 전체 남은 수량
+    /// </summary>
+    public bool TryGetPoolDebugInfo(
+        PokemonData data,
+        out int remaining,
+        out int initial,
+        out int sameCostRemaining,
+        out float costRatePercent,
+        out float appearancePercent)
+    {
+        remaining = 0;
+        initial = 0;
+        sameCostRemaining = 0;
+        costRatePercent = 0f;
+        appearancePercent = 0f;
+
+        if (data == null)
+            return false;
+
+        // 진화체가 전달되면 실제 풀 관리 대상인 기본종으로 변환한다.
+        PokemonData poolData =
+            _evolvedToBase.TryGetValue(data, out PokemonData baseData)
+                ? baseData
+                : data;
+
+        if (poolData == null ||
+            !_remainingPool.TryGetValue(poolData, out remaining))
+        {
+            return false;
+        }
+
+        initial = GetInitialPoolCount(poolData.cost);
+
+        // 같은 코스트 포켓몬들의 현재 남은 카피 수 합계.
+        foreach (var pair in _remainingPool)
+        {
+            PokemonData candidate = pair.Key;
+
+            if (candidate == null ||
+                candidate.cost != poolData.cost)
+            {
+                continue;
+            }
+
+            sameCostRemaining += Mathf.Max(0, pair.Value);
+        }
+
+        int[] rates = GetCostRates(_currentLevel);
+        int rateIndex = poolData.cost - 1;
+
+        if (rateIndex < 0 || rateIndex >= rates.Length)
+            return true;
+
+        int totalRateWeight = 0;
+
+        for (int i = 0; i < rates.Length; i++)
+            totalRateWeight += Mathf.Max(0, rates[i]);
+
+        if (totalRateWeight <= 0)
+            return true;
+
+        costRatePercent =
+            100f *
+            Mathf.Max(0, rates[rateIndex]) /
+            totalRateWeight;
+
+        if (sameCostRemaining > 0)
+        {
+            appearancePercent =
+                costRatePercent *
+                remaining /
+                sameCostRemaining;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// 유닛 상점을 새로 굴림. 무료 리롤 자원을 우선 소모하고, 없으면 골드로 폴백. 성공 시 true.
     /// 실제 소모가 일어나면 GameEvents.RerollSpent를 발행(리롤 환급 증강 등의 훅).
     /// </summary>
@@ -715,53 +990,124 @@ public class ShopManager : MonoBehaviour
     /// <summary>슬롯의 포켓몬을 구매해 벤치에 배치. 성공 시 true.</summary>
     public bool Buy(int slot)
     {
-        if (_slots == null || slot < 0 || slot >= _slots.Length) return false;
+        if (_slots == null || slot < 0 || slot >= _slots.Length)
+            return false;
 
-        PokemonData data = _slots[slot];
-        if (data == null) return false;
+        // 화면에 표시되는 데이터.
+        // 통신진화가 활성화됐다면 진화체일 수 있다.
+        PokemonData displayedData = _slots[slot];
 
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
-        bool usesSharedPool = network != null && network.UsesSharedShopPool;
+        if (displayedData == null)
+            return false;
 
-        if (_sharedRollPending || _sharedPurchasePending) return false;
+        // 실제 공용 풀에서 예약된 원본 데이터.
+        // 예: 화면은 핫삼이지만 풀 기준은 스라크.
+        PokemonData poolData =
+            _slotPoolPokemonIds != null &&
+            slot < _slotPoolPokemonIds.Length &&
+            _slotPoolPokemonIds[slot] > 0 &&
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(
+                    _slotPoolPokemonIds[slot]
+                )
+                : displayedData;
 
-        if (Gold < data.cost)
+        if (poolData == null)
+            return false;
+
+        // 구매 시 실제 생성될 데이터.
+        // 통신진화가 활성화됐다면 원본 대신 진화체 생성.
+        PokemonData purchaseData =
+            ResolveTradeEvolutionShopData(poolData);
+
+        if (purchaseData == null)
+            return false;
+
+        GameManager.TryGet(out var gm);
+
+        NetworkManager network = gm != null ? gm.Network : null;
+
+        bool usesSharedPool =
+            network != null &&
+            network.UsesSharedShopPool;
+
+        if (_sharedRollPending || _sharedPurchasePending)
+            return false;
+
+        // 가격은 공용 풀 원본 데이터 기준.
+        if (Gold < poolData.cost)
         {
-            Debug.Log($"[Shop] 골드 부족 — {data.pokemonName} 구매 실패 (필요 {data.cost}, 보유 {Gold})");
+            Debug.Log(
+                $"[Shop] 골드 부족 — " +
+                $"{purchaseData.pokemonName} 구매 실패 " +
+                $"(필요 {poolData.cost}, 보유 {Gold})"
+            );
+
             return false;
         }
 
-        var board = GameManager.Instance.Board;
+        BoardManager board = gm != null ? gm.Board : null;
+
+        if (board == null)
+        {
+            Debug.LogWarning("[Shop] BoardManager 없음 — 구매 불가");
+            return false;
+        }
+
         if (!board.HasBenchSpace())
         {
             Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
             return false;
         }
 
+        // 공유 풀 사용 시 MasterClient에게 구매 승인을 먼저 요청.
+        // 실제 생성은 ResolveSharedShopPurchase에서 처리한다.
         if (usesSharedPool)
         {
             _sharedPurchasePending = true;
-            if (!network.RequestSharedShopPurchase(_shopRevision, slot))
+
+            if (!network.RequestSharedShopPurchase(
+                    _shopRevision,
+                    slot))
             {
                 _sharedPurchasePending = false;
                 return false;
             }
+
             return true;
         }
 
-        PokemonUnit unit = UnitFactory.Create(data);
-        if (unit == null) return false;
+        // 로컬 풀 모드에서는 바로 구매 유닛 생성.
+        PokemonUnit unit =
+            UnitFactory.Create(purchaseData);
+
+        if (unit == null)
+            return false;
+
+        // 상점에서 통신진화체를 구매한 경우
+        // 특수진화 배율이 적용되도록 상태 표시.
+        unit.isTradeEvolved =
+            purchaseData != poolData;
+
+        unit.ResetForBattle();
 
         if (!board.TryPlaceInBench(unit))
         {
-            Destroy(unit.gameObject); // 방어적 정리(이론상 도달 안 함)
+            Destroy(unit.gameObject);
             return false;
         }
 
-        AddGold(-data.cost);
-        _slots[slot] = null;
-        GameEvents.ShopRerolled(); // 표시 갱신(슬롯 비움 반영)
-        Debug.Log($"[Shop] {data.pokemonName} 구매 (-{data.cost}G)");
+        AddGold(-poolData.cost);
+
+        ClearShopSlot(slot);
+
+        GameEvents.ShopRerolled();
+
+        Debug.Log(
+            $"[Shop] {purchaseData.pokemonName} 구매 " +
+            $"(-{poolData.cost}G, 풀 기준 {poolData.pokemonName})"
+        );
+
         return true;
     }
 
@@ -793,7 +1139,7 @@ public class ShopManager : MonoBehaviour
 
         int amount = GetBaseUnitCount(unit.starLevel);
 
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             network.RequestSharedShopReturn(data.id, amount);
@@ -876,6 +1222,397 @@ public class ShopManager : MonoBehaviour
         Debug.Log($"[SharedShopPool] {data.pokemonName} 풀 복귀 +{amount} / 남은 {_remainingPool[data]}");
     }
 
+    /// <summary>
+    /// MasterClient 권위로 현재 남아 있는 공용 풀에서
+    /// 지정 코스트 유닛 카피 1장을 실제로 선택하고 차감한다.
+    ///
+    /// 상점 슬롯 예약과는 별개이며 골드는 소비하지 않는다.
+    /// 같은 코스트 내에서는 남은 카피 수에 비례해 선택한다.
+    /// </summary>
+    public bool TryAuthorityTakeDebugUnitByCost(
+        int cost,
+        out int pokemonId)
+    {
+        pokemonId = 0;
+
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        EnsureChampionPoolInitialized();
+
+        if (!_poolInitialized)
+        {
+            Debug.LogWarning(
+                "[SharedShopPool][QA] 챔피언 풀이 초기화되지 않음"
+            );
+
+            return false;
+        }
+
+        PokemonData selected =
+            PickWeightedByRemaining(cost);
+
+        if (selected == null)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 남은 공용 풀 없음"
+            );
+
+            return false;
+        }
+
+        if (!HasPoolStock(selected, 1))
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {selected.pokemonName} 재고 부족"
+            );
+
+            return false;
+        }
+
+        DecreaseChampionPool(selected, 1);
+
+        pokemonId = selected.id;
+
+        Debug.Log(
+            $"[SharedShopPool][QA] {cost}코스트 선택: " +
+            $"{selected.pokemonName}, pokemonId={pokemonId}"
+        );
+
+        return true;
+    }
+
+    /// <summary>
+    /// MasterClient가 승인한 QA 유닛을 요청자의 벤치에 생성한다.
+    ///
+    /// 생성 또는 벤치 배치에 실패하면 이미 차감된 공용 풀 카피를
+    /// 기존 RequestSharedShopReturn을 통해 다시 반환한다.
+    /// </summary>
+    public void ResolveSharedDebugUnitByCost(
+        int cost,
+        int pokemonId,
+        bool success)
+    {
+        if (!success || pokemonId <= 0)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 지급 요청 실패"
+            );
+
+            return;
+        }
+
+        GameManager.TryGet(out var gm);
+
+        PokemonData poolData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(pokemonId)
+                : null;
+
+        if (poolData == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] Pokemon ID {pokemonId} 조회 실패"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        if (poolData.cost != cost)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 요청 코스트와 승인 유닛 불일치: " +
+                $"요청={cost}, 실제={poolData.cost}, " +
+                $"pokemonId={pokemonId}"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        BoardManager board = gm != null ? gm.Board : null;
+
+        if (board == null)
+        {
+            Debug.LogError(
+                "[SharedShopPool][QA] BoardManager 없음 — 지급 실패"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        if (!board.HasBenchSpace())
+        {
+            Debug.LogWarning(
+                "[SharedShopPool][QA] 벤치가 가득 참 — 지급 취소"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        /*
+         * 현재 플레이어가 해당 원본 종의 통신진화를 해금했다면
+         * 일반 상점 구매와 동일하게 진화체로 생성한다.
+         *
+         * 공용 풀 차감과 판매 반환 기준은 여전히 poolData 원본이다.
+         */
+        PokemonData grantData =
+            ResolveTradeEvolutionShopData(poolData);
+
+        if (grantData == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] 생성 데이터 조회 실패: " +
+                $"{poolData.pokemonName}"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        PokemonUnit unit =
+            UnitFactory.Create(grantData);
+
+        if (unit == null)
+        {
+            Debug.LogError(
+                $"[SharedShopPool][QA] {grantData.pokemonName} 생성 실패"
+            );
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            return;
+        }
+
+        unit.isTradeEvolved =
+            grantData != poolData;
+
+        unit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(unit))
+        {
+            Destroy(unit.gameObject);
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {grantData.pokemonName} " +
+                "벤치 배치 실패 — 공용 풀 반환 요청"
+            );
+
+            return;
+        }
+
+        /*
+         * 골드는 차감하지 않는다.
+         * 유닛은 일반 유닛과 완전히 동일하므로 판매하면
+         * HandleUnitSold → ReturnToChampionPool을 통해 풀에 복귀한다.
+         */
+        Debug.Log(
+            $"[SharedShopPool][QA] {grantData.pokemonName} " +
+            $"{cost}코스트 무료 지급 완료 " +
+            $"(풀 기준 {poolData.pokemonName})"
+        );
+    }
+
+    /// <summary>
+    /// QA 패널의 1~5코 유닛 획득 버튼이 호출하는 공개 진입점.
+    ///
+    /// 공유 풀 사용 중이면 NetworkManager를 통해 MasterClient에 요청한다.
+    /// 솔로 또는 오프라인이면 현재 로컬 풀에서 직접 차감 후 생성한다.
+    /// </summary>
+    public bool DebugGrantUnitByCost(int cost)
+    {
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[Shop][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        GameManager.TryGet(out var gm);
+
+        BoardManager board = gm != null ? gm.Board : null;
+
+        if (board == null)
+        {
+            Debug.LogWarning(
+                "[Shop][QA] BoardManager 없음 — 지급 불가"
+            );
+
+            return false;
+        }
+
+        if (!board.HasBenchSpace())
+        {
+            Debug.LogWarning(
+                "[Shop][QA] 벤치가 가득 참 — 지급 불가"
+            );
+
+            return false;
+        }
+
+        NetworkManager network = gm != null ? gm.Network : null;
+
+        /*
+         * 멀티플레이:
+         * MasterClient가 실제 공용 풀에서 선택 및 차감하고
+         * ResolveSharedDebugUnitByCost로 결과를 돌려준다.
+         */
+        if (network != null &&
+            network.UsesSharedShopPool)
+        {
+            bool requested =
+                network.RequestSharedDebugUnitByCost(cost);
+
+            if (!requested)
+            {
+                Debug.LogWarning(
+                    $"[Shop][QA] {cost}코스트 공유 풀 요청 실패"
+                );
+            }
+
+            return requested;
+        }
+
+        /*
+         * 솔로/오프라인:
+         * 로컬 _remainingPool이 권위 풀이므로
+         * 이곳에서 직접 선택·차감 후 생성한다.
+         */
+        EnsureChampionPoolInitialized();
+
+        PokemonData selected =
+            PickWeightedByRemaining(cost);
+
+        if (selected == null)
+        {
+            Debug.LogWarning(
+                $"[Shop][QA] {cost}코스트 남은 로컬 풀 없음"
+            );
+
+            return false;
+        }
+
+        if (!HasPoolStock(selected, 1))
+            return false;
+
+        DecreaseChampionPool(selected, 1);
+
+        PokemonData grantData =
+            ResolveTradeEvolutionShopData(selected);
+
+        if (grantData == null)
+        {
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            return false;
+        }
+
+        PokemonUnit unit =
+            UnitFactory.Create(grantData);
+
+        if (unit == null)
+        {
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            return false;
+        }
+
+        unit.isTradeEvolved =
+            grantData != selected;
+
+        unit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(unit))
+        {
+            Destroy(unit.gameObject);
+
+            AuthorityReturnSharedShopCopy(
+                selected.id,
+                1
+            );
+
+            Debug.LogWarning(
+                $"[Shop][QA] {grantData.pokemonName} " +
+                "벤치 배치 실패 — 로컬 풀 복귀"
+            );
+
+            return false;
+        }
+
+        Debug.Log(
+            $"[Shop][QA] {cost}코스트 무료 지급: " +
+            $"{grantData.pokemonName}, " +
+            $"풀 기준 {selected.pokemonName}"
+        );
+
+        return true;
+    }
+
+    /// <summary>
+    /// 현재 공용 풀 또는 로컬 풀에 남아 있는
+    /// 지정 코스트 전체 카피 수를 반환한다.
+    ///
+    /// 예:
+    /// 주뱃 28장 + 꼬렛 30장 + 캐터피 29장
+    /// → 1코스트 남은 수량 87장.
+    /// </summary>
+    public int GetRemainingPoolCountByCost(int cost)
+    {
+        if (cost < 1 || cost > 5)
+            return 0;
+
+        EnsureChampionPoolInitialized();
+
+        int total = 0;
+
+        foreach (var pair in _remainingPool)
+        {
+            PokemonData data = pair.Key;
+
+            if (data == null ||
+                data.cost != cost)
+            {
+                continue;
+            }
+
+            total += Mathf.Max(0, pair.Value);
+        }
+
+        return total;
+    }
+
+
     public void ApplySharedShopSnapshot(int revision, int[] pokemonIds)
     {
         _sharedRollPending = false;
@@ -888,50 +1625,170 @@ public class ShopManager : MonoBehaviour
         if (_slots == null || _slots.Length != pokemonIds.Length)
             _slots = new PokemonData[pokemonIds.Length];
 
+        if (_slotPoolPokemonIds == null ||
+            _slotPoolPokemonIds.Length != pokemonIds.Length)
+        {
+            _slotPoolPokemonIds = new int[pokemonIds.Length];
+        }
+
         var db = PokemonDatabase.Instance;
         for (int i = 0; i < pokemonIds.Length; i++)
-            _slots[i] = pokemonIds[i] > 0 && db != null ? db.GetById(pokemonIds[i]) : null;
+        {
+            int poolPokemonId = pokemonIds[i];
+
+            _slotPoolPokemonIds[i] = poolPokemonId;
+
+            PokemonData poolData =
+                poolPokemonId > 0 && db != null
+                    ? db.GetById(poolPokemonId)
+                    : null;
+
+            _slots[i] =
+                ResolveTradeEvolutionShopData(poolData);
+        }
 
         _shopRevision = revision;
         GameEvents.ShopRerolled();
     }
 
-    /// <summary>구매 승인 후 로컬 골드/벤치 상태를 커밋한다.</summary>
-    public void ResolveSharedShopPurchase(int revision, int slot, int pokemonId, bool success)
+    /// <summary>공유 상점 구매 승인 후 로컬 골드/벤치 상태를 커밋한다.</summary>
+    public void ResolveSharedShopPurchase(
+        int revision,
+        int slot,
+        int pokemonId,
+        bool success)
     {
         _sharedPurchasePending = false;
-        if (!success || revision != _shopRevision || _slots == null ||
-            slot < 0 || slot >= _slots.Length || _slots[slot] == null || _slots[slot].id != pokemonId)
+
+        if (!success ||
+            revision != _shopRevision ||
+            _slots == null ||
+            slot < 0 ||
+            slot >= _slots.Length ||
+            _slots[slot] == null)
         {
-            Debug.LogWarning("[SharedShopPool] 구매 승인 실패 또는 오래된 응답");
+            Debug.LogWarning(
+                "[SharedShopPool] 구매 승인 실패 또는 오래된 응답"
+            );
             return;
         }
 
-        PokemonData data = _slots[slot];
-        var board = GameManager.Instance != null ? GameManager.Instance.Board : null;
-        if (board == null || Gold < data.cost || !board.HasBenchSpace())
+        GameManager.TryGet(out var gm);
+
+        // MasterClient가 승인한 ID는 항상 공용 풀의 원본 ID.
+        PokemonData poolData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(pokemonId)
+                : null;
+
+        if (poolData == null)
         {
-            GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
-            _slots[slot] = null;
+            Debug.LogWarning(
+                $"[SharedShopPool] 승인된 원본 ID {pokemonId} 조회 실패"
+            );
+            return;
+        }
+
+        // 현재 슬롯이 예약한 원본과 응답 ID가 같은지 검증.
+        if (_slotPoolPokemonIds == null ||
+            slot >= _slotPoolPokemonIds.Length ||
+            _slotPoolPokemonIds[slot] != pokemonId)
+        {
+            Debug.LogWarning(
+                "[SharedShopPool] 슬롯 원본 ID와 구매 승인 ID가 일치하지 않음"
+            );
+            return;
+        }
+
+        // 통신진화가 활성화됐다면 실제 생성은 진화체로 한다.
+        PokemonData purchaseData =
+            ResolveTradeEvolutionShopData(poolData);
+
+        if (purchaseData == null)
+        {
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            ClearShopSlot(slot);
             GameEvents.ShopRerolled();
-            Debug.LogWarning("[SharedShopPool] 구매 커밋 실패 — 예약 카피 풀 반환");
             return;
         }
 
-        PokemonUnit unit = UnitFactory.Create(data);
-        if (unit == null || !board.TryPlaceInBench(unit))
+        BoardManager board = gm != null ? gm.Board : null;
+
+        if (board == null ||
+            Gold < poolData.cost ||
+            !board.HasBenchSpace())
         {
-            if (unit != null) Destroy(unit.gameObject);
-            GameManager.Instance?.Network?.RequestSharedShopReturn(pokemonId, 1);
-            _slots[slot] = null;
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            ClearShopSlot(slot);
+            GameEvents.ShopRerolled();
+
+            Debug.LogWarning(
+                "[SharedShopPool] 구매 커밋 실패 — 예약 카피 풀 반환"
+            );
+            return;
+        }
+
+        PokemonUnit unit =
+            UnitFactory.Create(purchaseData);
+
+        if (unit == null)
+        {
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            ClearShopSlot(slot);
             GameEvents.ShopRerolled();
             return;
         }
 
-        AddGold(-data.cost);
-        _slots[slot] = null;
+        unit.isTradeEvolved =
+            purchaseData != poolData;
+
+        unit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(unit))
+        {
+            Destroy(unit.gameObject);
+
+            gm?.Network?
+                .RequestSharedShopReturn(pokemonId, 1);
+
+            ClearShopSlot(slot);
+            GameEvents.ShopRerolled();
+            return;
+        }
+
+        AddGold(-poolData.cost);
+
+        ClearShopSlot(slot);
         GameEvents.ShopRerolled();
-        Debug.Log($"[SharedShopPool] {data.pokemonName} 구매 확정 (-{data.cost}G)");
+
+        Debug.Log(
+            $"[SharedShopPool] {purchaseData.pokemonName} 구매 확정 " +
+            $"(-{poolData.cost}G, 풀 기준 {poolData.pokemonName})"
+        );
+    }
+
+    /// <summary>유닛 상점의 표시 데이터와 풀 원본 ID를 함께 비운다.</summary>
+    private void ClearShopSlot(int slot)
+    {
+        if (_slots != null &&
+            slot >= 0 &&
+            slot < _slots.Length)
+        {
+            _slots[slot] = null;
+        }
+
+        if (_slotPoolPokemonIds != null &&
+            slot >= 0 &&
+            slot < _slotPoolPokemonIds.Length)
+        {
+            _slotPoolPokemonIds[slot] = 0;
+        }
     }
 
     /// <summary>모든 클라이언트가 권위 풀/예약 미러를 유지해 MasterClient 교체에 대비한다.</summary>
@@ -996,11 +1853,38 @@ public class ShopManager : MonoBehaviour
 
     private void ReturnLocalShopSlotsToPool()
     {
-        if (_slots == null) return;
-        foreach (PokemonData data in _slots)
+        if (_slotPoolPokemonIds == null)
+            return;
+
+        PokemonDatabase db =
+            PokemonDatabase.Instance;
+
+        for (int i = 0; i < _slotPoolPokemonIds.Length; i++)
         {
-            if (data == null || !_remainingPool.TryGetValue(data, out int remain)) continue;
-            _remainingPool[data] = Mathf.Min(GetInitialPoolCount(data.cost), remain + 1);
+            int poolPokemonId =
+                _slotPoolPokemonIds[i];
+
+            if (poolPokemonId <= 0 || db == null)
+                continue;
+
+            PokemonData poolData =
+                db.GetById(poolPokemonId);
+
+            if (poolData == null ||
+                !_remainingPool.TryGetValue(
+                    poolData,
+                    out int remain))
+            {
+                continue;
+            }
+
+            int maxCount =
+                GetInitialPoolCount(poolData.cost);
+
+            _remainingPool[poolData] =
+                Mathf.Min(maxCount, remain + 1);
+
+            _slotPoolPokemonIds[i] = 0;
         }
     }
 
@@ -1076,67 +1960,183 @@ public class ShopManager : MonoBehaviour
         for (int i = 0; i < _itemSlots.Length; i++)
         {
             if (i == 0)
-                _itemSlots[i] = RollOneStone();
-            else
-                _itemSlots[i] = RollOneItem();
+            {
+                EvolutionStoneData stone =
+                    RollOneStone();
 
-            _itemSlotRerollUsed[i] = false; // 지난 라운드 사용 여부와 무관하게 리롤 권한 복구(누적 없음)
+                _itemSlots[i] = stone;
+                _lastDisplayedStone = stone;
+            }
+            else
+            {
+                _itemSlots[i] = RollOneItem();
+            }
+
+            // 지난 라운드 사용 여부와 무관하게
+            // 리롤 권한 복구. 미사용 횟수는 누적되지 않는다.
+            _itemSlotRerollUsed[i] = false;
         }
 
         GameEvents.ItemShopRerolled();
     }
 
     /// <summary>
-    /// 아이템 상점 슬롯 1칸만 다시 굴린다(카드에 붙은 개별 리롤 버튼용). 비용 없음, 슬롯당 라운드 1회.
-    /// 슬롯 규칙은 RollItemShop과 동일 — 0번은 진화의 돌, 1~3번은 일반 아이템만 나온다.
-    /// 구매로 비워진 슬롯도 리롤 대상이다. 성공 시 true.
+    /// 아이템 상점 슬롯 1칸만 다시 굴린다.
+    /// 비용 없음, 슬롯당 라운드 1회.
+    ///
+    /// 0번 진화의 돌 슬롯:
+    /// 구매 여부와 관계없이 마지막으로 표시됐던 돌을 제외한다.
+    ///
+    /// 1~3번 일반 아이템 슬롯:
+    /// 현재 슬롯에 상품이 있을 때만 해당 상품을 제외한다.
+    /// 구매 후 빈 슬롯을 리롤하면 전체 일반 아이템이 후보가 된다.
     /// </summary>
     public bool RerollItemSlot(int slot)
     {
-        if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
-
-        if (!CanRerollItemSlot(slot))
+        if (_itemSlots == null ||
+            slot < 0 ||
+            slot >= _itemSlots.Length)
         {
-            Debug.Log($"[ItemShop] {slot}번 슬롯은 이번 라운드 리롤을 이미 사용함");
             return false;
         }
 
-        _itemSlots[slot] = slot == 0 ? (ScriptableObject)RollOneStone() : RollOneItem();
+        if (!CanRerollItemSlot(slot))
+        {
+            Debug.Log(
+                $"[ItemShop] {slot}번 슬롯은 " +
+                "이번 라운드 리롤을 이미 사용함"
+            );
+
+            return false;
+        }
+
+        ScriptableObject previousProduct =
+            _itemSlots[slot];
+
+        ScriptableObject rerolledProduct;
+
+        if (slot == 0)
+        {
+            /*
+             * 진화의 돌 슬롯은 구매로 비워져도
+             * 마지막으로 표시됐던 돌을 제외한다.
+             */
+            EvolutionStoneData stone =
+                RollOneStone(_lastDisplayedStone);
+
+            rerolledProduct = stone;
+            _lastDisplayedStone = stone;
+        }
+        else
+        {
+            /*
+             * 일반 아이템 슬롯은 현재 상품만 제외한다.
+             * 구매 후 슬롯이 비어 있으면 previousProduct가 null이므로
+             * 전체 아이템에서 무작위로 선택한다.
+             */
+            rerolledProduct =
+                RollOneItem(previousProduct as ItemData);
+        }
+
+        _itemSlots[slot] = rerolledProduct;
         _itemSlotRerollUsed[slot] = true;
 
         GameEvents.ItemShopRerolled();
-        Debug.Log($"[ItemShop] {slot}번 슬롯 리롤 완료 — 이번 라운드 재리롤 불가");
+
+        Debug.Log(
+            $"[ItemShop] {slot}번 슬롯 리롤 완료: " +
+            $"{GetItemShopName(previousProduct)} → " +
+            $"{GetItemShopName(rerolledProduct)} " +
+            "(이번 라운드 재리롤 불가)"
+        );
+
         return true;
     }
 
-    private EvolutionStoneData RollOneStone()
+    /// <summary>
+    /// 진화의 돌을 무작위로 선택한다.
+    /// excludedStone이 있으면 해당 돌은 후보에서 제외한다.
+    /// 제외 후 후보가 없으면 같은 돌을 다시 표시하지 않고 null을 반환한다.
+    /// </summary>
+    private EvolutionStoneData RollOneStone(
+        EvolutionStoneData excludedStone = null)
     {
         var db = EvolutionStoneDatabase.Instance;
-        if (db == null || db.all == null || db.all.Count == 0)
+
+        if (db == null ||
+            db.all == null ||
+            db.all.Count == 0)
         {
-            Debug.LogWarning("[ItemShop] EvolutionStoneDatabase 비어있음 — 진화의 돌 슬롯 비움");
+            Debug.LogWarning(
+                "[ItemShop] EvolutionStoneDatabase 비어있음 — " +
+                "진화의 돌 슬롯 비움"
+            );
+
             return null;
         }
 
-        var candidates = db.all.FindAll(s => s != null);
-        if (candidates.Count == 0) return null;
+        var candidates = db.all.FindAll(
+            stone =>
+                stone != null &&
+                stone != excludedStone
+        );
 
-        return candidates[Random.Range(0, candidates.Count)];
+        if (candidates.Count == 0)
+        {
+            Debug.LogWarning(
+                "[ItemShop] 이전 진화의 돌을 제외한 후보가 없음 — " +
+                "진화의 돌 슬롯 비움"
+            );
+
+            return null;
+        }
+
+        return candidates[
+            Random.Range(0, candidates.Count)
+        ];
     }
 
-    private ItemData RollOneItem()
+    /// <summary>
+    /// 일반 아이템을 무작위로 선택한다.
+    /// excludedItem이 있으면 해당 아이템은 후보에서 제외한다.
+    /// 제외 후 후보가 없으면 기존 아이템을 반환한다.
+    /// </summary>
+    private ItemData RollOneItem(
+        ItemData excludedItem = null)
     {
         var db = ItemDatabase.Instance;
-        if (db == null || db.all == null || db.all.Count == 0)
+
+        if (db == null ||
+            db.all == null ||
+            db.all.Count == 0)
         {
-            Debug.LogWarning("[ItemShop] ItemDatabase 비어있음 — 아이템 슬롯 비움");
+            Debug.LogWarning(
+                "[ItemShop] ItemDatabase 비어있음 — " +
+                "아이템 슬롯 비움"
+            );
+
             return null;
         }
 
-        var candidates = db.all.FindAll(i => i != null);
-        if (candidates.Count == 0) return null;
+        var candidates = db.all.FindAll(
+            item =>
+                item != null &&
+                item != excludedItem
+        );
 
-        return candidates[Random.Range(0, candidates.Count)];
+        if (candidates.Count == 0)
+        {
+            Debug.LogWarning(
+                "[ItemShop] 이전 아이템을 제외한 후보가 없음 — " +
+                "아이템 슬롯 비움"
+            );
+
+            return null;
+        }
+
+        return candidates[
+            Random.Range(0, candidates.Count)
+        ];
     }
 
     /// <summary>아이템 상점 슬롯의 상품을 아이템 쿠폰으로 구매해 인벤토리에 추가. 성공 시 true.</summary>
@@ -1147,7 +2147,7 @@ public class ShopManager : MonoBehaviour
         ScriptableObject product = _itemSlots[slot];
         if (product == null) return false;
 
-        var itemManager = GameManager.Instance.Item;
+        var itemManager = GameManager.TryGet(out var gm) ? gm.Item : null;
         if (itemManager == null)
         {
             Debug.LogWarning("[ItemShop] ItemManager 없음 — 구매 불가");

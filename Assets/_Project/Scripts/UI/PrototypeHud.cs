@@ -19,20 +19,305 @@ public class PrototypeHud : MonoBehaviour
     private void OnDisable() => GameEvents.OnPartnerGoldChanged -= OnPartnerGold;
     private void OnPartnerGold(int gold) => _partnerGold = gold;
 
+    private Vector2 _qaScroll;
+
     private void OnGUI()
     {
         if (!GameManager.TryGet(out var gm)) return;
 
+        if (gm.Network != null && gm.Network.IsMasterClient)
+        {
+            if (GUI.Button(
+                    new Rect(Screen.width - 570f, 10f, 200f, 40f),
+                    "게임 재시작"))
+            {
+                gm.Network.RestartGame();
+            }
+        }
+
         DrawStatusPanel(gm);
+        DrawQaPanel(gm);
 
         // Ready 버튼은 Canvas의 전투시작 버튼으로 이관되어 이 HUD에서 제거됐다(DrawReady 삭제).
+        // 준비 요청 경로도 gm.Phase.PlayerReady() 직접 호출에서 GameEvents.RequestPlayerReady()로 바뀌었다.
         if (_showShopDebugBar)
         {
+            DrawShopProbabilityPanel(gm);
             DrawItemShopBar(gm);
             DrawShopBar(gm);
         }
 
         DrawVictory(gm);
+    }
+
+    // ──────────────────────────────────────────
+    // QA 강제 실행 버튼
+    // ──────────────────────────────────────────
+    private void DrawQaPanel(GameManager gm)
+    {
+        const float panelWidth = 210f;
+        const float panelHeight = 360f;
+
+        float x =
+            Screen.width -
+            panelWidth -
+            1400f;
+
+        float y = 530f;
+
+        GUILayout.BeginArea(
+            new Rect(
+                x,
+                y,
+                panelWidth,
+                panelHeight
+            ),
+            GUI.skin.box
+        );
+
+        _qaScroll = GUILayout.BeginScrollView(
+            _qaScroll,
+            false,
+            true
+        );
+
+        GUILayout.Label("── QA 강제 실행 ──");
+
+        GUILayout.Space(4f);
+
+        if (GUILayout.Button(
+                "골드 +10",
+                GUILayout.Height(30f)))
+        {
+            DebugAddGold(gm, 10);
+        }
+
+        if (GUILayout.Button(
+                "아이템 쿠폰 +1",
+                GUILayout.Height(30f)))
+        {
+            DebugAddItemCoupon(gm, 1);
+        }
+
+        if (GUILayout.Button(
+                "아이템 상점 강제 갱신",
+                GUILayout.Height(30f)))
+        {
+            DebugRefreshItemShop(gm);
+        }
+
+        GUILayout.Space(8f);
+
+        // ─────────────────────────────
+        // 도구 디버그
+        // ─────────────────────────────
+
+        GUILayout.Label("── 도구 디버그 ──");
+
+        int reforgerCount =
+            gm.Item != null
+                ? gm.Item.ReforgerCount
+                : 0;
+
+        if (GUILayout.Button(
+                $"재조합기 +1  (보유 {reforgerCount})",
+                GUILayout.Height(30f)))
+        {
+            DebugAddReforger(gm, 1);
+        }
+
+        if (GUILayout.Button(
+                $"재조합기 -1  (보유 {reforgerCount})",
+                GUILayout.Height(30f)))
+        {
+            DebugSpendReforger(gm, 1);
+        }
+
+        GUILayout.Space(8f);
+
+        // ─────────────────────────────
+        // 코스트별 유닛 획득
+        // ─────────────────────────────
+
+        GUILayout.Label("── 코스트별 유닛 획득 ──");
+
+        for (int cost = 1; cost <= 5; cost++)
+        {
+            int selectedCost = cost;
+
+            int remaining =
+                gm.Shop != null
+                    ? gm.Shop.GetRemainingPoolCountByCost(selectedCost)
+                    : 0;
+
+            if (GUILayout.Button(
+                    $"{selectedCost}코 유닛 획득  (남음 {remaining})",
+                    GUILayout.Height(30f)))
+            {
+                DebugGrantUnitByCost(
+                    gm,
+                    selectedCost
+                );
+            }
+        }
+
+        GUILayout.Space(4f);
+
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+    }
+
+    private void DebugAddReforger(
+    GameManager gm,
+    int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Item.AddReforger(amount);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] 재조합기 +{amount} 획득 실패"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 재조합기 +{amount} 지급 완료 — " +
+            $"보유 {gm.Item.ReforgerCount}개"
+        );
+    }
+
+    private void DebugSpendReforger(
+        GameManager gm,
+        int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Item.SpendReforger(amount);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] 재조합기 -{amount} 실패 — " +
+                $"보유 {gm.Item.ReforgerCount}개"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 재조합기 -{amount} 처리 완료 — " +
+            $"보유 {gm.Item.ReforgerCount}개"
+        );
+    }
+
+    private void DebugAddGold(
+    GameManager gm,
+    int amount)
+    {
+        if (gm.Shop == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Shop.AddGold(amount);
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 골드 +{amount} 지급 완료"
+        );
+    }
+
+    private void DebugAddItemCoupon(
+        GameManager gm,
+        int amount)
+    {
+        if (gm.Item == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ItemManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Item.AddItemCoupon(amount);
+
+        Debug.Log(
+            $"[PrototypeHud][QA] 아이템 쿠폰 +{amount} 지급 완료"
+        );
+    }
+
+    private void DebugRefreshItemShop(
+        GameManager gm)
+    {
+        if (gm.Shop == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager가 없습니다."
+            );
+
+            return;
+        }
+
+        gm.Shop.RollItemShop();
+
+        Debug.Log(
+            "[PrototypeHud][QA] 아이템 상점 강제 갱신 완료"
+        );
+    }
+
+    private void DebugGrantUnitByCost(
+        GameManager gm,
+        int cost)
+    {
+        if (gm.Shop == null ||
+            gm.Board == null)
+        {
+            Debug.LogWarning(
+                "[PrototypeHud] ShopManager 또는 BoardManager가 없습니다."
+            );
+
+            return;
+        }
+
+        bool success =
+            gm.Shop.DebugGrantUnitByCost(cost);
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[PrototypeHud][QA] {cost}코 유닛 획득 실패"
+            );
+
+            return;
+        }
+
+        Debug.Log(
+            $"[PrototypeHud][QA] {cost}코 유닛 획득 요청 완료"
+        );
     }
 
     // ── 중앙: 완주 표시 ──
@@ -47,82 +332,241 @@ public class PrototypeHud : MonoBehaviour
     // ── 상단 좌측: 라운드·페이즈 / 팀 라이프 / 골드 / 파트너 골드 / 아이템 정보 ──
     private void DrawStatusPanel(GameManager gm)
     {
-        // 진행 정보 중 XP·레벨·유닛 캡은 UIManager가 담당한다.
-        GUILayout.BeginArea(new Rect(10, 10, 280, 268), GUI.skin.box);
+        const float panelX = 10f;
+        const float panelY = 10f;
+        const float panelWidth = 280f;
+        const float panelHeight = 320f;
+
+        GUILayout.BeginArea(
+            new Rect(
+                panelX,
+                panelY,
+                panelWidth,
+                panelHeight
+            ),
+            GUI.skin.box
+        );
+
+        // 기존 Scene / Is Master / Players 표시 아래로 내용 내리기
+        GUILayout.Space(68f);
 
         if (gm.Phase != null)
-            GUILayout.Label($"라운드 {gm.Phase.CurrentRound}   |   {PhaseKr(gm.Phase.CurrentPhase)}");
+            GUILayout.Label(
+                $"라운드 {gm.Phase.CurrentRound} | " +
+                $"{PhaseKr(gm.Phase.CurrentPhase)}"
+            );
 
         if (gm.PlayerHealth != null)
-            GUILayout.Label($"팀 라이프: {Mathf.Max(0, gm.PlayerHealth.Health)} / {gm.PlayerHealth.MaxHealth}");
+            GUILayout.Label(
+                $"팀 라이프: " +
+                $"{Mathf.Max(0, gm.PlayerHealth.Health)} / " +
+                $"{gm.PlayerHealth.MaxHealth}"
+            );
 
-        // 디버그: 무한 HP 토글 (검증 편의용 — 팀 데미지 전부 무시)
-        string infHpLabel = NetworkManager.DebugInfiniteTeamHealth ? "무한 HP: ON ▣" : "무한 HP: OFF ☐";
+        string infHpLabel =
+            NetworkManager.DebugInfiniteTeamHealth
+                ? "무한 HP: ON ▣"
+                : "무한 HP: OFF ☐";
+
         if (GUILayout.Button(infHpLabel))
-            NetworkManager.DebugInfiniteTeamHealth = !NetworkManager.DebugInfiniteTeamHealth;
+            NetworkManager.DebugInfiniteTeamHealth =
+                !NetworkManager.DebugInfiniteTeamHealth;
 
         if (gm.Shop != null)
-        {
             GUILayout.Label($"내 골드: {gm.Shop.Gold} G");
-        }
 
-        GUILayout.Space(4);
-        GUILayout.Label(_partnerGold >= 0 ? $"파트너 골드: {_partnerGold} G" : "파트너 골드: -");
+        GUILayout.Space(4f);
+
+        GUILayout.Label(
+            _partnerGold >= 0
+                ? $"파트너 골드: {_partnerGold} G"
+                : "파트너 골드: -"
+        );
 
         if (gm.Item != null)
         {
-            GUILayout.Space(4);
+            GUILayout.Space(4f);
             GUILayout.Label($"아이템 쿠폰: {gm.Item.ItemCoupon}");
-            GUILayout.Label($"아이템 인벤토리: {gm.Item.InventoryCount}/20");
+            GUILayout.Label(
+                $"아이템 인벤토리: {gm.Item.InventoryCount}/20"
+            );
         }
 
         GUILayout.EndArea();
     }
 
-    // ── 하단 중앙: 유닛 상점 슬롯(구매) + 판매 ──
+    // ──────────────────────────────────────────
+    // 아이템 상점 위쪽: 공용 풀 상태 + 코스트별 등장 확률
+    // ──────────────────────────────────────────
+    private void DrawShopProbabilityPanel(GameManager gm)
+    {
+        var shop = gm.Shop;
+        if (shop == null)
+            return;
+
+        const float width = 749f;
+        const float height = 64f;
+
+        float x = (Screen.width - width) / 2f;
+        float y = Screen.height - 299f;
+
+        GUILayout.BeginArea(
+            new Rect(x, y, width, height),
+            GUI.skin.box
+        );
+
+        var titleStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontStyle = FontStyle.Bold,
+            fontSize = 14
+        };
+
+        var probabilityStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 14
+        };
+
+        string poolStatus = "솔로 상점 풀";
+
+        if (gm.Network != null &&
+            gm.Network.UsesSharedShopPool)
+        {
+            poolStatus = gm.Network.IsMasterClient
+                ? "2인 공용 풀 ON · 내 역할: MasterClient"
+                : "2인 공용 풀 ON · 내 역할: 파트너";
+        }
+
+        GUILayout.Label(poolStatus, titleStyle);
+
+        int[] rates = shop.GetCurrentCostRatesForDebug();
+
+        string rateText =
+            $"1코 {GetRate(rates, 0)}%   " +
+            $"2코 {GetRate(rates, 1)}%   " +
+            $"3코 {GetRate(rates, 2)}%   " +
+            $"4코 {GetRate(rates, 3)}%   " +
+            $"5코 {GetRate(rates, 4)}%";
+
+        GUILayout.Label(rateText, probabilityStyle);
+        GUILayout.EndArea();
+    }
+
+    // ──────────────────────────────────────────
+    // 하단 중앙: 유닛 상점 슬롯 + 풀 잔여 수량 + 등장 확률
+    // ──────────────────────────────────────────
     private void DrawShopBar(GameManager gm)
     {
         var shop = gm.Shop;
-        if (shop == null) return;
+        if (shop == null)
+            return;
 
         var slots = shop.CurrentSlots;
-        int n = slots?.Count ?? 0;
-        const float w = 110f, h = 46f, gap = 6f;
+        int count = slots?.Count ?? 0;
 
-        float totalW = n * (w + gap);
-        float startX = (Screen.width - totalW) / 2f;
-        float y = Screen.height - 120f;
+        const float width = 145f;
+        const float height = 84f;
+        const float gap = 6f;
 
-        for (int i = 0; i < n; i++)
+        float totalWidth =
+            count > 0
+                ? count * width + (count - 1) * gap
+                : 0f;
+
+        float startX = (Screen.width - totalWidth) / 2f;
+        float y = Screen.height - 158f;
+
+        for (int i = 0; i < count; i++)
         {
-            var data = slots[i];
+            PokemonData data = slots[i];
             GUI.enabled = data != null;
 
-            string label = data != null ? $"{data.pokemonName}\n{data.cost} G" : "(빈 슬롯)";
+            string label;
 
-            if (GUI.Button(new Rect(startX + i * (w + gap), y, w, h), label))
+            if (data == null)
+            {
+                label = "(빈 슬롯)";
+            }
+            else if (shop.TryGetPoolDebugInfo(
+                         data,
+                         out int remaining,
+                         out int initial,
+                         out int sameCostRemaining,
+                         out float costRatePercent,
+                         out float appearancePercent))
+            {
+                label =
+                    $"{data.pokemonName}  {data.cost}G\n" +
+                    $"풀 {remaining}/{initial}\n" +
+                    $"다음 등장 {appearancePercent:0.00}%\n" +
+                    $"{costRatePercent:0.#}% × " +
+                    $"{remaining}/{sameCostRemaining}";
+            }
+            else
+            {
+                label =
+                    $"{data.pokemonName}\n" +
+                    $"{data.cost}G\n" +
+                    "풀 정보 없음";
+            }
+
+            var buttonRect = new Rect(
+                startX + i * (width + gap),
+                y,
+                width,
+                height
+            );
+
+            if (GUI.Button(buttonRect, label))
                 shop.Buy(i);
 
             GUI.enabled = true;
         }
 
-        float by = y + h + gap;
+        float buttonY = y + height + gap;
 
-        // 첫 벤치 유닛 판매
-        if (GUI.Button(new Rect(startX, by, w, 30), "첫 벤치 판매"))
+        string rerollLabel =
+            shop.RerollCount > 0
+                ? $"리롤 (무료 {shop.RerollCount})"
+                : $"리롤 ({shop.RerollCost}G)";
+
+        if (GUI.Button(
+                new Rect(
+                    startX,
+                    buttonY,
+                    width,
+                    30f
+                ),
+                rerollLabel))
         {
+            shop.Reroll();
+        }
+
+        if (GUI.Button(
+                new Rect(
+                    startX + width + gap,
+                    buttonY,
+                    width,
+                    30f
+                ),
+                "첫 벤치 판매"))
+        {
+            if (gm.Board == null)
+                return;
+
             var bench = gm.Board.GetBenchSnapshot();
 
             for (int i = 0; i < bench.Count; i++)
             {
-                if (bench[i] != null)
-                {
-                    gm.Board.SellUnit(bench[i]);
-                    break;
-                }
+                if (bench[i] == null)
+                    continue;
+
+                gm.Board.SellUnit(bench[i]);
+                break;
             }
         }
-        // 준비 완료 입력은 Canvas의 BattleRaedy_Button이 담당한다.
+        // 준비 완료 입력은 Canvas의 BattleReady_Button이 담당한다.
     }
 
     // ── 유닛 상점 위쪽: 아이템 상점 슬롯(쿠폰 구매). 0번 슬롯=진화의 돌, 1~3번 슬롯=일반 아이템 ──
@@ -137,7 +581,7 @@ public class PrototypeHud : MonoBehaviour
 
         float totalW = n * (w + gap);
         float startX = (Screen.width - totalW) / 2f;
-        float y = Screen.height - 190f;
+        float y = Screen.height - 225f;
 
         for (int i = 0; i < n; i++)
         {
@@ -158,7 +602,17 @@ public class PrototypeHud : MonoBehaviour
             GUI.enabled = true;
         }
     }
-    
+    private static int GetRate(int[] rates, int index)
+    {
+        if (rates == null ||
+            index < 0 ||
+            index >= rates.Length)
+        {
+            return 0;
+        }
+
+        return rates[index];
+    }
 
     private static string PhaseKr(GamePhase p) => p switch
     {

@@ -45,8 +45,8 @@ public class TradeEvolutionData : ScriptableObject
     // 잦은 조회를 위한 캐시 (targetEn → evolvedEn). 코드에서 딕셔너리로 제어.
     private Dictionary<string, string> _lookup;
 
-    private void OnEnable()  => _lookup = null;   // 핫리로드/임포트 후 재빌드 강제
-    private void OnDisable() => _lookup = null;
+    private void OnEnable()  { _lookup = null; _reverseLookup = null; }   // 핫리로드/임포트 후 재빌드 강제
+    private void OnDisable() { _lookup = null; _reverseLookup = null; }
 
     private Dictionary<string, string> Lookup
     {
@@ -63,10 +63,35 @@ public class TradeEvolutionData : ScriptableObject
         }
     }
 
+    // 역조회 캐시 (evolvedEn → targetEn). 재전송된 통신진화체의 원본 종 식별용.
+    private Dictionary<string, string> _reverseLookup;
+
+    private Dictionary<string, string> ReverseLookup
+    {
+        get
+        {
+            if (_reverseLookup == null)
+            {
+                _reverseLookup = new Dictionary<string, string>();
+                foreach (var m in mappings)
+                    if (!string.IsNullOrEmpty(m.evolvedPokemonEn))
+                        _reverseLookup[m.evolvedPokemonEn] = m.targetPokemonEn;
+            }
+            return _reverseLookup;
+        }
+    }
+
     /// <summary>해당 종이 통신교환 시 진화하는지 여부.</summary>
     public bool IsTradeEvolver(string targetNameEn) => Lookup.ContainsKey(targetNameEn);
 
     /// <summary>targetPokemonEn의 통신진화 후 영문명. 대상이 아니면 null.</summary>
     public string GetEvolved(string targetNameEn)
         => Lookup.TryGetValue(targetNameEn, out var evolved) ? evolved : null;
+
+    /// <summary>해당 종이 통신진화의 "결과물"인지 (예: Scizor → true).</summary>
+    public bool IsTradeEvolvedForm(string evolvedNameEn) => ReverseLookup.ContainsKey(evolvedNameEn);
+
+    /// <summary>evolvedPokemonEn의 통신진화 원본 영문명. 진화체가 아니면 null.</summary>
+    public string GetBaseOf(string evolvedNameEn)
+        => ReverseLookup.TryGetValue(evolvedNameEn, out var baseEn) ? baseEn : null;
 }

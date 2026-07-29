@@ -4,7 +4,11 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 마우스로 유닛을 집어 IDropTarget(보드 타일/벤치 슬롯)에 놓는 드래그앤드롭 컨트롤러.
-/// 아키텍처 문서의 "PlayerController" 역할. 쇼핑 페이즈에서만 동작한다.
+/// 아키텍처 문서의 "PlayerController" 역할.
+/// 쇼핑 중에는 필드/벤치 유닛을 자유롭게 집어 보드/벤치 어디에나 놓을 수 있다.
+/// 전투 중에는 "보호 대상은 필드에서 싸우는 유닛뿐" 원칙에 따라 벤치 유닛은 언제나
+/// 집기/이동/판매/통신교환이 가능하지만, 필드 유닛은 집을 수 없고 어떤 유닛도
+/// 보드 타일(HexTile)에는 놓을 수 없다.
 /// 레이캐스트를 사용하므로 유닛/타일/벤치에 Collider가 있어야 한다.
 ///
 /// 입력은 새 Input System의 "임베드된 InputAction"을 사용한다.
@@ -36,6 +40,8 @@ public class UnitDragController : MonoBehaviour
     private IDropTarget _hovered;
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
 
+    private AugmentManager _augmentManager;
+
     // 판매 영역 하이라이트 복원용. 색을 바꾼 대상과 원래 색을 함께 들고 있어야
     // 드래그 도중 상점 탭이 전환돼 대상이 바뀌어도 이전 대상을 되돌릴 수 있다.
     private Graphic _sellHighlightTarget;
@@ -43,7 +49,11 @@ public class UnitDragController : MonoBehaviour
 
     private void Awake()
     {
-        if (_camera == null) _camera = Camera.main;
+        if (_camera == null)
+            _camera = Camera.main;
+
+        if (GameManager.TryGet(out var gm))
+            _augmentManager = gm.GetComponent<AugmentManager>();
     }
 
     private void OnEnable()
@@ -62,9 +72,19 @@ public class UnitDragController : MonoBehaviour
     {
         if (_camera == null) return;
 
-        // 쇼핑 페이즈에서만 드래그 허용
-        var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
-        if (phase != null && phase.CurrentPhase != GamePhase.Shopping)
+        // 통신교환(6b46074a)이 "쇼핑 페이즈에서만 드래그"를 완화했다:
+        // 전투 중에도 벤치 유닛은 집어서 전송 대기열로 보낼 수 있어야 한다.
+        // 필드 유닛만 전투 중 조작을 막는다 — master의 쇼핑 전용 검사로 되돌리지 말 것.
+        // 쇼핑→전투 전환 순간 필드 유닛을 들고 있던 경우: 전투 중엔 필드 유닛을 쥘 수 없으므로 즉시 취소.
+        // (벤치 유닛을 들고 있던 채로 전환된 경우는 그대로 드래그를 이어간다.)
+        if (IsBattlePhase() && _held != null && IsUnitOnBoard(_held))
+        {
+            CancelDrag();
+            return;
+        }
+
+        // 증강 선택창이 펼쳐진 동안 3D 조작 차단
+        if (_augmentManager != null && _augmentManager.IsChoiceBlocking)
         {
             if (_held != null) CancelDrag();
             return;
@@ -88,8 +108,31 @@ public class UnitDragController : MonoBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f, _raycastMask))
         {
             var unit = hit.collider.GetComponentInParent<PokemonUnit>();
-            if (unit != null) _held = unit;
+            if (unit == null) return;
+
+            // 전투 중에는 필드(보드) 유닛을 집을 수 없다 — 벤치 유닛만 허용.
+            if (IsBattlePhase() && IsUnitOnBoard(unit)) return;
+
+            _held = unit;
         }
+    }
+
+    /// <summary>현재 전투 페이즈인지.</summary>
+    private static bool IsBattlePhase()
+    {
+        var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
+        return phase != null && phase.CurrentPhase == GamePhase.Battle;
+    }
+
+    /// <summary>
+    /// unit이 현재 보드(필드) 위에 있는지.
+    /// NetworkManager.SendTradeUnit이 wasOnBoard를 계산할 때 쓰는 것과 동일하게
+    /// BoardManager.GetUnitsOnBoard()를 재사용한다(새 판별 로직을 만들지 않음).
+    /// </summary>
+    private static bool IsUnitOnBoard(PokemonUnit unit)
+    {
+        var board = GameManager.TryGet(out var gm) ? gm.Board : null;
+        return unit != null && board != null && board.GetUnitsOnBoard().Contains(unit);
     }
 
     private void DragUpdate()
@@ -119,9 +162,16 @@ public class UnitDragController : MonoBehaviour
 
         IDropTarget target = RaycastDropTarget();
 
+        // 전투 중에는 어떤 유닛도 보드 타일에 놓을 수 없다.
+        // (필드 유닛과의 스왑도 이 검사 하나로 자연히 차단된다. BenchTile은 그대로 호출.)
+        bool blockedByBattlePhase = IsBattlePhase() && target is HexTile;
+
         if (target != null)
         {
-            target.OnDropUnit(_held);
+            // 타일이 막힌 경우 아무것도 하지 않는다 — 아래 판매 폴백으로 흘러가면
+            // 전투 중 타일 위에서 놓은 유닛이 팔릴 수 있으므로 else-if로 빠지지 않게 한다.
+            if (!blockedByBattlePhase)
+                target.OnDropUnit(_held);
         }
         else if (IsPointerOverShopSellArea())
         {
@@ -130,7 +180,7 @@ public class UnitDragController : MonoBehaviour
             SellHeldUnit();
         }
 
-        // BoardManager가 배치를 거부하면 갱신 이벤트가 발생하지 않는다.
+        // BoardManager가 배치를 거부했거나 위에서 스킵된 경우 갱신 이벤트가 발생하지 않는다.
         // 성공/실패와 관계없이 논리 상태를 다시 그려 실패한 기물을 원래 슬롯으로 돌린다.
         if (BoardView.Instance != null)
             BoardView.Instance.Resync();

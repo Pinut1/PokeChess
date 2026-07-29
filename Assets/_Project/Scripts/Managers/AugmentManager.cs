@@ -37,6 +37,12 @@ public class AugmentManager : MonoBehaviour
     /// <summary>선택 창이 조작을 블로킹 중인지. 카드를 내려둔(minimized) 동안은 false.</summary>
     public bool IsChoiceBlocking => _pendingOffer.Count > 0 && !_offerMinimized;
 
+    /// <summary>
+    /// 아직 선택하지 않은 증강 오퍼가 존재하는지.
+    /// 최소화 여부와 관계없이 라운드 진행을 정지할 때 사용한다.
+    /// </summary>
+    public bool HasPendingChoice => _pendingOffer.Count > 0;
+
     /// <summary>오퍼가 떠 있는 동안 남은 자동 선택 시간(초). 오퍼 없으면 0.</summary>
     public float OfferTimeRemaining =>
         _pendingOffer.Count > 0 ? Mathf.Max(0f, OFFER_TIMEOUT_SECONDS - (Time.time - _offerStartTime)) : 0f;

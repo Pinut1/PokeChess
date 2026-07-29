@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 #if PHOTON_UNITY_NETWORKING
@@ -90,6 +91,34 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public string RoomName       => _soloMode ? "solo" : PhotonNetwork.CurrentRoom?.Name ?? "";
     public string LocalNickname  => _soloMode ? "SoloPlayer" : PhotonNetwork.NickName;
 
+    public override void OnEnable()
+    {
+        base.OnEnable();
+
+        GameEvents.OnPhaseChanged += HandlePhaseChanged;
+        GameEvents.OnGoldTransferRequested += HandleGoldTransferRequested;
+        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
+    }
+
+    public override void OnDisable()
+    {
+        GameEvents.OnPhaseChanged -= HandlePhaseChanged;
+        GameEvents.OnGoldTransferRequested -= HandleGoldTransferRequested;
+        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+
+        base.OnDisable();
+    }
+
+    private void HandlePhaseChanged(GamePhase phase)
+    {
+        _isBattlePhase = phase == GamePhase.Battle;
+
+        if (phase == GamePhase.Shopping)
+        {
+            ApplyPendingTradeEvolutions();
+        }
+    }
+
     /// <summary>
     /// 현재 판의 고유 ID(GUID). 협동에선 MasterClient가 방 잠금 시점에 Room 커스텀 속성으로
     /// 배포해 두 클라이언트가 같은 값을 갖는다 — 전적 matchId의 "방이름+분단위 시각" 방식이
@@ -139,16 +168,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 같은 GameObject의 다른 컴포넌트(NetworkConnectionTest)가 Start에서 Connect()를 부를 수 있어
         // Start 순서 경합을 피하려고 모든 Start보다 먼저인 Awake에서 켠다.
         if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
-    }
-
-    private void OnEnable()
-    {
-        GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
-    }
-
-    private void OnDisable()
-    {
-        GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
     }
 
     private void Start()
@@ -370,6 +389,54 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         else photonView.RPC(nameof(RPC_RequestSharedShopReturn), RpcTarget.MasterClient, pokemonId, amount);
     }
 
+    /// <summary>
+    /// QA 패널에서 지정한 코스트의 유닛 1마리를
+    /// 현재 남아 있는 공용 풀에서 실제로 차감해 요청한다.
+    ///
+    /// 상점 슬롯 예약과는 무관하며 골드는 소비하지 않는다.
+    /// 실제 유닛 선택과 공용 풀 차감은 MasterClient가 담당한다.
+    /// </summary>
+    public bool RequestSharedDebugUnitByCost(int cost)
+    {
+        if (!UsesSharedShopPool)
+            return false;
+
+        if (cost < 1 || cost > 5)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 잘못된 코스트 요청: {cost}"
+            );
+
+            return false;
+        }
+
+        int actorNumber =
+            PhotonNetwork.LocalPlayer != null
+                ? PhotonNetwork.LocalPlayer.ActorNumber
+                : 0;
+
+        if (actorNumber <= 0)
+            return false;
+
+        if (IsMasterClient)
+        {
+            ProcessSharedDebugUnitByCost(
+                actorNumber,
+                cost
+            );
+        }
+        else
+        {
+            photonView.RPC(
+                nameof(RPC_RequestSharedDebugUnitByCost),
+                RpcTarget.MasterClient,
+                cost
+            );
+        }
+
+        return true;
+    }
+
     [PunRPC]
     private void RPC_RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, PhotonMessageInfo info)
     {
@@ -379,7 +446,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void ProcessSharedShopRoll(int actorNumber, int level, bool forceCostFour, bool onlyCostFour)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null || !shop.TryAuthorityRollSharedShop(
                 actorNumber, level, forceCostFour, onlyCostFour, out int revision, out int[] slots))
         {
@@ -401,7 +468,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [PunRPC]
     private void RPC_ApplySharedShopSnapshot(int revision, int[] slots)
     {
-        GameManager.Instance?.Shop?.ApplySharedShopSnapshot(revision, slots);
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ApplySharedShopSnapshot(revision, slots);
     }
 
     [PunRPC]
@@ -413,7 +481,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void ProcessSharedShopPurchase(int actorNumber, int revision, int slot)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         int pokemonId = 0;
         bool success = shop != null && shop.TryAuthorityPurchaseSharedShop(
             actorNumber, revision, slot, out pokemonId);
@@ -437,7 +505,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [PunRPC]
     private void RPC_ResolveSharedShopPurchase(int revision, int slot, int pokemonId, bool success)
     {
-        GameManager.Instance?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
     }
 
     [PunRPC]
@@ -446,18 +515,183 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (IsMasterClient) ProcessSharedShopReturn(pokemonId, amount);
     }
 
+    /// <summary>
+    /// 비마스터 클라이언트의 QA 코스트 유닛 획득 요청을
+    /// MasterClient가 수신한다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_RequestSharedDebugUnitByCost(
+        int cost,
+        PhotonMessageInfo info)
+    {
+        if (!IsMasterClient ||
+            info.Sender == null)
+        {
+            return;
+        }
+
+        ProcessSharedDebugUnitByCost(
+            info.Sender.ActorNumber,
+            cost
+        );
+    }
+
     private void ProcessSharedShopReturn(int pokemonId, int amount)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
         shop.AuthorityReturnSharedShopCopy(pokemonId, amount);
         BroadcastSharedPoolMirror(-1, 0, System.Array.Empty<int>());
     }
 
+    /// <summary>
+    /// MasterClient가 현재 남아 있는 공용 풀에서
+    /// 지정 코스트의 유닛 카피 1장을 선택하고 차감한다.
+    ///
+    /// 선택 확률은 ShopManager에서 남은 카피 수에 비례해 계산한다.
+    /// 성공하면 요청자에게 선택된 원본 pokemonId를 전달한다.
+    /// </summary>
+    private void ProcessSharedDebugUnitByCost(
+        int actorNumber,
+        int cost)
+    {
+        if (!IsMasterClient)
+            return;
+
+        Player target =
+            PhotonNetwork.CurrentRoom != null
+                ? PhotonNetwork.CurrentRoom.GetPlayer(actorNumber)
+                : null;
+
+        if (target == null)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] 요청 플레이어를 찾을 수 없음: " +
+                $"actor={actorNumber}"
+            );
+
+            return;
+        }
+
+        if (cost < 1 || cost > 5)
+        {
+            photonView.RPC(
+                nameof(RPC_ResolveSharedDebugUnitByCost),
+                target,
+                cost,
+                0,
+                false
+            );
+
+            return;
+        }
+
+        ShopManager shop =
+            GameManager.TryGet(out var gm) ? gm.Shop : null;
+
+        int pokemonId = 0;
+
+        bool success =
+            shop != null &&
+            shop.TryAuthorityTakeDebugUnitByCost(
+                cost,
+                out pokemonId
+            );
+
+        /*
+         * 먼저 요청자에게 결과를 전달한다.
+         *
+         * 요청자는 ShopManager에서 실제 벤치 생성을 시도하고,
+         * 생성이나 배치에 실패하면 기존
+         * RequestSharedShopReturn(pokemonId, 1)을 호출해
+         * 카피를 다시 공용 풀로 돌려보낸다.
+         */
+        photonView.RPC(
+            nameof(RPC_ResolveSharedDebugUnitByCost),
+            target,
+            cost,
+            success ? pokemonId : 0,
+            success
+        );
+
+        if (!success)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool][QA] {cost}코스트 획득 실패 — " +
+                "남은 공용 풀 없음 또는 ShopManager 처리 실패"
+            );
+
+            return;
+        }
+
+        /*
+         * 공용 풀에서 실제로 1장이 빠졌으므로
+         * 모든 클라이언트의 풀 미러를 갱신한다.
+         *
+         * actorNumber=-1:
+         * 특정 상점 예약 변경이 아니라 풀 수량만 변경됐다는 의미.
+         */
+        BroadcastSharedPoolMirror(
+            -1,
+            0,
+            System.Array.Empty<int>()
+        );
+
+        Debug.Log(
+            $"[SharedShopPool][QA] actor={actorNumber}, " +
+            $"{cost}코스트 유닛 지급 승인, pokemonId={pokemonId}"
+        );
+    }
+
+    /// <summary>
+    /// MasterClient가 선택·차감한 QA 유닛의 원본 ID를
+    /// 요청한 클라이언트가 수신한다.
+    ///
+    /// 실제 생성과 벤치 배치는 로컬 ShopManager가 처리한다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_ResolveSharedDebugUnitByCost(
+        int cost,
+        int pokemonId,
+        bool success)
+    {
+        ShopManager shop =
+            GameManager.TryGet(out var gm) ? gm.Shop : null;
+
+        if (shop == null)
+        {
+            /*
+             * 정상적인 게임 씬에서는 발생하면 안 되지만,
+             * ShopManager가 없는 상태에서 이미 풀이 차감됐다면
+             * MasterClient에 카피 반환을 요청한다.
+             */
+            if (success && pokemonId > 0)
+            {
+                RequestSharedShopReturn(
+                    pokemonId,
+                    1
+                );
+            }
+
+            Debug.LogError(
+                "[SharedShopPool][QA] ShopManager 없음 — " +
+                "QA 유닛 생성 불가"
+            );
+
+            return;
+        }
+
+        shop.ResolveSharedDebugUnitByCost(
+            cost,
+            pokemonId,
+            success
+        );
+    }
+
     private void BroadcastSharedPoolMirror(int actorNumber, int revision, int[] slots)
     {
         if (!IsMasterClient) return;
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
 
         shop.GetSharedPoolMirror(out int[] pokemonIds, out int[] remaining);
@@ -469,7 +703,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_ApplySharedPoolMirror(
         int[] pokemonIds, int[] remaining, int actorNumber, int revision, int[] slots)
     {
-        GameManager.Instance?.Shop?.ApplySharedPoolMirror(
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ApplySharedPoolMirror(
             pokemonIds, remaining, actorNumber, revision, slots);
     }
 
@@ -492,88 +727,896 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
-    // 통신교환 (전송 트랜잭션 — 모델A: 1마리 핸드오버 → 받는 쪽 진화/벤치)
+    // 통신교환
+    // 유닛 즉시 전송 → 상대 통신기 대기열 저장 → 수동 수령
     // ─────────────────────────────────────────
+    private sealed class TradeUnitPacket
+    {
+        /// <summary>송신자가 발급한 거래 고유번호.</summary>
+        public int tradeId;
 
-    /// <summary>전송 ack 대기 중인 보낸 유닛. 성공 ack 시 내 벤치에서 제거(취소 불가).</summary>
-    private PokemonUnit _pendingTradeUnit;
+        public int pokemonId;
+        public int starLevel;
+        public int[] itemIds;
+        public int stoneId;
+        public int preStonePokemonId;
+
+        /// <summary>송신 당시 필드에 배치돼 있던 유닛인지.</summary>
+        public bool wasOnBoard;
+
+        /// <summary>이미 통신진화가 완료된 유닛인지(재전송 시 ×1.4·역매핑 보존용).</summary>
+        public bool isTradeEvolved;
+    }
 
     /// <summary>
-    /// 내 벤치 유닛 1마리를 파트너에게 전송. 받는 쪽(A)이 자기 권위로 (매핑되면)진화체를 벤치에 생성.
-    /// 상대 벤치가 가득이면 거부(유닛 그대로). 전송은 베이스 종+성급만 넘기고 인스턴스화는 A가 함.
+    /// 송신 후 상대방의 실제 수령 ACK를 기다리는 거래 정보.
+    /// 유닛 GameObject가 없어져도 패킷만으로 유닛을 복원할 수 있어야 한다.
+    /// </summary>
+    private sealed class PendingOutgoingTrade
+    {
+        public TradeUnitPacket packet;
+        public int sentRound;
+        public string pokemonName;
+    }
+
+    /// <summary>파트너에게서 도착해 통신기에 대기 중인 유닛들.</summary>
+    private readonly Queue<TradeUnitPacket> _incomingTradeQueue = new();
+
+    /// <summary>
+    /// 내가 전송했지만 상대방이 아직 실제로 수령하지 않은 유닛들.
+    /// key = tradeId
+    /// </summary>
+    private readonly Dictionary<int, PendingOutgoingTrade>
+        _pendingOutgoingTrades = new();
+
+    /// <summary>로컬 거래 번호 발급용 순번.</summary>
+    private int _nextTradeSequence = 1;
+
+    /// <summary>마지막으로 유닛을 전송한 라운드.</summary>
+    private int _lastTradeSentRound = -1;
+
+    /// <summary>현재 내 통신기에 대기 중인 수신 유닛 수.</summary>
+    public int PendingTradeUnitCount => _incomingTradeQueue.Count;
+
+    /// <summary>파트너가 아직 수령하지 않은 내 송신 유닛 수.</summary>
+    public int PendingOutgoingTradeCount => _pendingOutgoingTrades.Count;
+
+    /// <summary>
+    /// 플레이어별 거래 고유번호를 발급한다.
+    /// 두 플레이어가 각각 같은 순번을 사용해도 ActorNumber가 달라 충돌하지 않는다.
+    /// </summary>
+    private int CreateTradeId()
+    {
+        int actorNumber =
+            PhotonNetwork.LocalPlayer != null
+                ? PhotonNetwork.LocalPlayer.ActorNumber
+                : 0;
+
+        int sequence = _nextTradeSequence++;
+
+        if (_nextTradeSequence >= 1000000)
+            _nextTradeSequence = 1;
+
+        return actorNumber * 1000000 + sequence;
+    }
+
+    /// <summary>
+    /// 유닛을 파트너 통신기로 전송한다.
+    ///
+    /// 전송 시점에 유닛은 내 보드/벤치에서 제거하지만,
+    /// 판매가 아니므로 공용 상점 풀이나 아이템 인벤토리에는 반환하지 않는다.
+    ///
+    /// 유닛의 전체 정보는 tradeId별 송신 대기 저장소에 보존되며,
+    /// 상대가 실제로 벤치에 수령한 뒤 ACK를 보내야 제거된다.
     /// </summary>
     public void SendTradeUnit(PokemonUnit unit)
     {
-        if (unit == null || unit.data == null) return;
-        if (_soloMode || !PhotonNetwork.InRoom) { Debug.LogWarning("[Trade] 파트너 없음 — 전송 불가"); return; }
-        if (_pendingTradeUnit != null) { Debug.LogWarning("[Trade] 이전 전송 처리 중"); return; }
-
-        _pendingTradeUnit = unit;
-        Debug.Log($"[Trade] 전송 요청: {unit.data.pokemonNameEn} ★{unit.starLevel} → 파트너");
-        photonView.RPC(nameof(RPC_TradeReceive), RpcTarget.Others, unit.data.pokemonNameEn, unit.starLevel);
-    }
-
-    [PunRPC]
-    private void RPC_TradeReceive(string baseNameEn, int starLevel)
-    {
-        var board = GameManager.Instance.Board;
-        if (board == null || !board.HasBenchSpace())
-        {
-            Debug.LogWarning("[Trade] 내 벤치 가득 — 전송 거부");
-            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
+        if (unit == null || unit.data == null)
             return;
-        }
 
-        // 통신진화 매핑 있으면 진화체로, 없으면 그대로 핸드오버(데이터 미입력 폴백).
-        var te = TradeEvolutionData.Instance;
-        string evolved = te != null ? te.GetEvolved(baseNameEn) : null;
-        string targetName = string.IsNullOrEmpty(evolved) ? baseNameEn : evolved;
-
-        var data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(targetName) : null;
-        if (data == null)
+        if (_soloMode || !PhotonNetwork.InRoom)
         {
-            Debug.LogWarning($"[Trade] '{targetName}' PokemonDatabase에 없음 — 거부");
-            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
-            return;
-        }
-
-        var unit = UnitFactory.Create(data, Mathf.Clamp(starLevel, 1, 3));
-        if (unit == null || !board.TryPlaceInBench(unit))
-        {
-            if (unit != null) Destroy(unit.gameObject);
-            photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, false);
-            return;
-        }
-
-        // 매핑이 적중해 베이스가 아닌 진화체를 받았을 때만 특수진화 배율(×1.5) 대상.
-        unit.isTradeEvolved = !string.IsNullOrEmpty(evolved);
-
-        Debug.Log($"[Trade] 수신: {baseNameEn} → {targetName} ★{unit.starLevel} 벤치 배치");
-        GameEvents.TradeUnitReceived(unit);
-        photonView.RPC(nameof(RPC_TradeAck), RpcTarget.Others, true);
-    }
-
-    [PunRPC]
-    private void RPC_TradeAck(bool success)
-    {
-        if (_pendingTradeUnit == null) return;
-        var unit = _pendingTradeUnit;
-        _pendingTradeUnit = null;
-
-        if (!success)
-        {
-            Debug.LogWarning("[Trade] 전송 실패(상대 벤치 가득) — 유닛 유지");
+            Debug.LogWarning("[Trade] 파트너 없음 — 전송 불가");
             GameEvents.TradeRejected();
             return;
         }
 
-        // 성공 — 보낸 유닛을 내 벤치에서 제거(환급 없음, 취소 불가). Destroy로 시각도 정리.
-        var board = GameManager.Instance.Board;
-        var bench = board.GetBenchSnapshot();
-        for (int i = 0; i < bench.Count; i++)
-            if (bench[i] == unit) { board.RemoveFromBench(i); break; }
+        if (_lastKnownRound <= 0)
+        {
+            Debug.LogWarning("[Trade] 라운드 시작 전에는 전송할 수 없습니다.");
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        if (_lastTradeSentRound == _lastKnownRound)
+        {
+            Debug.LogWarning(
+                $"[Trade] {_lastKnownRound}라운드 전송 횟수를 이미 사용했습니다."
+            );
+
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        Player[] others = PhotonNetwork.PlayerListOthers;
+
+        if (others == null ||
+            others.Length == 0 ||
+            others[0].IsInactive)
+        {
+            Debug.LogWarning("[Trade] 파트너 연결 끊김 — 전송 불가");
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        BoardManager board =
+            GameManager.TryGet(out var gm) ? gm.Board : null;
+
+        if (board == null)
+        {
+            Debug.LogError("[Trade] BoardManager 없음 — 전송 불가");
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        int[] itemIds;
+
+        if (unit.items == null || unit.items.Count == 0)
+        {
+            itemIds = System.Array.Empty<int>();
+        }
+        else
+        {
+            var ids = new List<int>();
+
+            foreach (ItemData item in unit.items)
+            {
+                if (item != null)
+                    ids.Add(item.id);
+            }
+
+            itemIds = ids.ToArray();
+        }
+
+        int stoneId =
+            unit.equippedStone != null
+                ? unit.equippedStone.id
+                : 0;
+
+        int preStonePokemonId =
+            unit.preStoneData != null
+                ? unit.preStoneData.id
+                : 0;
+
+        bool wasOnBoard = IsUnitOnBoard(board, unit);
+        int tradeId = CreateTradeId();
+
+        var packet = new TradeUnitPacket
+        {
+            tradeId = tradeId,
+            pokemonId = unit.data.id,
+            starLevel = Mathf.Clamp(unit.starLevel, 1, 3),
+            itemIds = itemIds,
+            stoneId = stoneId,
+            preStonePokemonId = preStonePokemonId,
+            wasOnBoard = wasOnBoard,
+            isTradeEvolved = unit.isTradeEvolved
+        };
+
+        var pendingTrade = new PendingOutgoingTrade
+        {
+            packet = packet,
+            sentRound = _lastKnownRound,
+            pokemonName = unit.data.pokemonName
+        };
+
+        /*
+         * 매우 중요:
+         * RemoveUnitForTrade는 판매 처리와 달라야 한다.
+         *
+         * 여기서는 다음 작업이 일어나면 안 된다.
+         * - 공용 상점 풀 반환
+         * - 일반 장비 인벤토리 반환
+         * - 진화의 돌 인벤토리 반환
+         *
+         * 오직 보드/벤치 점유 해제만 수행해야 한다.
+         */
+        if (!board.RemoveUnitForTrade(unit))
+        {
+            Debug.LogError(
+                $"[Trade] {unit.data.pokemonName} 보드/벤치 제거 실패"
+            );
+
+            GameEvents.TradeRejected();
+            return;
+        }
+
+        // GameObject를 제거하기 전에 복구 가능한 패킷을 저장한다.
+        _pendingOutgoingTrades.Add(tradeId, pendingTrade);
+
+        // 전송 요청이 정상 등록된 시점에 이번 라운드 사용 횟수를 소모한다.
+        _lastTradeSentRound = _lastKnownRound;
+
         Destroy(unit.gameObject);
-        Debug.Log("[Trade] 전송 완료 — 보낸 유닛 제거");
+
+        Debug.Log(
+            $"[Trade] 전송 등록: tradeId={tradeId}, " +
+            $"{pendingTrade.pokemonName} ★{packet.starLevel}, " +
+            $"장비 {packet.itemIds.Length}개, 돌 ID {packet.stoneId}, " +
+            $"위치 {(packet.wasOnBoard ? "필드" : "벤치")}, " +
+            $"ACK 대기 {_pendingOutgoingTrades.Count}마리"
+        );
+
+        photonView.RPC(
+            nameof(RPC_TradeQueueReceive),
+            RpcTarget.Others,
+            packet.tradeId,
+            packet.pokemonId,
+            packet.starLevel,
+            packet.itemIds,
+            packet.stoneId,
+            packet.preStonePokemonId,
+            packet.wasOnBoard,
+            packet.isTradeEvolved
+        );
+    }
+
+    private static bool IsUnitOnBoard(
+        BoardManager board,
+        PokemonUnit targetUnit)
+        {
+            if (board == null || targetUnit == null)
+                return false;
+
+            foreach (PokemonUnit unit in board.GetUnitsOnBoard())
+            {
+                if (unit == targetUnit)
+                    return true;
+            }
+
+            return false;
+        }
+
+    /// <summary>
+    /// 현재 전투 페이즈 여부.
+    /// 전투 중 필드 유닛의 통신진화를 다음 쇼핑 페이즈까지 지연하는 데 사용.
+    /// </summary>
+    private bool _isBattlePhase;
+
+    /// <summary>
+    /// 전투 중 발생해 다음 쇼핑 페이즈까지 대기 중인 통신진화 정보.
+    /// 유닛 참조를 직접 저장하지 않고 원본/진화체 ID를 저장한다.
+    /// 대기 중 유닛이 판매되거나 이동해도 안전하게 다시 조회하기 위함.
+    /// </summary>
+    private readonly List<PendingTradeEvolution> _pendingTradeEvolutions = new();
+
+    private sealed class PendingTradeEvolution
+    {
+        public int originalPokemonId;
+        public int evolvedPokemonId;
+    }
+
+    /// <summary>
+    /// 파트너가 보낸 유닛을 통신기 FIFO 대기열에 저장한다.
+    /// 이 시점에는 아직 실제 수령이 아니므로 ACK를 보내지 않는다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_TradeQueueReceive(
+        int tradeId,
+        int pokemonId,
+        int starLevel,
+        int[] itemIds,
+        int stoneId,
+        int preStonePokemonId,
+        bool wasOnBoard,
+        bool isTradeEvolved)
+    {
+        PokemonData data =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(pokemonId)
+                : null;
+
+        if (data == null)
+        {
+            /*
+             * ACK를 보내지 않는다.
+             * 송신자의 PendingOutgoingTrade가 유지되어 소유권 데이터가
+             * 사라지지 않게 한다.
+             */
+            Debug.LogError(
+                $"[Trade] 수신 패킷 저장 실패 — " +
+                $"tradeId={tradeId}, Pokemon ID {pokemonId} 조회 불가"
+            );
+
+            return;
+        }
+
+        var packet = new TradeUnitPacket
+        {
+            tradeId = tradeId,
+            pokemonId = pokemonId,
+            starLevel = Mathf.Clamp(starLevel, 1, 3),
+            itemIds = itemIds ?? System.Array.Empty<int>(),
+            stoneId = stoneId,
+            preStonePokemonId = preStonePokemonId,
+            wasOnBoard = wasOnBoard,
+            isTradeEvolved = isTradeEvolved
+        };
+
+        _incomingTradeQueue.Enqueue(packet);
+        GameEvents.TradeQueueChanged(_incomingTradeQueue.Count);
+
+        Debug.Log(
+            $"[Trade] 통신기 도착: tradeId={tradeId}, " +
+            $"{data.pokemonName} ★{packet.starLevel}, " +
+            $"현재 대기 {_incomingTradeQueue.Count}마리"
+        );
+    }
+
+    /// <summary>
+    /// 상대가 유닛을 실제로 벤치에 배치한 뒤 보내는 수령 완료 ACK.
+    /// 해당 tradeId의 송신 대기 데이터만 제거한다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_TradeQueueAck(int tradeId)
+    {
+        if (!_pendingOutgoingTrades.TryGetValue(
+                tradeId,
+                out PendingOutgoingTrade pendingTrade))
+        {
+            Debug.LogWarning(
+                $"[Trade] 알 수 없거나 이미 처리된 ACK 수신: tradeId={tradeId}"
+            );
+
+            return;
+        }
+
+        _pendingOutgoingTrades.Remove(tradeId);
+
+        Debug.Log(
+            $"[Trade] 수령 ACK 완료: tradeId={tradeId}, " +
+            $"{pendingTrade.pokemonName} ★{pendingTrade.packet.starLevel}, " +
+            $"남은 ACK 대기 {_pendingOutgoingTrades.Count}마리"
+        );
+    }
+
+    /// <summary>
+    /// 통신기를 클릭하면 FIFO 순서로 빈 벤치 칸만큼 연속 수령한다.
+    ///
+    /// 첫 번째 유닛의 복원에 실패하면 그 유닛을 Queue 맨 앞에 유지하고
+    /// 뒤의 유닛을 건너뛰지 않는다.
+    /// </summary>
+    public bool TryReceiveNextTradeUnit()
+    {
+        if (_incomingTradeQueue.Count == 0)
+        {
+            Debug.Log("[Trade] 통신기에 대기 중인 유닛이 없습니다.");
+            return false;
+        }
+
+        BoardManager board =
+            GameManager.TryGet(out var gm) ? gm.Board : null;
+
+        if (board == null)
+        {
+            Debug.LogError("[Trade] BoardManager 없음 — 수령 불가");
+            return false;
+        }
+
+        if (!board.HasBenchSpace())
+        {
+            Debug.LogWarning("[Trade] 벤치가 가득 차 수령할 수 없습니다.");
+            return false;
+        }
+
+        int receivedCount = 0;
+
+        while (_incomingTradeQueue.Count > 0 &&
+               board.HasBenchSpace())
+        {
+            /*
+             * FIFO 맨 앞 유닛 수령에 실패하면 반복을 즉시 종료한다.
+             * 실패 유닛을 건너뛰고 다음 유닛을 받으면 안 된다.
+             */
+            if (!TryReceiveFrontTradeUnit(board))
+                break;
+
+            receivedCount++;
+        }
+
+        if (receivedCount > 0)
+        {
+            Debug.Log(
+                $"[Trade] 통신기 일괄 수령 완료: {receivedCount}마리, " +
+                $"남은 대기 {_incomingTradeQueue.Count}마리"
+            );
+        }
+
+        return receivedCount > 0;
+    }
+
+    /// <summary>
+    /// FIFO Queue 맨 앞의 유닛 한 마리를 복원한다.
+    /// 성공한 경우에만 Queue에서 제거하고 송신자에게 ACK를 보낸다.
+    /// 수령 유닛은 항상 수신자의 벤치에 생성되고 벤치 유닛은 전투에 영향을 주지 않으므로,
+    /// 송신자가 필드/벤치 어디서 보냈는지와 무관하게 통신진화 대상이면 무조건 즉시 진화체로 생성한다.
+    /// </summary>
+    private bool TryReceiveFrontTradeUnit(BoardManager board)
+    {
+        if (board == null ||
+            _incomingTradeQueue.Count == 0 ||
+            !board.HasBenchSpace())
+        {
+            return false;
+        }
+
+        TradeUnitPacket packet = _incomingTradeQueue.Peek();
+
+        PokemonData originalData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(packet.pokemonId)
+                : null;
+
+        if (originalData == null)
+        {
+            Debug.LogError(
+                $"[Trade] 대기 유닛 조회 실패 — " +
+                $"tradeId={packet.tradeId}, Pokemon ID {packet.pokemonId}"
+            );
+
+            return false;
+        }
+
+        TradeEvolutionData tradeEvolution = TradeEvolutionData.Instance;
+
+        string evolvedNameEn =
+            tradeEvolution != null
+                ? tradeEvolution.GetEvolved(originalData.pokemonNameEn)
+                : null;
+
+        bool isTradeEvolution =
+            !string.IsNullOrEmpty(evolvedNameEn);
+
+        PokemonData evolvedData = null;
+
+        if (isTradeEvolution)
+        {
+            evolvedData =
+                PokemonDatabase.Instance.GetByNameEn(evolvedNameEn);
+
+            if (evolvedData == null)
+            {
+                Debug.LogError(
+                    $"[Trade] 통신진화체 '{evolvedNameEn}' 조회 실패 — " +
+                    $"tradeId={packet.tradeId}"
+                );
+
+                return false;
+            }
+        }
+
+        // 통신진화 대상이면 지연 없이 항상 진화체로 생성한다.
+        PokemonData receivedData = evolvedData ?? originalData;
+
+        PokemonUnit receivedUnit =
+            UnitFactory.Create(receivedData, packet.starLevel);
+
+        if (receivedUnit == null)
+        {
+            Debug.LogError(
+                $"[Trade] 유닛 생성 실패 — tradeId={packet.tradeId}"
+            );
+
+            return false;
+        }
+
+        // 일반 장비 복원
+        foreach (int itemId in packet.itemIds)
+        {
+            ItemData item =
+                ItemDatabase.Instance != null
+                    ? ItemDatabase.Instance.GetById(itemId)
+                    : null;
+
+            if (item == null || !receivedUnit.TryEquipItem(item))
+            {
+                Destroy(receivedUnit.gameObject);
+
+                Debug.LogError(
+                    $"[Trade] 일반 장비 복원 실패 — " +
+                    $"tradeId={packet.tradeId}, itemId={itemId}"
+                );
+
+                return false;
+            }
+        }
+
+        // 진화의 돌 장착 상태 복원
+        if (packet.stoneId > 0)
+        {
+            EvolutionStoneData stone =
+                EvolutionStoneDatabase.Instance != null
+                    ? EvolutionStoneDatabase.Instance.GetById(packet.stoneId)
+                    : null;
+
+            PokemonData preStoneData =
+                packet.preStonePokemonId > 0 &&
+                PokemonDatabase.Instance != null
+                    ? PokemonDatabase.Instance.GetById(
+                        packet.preStonePokemonId
+                    )
+                    : null;
+
+            if (stone == null || preStoneData == null)
+            {
+                Destroy(receivedUnit.gameObject);
+
+                Debug.LogError(
+                    $"[Trade] 진화의 돌 상태 복원 실패 — " +
+                    $"tradeId={packet.tradeId}, " +
+                    $"stone={packet.stoneId}, " +
+                    $"base={packet.preStonePokemonId}"
+                );
+
+                return false;
+            }
+
+            receivedUnit.equippedStone = stone;
+            receivedUnit.preStoneData = preStoneData;
+        }
+
+        // 이미 통신진화 완료 상태로 배송된 유닛은 그 상태를 그대로 복원하고,
+        // 이번 수령으로 새로 통신진화 대상이 된 경우도 즉시 반영한다(지연 없음).
+        receivedUnit.isTradeEvolved =
+            packet.isTradeEvolved || isTradeEvolution;
+
+        receivedUnit.ResetForBattle();
+
+        if (!board.TryPlaceInBench(receivedUnit))
+        {
+            Destroy(receivedUnit.gameObject);
+
+            Debug.LogWarning(
+                $"[Trade] 벤치 배치 실패 — tradeId={packet.tradeId}"
+            );
+
+            return false;
+        }
+
+        /*
+         * 여기까지 성공해야 유닛 소유권이 수신자에게 실제로 이동한 것이다.
+         *
+         * 상점 풀:
+         * - 새 구매가 아니므로 추가 차감 없음
+         * - 판매가 아니므로 반환 없음
+         *
+         * 아이템:
+         * - 인벤토리에서 새로 꺼내지 않음
+         * - 송신자의 인벤토리로 반환하지 않음
+         * - 패킷에 귀속된 상태 그대로 복원
+         */
+
+        _incomingTradeQueue.Dequeue();
+        GameEvents.TradeQueueChanged(_incomingTradeQueue.Count);
+
+        GameManager.TryGet(out var gm);
+
+        if (isTradeEvolution && evolvedData != null)
+        {
+            // 수령 유닛은 벤치에만 생성되고 전투에 영향을 주지 않으므로 지연 없이 즉시 진화 처리한다.
+            ApplyTradeEvolutionToOwnedUnits(
+                originalData,
+                evolvedData,
+                receivedUnit
+            );
+
+            gm?.Shop?.ActivateTradeEvolution(
+                originalData.id,
+                evolvedData.id
+            );
+
+            board.RecheckEvolution(receivedUnit);
+        }
+        else if (packet.isTradeEvolved)
+        {
+            /*
+             * 이미 통신진화가 완료된 유닛을 재전송받은 경우:
+             * 새 진화 사건이 아니므로 해금/광역진화는 발생시키지 않고,
+             * 판매 시 원본 종 풀 반환을 위한 역매핑만 등록한다.
+             */
+            string baseNameEn =
+                tradeEvolution != null
+                    ? tradeEvolution.GetBaseOf(originalData.pokemonNameEn)
+                    : null;
+
+            PokemonData tradeBaseData =
+                !string.IsNullOrEmpty(baseNameEn) &&
+                PokemonDatabase.Instance != null
+                    ? PokemonDatabase.Instance.GetByNameEn(baseNameEn)
+                    : null;
+
+            if (tradeBaseData != null)
+            {
+                gm?.Shop?.RegisterEvolvedToBase(
+                    originalData.id,
+                    tradeBaseData.id
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[Trade] 통신진화체 '{originalData.pokemonNameEn}'의 " +
+                    "원본 종 역조회 실패 — 판매 풀 반환이 어긋날 수 있음"
+                );
+            }
+        }
+
+        /*
+         * 유닛 생성, 장비 복원, 진화 상태 복원, 벤치 배치가
+         * 전부 성공한 뒤에만 해당 tradeId ACK를 보낸다.
+         */
+        photonView.RPC(
+            nameof(RPC_TradeQueueAck),
+            RpcTarget.Others,
+            packet.tradeId
+        );
+
+        string evolutionText =
+            isTradeEvolution &&
+            evolvedData != null
+                ? " → " + evolvedData.pokemonName
+                : "";
+
+        // 진화 판정에는 더 이상 사용하지 않고, 수령 로그 기록용으로만 남긴다.
+        string originText =
+            packet.wasOnBoard
+                ? " (필드 출신 유닛 수령)"
+                : "";
+
+        Debug.Log(
+            $"[Trade] 수령 완료: tradeId={packet.tradeId}, " +
+            $"{originalData.pokemonName}{evolutionText} " +
+            $"★{receivedUnit.starLevel}{originText}, " +
+            $"남은 대기 {_incomingTradeQueue.Count}마리"
+        );
+
+        GameEvents.TradeUnitReceived(receivedUnit);
+
+        return true;
+    }
+
+    /// <summary>
+    /// 통신진화 수령 시 받는 플레이어가 보유한 동일 원본 유닛을 진화시킨다.
+    ///
+    /// 쇼핑 상태:
+    /// - 필드 유닛 즉시 진화
+    /// - 벤치 유닛 즉시 진화
+    ///
+    /// 전투 상태:
+    /// - 필드 유닛은 다음 쇼핑 상태까지 진화 대기
+    /// - 벤치 유닛은 즉시 진화
+    /// </summary>
+    private void ApplyTradeEvolutionToOwnedUnits(
+        PokemonData originalData,
+        PokemonData evolvedData,
+        PokemonUnit receivedUnit)
+    {
+        BoardManager board =
+            GameManager.TryGet(out var gm) ? gm.Board : null;
+
+        if (board == null ||
+            originalData == null ||
+            evolvedData == null)
+        {
+            return;
+        }
+
+        int changedCount = 0;
+        int pendingCount = 0;
+
+        // 필드 유닛
+        foreach (PokemonUnit unit in board.GetUnitsOnBoard())
+        {
+            if (unit == null ||
+                unit == receivedUnit ||
+                unit.data == null ||
+                unit.data.id != originalData.id)
+            {
+                continue;
+            }
+
+            if (_isBattlePhase)
+            {
+                pendingCount++;
+                continue;
+            }
+
+            if (TryApplyTradeEvolution(
+                    unit,
+                    receivedUnit,
+                    originalData,
+                    evolvedData))
+            {
+                changedCount++;
+                GameEvents.UnitPlaced(unit);
+            }
+        }
+
+
+
+        // 벤치 유닛은 전투 중에도 즉시 진화
+        foreach (PokemonUnit unit in board.GetUnitsInBench())
+        {
+            if (TryApplyTradeEvolution(
+                    unit,
+                    receivedUnit,
+                    originalData,
+                    evolvedData))
+            {
+                changedCount++;
+                GameEvents.UnitBenched(unit);
+            }
+        }
+
+        if (_isBattlePhase && pendingCount > 0)
+        {
+            AddPendingTradeEvolution(
+                originalData.id,
+                evolvedData.id
+            );
+        }
+
+        Debug.Log(
+            $"[TradeEvolution] {originalData.pokemonName} → " +
+            $"{evolvedData.pokemonName} 즉시 진화 {changedCount}마리, " +
+            $"필드 진화 대기 {pendingCount}마리"
+        );
+    }
+
+    private static bool TryApplyTradeEvolution(
+        PokemonUnit unit,
+        PokemonUnit receivedUnit,
+        PokemonData originalData,
+        PokemonData evolvedData)
+    {
+        if (unit == null ||
+            unit == receivedUnit ||
+            unit.data == null ||
+            unit.data.id != originalData.id)
+        {
+            return false;
+        }
+
+        unit.data = evolvedData;
+        unit.isTradeEvolved = true;
+        unit.ResetForBattle();
+
+        return true;
+    }
+
+    /// <summary>
+    /// 전투 중 지연된 통신진화 정보를 등록한다.
+    /// 같은 원본/진화체 조합은 중복 저장하지 않는다.
+    /// </summary>
+    private void AddPendingTradeEvolution(
+        int originalPokemonId,
+        int evolvedPokemonId)
+    {
+        foreach (PendingTradeEvolution pending
+                 in _pendingTradeEvolutions)
+        {
+            if (pending.originalPokemonId == originalPokemonId &&
+                pending.evolvedPokemonId == evolvedPokemonId)
+            {
+                return;
+            }
+        }
+
+        _pendingTradeEvolutions.Add(
+            new PendingTradeEvolution
+            {
+                originalPokemonId = originalPokemonId,
+                evolvedPokemonId = evolvedPokemonId
+            }
+        );
+
+        Debug.Log(
+            $"[TradeEvolution] 진화 대기 등록: " +
+            $"{originalPokemonId} → {evolvedPokemonId}"
+        );
+    }
+
+    /// <summary>
+    /// 쇼핑 페이즈 진입 시 전투 중 지연된 통신진화를 적용한다.
+    /// </summary>
+    private void ApplyPendingTradeEvolutions()
+    {
+        if (_pendingTradeEvolutions.Count == 0)
+            return;
+
+        BoardManager board =
+            GameManager.TryGet(out var gm) ? gm.Board : null;
+
+        PokemonDatabase database = PokemonDatabase.Instance;
+
+        if (board == null || database == null)
+        {
+            Debug.LogWarning(
+                "[TradeEvolution] 대기 진화 적용 실패 — " +
+                "BoardManager 또는 PokemonDatabase 없음"
+            );
+
+            return;
+        }
+
+        int changedCount = 0;
+        var changedUnits = new List<PokemonUnit>();
+
+        foreach (PendingTradeEvolution pending
+                 in _pendingTradeEvolutions)
+        {
+            PokemonData originalData =
+                database.GetById(pending.originalPokemonId);
+
+            PokemonData evolvedData =
+                database.GetById(pending.evolvedPokemonId);
+
+            if (originalData == null || evolvedData == null)
+            {
+                Debug.LogError(
+                    $"[TradeEvolution] 대기 진화 데이터 조회 실패 " +
+                    $"({pending.originalPokemonId} → " +
+                    $"{pending.evolvedPokemonId})"
+                );
+
+                continue;
+            }
+
+            foreach (PokemonUnit unit in board.GetUnitsOnBoard())
+            {
+                if (!TryApplyTradeEvolution(
+                        unit,
+                        null,
+                        originalData,
+                        evolvedData))
+                {
+                    continue;
+                }
+
+                changedCount++;
+                changedUnits.Add(unit);
+                GameEvents.UnitPlaced(unit);
+            }
+
+            foreach (PokemonUnit unit in board.GetUnitsInBench())
+            {
+                if (!TryApplyTradeEvolution(
+                        unit,
+                        null,
+                        originalData,
+                        evolvedData))
+                {
+                    continue;
+                }
+
+                changedCount++;
+                changedUnits.Add(unit);
+                GameEvents.UnitBenched(unit);
+            }
+        }
+
+        _pendingTradeEvolutions.Clear();
+
+        foreach (PokemonUnit unit in changedUnits)
+        {
+            if (unit != null)
+                board.RecheckEvolution(unit);
+        }
+
+        Debug.Log(
+            $"[TradeEvolution] 쇼핑 페이즈 진입 — " +
+            $"대기 유닛 {changedCount}마리 진화 완료"
+        );
     }
 
     // ─────────────────────────────────────────
@@ -613,7 +1656,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null || shop.Gold < amount)
         {
             Debug.LogWarning($"[GoldTransfer] 골드 부족 — 보유 {(shop != null ? shop.Gold : 0)} < 요청 {amount}");
@@ -627,10 +1670,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         photonView.RPC(nameof(RPC_GoldReceive), RpcTarget.Others, amount);
     }
 
+    private void HandleGoldTransferRequested(int amount)
+    {
+        SendGoldToPartner(amount);
+    }
+
     [PunRPC]
     private void RPC_GoldReceive(int amount)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (amount <= 0 || shop == null)
         {
             Debug.LogWarning($"[GoldTransfer] 수신 거부 (amount={amount}, shop={(shop != null)})");
@@ -653,7 +1701,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!success)
         {
-            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
             shop?.AddGold(amount); // 환급
             Debug.LogWarning($"[GoldTransfer] 전송 실패 — {amount}G 환급");
             GameEvents.GoldTransferRejected("상대 수신 실패 — 환급됨");
@@ -1189,6 +2237,110 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
         }
     }
+
+    // ─────────────────────────────────────────
+    // 테스트용 게임 재시작
+    // 마스터가 전체 클라이언트에 재시작 RPC를 보내고,
+    // 각 클라이언트가 자기 로컬 게임 씬을 직접 다시 로드한다.
+    // ─────────────────────────────────────────
+
+    public void RestartGame()
+    {
+        if (_soloMode)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
+            );
+            return;
+        }
+
+        if (!PhotonNetwork.InRoom || !IsMasterClient)
+        {
+            Debug.LogWarning("[Restart] 마스터 클라이언트만 재시작할 수 있습니다.");
+            return;
+        }
+
+        string sceneName =
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+        Debug.Log("[Restart] 전체 클라이언트 새 판 재시작 요청");
+
+        // 이전 판 Room 상태 초기화
+        PhotonNetwork.CurrentRoom.SetCustomProperties(
+            new Hashtable
+            {
+            { ROUND_PROP_KEY, 0 },
+            { TEAM_HP_PROP_KEY, -1 },
+            {
+                MATCH_GUID_ROOM_KEY,
+                System.Guid.NewGuid().ToString("N")
+            }
+            }
+        );
+
+        // 같은 씬을 PhotonNetwork.LoadLevel로 다시 불러오면
+        // 파트너가 씬 변경으로 인식하지 않을 수 있으므로
+        // 양쪽 클라이언트가 직접 로컬 씬을 재로드한다.
+        photonView.RPC(
+            nameof(RPC_RestartGame),
+            RpcTarget.AllViaServer,
+            sceneName
+        );
+    }
+
+    [PunRPC]
+    private void RPC_RestartGame(string sceneName)
+    {
+        Debug.Log($"[Restart] 재시작 명령 수신: {sceneName}");
+
+        // 이전 판 Player 상태 초기화
+        PhotonNetwork.LocalPlayer.SetCustomProperties(
+            new Hashtable
+            {
+            { SCENE_READY_PROP_KEY, false },
+            { READY_PROP_KEY, false },
+            { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED },
+            { GOLD_PROP_KEY, 0 },
+            { AUGMENTS_PROP_KEY, System.Array.Empty<string>() }
+            }
+        );
+
+        // 현재 NetworkManager 로컬 상태 초기화
+        _gameStarted = false;
+        _roundResultResolved = false;
+
+        _lastKnownRound = 0;
+        _localBoardRevision = 0;
+        _lastOpponentBoardRevision = -1;
+
+        // 통신교환 상태 초기화
+        _pendingOutgoingTrades.Clear();
+        _nextTradeSequence = 1;
+        _lastTradeSentRound = -1;
+
+        _incomingTradeQueue.Clear();
+        _pendingTradeEvolutions.Clear();
+        _isBattlePhase = false;
+
+        GameEvents.TradeQueueChanged(0);
+
+        // 골드 전송 대기 상태 초기화
+        _pendingGoldTransfer = 0;
+
+        StartCoroutine(ReloadGameSceneRoutine(sceneName));
+    }
+
+    private System.Collections.IEnumerator ReloadGameSceneRoutine(
+        string sceneName)
+    {
+        // CustomProperties가 서버에 전달될 시간을 잠깐 확보
+        yield return new WaitForSecondsRealtime(0.3f);
+
+        Debug.Log($"[Restart] 로컬 씬 재로드: {sceneName}");
+
+        UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+    }
+
 }
 
 #else
@@ -1264,6 +2416,12 @@ public class NetworkManager : MonoBehaviour
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
     public void RequestSharedShopReturn(int pokemonId, int amount) { }
 
+    /// <summary>
+    /// 오프라인에서는 공유 풀이 없으므로 false.
+    /// ShopManager가 로컬 풀 직접 획득 방식으로 처리한다.
+    /// </summary>
+    public bool RequestSharedDebugUnitByCost(int cost) => false;
+
     /// <summary>오프라인(1인)은 씬 로드 즉시 라운드 1 시작.</summary>
     public void NotifySceneReady()              => BroadcastRoundStart(1);
 
@@ -1302,6 +2460,21 @@ public class NetworkManager : MonoBehaviour
     {
         Debug.LogWarning("[GoldTransfer] 오프라인 — 파트너 없음, 전송 불가");
         GameEvents.GoldTransferRejected("파트너 없음");
+    }
+
+    public int PendingTradeUnitCount => 0;
+
+    public bool TryReceiveNextTradeUnit()
+    {
+        Debug.LogWarning("[Trade] 오프라인 — 수령할 파트너 유닛 없음");
+        return false;
+    }
+
+    public void RestartGame()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
+        );
     }
 }
 

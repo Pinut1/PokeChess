@@ -53,7 +53,11 @@ public class PokemonUnit : MonoBehaviour
     /// <see cref="BoardManager"/>.CheckEvolution이 참조. 이 플래그가 이브이 3성 봇소환의 판정 기준이기도 함(BattleManager).</summary>
     public bool evolutionLocked;
 
-    /// <summary>영웅증강 전용 스탯 배수(이브이 ×1.4). MaxHp/Attack/SpellPower에 곱해지며 특수진화 ×1.5와 독립적으로 누적.</summary>
+    /// <summary>
+    /// 영웅증강 전용 스탯 배수.
+    /// 현재 종의 PokemonData 기본값에 먼저 적용한 뒤,
+    /// 일반진화 또는 특수진화 상태에 맞는 성급 배율을 적용한다.
+    /// </summary>
     public float heroStatMultiplier = 1f;
 
     /// <summary>파치리스 영웅증강: 비어있지 않으면 <see cref="Role"/>이 이 값을 반환(서포터→탱커). 시너지는 data.synergies 그대로 유지.</summary>
@@ -137,14 +141,53 @@ public class PokemonUnit : MonoBehaviour
     }
 
     // ──────────────────────────────────────────
-    // 유효 스탯 (별 강화 반영) — 전투/스냅샷이 읽는 진짜 값
+    // 유효 스탯 (영웅증강 → 진화 유형별 성급 배율 반영)
+    // 전투/스냅샷이 읽는 장비 적용 전 실제 값
     // ──────────────────────────────────────────
 
-    public float MaxHp        => data != null ? data.hp * StarMultiplier * heroStatMultiplier : 0f;
-    public float Attack       => data != null ? data.attack * StarMultiplier * heroStatMultiplier : 0f;
-    public float SpellPower   => data != null ? data.spellPower * StarMultiplier * heroStatMultiplier : 0f;
-    public float Defense      => data != null ? data.defense : 0f;
-    public float AttackSpeed  => data != null ? data.attackSpeed : 0f;
+    /// <summary>
+    /// 현재 종의 기본 능력치에 확정된 순서로 배율을 적용한다.
+    /// PokemonData 기본값
+    /// → 영웅증강 배율
+    /// → 일반/특수진화 상태에 맞는 성급 배율
+    /// 특수진화는 일반 성급 배율과 별도로 곱하지 않고,
+    /// 특수진화 전용 성급표를 선택해 적용한다.
+    /// </summary>
+    private float ApplyEffectiveStatMultiplier(float baseStat)
+    {
+        float heroAugmentApplied =
+            baseStat * heroStatMultiplier;
+
+        float starEvolutionApplied =
+            heroAugmentApplied * StarMultiplier;
+
+        return starEvolutionApplied;
+    }
+
+    public float MaxHp =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.hp)
+            : 0f;
+
+    public float Attack =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.attack)
+            : 0f;
+
+    public float SpellPower =>
+        data != null
+            ? ApplyEffectiveStatMultiplier(data.spellPower)
+            : 0f;
+
+    public float Defense =>
+        data != null
+            ? data.defense
+            : 0f;
+
+    public float AttackSpeed =>
+        data != null
+            ? data.attackSpeed
+            : 0f;
     public int   Range        => data != null ? data.range : 0;
     public int   ManaCost     => data != null ? data.manaCost : 0;
     public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");
@@ -160,11 +203,27 @@ public class PokemonUnit : MonoBehaviour
     // data는 진화(합체/돌/통신교환)로 런타임에 스왑되므로 모델도 그때마다 다시 붙여야 한다.
     // 생성 시점 1회 Instantiate로 두면 2성이 돼도 1성 모델이 남는다.
 
-    private GameObject _visual;
+    // [SerializeField] 필수 — 합체 진화는 기존 유닛을 Instantiate로 복제해 새 유닛을 만든다.
+    // 직렬화되지 않으면 복제본의 _visual이 null이 되고, RefreshVisual이 이전 모델을 못 지운 채
+    // 새 모델만 덧붙여 두 모델이 겹친다. 직렬화하면 Unity가 복제된 자식으로 참조를 remap한다.
+    [SerializeField] private GameObject _visual;
 
     /// <summary>현재 data의 modelPrefab으로 시각 요소를 (재)생성. 없으면 placeholder 캡슐.</summary>
     public void RefreshVisual()
     {
+        // 복제본이 아직 _visual을 못 물고 있을 때(구 씬 데이터 등)의 안전망 —
+        // 이 컴포넌트가 만든 시각 자식은 하나뿐이므로 남은 자식을 먼저 정리한다.
+        if (_visual == null && transform.childCount > 0)
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                GameObject stale = transform.GetChild(i).gameObject;
+                stale.transform.SetParent(null);
+                if (Application.isPlaying) Destroy(stale);
+                else                       DestroyImmediate(stale);
+            }
+        }
+
         if (_visual != null)
         {
             // Destroy는 프레임 끝에 처리되므로 즉시 분리 — 안 그러면 아래 Collider 검사가 옛 모델을 본다.
@@ -284,5 +343,52 @@ public class PokemonUnit : MonoBehaviour
         returnedStone = RemoveStone();                  // 돌 있으면 원복 + 반환
         returnedItems = new List<ItemData>(items);
         items.Clear();
+    }
+
+    /// <summary>
+    /// 성급 합체 전에 현재 장착물을 유닛에서 분리한다.
+    ///
+    /// 일반 아이템과 진화의 돌을 인벤토리에 넣지는 않고 참조만 반환한다.
+    /// RemoveStone()을 사용하지 않으므로 data가 원본 포켓몬으로 되돌아가지 않는다.
+    ///
+    /// 예:
+    /// 라이츄 → 돌과 원본 피카츄 정보를 분리하더라도
+    /// 현재 data는 라이츄로 유지된다.
+    /// </summary>
+    public void DetachEquipmentForMerge(
+        out EvolutionStoneData detachedStone,
+        out PokemonData detachedPreStoneData,
+        out List<ItemData> detachedItems)
+    {
+        detachedStone = equippedStone;
+        detachedPreStoneData = preStoneData;
+        detachedItems = new List<ItemData>(items);
+
+        items.Clear();
+        equippedStone = null;
+        preStoneData = null;
+    }
+
+    /// <summary>
+    /// 이미 돌 진화체인 신규 합체 유닛에 진화의 돌 상태를 복원한다.
+    ///
+    /// TryEquipStone()은 현재 종에서 다시 진화 대상을 찾기 때문에
+    /// 이미 라이츄인 유닛에 번개의돌을 다시 장착할 수 없다.
+    /// 따라서 합체 복원에서는 현재 data를 변경하지 않고
+    /// 돌과 돌 장착 전 원본 종 정보만 복원한다.
+    /// </summary>
+    public bool RestoreStoneStateAfterMerge(
+        EvolutionStoneData stone,
+        PokemonData originalData)
+    {
+        if (stone == null || originalData == null)
+            return false;
+
+        if (equippedStone != null || !HasFreeSlot)
+            return false;
+
+        equippedStone = stone;
+        preStoneData = originalData;
+        return true;
     }
 }
