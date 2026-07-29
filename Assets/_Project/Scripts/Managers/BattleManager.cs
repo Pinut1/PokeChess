@@ -1182,6 +1182,34 @@ public class BattleManager : MonoBehaviour
         return allyHp >= enemyHp;
     }
 
+    public PokemonUnit GetSourceUnitFromVisual(GameObject hitObject)
+    {
+        if (hitObject == null)
+            return null;
+
+        Transform hitTransform = hitObject.transform;
+
+        foreach (BattleUnit unit in _units)
+        {
+            if (unit == null ||
+                unit.visual == null)
+            {
+                continue;
+            }
+
+            Transform visualTransform =
+                unit.visual.transform;
+
+            if (hitTransform == visualTransform ||
+                hitTransform.IsChildOf(visualTransform))
+            {
+                return unit.source;
+            }
+        }
+
+        return null;
+    }
+
     // ─────────────────────────────────────────
     // 정리
     // ─────────────────────────────────────────

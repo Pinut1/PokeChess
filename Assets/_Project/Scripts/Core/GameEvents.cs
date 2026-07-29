@@ -85,6 +85,13 @@ public static class GameEvents
     /// <summary>아이템/진화의 돌 인벤토리 변경. UI 갱신용.</summary>
     public static event Action OnInventoryChanged;
 
+    /// <summary>
+    /// 통신기 골드 전송 요청.
+    /// 인자 = 전송할 골드 수량.
+    /// UI가 발행하고 NetworkManager가 구독한다.
+    /// </summary>
+    public static event Action<int> OnGoldTransferRequested;
+
     // ──────────────────────────────────────────
     // 증강
     // ──────────────────────────────────────────
@@ -149,7 +156,17 @@ public static class GameEvents
     /// <summary>통신교환으로 파트너에게서 유닛을 받아 벤치에 배치 완료(A측). 인자 = 받은 유닛(진화체일 수 있음).</summary>
     public static event Action<PokemonUnit> OnTradeUnitReceived;
 
-    /// <summary>통신교환 전송 실패(상대 벤치 가득). 보낸 쪽(B) 피드백용 — 유닛은 그대로 남음.</summary>
+    /// <summary>
+    /// 통신기에 대기 중인 유닛 수 변경.
+    /// 인자 = 현재 대기 중인 유닛 수.
+    /// </summary>
+    public static event Action<int> OnTradeQueueChanged;
+
+    /// <summary>
+    /// 통신교환 전송 실패.
+    /// 파트너 없음, 라운드당 전송 횟수 초과, 네트워크 처리 실패 등에 사용.
+    /// 보낸 유닛은 그대로 유지된다.
+    /// </summary>
     public static event Action OnTradeRejected;
 
     /// <summary>통신기 골드 전송으로 파트너에게서 골드 수령 완료(받는 쪽). 인자 = 받은 골드. 골드 잔액 표시는 OnGoldChanged가 담당.</summary>
@@ -279,6 +296,8 @@ public static class GameEvents
     public static void UnitEvolved(PokemonUnit unit, bool isStarUp) => OnUnitEvolved?.Invoke(unit, isStarUp);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);
+
+    public static void TradeQueueChanged(int count)  => OnTradeQueueChanged?.Invoke(count);
     public static void TradeRejected()               => OnTradeRejected?.Invoke();
     public static void PartnerGoldReceived(int amount)     => OnPartnerGoldReceived?.Invoke(amount);
     public static void GoldTransferCompleted(int amount)   => OnGoldTransferCompleted?.Invoke(amount);
@@ -302,4 +321,6 @@ public static class GameEvents
     public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
     public static void RequestServerMatches(int count) => OnServerMatchesRequested?.Invoke(count);
     public static void ServerMatchesLoaded(IReadOnlyList<MatchRecord> records, string error) => OnServerMatchesLoaded?.Invoke(records, error);
+    
+    public static void RequestGoldTransfer(int amount) => OnGoldTransferRequested?.Invoke(amount);
 }

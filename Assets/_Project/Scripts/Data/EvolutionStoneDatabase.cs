@@ -19,4 +19,10 @@ public class EvolutionStoneDatabase : NamedScriptableDatabase<EvolutionStoneData
 
     /// <summary>영문명으로 조회(대소문자 무관). 없으면 null.</summary>
     public EvolutionStoneData GetByNameEn(string nameEn) => Lookup(nameEn);
+
+    /// <summary>ID로 진화의 돌 조회. 없으면 null.</summary>
+    public EvolutionStoneData GetById(int id)
+    {
+        return all.Find(stone => stone != null && stone.id == id);
+    }
 }

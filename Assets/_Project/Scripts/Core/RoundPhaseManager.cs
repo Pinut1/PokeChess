@@ -136,7 +136,20 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleAllPlayersReady()
     {
-        if (CurrentPhase != GamePhase.Shopping) return;
+        if (CurrentPhase != GamePhase.Shopping)
+            return;
+
+        AugmentManager augment =
+            GameManager.TryGet(out var gm) ? gm.Augment : null;
+
+        if (augment != null && augment.HasPendingChoice)
+        {
+            Debug.LogWarning(
+                "[Phase] 증강 선택 대기 중 — 전투 시작 보류"
+            );
+            return;
+        }
+
         EnterPhase(GamePhase.Battle);
     }
 
@@ -232,20 +245,44 @@ public class RoundPhaseManager : MonoBehaviour
 
     private IEnumerator ShoppingTimer()
     {
-        // 자동 시작이 꺼져 있으면 제한시간으로 전투를 강제하지 않는다.
-        // 이 경우 두 플레이어가 모두 Ready → OnAllPlayersReady 로만 전투가 시작된다.
+        // 자동 시작이 꺼져 있으면 두 플레이어 Ready로만 전투가 시작된다.
         if (!_autoStartBattleOnTimeout)
             yield break;
 
-        yield return new WaitForSeconds(_shoppingDuration);
-        EnterPhase(GamePhase.Battle);
+        float elapsed = 0f;
+
+        while (elapsed < _shoppingDuration)
+        {
+            // 증강 선택 대기 중에는 쇼핑 타이머를 진행시키지 않는다.
+            AugmentManager augment =
+                GameManager.TryGet(out var gm) ? gm.Augment : null;
+
+            if (augment == null || !augment.HasPendingChoice)
+                elapsed += Time.deltaTime;
+
+            yield return null;
+        }
+
+        // 타이머 종료 직전에 증강 오퍼가 생겼을 가능성까지 방어한다.
+        while (GameManager.TryGet(out var gmPending)
+               && gmPending.Augment != null
+               && gmPending.Augment.HasPendingChoice)
+        {
+            yield return null;
+        }
+
+        if (CurrentPhase == GamePhase.Shopping)
+            EnterPhase(GamePhase.Battle);
     }
 
     private IEnumerator ResultTimer()
     {
         yield return new WaitForSeconds(_resultDuration);
 
-        var network = GameManager.Instance.Network;
+        if (!GameManager.TryGet(out var gm))
+            yield break;
+
+        var network = gm.Network;
         if (!network.IsMasterClient) yield break;
 
         // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
@@ -281,6 +318,16 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandlePlayerReadyRequested()
     {
         if (CurrentPhase != GamePhase.Shopping) return;
+
+        // 증강 3택1이 떠 있는 동안은 준비를 막는다(블로킹 UX).
+        AugmentManager augment = GameManager.TryGet(out var gm) ? gm.Augment : null;
+        if (augment != null && augment.HasPendingChoice)
+        {
+            Debug.LogWarning("[Phase] 증강을 먼저 선택해야 준비할 수 있습니다.");
+            return;
+        }
+
+        // 실제 브로드캐스트는 이벤트를 구독한 NetworkManager가 담당한다.
         GameEvents.ApprovePlayerReady();
     }
 

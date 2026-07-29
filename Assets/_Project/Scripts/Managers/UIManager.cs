@@ -155,6 +155,13 @@ public class UIManager : MonoBehaviour
     private int _requiredXp;
     private int _unitCap = 1;
 
+    private int _buyXpCostGold;
+    private int _buyXpAmount;
+
+    // 통신기 골드 전송 UI 상태
+    private bool _isGoldTransferPending;
+    private string _goldTransferResult = "";
+
     // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
@@ -189,6 +196,10 @@ public class UIManager : MonoBehaviour
         GameEvents.OnItemCouponChanged += HandleItemCouponChanged;
         // 무료 리롤 자원이 늘면 골드가 그대로여도 리롤 버튼이 눌릴 수 있어야 한다.
         GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
+
+        GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
+        GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
+        GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
     }
 
     private void OnDisable()
@@ -203,6 +214,12 @@ public class UIManager : MonoBehaviour
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
         GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
+
+        GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
+        GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
+        GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
+
+        _isGoldTransferPending = false;
     }
 
     private void Start()
@@ -579,6 +596,26 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
+    /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
+    private void HandleGoldTransferCompleted(int amount)
+    {
+        _isGoldTransferPending = false;
+        _goldTransferResult = $"전송 완료: {amount}G";
+    }
+
+    /// <summary>골드 전송 실패 시 대기 상태를 해제하고 실패 사유를 표시한다.</summary>
+    private void HandleGoldTransferRejected(string reason)
+    {
+        _isGoldTransferPending = false;
+        _goldTransferResult = $"전송 실패: {reason}";
+    }
+
+    /// <summary>파트너에게서 골드를 받은 경우 수령 문구를 표시한다.</summary>
+    private void HandlePartnerGoldReceived(int amount)
+    {
+        _goldTransferResult = $"파트너에게서 {amount}G 수령";
+    }
+
     private void OnGUI()
     {
         EnsureStyles();
@@ -590,11 +627,88 @@ public class UIManager : MonoBehaviour
         // IMGUI 진행 패널은 같은 값을 중복 표시하며 상점 카드 위를 덮으므로 호출하지 않는다.
         // 메서드는 Canvas 미배선 씬을 위한 폴백으로 남겨둔다.
 
+        DrawTradeGoldPanel();
+
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
 
         if (_showSampleDeck)
             DrawSampleDeckWindow();
+    }
+
+    // ──────────────────────────────────────────
+    // 통신기 골드 전송 UI
+    // ──────────────────────────────────────────
+    private void DrawTradeGoldPanel()
+    {
+        const float width = 250f;
+        const float height = 115f;
+
+        float x = 20f;
+        float y = Screen.height - 360f;
+
+        GUI.Box(
+            new Rect(x, y, width, height),
+            "통신기 골드 전송"
+        );
+
+        bool previousEnabled = GUI.enabled;
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 1;
+
+        if (GUI.Button(
+                new Rect(x + 15f, y + 30f, 65f, 28f),
+                "1G"))
+        {
+            RequestGoldTransfer(1);
+        }
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 5;
+
+        if (GUI.Button(
+                new Rect(x + 92f, y + 30f, 65f, 28f),
+                "5G"))
+        {
+            RequestGoldTransfer(5);
+        }
+
+        GUI.enabled =
+            !_isGoldTransferPending &&
+            _gold >= 10;
+
+        if (GUI.Button(
+                new Rect(x + 169f, y + 30f, 65f, 28f),
+                "10G"))
+        {
+            RequestGoldTransfer(10);
+        }
+
+        GUI.enabled = previousEnabled;
+
+        string statusText =
+            _isGoldTransferPending
+                ? "전송 처리 중..."
+                : _goldTransferResult;
+
+        GUI.Label(
+            new Rect(x + 15f, y + 68f, 220f, 22f),
+            statusText
+        );
+    }
+
+    private void RequestGoldTransfer(int amount)
+    {
+        if (_isGoldTransferPending)
+            return;
+
+        _isGoldTransferPending = true;
+        _goldTransferResult = "";
+
+        GameEvents.RequestGoldTransfer(amount);
     }
 
 
@@ -614,16 +728,18 @@ public class UIManager : MonoBehaviour
 
         // PrototypeHud의 유닛 상점 배치값과 동일하게 계산한다.
         const int shopSlotCount = 5;
-        const float shopSlotWidth = 110f;
+        const float shopSlotWidth = 145f;
         const float shopSlotGap = 6f;
 
-        float shopTotalWidth = shopSlotCount * (shopSlotWidth + shopSlotGap);
+        float shopTotalWidth = shopSlotCount * shopSlotWidth + (shopSlotCount - 1) * shopSlotGap;
+
         float shopStartX = (Screen.width - shopTotalWidth) / 2f;
 
         // 유닛 상점 왼쪽에 패널 배치.
         // 작은 해상도에서는 화면 밖으로 나가지 않도록 최소 10px을 보장한다.
         float x = Mathf.Max(10f, shopStartX - width - 20f);
-        float y = Screen.height - 190f;
+        
+        float y = Screen.height - 160f;
 
         GUI.Box(new Rect(x, y, width, height), "플레이어 정보");
 
