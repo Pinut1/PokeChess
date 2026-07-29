@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 5
   synergyName: "\uBD88\uAF43"
   synergyNameEn: Fire
+  countPerSpecies: 0
   tiers:
   - count: 2
     effectDescription: "defense \uBE44\uC728 \uC99D\uAC00"

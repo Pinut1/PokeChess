@@ -21,6 +21,7 @@ MonoBehaviour:
   defense: 35
   attackSpeed: 0.4
   range: 2
+  attackRange: 1
   spellPower: 45
   manaCost: 100
   synergies:

@@ -6,22 +6,23 @@
       "nameEn": "Grass",
       "tiers": [
         {
-          "count": 3,
+          "count": 2,
           "effect": "atkSpeed 고정값 증가"
         },
         {
-          "count": 5,
+          "count": 4,
           "effect": "atkSpeed 고정값 증가"
         },
         {
-          "count": 7,
+          "count": 6,
           "effect": "atkSpeed 고정값 증가"
         },
         {
-          "count": 9,
+          "count": 8,
           "effect": "atkSpeed 고정값 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 2,
@@ -44,7 +45,8 @@
           "count": 9,
           "effect": "defense 고정값 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 3,
@@ -67,7 +69,8 @@
           "count": 9,
           "effect": "전투 시작 시 spellPower 기반 보호막"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 4,
@@ -90,7 +93,8 @@
           "count": 5,
           "effect": "단계마다 봇 유닛 추가 (에브이→브래키→글레이시아→님피아)"
         }
-      ]
+      ],
+      "countPerSpecies": true
     },
     {
       "id": 5,
@@ -109,7 +113,8 @@
           "count": 6,
           "effect": "defense 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 6,
@@ -128,7 +133,8 @@
           "count": 6,
           "effect": "atkSpeed 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 7,
@@ -147,7 +153,8 @@
           "count": 6,
           "effect": "치명타 확률 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 8,
@@ -166,7 +173,8 @@
           "count": 6,
           "effect": "마나 충전 속도 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 9,
@@ -185,7 +193,8 @@
           "count": 4,
           "effect": "hp 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 10,
@@ -204,7 +213,8 @@
           "count": 4,
           "effect": "spellPower 고정값 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 11,
@@ -223,7 +233,8 @@
           "count": 4,
           "effect": "attack 고정값 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 12,
@@ -242,7 +253,8 @@
           "count": 4,
           "effect": "attack 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 13,
@@ -250,18 +262,15 @@
       "nameEn": "Dragon",
       "tiers": [
         {
+          "count": 1,
+          "effect": "spellPower 비율 증가"
+        },
+        {
           "count": 2,
           "effect": "spellPower 비율 증가"
-        },
-        {
-          "count": 3,
-          "effect": "spellPower 비율 증가"
-        },
-        {
-          "count": 4,
-          "effect": "spellPower 비율 증가"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 14,
@@ -272,7 +281,8 @@
           "count": 1,
           "effect": "적 atkSpeed -20% (고유)"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 15,
@@ -283,7 +293,8 @@
           "count": 1,
           "effect": "전투 시작 후 첫 스킬 사용 시 STUN 1.5초 (고유)"
         }
-      ]
+      ],
+      "countPerSpecies": false
     },
     {
       "id": 16,
@@ -294,7 +305,8 @@
           "count": 1,
           "effect": "atkSpeed +15% or manaRegen +30% 선택 (고유)"
         }
-      ]
+      ],
+      "countPerSpecies": false
     }
   ]
 }

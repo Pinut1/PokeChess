@@ -15,13 +15,14 @@ MonoBehaviour:
   id: 1
   synergyName: "\uD480"
   synergyNameEn: Grass
+  countPerSpecies: 0
   tiers:
-  - count: 3
+  - count: 2
     effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
-  - count: 5
+  - count: 4
     effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
-  - count: 7
+  - count: 6
     effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
-  - count: 9
+  - count: 8
     effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
   icon: {fileID: 1589223451, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

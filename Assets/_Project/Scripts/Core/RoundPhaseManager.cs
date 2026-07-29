@@ -30,6 +30,9 @@ public class RoundPhaseManager : MonoBehaviour
     public GamePhase CurrentPhase { get; private set; } = GamePhase.Lobby;
     public int       CurrentRound { get; private set; } = 0;
 
+    /// <summary>쇼핑 제한시간 자동 전투 시작 여부. 꺼져 있으면 제한시간이 없어 UI가 카운트다운 대신 별도 표기를 한다.</summary>
+    public bool AutoStartBattleOnTimeout => _autoStartBattleOnTimeout;
+
     /// <summary>
     /// 현재 라운드에 진행 중인 스테이지(중앙 StageDatabase에서 해석). 라운드 변경 시 갱신.
     /// 전투의 적 구성·보상테이블·트레이너·preReward의 단일 출처 — BattleManager 등은 여기서 읽는다.
@@ -117,7 +120,7 @@ public class RoundPhaseManager : MonoBehaviour
         // 전투 승리 보상은 RewardManager가 OnBattleEnd(true)에서 CurrentStage.rewardTableId로 지급(연결 완료, 골드만 — 수치는 역기획서 대기).
     }
 
-    private void HandleBattleEnd(bool isWin)
+    private void HandleBattleEnd(BattleEndReason reason)
     {
         // 패배로 체력 0 → PlayerHealthManager가 SessionEnded로 이미 GameOver 전환했을 수 있음.
         // 완주 직후 마지막 전투 결과가 Victory를 덮어쓰는 것도 방지.

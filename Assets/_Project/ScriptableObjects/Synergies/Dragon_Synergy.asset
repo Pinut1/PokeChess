@@ -15,11 +15,10 @@ MonoBehaviour:
   id: 13
   synergyName: "\uB4DC\uB798\uACE4"
   synergyNameEn: Dragon
+  countPerSpecies: 0
   tiers:
+  - count: 1
+    effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
   - count: 2
-    effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
-  - count: 3
-    effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
-  - count: 4
     effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
   icon: {fileID: 995343878, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

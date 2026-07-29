@@ -198,8 +198,8 @@ public class AugmentManager : MonoBehaviour
     private void HandleBattleStart()
         => _activeAugments.ForEach(a => a.OnBattleStart());
 
-    private void HandleBattleEnd(bool isWin)
-        => _activeAugments.ForEach(a => a.OnBattleEnd(isWin));
+    private void HandleBattleEnd(BattleEndReason reason)
+        => _activeAugments.ForEach(a => a.OnBattleEnd(reason));
 
     private void HandleUnitPlaced(PokemonUnit unit)
         => _activeAugments.ForEach(a => a.OnUnitPlaced(unit));

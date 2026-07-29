@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 4
   synergyName: "\uB3CC\uC5F0\uBCC0\uC774"
   synergyNameEn: Mutant
+  countPerSpecies: 1
   tiers:
   - count: 2
     effectDescription: "\uB2E8\uACC4\uB9C8\uB2E4 \uBD07 \uC720\uB2DB \uCD94\uAC00

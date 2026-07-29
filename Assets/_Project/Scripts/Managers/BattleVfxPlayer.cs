@@ -18,6 +18,17 @@ public static class BattleVfxPlayer
     // 미등록 vfxId 경고는 id당 1회만 (매 시전마다 로그 스팸 방지).
     private static readonly HashSet<string> _warnedIds = new(System.StringComparer.OrdinalIgnoreCase);
 
+    // 전투 중 생성된 VFX 오브젝트들. 전투 종료 시 일괄 파괴하기 위해 추적.
+    private static readonly List<GameObject> _activeVfx = new();
+
+    /// <summary>전투 종료 시 모든 활성 VFX를 즉시 파괴한다. BattleManager에서 호출.</summary>
+    public static void ClearAllActive()
+    {
+        foreach (var go in _activeVfx)
+            if (go != null) Object.Destroy(go);
+        _activeVfx.Clear();
+    }
+
     /// <summary>대상 유닛들 위치에 VFX 생성. vfxId가 비었거나 미등록이면 조용히 무시(경고 1회).</summary>
     public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets)
     {
@@ -83,11 +94,11 @@ public static class BattleVfxPlayer
     }
 
     /// <summary>
-    /// 평타 VFX. 사거리에 따라 연출 형태가 다르다.
-    ///   근접(range &lt;= 1): 대상 위치에서 터지는 타격 이펙트 — 기존과 동일.
-    ///   원거리(range &gt; 1): 공격자에서 출발해 대상까지 날아가는 투사체.
+    /// 평타 VFX. 프리팹 종류에 따라 연출 형태가 다르다.
+    ///   근거리(_S): 대상 위치에서 터지는 타격 이펙트.
+    ///   원거리(_L): 공격자에서 출발해 대상까지 날아가는 투사체.
     ///
-    /// 원거리를 대상 위치에 생성하면 투사체가 도착지에서 출발해 그 너머로 지나가 버린다.
+    /// 투사체를 대상 위치에 생성하면 도착지에서 출발해 그 너머로 지나가 버린다.
     /// 그래서 출발점을 공격자로 옮기고, 파티클 수명을 실제 거리에 맞춰 대상에서 멈추게 한다.
     /// </summary>
     public static void PlayBasicAttack(string vfxId, BattleUnit attacker, BattleUnit target)
@@ -97,7 +108,7 @@ public static class BattleVfxPlayer
 
         Vector3 hit = target.visual.transform.position;
 
-        bool ranged = attacker != null && attacker.visual != null && attacker.range > 1;
+        bool ranged = IsRangedVfx(vfxId) && attacker != null && attacker.visual != null;
         if (!ranged)
         {
             Spawn(entry, hit);
@@ -117,6 +128,20 @@ public static class BattleVfxPlayer
         float travel = FitProjectileTravel(go, distance);
         ScheduleDestroy(go, entry, travel);
     }
+
+    /// <summary>
+    /// 투사체형 평타 프리팹인지. 판정 기준은 <b>사거리가 아니라 vfxId 접미사</b>다.
+    ///
+    /// 시트(VFX Table) 계약: <c>_L</c> = 원거리 평타(Archer·Magician·Supporter),
+    /// <c>_S</c> = 근거리 평타(Warrior·Tanker·Assassin). 접미사와 role은 예외 없이 1:1이다.
+    ///
+    /// 반면 PokemonData.range는 진화하며 오르는 밸런스 수치라 연출 형태와 다른 축이다
+    /// (_L인데 range=1인 1단계 유닛이 32종). 예전처럼 range로 판정하면 그 32종이
+    /// 방향성 있는 투사체 프리팹을 대상 위치에 회전 없이 제자리 생성해 엉뚱하게 날아간다.
+    /// </summary>
+    private static bool IsRangedVfx(string vfxId)
+        => !string.IsNullOrEmpty(vfxId)
+           && vfxId.EndsWith("_L", System.StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// 파티클이 정확히 distance만큼 날아가고 멈추도록 수명을 맞춘다(수명 = 거리 / 속도).
@@ -194,6 +219,7 @@ public static class BattleVfxPlayer
     {
         var go = Object.Instantiate(entry.prefab, position, rotation);
         if (!Mathf.Approximately(scale, 1f)) go.transform.localScale *= scale;
+        _activeVfx.Add(go);
         return go;
     }
 

@@ -33,7 +33,20 @@ public class EnemyPlacement
     public int    starLevel = 1;   // 1~3 ★
     public int    q;               // 헥스 좌표 q (적 보드 기준, 임시값 — 기획 확정 필요)
     public int    r;               // 헥스 좌표 r
-    public string heldItemEn;      // (옵션) 트레이너 보유 아이템 영문명
+    // 트레이너 보유 아이템(옵션). 아군 유닛과 동일하게 최대 2칸(PokemonUnit.MaxItemSlots).
+    // 시트 컬럼 itemSet1/itemSet2에 대응하며, 빈 값이나 "NONE"이면 없는 것으로 본다.
+    public string heldItemEn;      // 1번 칸
+    public string heldItemEn2;     // 2번 칸
+
+    /// <summary>비어 있지 않은 보유 아이템 영문명만 순서대로 반환.</summary>
+    public IEnumerable<string> HeldItemsEn
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(heldItemEn))  yield return heldItemEn;
+            if (!string.IsNullOrEmpty(heldItemEn2)) yield return heldItemEn2;
+        }
+    }
 
     // ── 보스/시그니처 강화 ─────────────────────────
     // 같은 PokemonData를 스테이지마다 다른 강도로 쓰기 위한 배수. ★ 스케일 위에 추가로 곱해짐.

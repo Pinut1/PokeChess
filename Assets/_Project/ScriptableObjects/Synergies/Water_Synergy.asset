@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 3
   synergyName: "\uBB3C"
   synergyNameEn: Water
+  countPerSpecies: 0
   tiers:
   - count: 3
     effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18

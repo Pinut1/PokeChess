@@ -19,7 +19,7 @@ public abstract class Augment
 
     public virtual void OnRoundChanged(int round) { }
     public virtual void OnBattleStart()           { }
-    public virtual void OnBattleEnd(bool isWin)   { }
+    public virtual void OnBattleEnd(BattleEndReason reason) { }
     public virtual void OnUnitPlaced(PokemonUnit unit)  { }
     public virtual void OnUnitBenched(PokemonUnit unit) { }
     public virtual void OnUnitSold(PokemonUnit unit)    { }

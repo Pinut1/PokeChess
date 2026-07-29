@@ -85,6 +85,7 @@ public static class PokeChessImporter
         public int id;
         public string name, nameEn;
         public List<SynergyTierEntry> tiers;
+        public bool countPerSpecies;   // 시트 countPerSpecies 컬럼. 키가 없으면 JsonUtility가 false로 둔다.
     }
 
     [Serializable]
@@ -158,7 +159,9 @@ public static class PokeChessImporter
         public int q;
         public int r;
 
+        // 시트 컬럼 itemSet1 / itemSet2. "NONE"은 빈 칸을 뜻하는 시트 관례라 임포트에서 걸러낸다.
         public string heldItemEn;
+        public string heldItemEn2;
 
         public float statMultiplier;
         public float hpMultiplier;
@@ -249,6 +252,10 @@ public static class PokeChessImporter
             // skillId로 Skill Table join → skill에 베이킹. 없으면 평타만(빈 스킬).
             so.skill = BuildSkill(e.skillId, skillMap);
 
+            // 평타 사거리는 attackVfxId로 Skill Table의 ATTACK 행을 조인해 lineLength에서 가져온다.
+            // (시트의 range 컬럼은 사거리가 아니라 진화 단계라 쓰면 안 된다.)
+            so.attackRange = ResolveAttackRange(e.attackVfxId, skillMap, e.name);
+
             so.evolvesIntoEn = e.evolvesInto ?? "";
 
             // obtainBy 미지정("")/"shop" → 상점 풀 포함. evolution/stone/trade/synergy/wild → 풀 제외.
@@ -261,6 +268,7 @@ public static class PokeChessImporter
         }
 
         UpdatePokemonDatabase(imported);
+        EvolutionFamily.Invalidate(); // 진화 사슬(evolvesInto)이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         int withSkill = imported.FindAll(p => p.skill != null && p.skill.HasSkill).Count;
@@ -446,6 +454,7 @@ public static class PokeChessImporter
         }
 
         UpdateEvolutionStoneDatabase(imported);
+        EvolutionFamily.Invalidate(); // 돌 진화 매핑이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료 (EvolutionStoneDatabase 갱신)");
@@ -480,10 +489,11 @@ public static class PokeChessImporter
             string path = $"{dir}/{e.nameEn}_Synergy.asset";
             var so = LoadOrCreate<SynergyData>(path);
 
-            so.id            = e.id;
-            so.synergyName   = e.name;
-            so.synergyNameEn = e.nameEn;
-            so.tiers         = new List<SynergyTier>();
+            so.id              = e.id;
+            so.synergyName     = e.name;
+            so.synergyNameEn   = e.nameEn;
+            so.countPerSpecies = e.countPerSpecies;
+            so.tiers           = new List<SynergyTier>();
 
             foreach (var t in e.tiers)
                 so.tiers.Add(new SynergyTier { count = t.count, effectDescription = t.effect });
@@ -683,6 +693,8 @@ public static class PokeChessImporter
                     });
 
         EditorUtility.SetDirty(so);
+        EvolutionFamily.Invalidate(); // 통신교환 매핑이 바뀌었을 수 있음
+
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");
     }
@@ -993,7 +1005,8 @@ public static class PokeChessImporter
                 starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
                 q = q,
                 r = r,
-                heldItemEn = enemy.heldItemEn ?? "",
+                heldItemEn = NormalizeItemName(enemy.heldItemEn),
+                heldItemEn2 = NormalizeItemName(enemy.heldItemEn2),
                 statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
                 hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
                 atkMultiplier = NormalizeMultiplier(enemy.atkMultiplier)
@@ -1119,6 +1132,31 @@ public static class PokeChessImporter
                 map[s.skillId] = s;
         Debug.Log($"[PokeChess] skill_table {map.Count}개 로드");
         return map;
+    }
+
+    /// <summary>
+    /// 평타 사거리를 attackVfxId로 Skill Table의 ATTACK 행에서 찾는다(lineLength).
+    /// 행이 없으면 접미사 규약(_L=원거리 4 / _S=근거리 1)으로 폴백하고 경고를 남긴다 —
+    /// 조용히 1로 떨어지면 원거리 유닛이 적에게 붙어 싸우는데도 원인을 알기 어렵다.
+    /// </summary>
+    private static int ResolveAttackRange(string attackVfxId, Dictionary<string, SkillTableEntry> map, string pokemonName)
+    {
+        const int RANGED = 4, MELEE = 1;
+
+        if (string.IsNullOrEmpty(attackVfxId))
+        {
+            Debug.LogWarning($"[PokeChess] {pokemonName}: attackVfxId 없음 → 평타 사거리 {MELEE}로 폴백");
+            return MELEE;
+        }
+
+        if (map.TryGetValue(attackVfxId, out var row) && row.lineLength > 0)
+            return row.lineLength;
+
+        int fallback = attackVfxId.EndsWith("_L", StringComparison.OrdinalIgnoreCase) ? RANGED : MELEE;
+        Debug.LogWarning(
+            $"[PokeChess] {pokemonName}: Skill Table에 '{attackVfxId}' ATTACK 행이 없음 " +
+            $"→ 접미사 규약으로 사거리 {fallback} 폴백. 시트에 행을 추가할 것");
+        return fallback;
     }
 
     /// <summary>skillId로 Skill Table 행을 찾아 PokemonSkillData 생성. 없으면 빈 스킬(HasSkill=false).</summary>
@@ -1256,6 +1294,18 @@ public static class PokeChessImporter
     private static float NormalizeMultiplier(float value)
     {
         return value <= 0f ? 1f : value;
+    }
+
+    /// <summary>
+    /// 시트의 아이템 칸을 정규화. 기획 시트는 빈 칸을 "NONE"으로 적으므로 그대로 두면
+    /// ItemDatabase 조회가 실패해 매 전투마다 경고가 찍힌다. 빈 문자열로 바꿔 "없음"으로 취급한다.
+    /// </summary>
+    private static string NormalizeItemName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+
+        string trimmed = value.Trim();
+        return trimmed.Equals("NONE", StringComparison.OrdinalIgnoreCase) ? "" : trimmed;
     }
 }
 

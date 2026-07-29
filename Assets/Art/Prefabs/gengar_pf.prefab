@@ -64,6 +64,14 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7634783943795983107, guid: 8dd37a0be92db0d4d8024a5799511d16, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.247
+      objectReference: {fileID: 0}
+    - target: {fileID: -7634783943795983107, guid: 8dd37a0be92db0d4d8024a5799511d16, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 1.072
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 8dd37a0be92db0d4d8024a5799511d16, type: 3}
       propertyPath: m_Name
       value: gengar_pf
@@ -73,7 +81,8 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: -5643483997740214471, guid: 8dd37a0be92db0d4d8024a5799511d16, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8dd37a0be92db0d4d8024a5799511d16, type: 3}

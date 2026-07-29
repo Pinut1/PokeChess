@@ -21,6 +21,7 @@ MonoBehaviour:
   defense: 15
   attackSpeed: 0.6
   range: 1
+  attackRange: 4
   spellPower: 350
   manaCost: 40
   synergies:
@@ -36,7 +37,7 @@ MonoBehaviour:
     areaRadius: 1
     lineLength: 4
     vfxId: VFX_Ethereal_Magician_SPELL
-  attackVfxId: Elecric_L
+  attackVfxId: Ethereal_L
   evolvesIntoEn: 
   shopBuyable: 0
   modelPrefab: {fileID: 2070301872082320055, guid: a98180314130fca4b91b119d4e8598d3, type: 3}
