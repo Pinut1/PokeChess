@@ -526,7 +526,7 @@ public class ShopManager : MonoBehaviour
     /// <summary>샵 풀에서 레벨별 코스트 확률과 남은 풀 수량을 기준으로 _shopSize개를 다시 공개.</summary>
     public void Roll()
     {
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
@@ -588,7 +588,7 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public void OpenCostFourShopOnce()
     {
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
@@ -1139,7 +1139,7 @@ public class ShopManager : MonoBehaviour
 
         int amount = GetBaseUnitCount(unit.starLevel);
 
-        var network = GameManager.Instance != null ? GameManager.Instance.Network : null;
+        var network = GameManager.TryGet(out var gm) ? gm.Network : null;
         if (network != null && network.UsesSharedShopPool)
         {
             network.RequestSharedShopReturn(data.id, amount);
@@ -2147,7 +2147,7 @@ public class ShopManager : MonoBehaviour
         ScriptableObject product = _itemSlots[slot];
         if (product == null) return false;
 
-        var itemManager = GameManager.Instance.Item;
+        var itemManager = GameManager.TryGet(out var gm) ? gm.Item : null;
         if (itemManager == null)
         {
             Debug.LogWarning("[ItemShop] ItemManager 없음 — 구매 불가");

@@ -446,7 +446,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void ProcessSharedShopRoll(int actorNumber, int level, bool forceCostFour, bool onlyCostFour)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null || !shop.TryAuthorityRollSharedShop(
                 actorNumber, level, forceCostFour, onlyCostFour, out int revision, out int[] slots))
         {
@@ -468,7 +468,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [PunRPC]
     private void RPC_ApplySharedShopSnapshot(int revision, int[] slots)
     {
-        GameManager.Instance?.Shop?.ApplySharedShopSnapshot(revision, slots);
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ApplySharedShopSnapshot(revision, slots);
     }
 
     [PunRPC]
@@ -480,7 +481,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void ProcessSharedShopPurchase(int actorNumber, int revision, int slot)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         int pokemonId = 0;
         bool success = shop != null && shop.TryAuthorityPurchaseSharedShop(
             actorNumber, revision, slot, out pokemonId);
@@ -504,7 +505,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [PunRPC]
     private void RPC_ResolveSharedShopPurchase(int revision, int slot, int pokemonId, bool success)
     {
-        GameManager.Instance?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
     }
 
     [PunRPC]
@@ -536,7 +538,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void ProcessSharedShopReturn(int pokemonId, int amount)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
         shop.AuthorityReturnSharedShopCopy(pokemonId, amount);
         BroadcastSharedPoolMirror(-1, 0, System.Array.Empty<int>());
@@ -689,7 +691,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void BroadcastSharedPoolMirror(int actorNumber, int revision, int[] slots)
     {
         if (!IsMasterClient) return;
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
 
         shop.GetSharedPoolMirror(out int[] pokemonIds, out int[] remaining);
@@ -701,7 +703,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_ApplySharedPoolMirror(
         int[] pokemonIds, int[] remaining, int actorNumber, int revision, int[] slots)
     {
-        GameManager.Instance?.Shop?.ApplySharedPoolMirror(
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ApplySharedPoolMirror(
             pokemonIds, remaining, actorNumber, revision, slots);
     }
 
@@ -1653,7 +1656,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null || shop.Gold < amount)
         {
             Debug.LogWarning($"[GoldTransfer] 골드 부족 — 보유 {(shop != null ? shop.Gold : 0)} < 요청 {amount}");
@@ -1675,7 +1678,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     [PunRPC]
     private void RPC_GoldReceive(int amount)
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (amount <= 0 || shop == null)
         {
             Debug.LogWarning($"[GoldTransfer] 수신 거부 (amount={amount}, shop={(shop != null)})");
@@ -1698,7 +1701,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!success)
         {
-            var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+            var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
             shop?.AddGold(amount); // 환급
             Debug.LogWarning($"[GoldTransfer] 전송 실패 — {amount}G 환급");
             GameEvents.GoldTransferRejected("상대 수신 실패 — 환급됨");

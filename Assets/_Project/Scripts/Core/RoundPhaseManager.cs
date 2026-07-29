@@ -279,7 +279,10 @@ public class RoundPhaseManager : MonoBehaviour
     {
         yield return new WaitForSeconds(_resultDuration);
 
-        var network = GameManager.Instance.Network;
+        if (!GameManager.TryGet(out var gm))
+            yield break;
+
+        var network = gm.Network;
         if (!network.IsMasterClient) yield break;
 
         // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
