@@ -208,6 +208,11 @@ public class PokemonUnit : MonoBehaviour
     // 새 모델만 덧붙여 두 모델이 겹친다. 직렬화하면 Unity가 복제된 자식으로 참조를 remap한다.
     [SerializeField] private GameObject _visual;
 
+    // 성급별 모델 확대 배율. 인덱스 = starLevel - 1.
+    // 진화로 프리팹이 바뀌지 않는 성급업(피카츄 2성→3성, 라프라스 1→2→3성)은 크기 말고는
+    // 구분할 단서가 없어서 눈으로 성급을 읽을 수 있게 키운다.
+    [SerializeField] private float[] _starVisualScale = { 1f, 1.15f, 1.3f };
+
     /// <summary>현재 data의 modelPrefab으로 시각 요소를 (재)생성. 없으면 placeholder 캡슐.</summary>
     public void RefreshVisual()
     {
@@ -248,9 +253,23 @@ public class PokemonUnit : MonoBehaviour
         _visual.transform.localPosition = Vector3.zero;
         _visual.transform.localRotation = Quaternion.identity;
 
+        // 성급 배율은 프리팹 고유 스케일에 곱한다. RefreshVisual은 매번 프리팹에서 새로
+        // Instantiate하므로 여러 번 불려도 배율이 누적되지 않는다.
+        _visual.transform.localScale *= StarVisualScale();
+
         // 드래그 레이캐스트 픽업용 콜라이더 보장 (모델 프리팹에 없을 수도 있음)
         if (GetComponentInChildren<Collider>() == null)
             gameObject.AddComponent<CapsuleCollider>();
+    }
+
+    /// <summary>현재 성급의 모델 확대 배율. 배열이 비었거나 범위를 벗어나면 1배(무확대).</summary>
+    private float StarVisualScale()
+    {
+        if (_starVisualScale == null || _starVisualScale.Length == 0) return 1f;
+
+        int idx = Mathf.Clamp(starLevel - 1, 0, _starVisualScale.Length - 1);
+        float scale = _starVisualScale[idx];
+        return scale > 0f ? scale : 1f;
     }
 
     /// <summary>
