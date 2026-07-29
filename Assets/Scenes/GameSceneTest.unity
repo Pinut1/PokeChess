@@ -3183,6 +3183,7 @@ MonoBehaviour:
   _battleReadyButton: {fileID: 0}
   _showItemStoreButton: {fileID: 0}
   _showUnitStoreButton: {fileID: 0}
+  _disabledGrayscaleMaterial: {fileID: 2100000, guid: 14260e36e5de75342936f31c2cfa1414, type: 2}
   _unitStorePanel: {fileID: 0}
   _itemStorePanel: {fileID: 0}
   _levelText: {fileID: 0}
@@ -3557,6 +3558,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1914424245}
     m_Modifications:
+    - target: {fileID: 4365812645288770273, guid: f732d57755843e140b26b80ed0086796, type: 3}
+      propertyPath: m_Color.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4365812645288770273, guid: f732d57755843e140b26b80ed0086796, type: 3}
+      propertyPath: m_Color.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4365812645288770273, guid: f732d57755843e140b26b80ed0086796, type: 3}
+      propertyPath: m_Color.r
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4564101226086195995, guid: f732d57755843e140b26b80ed0086796, type: 3}
       propertyPath: m_Name
       value: CardContanier_pf (1)

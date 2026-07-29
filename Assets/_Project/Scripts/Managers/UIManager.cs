@@ -43,6 +43,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button _showItemStoreButton;
     [Tooltip("비어 있으면 ItemStore_Panel 아래의 ShopChange Button을 런타임에 찾습니다.")]
     [SerializeField] private Button _showUnitStoreButton;
+
+    [Tooltip("골드 부족으로 버튼이 꺼졌을 때 씌울 흑백 머티리얼(PokeChess/UI/Grayscale). " +
+             "카드 일러스트와 같은 것을 쓰면 톤이 맞는다. 비워두면 Animator의 Disabled 상태에만 의존한다.")]
+    [SerializeField] private Material _disabledGrayscaleMaterial;
     [SerializeField] private GameObject _unitStorePanel;
     [SerializeField] private GameObject _itemStorePanel;
 
@@ -183,6 +187,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnUnitCapChanged += HandleUnitCapChanged;
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
         GameEvents.OnItemCouponChanged += HandleItemCouponChanged;
+        // 무료 리롤 자원이 늘면 골드가 그대로여도 리롤 버튼이 눌릴 수 있어야 한다.
+        GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
     }
 
     private void OnDisable()
@@ -195,6 +201,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnXpChanged -= HandleXpChanged;
         GameEvents.OnUnitCapChanged -= HandleUnitCapChanged;
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
+        GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
     }
 
@@ -289,6 +296,41 @@ public class UIManager : MonoBehaviour
         if (_couponText != null) _couponText.text = _itemCoupon.ToString();
 
         RefreshCostRateTexts();
+        RefreshShopButtonAffordability();
+    }
+
+    /// <summary>
+    /// 골드가 모자란 상점 버튼을 비활성으로 만든다.
+    /// interactable=false면 클릭뿐 아니라 Hover(Highlighted) 전환도 함께 막힌다 —
+    /// Selectable이 비활성 상태에서는 상태 전환 자체를 하지 않기 때문이다.
+    ///
+    /// 리롤은 무료 리롤 자원이 남아 있으면 골드와 무관하게 누를 수 있다.
+    /// XP 구매는 최대 레벨(RequiredXp=0)에서도 의미가 없으므로 함께 막는다.
+    /// </summary>
+    private void RefreshShopButtonAffordability()
+    {
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        if (shop == null) return;
+
+        SetButtonAffordable(_shopRerollButton, shop.RerollCount > 0 || _gold >= shop.RerollCost);
+        SetButtonAffordable(_xpPurchaseButton, _requiredXp > 0 && _gold >= shop.BuyXpCostGold);
+    }
+
+    /// <summary>
+    /// 버튼을 켜고 끄면서 흑백 머티리얼도 함께 씌운다.
+    /// Animator의 Disabled 상태와 중복돼도 문제없다 — 머티리얼은 색만 바꾸고 애니메이션은 형태를 다룬다.
+    /// </summary>
+    private void SetButtonAffordable(Button button, bool affordable)
+    {
+        if (button == null) return;
+
+        button.interactable = affordable;
+
+        if (_disabledGrayscaleMaterial == null) return;
+
+        var graphic = button.targetGraphic;
+        if (graphic != null)
+            graphic.material = affordable ? null : _disabledGrayscaleMaterial;
     }
 
     /// <summary>현재 레벨의 코스트별 등장 확률을 1~5코스트 순으로 표시한다.</summary>
@@ -381,6 +423,8 @@ public class UIManager : MonoBehaviour
             _unitStorePanel != null && _itemStorePanel != null;
 
         UpdateBattleReadyButtonState();
+        // 버튼을 방금 찾았으므로 첫 골드 이벤트를 기다리지 않고 초기 활성 상태를 잡는다.
+        RefreshShopButtonAffordability();
 
         if (!_canvasShopControlsReady && !_canvasShopControlsWarningLogged)
         {
@@ -502,6 +546,9 @@ public class UIManager : MonoBehaviour
         _gold = gold;
         RefreshCanvasProgressTexts();
     }
+
+    /// <summary>무료 리롤 자원 변동. 표시값은 없고 리롤 버튼 활성 여부만 바뀐다.</summary>
+    private void HandleRerollCountChanged(int _) => RefreshShopButtonAffordability();
 
     /// <summary>레벨 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
     private void HandleLevelChanged(int level)
