@@ -1402,6 +1402,11 @@ public class ItemInventoryHud : MonoBehaviour
                 a.distance.CompareTo(b.distance)
         );
 
+        BattleManager battleManager =
+            GameManager.TryGet(out var gm)
+                ? gm.GetComponent<BattleManager>()
+                : null;
+
         foreach (RaycastHit hit in hits)
         {
             PokemonUnit unit =
@@ -1410,12 +1415,6 @@ public class ItemInventoryHud : MonoBehaviour
 
             if (unit != null)
                 return unit;
-
-            BattleManager battleManager =
-                GameManager.Instance != null
-                    ? GameManager.Instance
-                        .GetComponent<BattleManager>()
-                    : null;
 
             if (battleManager == null)
                 continue;

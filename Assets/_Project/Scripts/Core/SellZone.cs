@@ -76,9 +76,7 @@ public class SellZone : MonoBehaviour, IDropTarget
     private static void SellUnit(PokemonUnit unit)
     {
         BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Board : null;
 
         if (board == null)
         {
@@ -94,9 +92,7 @@ public class SellZone : MonoBehaviour, IDropTarget
     private static void TradeUnit(PokemonUnit unit)
     {
         NetworkManager network =
-            GameManager.Instance != null
-                ? GameManager.Instance.Network
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Network : null;
 
         if (network == null)
         {
@@ -121,9 +117,7 @@ public class SellZone : MonoBehaviour, IDropTarget
             return;
 
         NetworkManager network =
-            GameManager.Instance != null
-                ? GameManager.Instance.Network
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Network : null;
 
         if (network == null)
         {

@@ -1023,10 +1023,9 @@ public class ShopManager : MonoBehaviour
         if (purchaseData == null)
             return false;
 
-        NetworkManager network =
-            GameManager.Instance != null
-                ? GameManager.Instance.Network
-                : null;
+        GameManager.TryGet(out var gm);
+
+        NetworkManager network = gm != null ? gm.Network : null;
 
         bool usesSharedPool =
             network != null &&
@@ -1047,10 +1046,7 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
-        BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+        BoardManager board = gm != null ? gm.Board : null;
 
         if (board == null)
         {
@@ -1312,6 +1308,8 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
+        GameManager.TryGet(out var gm);
+
         PokemonData poolData =
             PokemonDatabase.Instance != null
                 ? PokemonDatabase.Instance.GetById(pokemonId)
@@ -1323,7 +1321,7 @@ public class ShopManager : MonoBehaviour
                 $"[SharedShopPool][QA] Pokemon ID {pokemonId} 조회 실패"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
@@ -1337,16 +1335,13 @@ public class ShopManager : MonoBehaviour
                 $"pokemonId={pokemonId}"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
         }
 
-        BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+        BoardManager board = gm != null ? gm.Board : null;
 
         if (board == null)
         {
@@ -1354,7 +1349,7 @@ public class ShopManager : MonoBehaviour
                 "[SharedShopPool][QA] BoardManager 없음 — 지급 실패"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
@@ -1366,7 +1361,7 @@ public class ShopManager : MonoBehaviour
                 "[SharedShopPool][QA] 벤치가 가득 참 — 지급 취소"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
@@ -1388,7 +1383,7 @@ public class ShopManager : MonoBehaviour
                 $"{poolData.pokemonName}"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
@@ -1403,7 +1398,7 @@ public class ShopManager : MonoBehaviour
                 $"[SharedShopPool][QA] {grantData.pokemonName} 생성 실패"
             );
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             return;
@@ -1418,7 +1413,7 @@ public class ShopManager : MonoBehaviour
         {
             Destroy(unit.gameObject);
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             Debug.LogWarning(
@@ -1458,10 +1453,9 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
-        BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+        GameManager.TryGet(out var gm);
+
+        BoardManager board = gm != null ? gm.Board : null;
 
         if (board == null)
         {
@@ -1481,10 +1475,7 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
-        NetworkManager network =
-            GameManager.Instance != null
-                ? GameManager.Instance.Network
-                : null;
+        NetworkManager network = gm != null ? gm.Network : null;
 
         /*
          * 멀티플레이:
@@ -1682,6 +1673,8 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
+        GameManager.TryGet(out var gm);
+
         // MasterClient가 승인한 ID는 항상 공용 풀의 원본 ID.
         PokemonData poolData =
             PokemonDatabase.Instance != null
@@ -1713,7 +1706,7 @@ public class ShopManager : MonoBehaviour
 
         if (purchaseData == null)
         {
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             ClearShopSlot(slot);
@@ -1721,16 +1714,13 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
-        BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+        BoardManager board = gm != null ? gm.Board : null;
 
         if (board == null ||
             Gold < poolData.cost ||
             !board.HasBenchSpace())
         {
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             ClearShopSlot(slot);
@@ -1747,7 +1737,7 @@ public class ShopManager : MonoBehaviour
 
         if (unit == null)
         {
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             ClearShopSlot(slot);
@@ -1764,7 +1754,7 @@ public class ShopManager : MonoBehaviour
         {
             Destroy(unit.gameObject);
 
-            GameManager.Instance?.Network?
+            gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
 
             ClearShopSlot(slot);

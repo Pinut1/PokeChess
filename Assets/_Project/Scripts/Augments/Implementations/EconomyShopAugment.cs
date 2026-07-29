@@ -18,8 +18,8 @@ public class EconomyShopAugment : Augment
     public override void Apply()
     {
         ShopManager shop =
-            GameManager.Instance != null
-                ? GameManager.Instance.Shop
+            GameManager.TryGet(out var gm)
+                ? gm.Shop
                 : null;
 
         if (shop == null)

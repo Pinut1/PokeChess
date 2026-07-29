@@ -956,9 +956,7 @@ public class ItemManager : MonoBehaviour
     private static bool IsBattlePhaseAndUnitOnBoard(
         PokemonUnit unit)
     {
-        GameManager gm = GameManager.Instance;
-
-        if (gm == null || unit == null)
+        if (!GameManager.TryGet(out var gm) || unit == null)
             return false;
 
         bool isBattlePhase =

@@ -585,9 +585,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         ShopManager shop =
-            GameManager.Instance != null
-                ? GameManager.Instance.Shop
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Shop : null;
 
         int pokemonId = 0;
 
@@ -656,9 +654,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         bool success)
     {
         ShopManager shop =
-            GameManager.Instance != null
-                ? GameManager.Instance.Shop
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Shop : null;
 
         if (shop == null)
         {
@@ -851,9 +847,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Board : null;
 
         if (board == null)
         {
@@ -1098,9 +1092,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Board : null;
 
         if (board == null)
         {
@@ -1304,6 +1296,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _incomingTradeQueue.Dequeue();
         GameEvents.TradeQueueChanged(_incomingTradeQueue.Count);
 
+        GameManager.TryGet(out var gm);
+
         if (isTradeEvolution && evolvedData != null)
         {
             // 수령 유닛은 벤치에만 생성되고 전투에 영향을 주지 않으므로 지연 없이 즉시 진화 처리한다.
@@ -1313,7 +1307,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 receivedUnit
             );
 
-            GameManager.Instance?.Shop?.ActivateTradeEvolution(
+            gm?.Shop?.ActivateTradeEvolution(
                 originalData.id,
                 evolvedData.id
             );
@@ -1340,7 +1334,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
             if (tradeBaseData != null)
             {
-                GameManager.Instance?.Shop?.RegisterEvolvedToBase(
+                gm?.Shop?.RegisterEvolvedToBase(
                     originalData.id,
                     tradeBaseData.id
                 );
@@ -1405,9 +1399,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PokemonUnit receivedUnit)
     {
         BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Board : null;
 
         if (board == null ||
             originalData == null ||
@@ -1540,9 +1532,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
 
         BoardManager board =
-            GameManager.Instance != null
-                ? GameManager.Instance.Board
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Board : null;
 
         PokemonDatabase database = PokemonDatabase.Instance;
 

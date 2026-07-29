@@ -140,9 +140,7 @@ public class RoundPhaseManager : MonoBehaviour
             return;
 
         AugmentManager augment =
-            GameManager.Instance != null
-                ? GameManager.Instance.Augment
-                : null;
+            GameManager.TryGet(out var gm) ? gm.Augment : null;
 
         if (augment != null && augment.HasPendingChoice)
         {
@@ -257,9 +255,7 @@ public class RoundPhaseManager : MonoBehaviour
         {
             // 증강 선택 대기 중에는 쇼핑 타이머를 진행시키지 않는다.
             AugmentManager augment =
-                GameManager.Instance != null
-                    ? GameManager.Instance.Augment
-                    : null;
+                GameManager.TryGet(out var gm) ? gm.Augment : null;
 
             if (augment == null || !augment.HasPendingChoice)
                 elapsed += Time.deltaTime;
@@ -268,9 +264,9 @@ public class RoundPhaseManager : MonoBehaviour
         }
 
         // 타이머 종료 직전에 증강 오퍼가 생겼을 가능성까지 방어한다.
-        while (GameManager.Instance != null
-               && GameManager.Instance.Augment != null
-               && GameManager.Instance.Augment.HasPendingChoice)
+        while (GameManager.TryGet(out var gmPending)
+               && gmPending.Augment != null
+               && gmPending.Augment.HasPendingChoice)
         {
             yield return null;
         }
