@@ -33,6 +33,11 @@ MonoBehaviour:
     lifetime: 0
     spawnMode: 0
     scaleWithRadius: 0
+  - vfxId: VFX_Cheer_L
+    prefab: {fileID: 816935066798950324, guid: cebeabe9ee2fcff41b4d7856f8e70e39, type: 3}
+    lifetime: 0
+    spawnMode: 0
+    scaleWithRadius: 0
   - vfxId: VFX_Dark_L
     prefab: {fileID: 816935066798950324, guid: 573b41c01409d844a8e51647a8d82199, type: 3}
     lifetime: 0

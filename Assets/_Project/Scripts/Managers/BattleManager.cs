@@ -108,7 +108,10 @@ public class BattleManager : MonoBehaviour
         if (_units.Count == 0)
         {
             // 보드에 유닛이 하나도 없음 — 즉시 종료(엣지케이스), 승리로 처리
-            GameEvents.BattleEnd(true);
+            Debug.Log("[Battle] 유닛 없음 → 승리로 처리 (엣지케이스)");
+            Cleanup();
+            BattleVfxPlayer.ClearAllActive();
+            GameEvents.BattleEnd(BattleEndReason.Victory);
             yield break;
         }
 
@@ -122,11 +125,26 @@ public class BattleManager : MonoBehaviour
         var result = new BattleLoopResult();
         yield return SimulateBattleLoop(result);
 
-        // 타임아웃으로 승부가 안 났으면 잔여 HP로 판정.
-        bool allyWon = result.allyWon ?? DetermineWinnerByRemainingHp();
-
         Cleanup();
-        GameEvents.BattleEnd(allyWon);
+        BattleVfxPlayer.ClearAllActive();
+
+        // 타임아웃으로 승부가 안 났으면 잔여 HP로 판정.
+        BattleEndReason reason;
+        if (result.allyWon != null)
+        {
+            // 조기 종료 (한쪽 전멸)
+            reason = result.allyWon.Value ? BattleEndReason.Victory : BattleEndReason.Defeat;
+            Debug.Log($"[Battle] 조기 종료 → {reason} (전멸)");
+        }
+        else
+        {
+            // 타임아웃 후 HP 판정
+            bool allyWon = DetermineWinnerByRemainingHp();
+            reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
+            Debug.Log($"[Battle] 타임아웃 30초 경과 → {reason} (HP 판정)");
+        }
+
+        GameEvents.BattleEnd(reason);
     }
 
     /// <summary>코루틴은 out 파라미터를 못 쓰므로 루프 결과를 담아 전달하는 홀더.</summary>

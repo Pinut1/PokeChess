@@ -17,7 +17,18 @@ public class PokemonData : ScriptableObject
     public float attack;            // 평타 데미지
     public float defense;           // 받는 데미지 경감
     public float attackSpeed;       // 초당 공격 횟수 (atkSpeed)
-    public int   range;             // 사거리 (칸 수)
+
+    /// <summary>
+    /// ⚠️ 사거리가 아니라 <b>진화 단계</b>(1/2/3단계)다. 시트 컬럼명이 range라 오해하기 쉽다.
+    /// 실제 평타 사거리는 attackRange를 쓸 것.
+    /// </summary>
+    public int   range;
+
+    /// <summary>
+    /// 평타 사거리(칸 수). Skill Table의 ATTACK 행을 attackVfxId로 조인해 lineLength를 베이킹한다.
+    /// 규약상 _L(원거리) = 4, _S(근거리) = 1. 임포터 산출물이라 직접 수정하지 말 것.
+    /// </summary>
+    public int   attackRange = 1;
     public float spellPower;        // 스킬 위력 (SPELL/HP_REGEN/SHIELD 등 수치 기반)
     public int   manaCost;          // 스킬 발동 마나 (평타로 충전, 도달 시 발동)
 

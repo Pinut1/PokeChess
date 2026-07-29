@@ -188,7 +188,8 @@ public class PokemonUnit : MonoBehaviour
         data != null
             ? data.attackSpeed
             : 0f;
-    public int   Range        => data != null ? data.range : 0;
+    /// <summary>평타 사거리(칸). data.range는 진화 단계라 여기 쓰면 안 된다.</summary>
+    public int   Range        => data != null ? data.attackRange : 0;
     public int   ManaCost     => data != null ? data.manaCost : 0;
     public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");
 

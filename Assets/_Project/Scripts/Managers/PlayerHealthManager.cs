@@ -39,13 +39,14 @@ public class PlayerHealthManager : MonoBehaviour
         if (net.TeamHealth >= 0) GameEvents.HealthChanged(net.TeamHealth);
     }
 
-    private void HandleBattleEnd(bool isWin)
+    private void HandleBattleEnd(BattleEndReason reason)
     {
         // 내 보드 승패를 팀에 보고(승/패 둘 다). 두 플레이어가 모두 보고하면 MasterClient가
         // 팀 결과(BothWin/Split/BothLose)를 판정하고, 둘 다 패배일 때만 라이프 -1을 권위로 처리한다.
         // 라이프 감소/게임오버 통지는 NetworkManager의 Room 속성 변경 콜백에서 발행된다.
+        bool isWin = reason == BattleEndReason.Victory || reason == BattleEndReason.DecisionVictory;
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
         net?.ReportBattleResult(isWin);
-        Debug.Log($"[Health] 전투 결과 보고: {(isWin ? "승" : "패")}");
+        Debug.Log($"[Health] 전투 결과 보고: {reason} ({(isWin ? "승" : "패")})");
     }
 }

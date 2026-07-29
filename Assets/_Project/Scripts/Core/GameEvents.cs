@@ -27,6 +27,17 @@ public enum SessionEndReason
 }
 
 /// <summary>
+/// 전투 종료 방식 구분. 타임아웃 전/후에 따라 판정 방법이 다르다.
+/// </summary>
+public enum BattleEndReason
+{
+    Victory,           // 30초 타임아웃 전 아군 전멸 또는 적군 전멸 → 아군 승
+    Defeat,            // 30초 타임아웃 전 아군 전멸 → 아군 패
+    DecisionVictory,   // 30초 타임아웃 후 HP 판정 → 아군 승
+    DecisionDefeat     // 30초 타임아웃 후 HP 판정 → 아군 패
+}
+
+/// <summary>
 /// 매니저 간 직접 참조 대신 이벤트로 통신.
 /// 새 이벤트는 반드시 여기에만 추가할 것.
 /// </summary>
@@ -39,8 +50,8 @@ public static class GameEvents
     /// <summary>전투 시작</summary>
     public static event Action OnBattleStart;
 
-    /// <summary>전투 종료(각자 보드 로컬 결과). true = 승, false = 패</summary>
-    public static event Action<bool> OnBattleEnd;
+    /// <summary>전투 종료(종료 방식 구분). Victory/Defeat = 조기 종료, DecisionVictory/DecisionDefeat = 타임아웃 후 판정</summary>
+    public static event Action<BattleEndReason> OnBattleEnd;
 
     /// <summary>
     /// 팀(2인) 단위 라운드 결과 확정. MasterClient가 두 플레이어 승패를 집계해 발행.
@@ -273,7 +284,7 @@ public static class GameEvents
     public static void AugmentSelected(AugmentData data) => OnAugmentSelected?.Invoke(data);
     public static void PartnerAugmentsChanged(string[] augmentNamesEn) => OnPartnerAugmentsChanged?.Invoke(augmentNamesEn);
     public static void BattleStart()           => OnBattleStart?.Invoke();
-    public static void BattleEnd(bool isWin)   => OnBattleEnd?.Invoke(isWin);
+    public static void BattleEnd(BattleEndReason reason) => OnBattleEnd?.Invoke(reason);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();

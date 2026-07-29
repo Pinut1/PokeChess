@@ -2066,7 +2066,7 @@
       "spellPower": 350.0,
       "manaCost": 40,
       "skillId": "DazzlingGleam",
-      "attackVfxId": "Elecric_L",
+      "attackVfxId": "Ethereal_L",
       "synergies": [
         "Mutant"
       ],

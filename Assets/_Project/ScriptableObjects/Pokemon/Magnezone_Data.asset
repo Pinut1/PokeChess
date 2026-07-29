@@ -21,6 +21,7 @@ MonoBehaviour:
   defense: 55
   attackSpeed: 0.55
   range: 2
+  attackRange: 1
   spellPower: 180
   manaCost: 55
   synergies:
@@ -36,7 +37,7 @@ MonoBehaviour:
     targetType: 0
     areaRadius: 0
     lineLength: 1
-    vfxId: VFX_Steel_Tanker_SHIELD
+    vfxId: VFX_Breaker_Tanker_SHIELD
   attackVfxId: Electric_S
   evolvesIntoEn: 
   shopBuyable: 0
