@@ -28,7 +28,7 @@ public static class SynergyConstants
         ["ETHEREAL"] = new[] { 0.20f, 0.40f, 0.60f },        // manaRegen %(충전속도 배수 가산)
         ["GROUND"]   = new[] { 0.15f, 0.30f, 0.50f },        // hp %
         ["BREAKER"]  = new[] { 0.10f, 0.20f, 0.35f },        // attack %
-        ["DRAGON"]   = new[] { 0.15f, 0.30f, 0.50f },        // spellPower %
+        ["DRAGON"]   = new[] { 0.20f, 0.40f },               // spellPower % (2026-07-30: 계열 카운트 전환으로 3티어→2티어)
 
         // special(MUTANT/DARK)·고유 디버프(ICE)·선택형(CHEERLEADER)은 수치 단순가산이 아니라
         // 전용 로직 → 여기 두지 않음(아래 상수만 참고용).

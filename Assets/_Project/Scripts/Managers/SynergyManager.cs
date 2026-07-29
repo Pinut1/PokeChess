@@ -8,7 +8,7 @@ using UnityEngine;
 public class SynergyStatus
 {
     public SynergyData data;
-    public int uniqueCount;       // 보드 위 고유 종 수 (같은 포켓몬 중복은 1로 카운트)
+    public int uniqueCount;       // 보드 위 고유 계열 수 (진화 계열·같은 포켓몬 중복은 1로 카운트)
     public int activeTierIndex;   // -1 = 비활성, 0부터 = data.tiers 인덱스
 
     public bool IsActive => activeTierIndex >= 0;
@@ -89,8 +89,9 @@ public class SynergyManager : MonoBehaviour
         var board = GameManager.Instance.Board;
         if (board == null) return;
 
-        // 시너지 id → 고유 종(pokemon id) 집합
-        var speciesPerSynergy = new Dictionary<int, HashSet<int>>();
+        // 시너지 id → 고유 카운트 키 집합.
+        // 키는 기본적으로 진화 계열 루트(EvolutionFamily), countPerSpecies 시너지만 종 id.
+        var keysPerSynergy = new Dictionary<int, HashSet<int>>();
 
         foreach (var unit in board.GetUnitsOnBoard())
         {
@@ -105,10 +106,16 @@ public class SynergyManager : MonoBehaviour
                     continue;
                 }
 
-                if (!speciesPerSynergy.TryGetValue(synergyData.id, out var species))
-                    speciesPerSynergy[synergyData.id] = species = new HashSet<int>();
+                if (!keysPerSynergy.TryGetValue(synergyData.id, out var keys))
+                    keysPerSynergy[synergyData.id] = keys = new HashSet<int>();
 
-                species.Add(unit.data.id); // 같은 종 중복은 HashSet이 걸러줌
+                // 기본은 진화 계열 단위 — 이상해씨·이상해풀·이상해꽃을 나란히 올려도 1카운트.
+                // 상점에서 한 번 투자한 개체의 성장 과정이지 종류가 늘어난 게 아니기 때문.
+                // 돌연변이(countPerSpecies)만 종 단위 — 이브이 진화체 수집이 시너지 설계 자체라
+                // 계열로 묶으면 최대 1카운트가 되어 성립하지 않는다.
+                keys.Add(synergyData.countPerSpecies
+                    ? unit.data.id
+                    : EvolutionFamily.RootId(unit.data)); // 중복은 HashSet이 걸러줌
             }
         }
 
@@ -117,7 +124,7 @@ public class SynergyManager : MonoBehaviour
         {
             if (data == null) continue;
 
-            int count = speciesPerSynergy.TryGetValue(data.id, out var species) ? species.Count : 0;
+            int count = keysPerSynergy.TryGetValue(data.id, out var keys) ? keys.Count : 0;
             if (count == 0) continue;
 
             _statuses[data.id] = new SynergyStatus

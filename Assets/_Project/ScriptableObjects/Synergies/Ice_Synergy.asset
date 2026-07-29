@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 14
   synergyName: "\uC5BC\uC74C"
   synergyNameEn: Ice
+  countPerSpecies: 0
   tiers:
   - count: 1
     effectDescription: "\uC801 atkSpeed -20% (\uACE0\uC720)"

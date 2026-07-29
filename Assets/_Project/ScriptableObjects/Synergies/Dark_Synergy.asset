@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 15
   synergyName: "\uC545"
   synergyNameEn: Dark
+  countPerSpecies: 0
   tiers:
   - count: 1
     effectDescription: "\uC804\uD22C \uC2DC\uC791 \uD6C4 \uCCAB \uC2A4\uD0AC \uC0AC\uC6A9

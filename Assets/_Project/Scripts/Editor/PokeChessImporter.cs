@@ -85,6 +85,7 @@ public static class PokeChessImporter
         public int id;
         public string name, nameEn;
         public List<SynergyTierEntry> tiers;
+        public bool countPerSpecies;   // 시트 countPerSpecies 컬럼. 키가 없으면 JsonUtility가 false로 둔다.
     }
 
     [Serializable]
@@ -263,6 +264,7 @@ public static class PokeChessImporter
         }
 
         UpdatePokemonDatabase(imported);
+        EvolutionFamily.Invalidate(); // 진화 사슬(evolvesInto)이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         int withSkill = imported.FindAll(p => p.skill != null && p.skill.HasSkill).Count;
@@ -448,6 +450,7 @@ public static class PokeChessImporter
         }
 
         UpdateEvolutionStoneDatabase(imported);
+        EvolutionFamily.Invalidate(); // 돌 진화 매핑이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료 (EvolutionStoneDatabase 갱신)");
@@ -482,10 +485,11 @@ public static class PokeChessImporter
             string path = $"{dir}/{e.nameEn}_Synergy.asset";
             var so = LoadOrCreate<SynergyData>(path);
 
-            so.id            = e.id;
-            so.synergyName   = e.name;
-            so.synergyNameEn = e.nameEn;
-            so.tiers         = new List<SynergyTier>();
+            so.id              = e.id;
+            so.synergyName     = e.name;
+            so.synergyNameEn   = e.nameEn;
+            so.countPerSpecies = e.countPerSpecies;
+            so.tiers           = new List<SynergyTier>();
 
             foreach (var t in e.tiers)
                 so.tiers.Add(new SynergyTier { count = t.count, effectDescription = t.effect });
@@ -685,6 +689,8 @@ public static class PokeChessImporter
                     });
 
         EditorUtility.SetDirty(so);
+        EvolutionFamily.Invalidate(); // 통신교환 매핑이 바뀌었을 수 있음
+
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");
     }
