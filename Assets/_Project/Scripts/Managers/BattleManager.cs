@@ -67,14 +67,36 @@ public class BattleManager : MonoBehaviour
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
 
+    // 준비 단계에 미리 보여주는 적 진영(바닥 + 적 모델). 시각 전용이라 BattleUnit을 만들지 않는다 —
+    // 스탯 스냅샷은 전투 시작 시점 보드/아이템 기준이어야 하므로 미리 만들어 두면 안 된다.
+    private readonly List<GameObject> _previewObjects = new();
+
     /// <summary>전투 중인 유닛 스냅샷(읽기 전용). BalanceCheckHarness가 실측 스탯을 확인하는 용도.</summary>
     public IReadOnlyList<BattleUnit> Units => _units;
 
-    private void OnEnable()  => GameEvents.OnBattleStart += HandleBattleStart;
-    private void OnDisable() => GameEvents.OnBattleStart -= HandleBattleStart;
+    private void OnEnable()
+    {
+        GameEvents.OnBattleStart += HandleBattleStart;
+        GameEvents.OnStageEntered += HandleStageEntered;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnBattleStart -= HandleBattleStart;
+        GameEvents.OnStageEntered -= HandleStageEntered;
+
+        // 컴포넌트가 꺼지면 프리뷰를 지울 주체가 사라지므로 씬에 남지 않게 정리한다.
+        ClearEnemyPreview();
+    }
+
+    /// <summary>라운드 스테이지가 확정되면 준비 단계 동안 이번 라운드 적 진영을 미리 보여준다.</summary>
+    private void HandleStageEntered(StageData stage) => ShowEnemyPreview(stage);
 
     private void HandleBattleStart()
     {
+        // 전투용 실제 적이 같은 자리에 생성되므로 프리뷰를 먼저 걷어낸다(겹쳐 보이는 것 방지).
+        ClearEnemyPreview();
+
         if (_battleCoroutine != null) StopCoroutine(_battleCoroutine);
         _battleCoroutine = StartCoroutine(RunBattle());
     }
@@ -429,6 +451,95 @@ public class BattleManager : MonoBehaviour
         SpawnMirrorBoard(board);
     }
 
+    // ─────────────────────────────────────────
+    // 적 진영 프리뷰 (준비 단계)
+    //
+    // 전투를 시작해야 적이 보이면 덱을 짜는 동안 상대 구성을 알 수 없다.
+    // 스테이지가 확정되는 즉시(OnStageEntered) 바닥과 적 모델만 미리 띄워 두고,
+    // 전투가 시작되면 걷어내 실제 BattleUnit 시각화에 자리를 넘긴다.
+    // 시각 전용이므로 스탯/효과 스냅샷은 기존대로 전투 시작 시점에만 만들어진다.
+    // ─────────────────────────────────────────
+
+    /// <summary>이번 라운드 적 진영(바닥 + 적 모델)을 미리 표시. 기존 프리뷰는 먼저 제거한다.</summary>
+    private void ShowEnemyPreview(StageData stage)
+    {
+        ClearEnemyPreview();
+
+        // 전투 중에 라운드가 바뀌는 경우는 없지만, 있더라도 실제 전투 시각화를 덮지 않도록 막는다.
+        if (_units.Count > 0) return;
+
+        var board = GameManager.TryGet(out var gm) ? gm.Board : null;
+        if (board == null || stage == null) return;
+
+        SpawnPreviewTiles(board);
+        SpawnPreviewEnemies(stage, board);
+    }
+
+    private void SpawnPreviewTiles(BoardManager board)
+    {
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+        {
+            HexCoords enemyCoords = board.GetEnemyBattleCoords(coords);
+
+            GameObject tile = _enemyTilePrefab != null
+                ? CreateEnemyTileFromPrefab()
+                : CreateFallbackEnemyTile();
+
+            tile.name = $"EnemyPreviewTile_{enemyCoords}";
+            tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
+
+            _previewObjects.Add(tile);
+        }
+    }
+
+    /// <summary>SpawnEnemiesFromStage와 같은 좌표 규칙을 쓰되 BattleUnit 없이 모델만 세운다.</summary>
+    private void SpawnPreviewEnemies(StageData stage, BoardManager board)
+    {
+        if (stage.enemies == null) return;
+
+        foreach (var e in stage.enemies)
+        {
+            if (e == null) continue;
+
+            PokemonData data = ResolvePokemon(e.pokemonNameEn);
+            if (data == null) continue; // DUMMY/미해결 슬롯은 건너뜀
+
+            HexCoords coords = board.GetEnemyBattleCoords(new HexCoords(e.q, e.r));
+
+            GameObject visual = data.modelPrefab != null
+                ? Instantiate(data.modelPrefab)
+                : CreateFallbackEnemyVisual();
+
+            visual.name = $"EnemyPreview_{data.pokemonNameEn}_{coords}";
+            // 적은 아군 진영을 바라본다. 전투 시각화(SpawnVisual)와 같은 규칙.
+            visual.transform.Rotate(0f, 180f, 0f, Space.World);
+            visual.transform.position = board.CoordsToWorldPosition(coords) + Vector3.up * 0.5f;
+
+            // 준비 단계에는 유닛 드래그/아이템 장착 레이캐스트가 살아 있다.
+            // 프리뷰는 장식이므로 콜라이더를 꺼서 그 판정에 끼어들지 않게 한다(적 진영 타일과 동일).
+            foreach (var col in visual.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
+
+            _previewObjects.Add(visual);
+        }
+    }
+
+    private static GameObject CreateFallbackEnemyVisual()
+    {
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
+        visual.GetComponent<Renderer>().material.color = Color.red;
+        return visual;
+    }
+
+    private void ClearEnemyPreview()
+    {
+        foreach (var obj in _previewObjects)
+            if (obj != null) Destroy(obj);
+
+        _previewObjects.Clear();
+    }
+
     /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
     private int SpawnEnemiesFromStage(StageData stage, BoardManager board)
     {
@@ -564,22 +675,21 @@ public class BattleManager : MonoBehaviour
         bu.attackVfxId = data.attackVfxId; // 평타 VFX(아군과 동일 규칙)
 
         // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
-        // (아군은 unit.items 리스트, 적은 heldItemEn 단일 문자열을 ItemDatabase로 해석)
-        if (!string.IsNullOrEmpty(e.heldItemEn))
+        // (아군은 unit.items 리스트, 적은 시트 itemSet1/itemSet2를 ItemDatabase로 해석)
+        foreach (var itemNameEn in e.HeldItemsEn)
         {
             var itemDb = ItemDatabase.Instance;
-            ItemData item = itemDb != null ? itemDb.GetByNameEn(e.heldItemEn) : null;
-            if (item != null)
+            ItemData item = itemDb != null ? itemDb.GetByNameEn(itemNameEn) : null;
+            if (item == null)
             {
-                bu.effects.Add(new ItemStatEffect(item));
-                bu.effects.Add(new ItemConditionalEffect(item, this));
-                bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
-                if (item.ccImmune) bu.HasCcImmuneItem = true;
+                Debug.LogWarning($"[Battle] 적 보유 아이템 '{itemNameEn}'을 ItemDatabase에서 못 찾음 — 효과 미적용");
+                continue;
             }
-            else
-            {
-                Debug.LogWarning($"[Battle] 적 보유 아이템 '{e.heldItemEn}'을 ItemDatabase에서 못 찾음 — 효과 미적용");
-            }
+
+            bu.effects.Add(new ItemStatEffect(item));
+            bu.effects.Add(new ItemConditionalEffect(item, this));
+            bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
+            if (item.ccImmune) bu.HasCcImmuneItem = true;
         }
 
         return bu;
@@ -664,13 +774,27 @@ public class BattleManager : MonoBehaviour
 
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
 
-        // 적은 아군 진영을 바라보게 뒤집는다. 보드가 점대칭 미러라 정확히 180도.
-        // rotation을 대입하지 않고 Rotate로 돌려, 모델 프리팹이 가진 기본 자세(기울기 등)를 유지한다.
-        if (bu.team == BattleTeam.Enemy)
-            visual.transform.Rotate(0f, 180f, 0f, Space.World);
+        // 전투 시작 시엔 서로 마주 보게 세워두고, 이후 매 틱 실제 노리는 대상을 향해 돌린다.
+        // 프리팹의 기본 자세는 UnitFacing이 보관해 요(yaw)만 덧씌우므로 기울기가 유지된다.
+        bu.facing = visual.AddComponent<UnitFacing>();
+        bu.facing.Initialize(visual.transform.rotation, InitialFacingDirection(bu));
 
         bu.visual = visual;
         UpdateVisualPosition(bu);
+    }
+
+    /// <summary>
+    /// 전투 시작 시 기본 시선 방향(월드). 아군은 적 진영 쪽, 적은 그 반대.
+    /// 보드 앵커가 회전돼 있어도 맞도록 월드 좌표 변환에서 "행이 커지는 축"을 직접 뽑는다.
+    /// </summary>
+    private Vector3 InitialFacingDirection(BattleUnit bu)
+    {
+        var board = GameManager.Instance.Board;
+        Vector3 here = board.CoordsToWorldPosition(bu.coords);
+        Vector3 nextRow = board.CoordsToWorldPosition(new HexCoords(bu.coords.q, bu.coords.r + 1));
+
+        Vector3 towardEnemyHalf = nextRow - here;
+        return bu.team == BattleTeam.Ally ? towardEnemyHalf : -towardEnemyHalf;
     }
 
     private void UpdateVisualPosition(BattleUnit bu)
@@ -737,6 +861,12 @@ public class BattleManager : MonoBehaviour
             bu.lastTickTarget = target; // 도발 발동 시 "원래 타겟" 스냅샷의 원천
             if (target == null) continue;
 
+            // 노리는 대상을 바라보게 한다. 사거리 안이든 밖이든(=이동 중이든) 대상 기준이라
+            // 원거리 유닛도 제자리에서 표적을 향하고, 도발당하면 도발자 쪽으로 돌아선다.
+            // (?. 는 파괴된 UnityEngine.Object를 못 걸러내므로 != null 로 검사한다)
+            if (bu.facing != null)
+                bu.facing.FaceTowards(GameManager.Instance.Board.CoordsToWorldPosition(target.coords));
+
             int distance = bu.coords.DistanceTo(target.coords);
 
             if (distance <= bu.range)
@@ -769,6 +899,7 @@ public class BattleManager : MonoBehaviour
             {
                 Destroy(bu.visual);
                 bu.visual = null;
+                bu.facing = null; // visual과 함께 파괴됨 — 참조를 남기면 다음 틱에 파괴된 객체를 만진다
             }
         }
     }
@@ -1220,6 +1351,8 @@ public class BattleManager : MonoBehaviour
         {
             if (bu.visual != null)
                 Destroy(bu.visual);
+            bu.visual = null;
+            bu.facing = null;
 
             if (bu.source != null)
             {

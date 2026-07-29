@@ -158,7 +158,9 @@ public static class PokeChessImporter
         public int q;
         public int r;
 
+        // 시트 컬럼 itemSet1 / itemSet2. "NONE"은 빈 칸을 뜻하는 시트 관례라 임포트에서 걸러낸다.
         public string heldItemEn;
+        public string heldItemEn2;
 
         public float statMultiplier;
         public float hpMultiplier;
@@ -993,7 +995,8 @@ public static class PokeChessImporter
                 starLevel = enemy.starLevel <= 0 ? 1 : enemy.starLevel,
                 q = q,
                 r = r,
-                heldItemEn = enemy.heldItemEn ?? "",
+                heldItemEn = NormalizeItemName(enemy.heldItemEn),
+                heldItemEn2 = NormalizeItemName(enemy.heldItemEn2),
                 statMultiplier = NormalizeMultiplier(enemy.statMultiplier),
                 hpMultiplier = NormalizeMultiplier(enemy.hpMultiplier),
                 atkMultiplier = NormalizeMultiplier(enemy.atkMultiplier)
@@ -1256,6 +1259,18 @@ public static class PokeChessImporter
     private static float NormalizeMultiplier(float value)
     {
         return value <= 0f ? 1f : value;
+    }
+
+    /// <summary>
+    /// 시트의 아이템 칸을 정규화. 기획 시트는 빈 칸을 "NONE"으로 적으므로 그대로 두면
+    /// ItemDatabase 조회가 실패해 매 전투마다 경고가 찍힌다. 빈 문자열로 바꿔 "없음"으로 취급한다.
+    /// </summary>
+    private static string NormalizeItemName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+
+        string trimmed = value.Trim();
+        return trimmed.Equals("NONE", StringComparison.OrdinalIgnoreCase) ? "" : trimmed;
     }
 }
 

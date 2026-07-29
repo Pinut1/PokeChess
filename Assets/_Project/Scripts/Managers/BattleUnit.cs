@@ -43,6 +43,7 @@ public class BattleUnit
 
     public float attackCooldown;   // 0 이하가 되면 공격 가능
     public GameObject visual;
+    public UnitFacing facing;      // visual에 붙은 회전 컴포넌트(타겟 바라보기). visual과 생명주기 동일.
 
     // ── 효과 훅(기둥B) — 아이템/스킬/시너지가 전투 틱에 꽂히는 진입점 ──
     public readonly List<ICombatEffect> effects = new();
