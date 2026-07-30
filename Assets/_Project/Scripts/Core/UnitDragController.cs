@@ -46,6 +46,7 @@ public class UnitDragController : MonoBehaviour
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
 
     private AugmentManager _augmentManager;
+    private UIManager _uiManager;
 
     private void Awake()
     {
@@ -53,7 +54,10 @@ public class UnitDragController : MonoBehaviour
             _camera = Camera.main;
 
         if (GameManager.TryGet(out var gm))
+        {
             _augmentManager = gm.GetComponent<AugmentManager>();
+            _uiManager = gm.UI;
+        }
     }
 
     private void OnEnable()
@@ -85,6 +89,13 @@ public class UnitDragController : MonoBehaviour
 
         // 증강 선택창이 펼쳐진 동안 3D 조작 차단
         if (_augmentManager != null && _augmentManager.IsChoiceBlocking)
+        {
+            if (_held != null) CancelDrag();
+            return;
+        }
+
+        // 플러시/마이농 선택창이 펼쳐진 동안 3D 조작 차단(증강과 동일한 방식)
+        if (_uiManager != null && _uiManager.IsPlusleMinunChoiceBlocking)
         {
             if (_held != null) CancelDrag();
             return;

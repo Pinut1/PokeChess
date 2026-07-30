@@ -316,6 +316,30 @@ public class PokemonUnit : MonoBehaviour
     }
 
     /// <summary>
+    /// 필드 전용 폼 전환(플러시와마이농 ↔ 플러시/마이농). data만 안전하게 교체하고
+    /// 성급·장착템·진화의 돌·통신진화 등 나머지 상태는 그대로 유지한다.
+    ///
+    /// notifyChange=false면 GameEvents.UnitChanged를 발행하지 않는다 — BoardManager가
+    /// 배치/벤치 이동 흐름 안에서 자동전환할 때 바로 뒤에 이어지는 기존 UnitPlaced/UnitBenched·
+    /// CheckEvolution 호출과 순서가 꼬이거나 중복 실행되는 걸 막기 위함(호출측 책임).
+    /// </summary>
+    public bool TrySetForm(PokemonData formData, bool notifyChange = true)
+    {
+        if (formData == null) return false;
+        if (data == formData) return false;             // 이미 같은 폼이면 중복 갱신 안 함
+
+        data      = formData;
+        currentHp = Mathf.Min(currentHp, MaxHp);
+
+        RefreshVisual();
+
+        if (notifyChange)
+            GameEvents.UnitChanged(this);
+
+        return true;
+    }
+
+    /// <summary>
     /// 진화의 돌 제거(제거기). data를 베이스 종으로 원복하고 돌을 반환(인벤 복귀는 호출측 몫).
     /// 돌이 없으면 null. 원복으로 같은 종 3마리가 되면 합체돼야 하므로 OnUnitChanged 발화.
     /// </summary>

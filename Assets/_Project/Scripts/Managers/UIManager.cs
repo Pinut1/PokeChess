@@ -162,6 +162,16 @@ public class UIManager : MonoBehaviour
     private bool _isGoldTransferPending;
     private string _goldTransferResult = "";
 
+    // 플러시와마이농 필드 폼 선택 UI 상태.
+    // 신규 유틸 클래스를 만들지 않고 이 클래스 안에서만 쓴다.
+    private const int PLUSLE_MINUN_ID = 310;
+    private const int PLUSLE_ID       = 311;
+    private const int MINUN_ID        = 312;
+
+    private PokemonUnit _pendingFormUnit;
+    private PokemonData _plusleFormData;
+    private PokemonData _minunFormData;
+
     // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
@@ -200,6 +210,10 @@ public class UIManager : MonoBehaviour
         GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
         GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
         GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
+
+        GameEvents.OnUnitPlaced += HandleUnitPlacedForForm;
+        GameEvents.OnUnitBenched += HandleUnitBenchedForForm;
+        GameEvents.OnAllPlayersReady += HandleAllPlayersReadyForForm;
     }
 
     private void OnDisable()
@@ -219,7 +233,12 @@ public class UIManager : MonoBehaviour
         GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
         GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
 
+        GameEvents.OnUnitPlaced -= HandleUnitPlacedForForm;
+        GameEvents.OnUnitBenched -= HandleUnitBenchedForForm;
+        GameEvents.OnAllPlayersReady -= HandleAllPlayersReadyForForm;
+
         _isGoldTransferPending = false;
+        _pendingFormUnit = null;
     }
 
     private void Start()
@@ -230,6 +249,7 @@ public class UIManager : MonoBehaviour
         BindCanvasShopControls();
         BindCanvasProgressTexts();
         RefreshCanvasProgressTexts();
+        CachePlusleMinunFormData();
     }
 
     private void OnDestroy()
@@ -628,6 +648,7 @@ public class UIManager : MonoBehaviour
         // 메서드는 Canvas 미배선 씬을 위한 폴백으로 남겨둔다.
 
         DrawTradeGoldPanel();
+        DrawPlusleMinunFormChoicePanel();
 
         if (_showMatchHistory)
             DrawMatchHistoryWindow();
@@ -711,6 +732,121 @@ public class UIManager : MonoBehaviour
         GameEvents.RequestGoldTransfer(amount);
     }
 
+    // ──────────────────────────────────────────
+    // 플러시와마이농 필드 폼 선택 UI
+    //
+    // 게임 규칙(자동전환/벤치 복원/합체 정규화)은 BoardManager가 담당한다.
+    // 여기서는 선택 대기 유닛 참조 보관, 선택 UI 표시, 선택 결과를
+    // PokemonUnit.TrySetForm에 전달, OnAllPlayersReady 강제선택, 대기 해제만 담당한다.
+    // 매 프레임 GetUnitsOnBoard() 전체를 검색하지 않고 참조 하나만 들고 있는다.
+    // ──────────────────────────────────────────
+
+    /// <summary>PokemonDatabase에서 플러시(311)/마이농(312) 데이터를 1회만 캐시한다.</summary>
+    private void CachePlusleMinunFormData()
+    {
+        if (PokemonDatabase.Instance == null)
+            return;
+
+        _plusleFormData = PokemonDatabase.Instance.GetById(PLUSLE_ID);
+        _minunFormData = PokemonDatabase.Instance.GetById(MINUN_ID);
+    }
+
+    /// <summary>배치된 유닛이 아직 미결정(310)이면 선택 대기 참조로 보관한다.</summary>
+    private void HandleUnitPlacedForForm(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null || unit.data.id != PLUSLE_MINUN_ID)
+            return;
+
+        _pendingFormUnit = unit;
+    }
+
+    /// <summary>선택 대기 중이던 유닛이 벤치로 내려가면(BoardManager가 이미 310으로 복원한 뒤) 대기 상태를 해제한다.</summary>
+    private void HandleUnitBenchedForForm(PokemonUnit unit)
+    {
+        if (unit == _pendingFormUnit)
+            _pendingFormUnit = null;
+    }
+
+    /// <summary>
+    /// 전투 시작 시점까지 미선택이면 보관된 유닛 하나에 한해 무작위로 강제 선택한다.
+    /// AugmentManager.AutoSelectRandom과 동일한 트리거 이벤트(OnAllPlayersReady)·
+    /// 동일한 "대기 중이던 것 하나를 무작위 자동확정" 패턴을 재사용한다.
+    /// 필드 전체를 다시 검색하지 않고 보관된 참조만 사용한다.
+    /// </summary>
+    private void HandleAllPlayersReadyForForm()
+    {
+        if (!IsPendingFormUnitValid())
+        {
+            _pendingFormUnit = null;
+            return;
+        }
+
+        PokemonData picked =
+            UnityEngine.Random.value < 0.5f ? _plusleFormData : _minunFormData;
+
+        if (picked != null)
+            _pendingFormUnit.TrySetForm(picked, notifyChange: true);
+
+        _pendingFormUnit = null;
+    }
+
+    /// <summary>
+    /// 선택 대기 참조가 여전히 유효한 선택 대상인지 검증한다(참조/데이터/현재 종/필드 여부).
+    /// 판매·합체·벤치 이동 등으로 더 이상 선택 대상이 아니게 됐을 수 있어
+    /// 표시 직전·버튼 처리 직전·강제 선택 직전에 매번 다시 확인한다.
+    /// </summary>
+    private bool IsPendingFormUnitValid()
+    {
+        if (_pendingFormUnit == null) return false;
+        if (_pendingFormUnit.data == null) return false;
+        if (_pendingFormUnit.data.id != PLUSLE_MINUN_ID) return false;
+        if (!_pendingFormUnit.isOnBoard) return false;
+
+        return true;
+    }
+
+    /// <summary>선택 UI가 떠 있는 동안 3D 조작(드래그)을 막기 위해 UnitDragController가 참조한다.</summary>
+    public bool IsPlusleMinunChoiceBlocking => IsPendingFormUnitValid();
+
+    private void DrawPlusleMinunFormChoicePanel()
+    {
+        if (!IsPendingFormUnitValid())
+        {
+            _pendingFormUnit = null;
+            return;
+        }
+
+        GUI.depth = -100; // 증강 선택창과 동일하게 다른 OnGUI보다 먼저 입력을 받는다.
+
+        const float width = 260f;
+        const float height = 120f;
+        float x = (Screen.width - width) * 0.5f;
+        float y = (Screen.height - height) * 0.5f;
+        var panelRect = new Rect(x, y, width, height);
+
+        GUI.Box(panelRect, $"{_pendingFormUnit.data.pokemonName}의 형태를 선택하세요");
+
+        var plusleRect = new Rect(x + 15f, y + 40f, 100f, 50f);
+        var minunRect = new Rect(x + 145f, y + 40f, 100f, 50f);
+
+        if (GUI.Button(plusleRect, "플러시"))
+        {
+            if (IsPendingFormUnitValid() && _plusleFormData != null)
+                _pendingFormUnit.TrySetForm(_plusleFormData, notifyChange: true);
+
+            _pendingFormUnit = null;
+            return;
+        }
+
+        if (GUI.Button(minunRect, "마이농"))
+        {
+            if (IsPendingFormUnitValid() && _minunFormData != null)
+                _pendingFormUnit.TrySetForm(_minunFormData, notifyChange: true);
+
+            _pendingFormUnit = null;
+            return;
+        }
+    }
 
     // ──────────────────────────────────────────
     // 플레이어 진행 HUD

@@ -73,6 +73,11 @@ public class BoardManager : MonoBehaviour
     private readonly List<PendingStarEvolution> _pendingStarEvolutions = new();
     private bool _isBattlePhase;
 
+    // 플러시와마이농 필드 전용 폼 전환. 신규 유틸 클래스를 만들지 않고 이 클래스 안에서만 쓴다.
+    private const int PLUSLE_MINUN_ID = 310;
+    private const int PLUSLE_ID       = 311;
+    private const int MINUN_ID        = 312;
+
     private struct PendingStarEvolution
     {
         public int SpeciesId;
@@ -474,6 +479,8 @@ public class BoardManager : MonoBehaviour
 
         if (!placed) return false;
 
+        AutoConvertPlusleMinunOnPlace(unit);
+
         GameEvents.UnitPlaced(unit);
 
         if (unit.data != null)
@@ -548,6 +555,8 @@ public class BoardManager : MonoBehaviour
         _bench[slot] = unit;
         unit.isOnBoard = false;
 
+        RevertPlusleMinunOnBench(unit);
+
         GameEvents.UnitBenched(unit);
 
         if (unit.data != null)
@@ -596,6 +605,8 @@ public class BoardManager : MonoBehaviour
 
         _bench[slot] = unit;
         unit.isOnBoard = false;
+
+        RevertPlusleMinunOnBench(unit);
 
         GameEvents.UnitBenched(unit);
 
@@ -817,6 +828,75 @@ public class BoardManager : MonoBehaviour
         }
     }
 
+    /// <summary>310/311/312를 합체 판정에서 같은 유닛으로 취급하기 위한 정규화. 그 외 ID는 그대로 반환.</summary>
+    private static int NormalizeSpeciesId(int id)
+        => (id == PLUSLE_ID || id == MINUN_ID) ? PLUSLE_MINUN_ID : id;
+
+    /// <summary>
+    /// 벤치의 플러시와마이농(310)을 필드에 올릴 때, 이미 필드에 확정된 폼(플러시/마이농)이
+    /// 있으면 그 폼으로 자동전환한다. 없으면 그대로 두어(310 유지) 선택 대기 상태로 남긴다.
+    ///
+    /// GameEvents.UnitChanged는 발행하지 않는다(notifyChange:false) — 바로 뒤에 이어지는
+    /// UnitPlaced 발행/CheckEvolution 호출과 순서가 꼬이거나 중복 실행되지 않도록
+    /// 호출측인 여기서 억제한다.
+    /// </summary>
+    private void AutoConvertPlusleMinunOnPlace(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null || unit.data.id != PLUSLE_MINUN_ID)
+            return;
+
+        int existingFormId = 0;
+
+        foreach (var kv in _battleField)
+        {
+            PokemonUnit other = kv.Value;
+
+            if (other == null || other == unit || other.data == null || !other.isOnBoard)
+                continue;
+
+            if (other.data.id == PLUSLE_ID || other.data.id == MINUN_ID)
+            {
+                existingFormId = other.data.id;
+                break;
+            }
+        }
+
+        if (existingFormId == 0)
+            return;
+
+        PokemonData formData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(existingFormId)
+                : null;
+
+        if (formData != null)
+            unit.TrySetForm(formData, notifyChange: false);
+    }
+
+    /// <summary>
+    /// 필드의 플러시(311)/마이농(312)을 벤치로 내리면 플러시와마이농(310)으로 복원한다.
+    ///
+    /// GameEvents.UnitChanged는 발행하지 않는다(notifyChange:false) — 바로 뒤에 이어지는
+    /// UnitBenched 발행/CheckEvolution 호출과 순서가 꼬이거나 중복 실행되지 않도록
+    /// 호출측인 여기서 억제한다.
+    /// </summary>
+    private void RevertPlusleMinunOnBench(PokemonUnit unit)
+    {
+        if (unit == null || unit.data == null)
+            return;
+
+        if (unit.data.id != PLUSLE_ID && unit.data.id != MINUN_ID)
+            return;
+
+        PokemonData baseData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(PLUSLE_MINUN_ID)
+                : null;
+
+        if (baseData != null)
+            unit.TrySetForm(baseData, notifyChange: false);
+    }
+
     /// <summary>
     /// 보드와 벤치에서 현재 종 ID와 성급이 같은 유닛 3마리를 찾아
     /// 모두 제거한 뒤 다음 성급 유닛을 신규 생성한다.
@@ -864,7 +944,7 @@ public class BoardManager : MonoBehaviour
             if (unit == null || unit.data == null)
                 continue;
 
-            if (unit.data.id != speciesId ||
+            if (NormalizeSpeciesId(unit.data.id) != NormalizeSpeciesId(speciesId) ||
                 unit.starLevel != starLevel)
             {
                 continue;
@@ -882,7 +962,7 @@ public class BoardManager : MonoBehaviour
             if (unit == null || unit.data == null)
                 continue;
 
-            if (unit.data.id != speciesId ||
+            if (NormalizeSpeciesId(unit.data.id) != NormalizeSpeciesId(speciesId) ||
                 unit.starLevel != starLevel)
             {
                 continue;
