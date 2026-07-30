@@ -2778,7 +2778,7 @@ public class UIManager : MonoBehaviour
 
             GUI.Label(
                 new Rect(0f, y, contentRect.width, 22f),
-                $"사거리: {pokemon.range}칸",
+                $"사거리: {pokemon.attackRange}칸",
                 _labelStyle
             );
 
