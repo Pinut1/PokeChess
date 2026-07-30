@@ -1072,14 +1072,24 @@ public class ShopManager : MonoBehaviour
             return false;
         }
 
-        if (!board.HasBenchSpace())
+        // 일반 배치 가능 여부: 벤치 우선, 벤치 불가면 쇼핑 페이즈에 한해 필드 여유를 확인한다.
+        // 전투 페이즈에는 필드 자동 배치를 시도하지 않는다.
+        bool isShoppingPhase =
+            gm != null && gm.Phase != null &&
+            gm.Phase.CurrentPhase == GamePhase.Shopping;
+
+        bool hasNormalSpace =
+            board.HasBenchSpace() ||
+            (isShoppingPhase && board.HasBoardSpace());
+
+        if (!hasNormalSpace)
         {
-            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
-            return false;
+            return TryBuyByMergeException(
+                slot, poolData, purchaseData, board, gm, network, usesSharedPool);
         }
 
         // 공유 풀 사용 시 MasterClient에게 구매 승인을 먼저 요청.
-        // 실제 생성은 ResolveSharedShopPurchase에서 처리한다.
+        // 실제 생성·배치는 ResolveSharedShopPurchase에서 처리한다(벤치→필드 순서 동일 적용).
         if (usesSharedPool)
         {
             _sharedPurchasePending = true;
@@ -1109,7 +1119,12 @@ public class ShopManager : MonoBehaviour
 
         unit.ResetForBattle();
 
-        if (!board.TryPlaceInBench(unit))
+        bool placed =
+            board.HasBenchSpace()
+                ? board.TryPlaceInBench(unit)
+                : board.TryPlaceUnit(unit);
+
+        if (!placed)
         {
             Destroy(unit.gameObject);
             return false;
@@ -1124,6 +1139,161 @@ public class ShopManager : MonoBehaviour
         Debug.Log(
             $"[Shop] {purchaseData.pokemonName} 구매 " +
             $"(-{poolData.cost}G, 풀 기준 {poolData.pokemonName})"
+        );
+
+        return true;
+    }
+
+    /// <summary>
+    /// 벤치·필드가 모두 찬 상태에서의 구매 합체 예외.
+    /// CheckEvolution과 동일한 후보 수집으로 기존 동일 종·동일 성급 유닛을 최대 2마리까지 모으고
+    /// (전투 페이즈면 벤치만), 부족한 수량(1 또는 2)만큼만 상점에서 구매해 즉시 합체한다.
+    /// requestedSlot을 포함해 필요한 만큼의 상점 슬롯과 그만큼의 골드가 있어야 성립하며,
+    /// 조건을 하나라도 못 채우면 기존과 동일하게 "공간 부족 — 구매 불가"로 실패 처리한다.
+    /// </summary>
+    private bool TryBuyByMergeException(
+        int slot,
+        PokemonData poolData,
+        PokemonData purchaseData,
+        BoardManager board,
+        GameManager gm,
+        NetworkManager network,
+        bool usesSharedPool)
+    {
+        List<PokemonUnit> existingCandidates =
+            board.FindPurchaseMergeCandidates(purchaseData.id, 1);
+
+        if (existingCandidates.Count == 0)
+        {
+            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            return false;
+        }
+
+        int needed = 3 - existingCandidates.Count; // 1 또는 2
+
+        if (!TryFindMergeSlots(slot, poolData.id, needed, out List<int> slots) ||
+            Gold < poolData.cost * needed)
+        {
+            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            return false;
+        }
+
+        // 공유 풀 사용 시 MasterClient에게 필요한 슬롯을 하나의 요청으로 승인받는다.
+        // needed==1이면 기존 단일 슬롯 경로(ResolveSharedShopPurchase)를 그대로 재사용하고,
+        // needed==2면 2슬롯 전체 성공/실패 경로(ResolveSharedShopMergePurchase)를 사용한다.
+        if (usesSharedPool)
+        {
+            _sharedPurchasePending = true;
+
+            bool requested =
+                network != null &&
+                (needed == 1
+                    ? network.RequestSharedShopPurchase(_shopRevision, slot)
+                    : network.RequestSharedShopMergePurchase(_shopRevision, slots[0], slots[1]));
+
+            if (!requested)
+            {
+                _sharedPurchasePending = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        return CommitLocalMergePurchase(
+            slots, poolData, purchaseData, existingCandidates, board);
+    }
+
+    /// <summary>
+    /// requestedSlot을 반드시 포함해 총 needed개의 상점 슬롯을 모은다.
+    /// 추가 슬롯은 _slotPoolPokemonIds(공용 풀 원본 ID) 기준으로 poolSpeciesId와 일치하는
+    /// 슬롯 중 가장 낮은 인덱스부터 고른다. 필요한 개수를 못 채우면 실패하며,
+    /// 동일 종 슬롯이 더 있어도 초과분은 건드리지 않고 상점에 그대로 남긴다.
+    /// </summary>
+    private bool TryFindMergeSlots(int requestedSlot, int poolSpeciesId, int needed, out List<int> slots)
+    {
+        slots = null;
+
+        if (_slotPoolPokemonIds == null ||
+            requestedSlot < 0 || requestedSlot >= _slotPoolPokemonIds.Length ||
+            _slotPoolPokemonIds[requestedSlot] != poolSpeciesId)
+        {
+            return false;
+        }
+
+        var result = new List<int> { requestedSlot };
+
+        for (int i = 0; i < _slotPoolPokemonIds.Length && result.Count < needed; i++)
+        {
+            if (i == requestedSlot)
+                continue;
+
+            if (_slotPoolPokemonIds[i] != poolSpeciesId)
+                continue;
+
+            result.Add(i);
+        }
+
+        if (result.Count != needed)
+            return false;
+
+        slots = result;
+        return true;
+    }
+
+    /// <summary>
+    /// 로컬(비공유) 풀 모드에서 합체 예외 구매를 실제로 반영한다.
+    /// slots 개수(1 또는 2)만큼 신규 유닛을 생성해 기존 후보(existingCandidates)와 함께
+    /// BoardManager.TryMergePurchasedCopies로 넘기고, 성공했을 때만 골드를 차감하고
+    /// 사용한 슬롯만 비운다.
+    /// </summary>
+    private bool CommitLocalMergePurchase(
+        List<int> slots,
+        PokemonData poolData,
+        PokemonData purchaseData,
+        List<PokemonUnit> existingCandidates,
+        BoardManager board)
+    {
+        var newUnits = new List<PokemonUnit>();
+
+        foreach (int _ in slots)
+        {
+            PokemonUnit newUnit = UnitFactory.Create(purchaseData);
+
+            if (newUnit == null)
+            {
+                foreach (PokemonUnit created in newUnits)
+                    Destroy(created.gameObject);
+
+                return false;
+            }
+
+            newUnit.isTradeEvolved = purchaseData != poolData;
+            newUnit.ResetForBattle();
+
+            newUnits.Add(newUnit);
+        }
+
+        if (!board.TryMergePurchasedCopies(existingCandidates, newUnits))
+        {
+            foreach (PokemonUnit created in newUnits)
+                Destroy(created.gameObject);
+
+            return false;
+        }
+
+        int totalCost = poolData.cost * slots.Count;
+
+        AddGold(-totalCost);
+
+        foreach (int usedSlot in slots)
+            ClearShopSlot(usedSlot);
+
+        GameEvents.ShopRerolled();
+
+        Debug.Log(
+            $"[Shop] {purchaseData.pokemonName} 합체 구매 " +
+            $"(-{totalCost}G, 풀 기준 {poolData.pokemonName})"
         );
 
         return true;
@@ -1225,6 +1395,45 @@ public class ShopManager : MonoBehaviour
         pokemonId = reservation.pokemonIds[slot];
         if (pokemonId <= 0) return false;
         reservation.pokemonIds[slot] = 0;
+        return true;
+    }
+
+    /// <summary>
+    /// 구매 합체 예외(2슬롯 동시 구매)를 마스터 권위로 검증·소비한다.
+    /// 두 슬롯 인덱스가 유효하고, 둘 다 아직 예약 상태(pokemonIds &gt; 0)이며,
+    /// 두 슬롯의 원본 종이 서로 같을 때만 두 슬롯을 함께 소비한다.
+    /// 하나라도 실패하면 어느 슬롯도 소비하지 않는다.
+    /// </summary>
+    public bool TryAuthorityPurchaseMergeSharedShop(
+        int actorNumber,
+        int revision,
+        int slotA,
+        int slotB,
+        out int pokemonId)
+    {
+        pokemonId = 0;
+
+        if (slotA == slotB)
+            return false;
+
+        if (!_sharedReservations.TryGetValue(actorNumber, out var reservation) ||
+            reservation.revision != revision || reservation.pokemonIds == null ||
+            slotA < 0 || slotA >= reservation.pokemonIds.Length ||
+            slotB < 0 || slotB >= reservation.pokemonIds.Length)
+        {
+            return false;
+        }
+
+        int idA = reservation.pokemonIds[slotA];
+        int idB = reservation.pokemonIds[slotB];
+
+        if (idA <= 0 || idB <= 0 || idA != idB)
+            return false;
+
+        reservation.pokemonIds[slotA] = 0;
+        reservation.pokemonIds[slotB] = 0;
+
+        pokemonId = idA;
         return true;
     }
 
@@ -1734,9 +1943,7 @@ public class ShopManager : MonoBehaviour
 
         BoardManager board = gm != null ? gm.Board : null;
 
-        if (board == null ||
-            Gold < poolData.cost ||
-            !board.HasBenchSpace())
+        if (board == null || Gold < poolData.cost)
         {
             gm?.Network?
                 .RequestSharedShopReturn(pokemonId, 1);
@@ -1749,6 +1956,14 @@ public class ShopManager : MonoBehaviour
             );
             return;
         }
+
+        // 벤치 우선, 벤치 불가면 쇼핑 페이즈에 한해 필드 여유를 확인한다(로컬 Buy()와 동일 순서).
+        bool isShoppingPhase =
+            gm.Phase != null && gm.Phase.CurrentPhase == GamePhase.Shopping;
+
+        bool hasNormalSpace =
+            board.HasBenchSpace() ||
+            (isShoppingPhase && board.HasBoardSpace());
 
         PokemonUnit unit =
             UnitFactory.Create(purchaseData);
@@ -1768,7 +1983,30 @@ public class ShopManager : MonoBehaviour
 
         unit.ResetForBattle();
 
-        if (!board.TryPlaceInBench(unit))
+        bool committed;
+
+        if (hasNormalSpace)
+        {
+            committed =
+                board.HasBenchSpace()
+                    ? board.TryPlaceInBench(unit)
+                    : board.TryPlaceUnit(unit);
+        }
+        else
+        {
+            // 일반 배치가 불가능하면, 기존 동일 종·성급 유닛이 정확히 2마리일 때만
+            // 이번 승인 건(1마리)을 합쳐 즉시 성급진화시킨다(단일 슬롯 경로 그대로 재사용).
+            List<PokemonUnit> existingCandidates =
+                board.FindPurchaseMergeCandidates(purchaseData.id, 1);
+
+            committed =
+                existingCandidates.Count == 2 &&
+                board.TryMergePurchasedCopies(
+                    existingCandidates,
+                    new List<PokemonUnit> { unit });
+        }
+
+        if (!committed)
         {
             Destroy(unit.gameObject);
 
@@ -1788,6 +2026,145 @@ public class ShopManager : MonoBehaviour
         Debug.Log(
             $"[SharedShopPool] {purchaseData.pokemonName} 구매 확정 " +
             $"(-{poolData.cost}G, 풀 기준 {poolData.pokemonName})"
+        );
+    }
+
+    /// <summary>
+    /// 공유 상점 합체 예외 구매 승인 후 로컬 골드/합체 상태를 커밋한다.
+    /// 신규 유닛 2마리를 생성해 BoardManager.TryMergePurchasedCopies로 즉시 합체하며,
+    /// 성공했을 때만 골드를 차감하고 두 슬롯을 비운다. 실패하면 승인된 카피 2장을 공용 풀에 반환한다.
+    /// </summary>
+    public void ResolveSharedShopMergePurchase(
+        int revision,
+        int slotA,
+        int slotB,
+        int pokemonId,
+        bool success)
+    {
+        _sharedPurchasePending = false;
+
+        if (!success ||
+            revision != _shopRevision ||
+            _slots == null ||
+            slotA < 0 || slotA >= _slots.Length ||
+            slotB < 0 || slotB >= _slots.Length ||
+            _slots[slotA] == null || _slots[slotB] == null)
+        {
+            Debug.LogWarning(
+                "[SharedShopPool] 합체 구매 승인 실패 또는 오래된 응답"
+            );
+            return;
+        }
+
+        GameManager.TryGet(out var gm);
+
+        // MasterClient가 승인한 ID는 항상 공용 풀의 원본 ID.
+        PokemonData poolData =
+            PokemonDatabase.Instance != null
+                ? PokemonDatabase.Instance.GetById(pokemonId)
+                : null;
+
+        if (poolData == null)
+        {
+            Debug.LogWarning(
+                $"[SharedShopPool] 승인된 원본 ID {pokemonId} 조회 실패"
+            );
+            return;
+        }
+
+        // 두 슬롯 모두 예약한 원본과 응답 ID가 같은지 검증.
+        if (_slotPoolPokemonIds == null ||
+            slotA >= _slotPoolPokemonIds.Length ||
+            slotB >= _slotPoolPokemonIds.Length ||
+            _slotPoolPokemonIds[slotA] != pokemonId ||
+            _slotPoolPokemonIds[slotB] != pokemonId)
+        {
+            Debug.LogWarning(
+                "[SharedShopPool] 슬롯 원본 ID와 합체 구매 승인 ID가 일치하지 않음"
+            );
+            return;
+        }
+
+        // 통신진화가 활성화됐다면 실제 생성은 진화체로 한다.
+        PokemonData purchaseData =
+            ResolveTradeEvolutionShopData(poolData);
+
+        if (purchaseData == null)
+        {
+            gm?.Network?.RequestSharedShopReturn(pokemonId, 2);
+
+            ClearShopSlot(slotA);
+            ClearShopSlot(slotB);
+            GameEvents.ShopRerolled();
+            return;
+        }
+
+        BoardManager board = gm != null ? gm.Board : null;
+
+        List<PokemonUnit> existingCandidates =
+            board != null
+                ? board.FindPurchaseMergeCandidates(purchaseData.id, 1)
+                : new List<PokemonUnit>();
+
+        if (board == null ||
+            Gold < poolData.cost * 2 ||
+            existingCandidates.Count != 1)
+        {
+            gm?.Network?.RequestSharedShopReturn(pokemonId, 2);
+
+            ClearShopSlot(slotA);
+            ClearShopSlot(slotB);
+            GameEvents.ShopRerolled();
+
+            Debug.LogWarning(
+                "[SharedShopPool] 합체 구매 커밋 실패 — 예약 카피 풀 반환"
+            );
+            return;
+        }
+
+        PokemonUnit newUnitA = UnitFactory.Create(purchaseData);
+        PokemonUnit newUnitB = UnitFactory.Create(purchaseData);
+
+        if (newUnitA == null || newUnitB == null)
+        {
+            if (newUnitA != null) Destroy(newUnitA.gameObject);
+            if (newUnitB != null) Destroy(newUnitB.gameObject);
+
+            gm?.Network?.RequestSharedShopReturn(pokemonId, 2);
+
+            ClearShopSlot(slotA);
+            ClearShopSlot(slotB);
+            GameEvents.ShopRerolled();
+            return;
+        }
+
+        newUnitA.isTradeEvolved = purchaseData != poolData;
+        newUnitB.isTradeEvolved = purchaseData != poolData;
+        newUnitA.ResetForBattle();
+        newUnitB.ResetForBattle();
+
+        if (!board.TryMergePurchasedCopies(existingCandidates, new List<PokemonUnit> { newUnitA, newUnitB }))
+        {
+            Destroy(newUnitA.gameObject);
+            Destroy(newUnitB.gameObject);
+
+            gm?.Network?.RequestSharedShopReturn(pokemonId, 2);
+
+            ClearShopSlot(slotA);
+            ClearShopSlot(slotB);
+            GameEvents.ShopRerolled();
+            return;
+        }
+
+        AddGold(-(poolData.cost * 2));
+
+        ClearShopSlot(slotA);
+        ClearShopSlot(slotB);
+        GameEvents.ShopRerolled();
+
+        Debug.Log(
+            $"[SharedShopPool] {purchaseData.pokemonName} 합체 구매 확정 " +
+            $"(-{poolData.cost * 2}G, 풀 기준 {poolData.pokemonName})"
         );
     }
 

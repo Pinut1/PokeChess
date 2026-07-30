@@ -120,9 +120,6 @@ public class BoardManager : MonoBehaviour
         // 캡 값은 ShopManager가 레벨별 테이블 기준으로 산정해 전달한다. 여기서는 그대로 반영만.
         _unitCap = Mathf.Max(1, cap);
         Debug.Log($"[BoardManager] 배치 가능 기물 수 변경 반영: {_unitCap}");
-
-        // 레벨업으로 캡이 늘면 롤체처럼 벤치 앞쪽 기물을 빈 보드로 자동 승격한다.
-        AutoPromoteBenchToBoard();
     }
 
     private void HandlePhaseChanged(GamePhase phase)
@@ -131,6 +128,8 @@ public class BoardManager : MonoBehaviour
 
         if (phase == GamePhase.Shopping)
             ApplyPendingStarEvolutions();
+        else if (phase == GamePhase.Battle)
+            AutoPromoteBenchToBoard(); // 전투 시작 시점에만 부족한 만큼 벤치 앞쪽 기물을 빈 보드로 자동 승격한다.
     }
 
     private void AddPendingStarEvolution(int speciesId, int starLevel)
@@ -438,6 +437,18 @@ public class BoardManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     /// <summary>
+    /// TryPlaceInBench(unit)과 대칭되는 좌표 미지정 오버로드. 빈 보드 타일을 자동으로 찾아
+    /// 배치한다(구매 시 벤치가 가득 찼을 때의 필드 폴백 등). 빈 타일이 없으면 실패.
+    /// </summary>
+    public bool TryPlaceUnit(PokemonUnit unit)
+    {
+        if (!TryGetFirstEmptyBoardCoords(out HexCoords coords))
+            return false;
+
+        return TryPlaceUnit(unit, coords);
+    }
+
+    /// <summary>
     /// 타일에서 마우스 드롭이 일어났을 때 콜백으로 호출되거나, 외부(샵 등)에서 직접 호출.
     /// 빈 타일이면 이동/배치, 점유된 타일이면 스왑. 성공 시 true.
     /// </summary>
@@ -646,6 +657,9 @@ public class BoardManager : MonoBehaviour
     /// <summary>벤치에 빈 슬롯이 있는지.</summary>
     public bool HasBenchSpace() => FirstEmptyBenchSlot() >= 0;
 
+    /// <summary>필드(보드)에 유닛 캡 여유가 있는지.</summary>
+    public bool HasBoardSpace() => CountUnitsOnBoard() < _unitCap;
+
     /// <summary>
     /// 유닛을 보드/벤치 어디에 있든 제거하고 판매 처리. 골드 환급은 ShopManager가 OnUnitSold를 받아 처리한다.
     /// UnitSold 발행 시점엔 unit이 아직 유효(Destroy는 프레임 끝에 적용)하므로 구독자가 data를 읽을 수 있음.
@@ -831,6 +845,141 @@ public class BoardManager : MonoBehaviour
     /// <summary>310/311/312를 합체 판정에서 같은 유닛으로 취급하기 위한 정규화. 그 외 ID는 그대로 반환.</summary>
     private static int NormalizeSpeciesId(int id)
         => (id == PLUSLE_ID || id == MINUN_ID) ? PLUSLE_MINUN_ID : id;
+
+    /// <summary>
+    /// 구매 합체 예외(벤치·필드가 모두 찬 상태에서 부족분만 상점에서 구매) 후보를
+    /// 최대 2마리까지 수집한다. CheckEvolution과 동일한 후보 수집 순서·우선순위를 재사용한다.
+    ///   - 쇼핑 페이즈: 필드+벤치 모두 후보, 발견 순서(보드 우선)로 최대 2마리.
+    ///   - 전투 페이즈: 보호 대상은 필드 유닛뿐이므로 필드는 후보에서 제외하고 벤치만 사용.
+    /// 2마리를 채우면 그 이상은 스캔하지 않는다(이번 합체에 쓸 만큼만 확보).
+    /// 반환 리스트가 비어있으면 합체 예외 불가, 1개면 신규 2마리, 2개면 신규 1마리가 필요하다는 뜻.
+    /// 나머지 동일 종 유닛은 후보로 잡히지 않아 그대로 유지된다(새로운 우선순위 추가 없음).
+    /// </summary>
+    public List<PokemonUnit> FindPurchaseMergeCandidates(int speciesId, int starLevel)
+    {
+        var found = new List<PokemonUnit>();
+
+        if (!_isBattlePhase)
+        {
+            foreach (var kv in _battleField)
+            {
+                PokemonUnit unit = kv.Value;
+
+                if (unit == null || unit.data == null)
+                    continue;
+
+                if (NormalizeSpeciesId(unit.data.id) != NormalizeSpeciesId(speciesId) ||
+                    unit.starLevel != starLevel)
+                {
+                    continue;
+                }
+
+                found.Add(unit);
+
+                if (found.Count >= 2)
+                    return found;
+            }
+        }
+
+        for (int slot = 0; slot < _bench.Length; slot++)
+        {
+            PokemonUnit unit = _bench[slot];
+
+            if (unit == null || unit.data == null)
+                continue;
+
+            if (NormalizeSpeciesId(unit.data.id) != NormalizeSpeciesId(speciesId) ||
+                unit.starLevel != starLevel)
+            {
+                continue;
+            }
+
+            found.Add(unit);
+
+            if (found.Count >= 2)
+                return found;
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// 구매 합체 예외 실행. 이미 board/bench에 있는 existingUnits(1~2마리)와 아직 어디에도
+    /// 놓이지 않은 신규 구매 유닛 newUnits(합쳐서 총 3마리가 되는 나머지)를 묶어,
+    /// existingUnits 중 CheckEvolution과 동일한 목적지 우선순위(필드 후보 우선, 그 안에서 무작위)로
+    /// 고른 자리에 상위 성급 유닛을 생성한다. 실제 병합은 CheckEvolution과 공유하는
+    /// ExecuteMerge로 처리한다(대규모 병합 로직 중복 없음).
+    /// existingUnits 중 하나라도 현재 위치를 찾지 못하면(호출 사이 상태가 바뀐 경우) 실패한다.
+    /// </summary>
+    public bool TryMergePurchasedCopies(
+        IReadOnlyList<PokemonUnit> existingUnits,
+        IReadOnlyList<PokemonUnit> newUnits)
+    {
+        if (_isEvolving)
+            return false;
+
+        if (existingUnits == null || newUnits == null)
+            return false;
+
+        if (existingUnits.Count < 1 || existingUnits.Count > 2)
+            return false;
+
+        if (existingUnits.Count + newUnits.Count != 3)
+            return false;
+
+        var realCandidates = new List<EvolutionCandidate>();
+
+        foreach (PokemonUnit existing in existingUnits)
+        {
+            if (existing == null)
+                return false;
+
+            if (TryFindBoardCoords(existing, out HexCoords coords))
+            {
+                realCandidates.Add(new EvolutionCandidate(existing, coords));
+                continue;
+            }
+
+            int slot = FindBenchSlot(existing);
+
+            if (slot < 0)
+                return false;
+
+            realCandidates.Add(new EvolutionCandidate(existing, slot));
+        }
+
+        foreach (PokemonUnit fresh in newUnits)
+        {
+            if (fresh == null)
+                return false;
+        }
+
+        // CheckEvolution과 동일한 목적지 우선순위: 필드 후보가 있으면 그중에서, 없으면
+        // 기존 유닛(실좌표가 있는 후보) 중에서만 무작위로 고른다 — 가상 후보는 목적지가 될 수 없다.
+        var boardDestinations = new List<EvolutionCandidate>();
+
+        foreach (EvolutionCandidate candidate in realCandidates)
+        {
+            if (candidate.IsOnBoard)
+                boardDestinations.Add(candidate);
+        }
+
+        EvolutionCandidate destination =
+            boardDestinations.Count > 0
+                ? boardDestinations[Random.Range(0, boardDestinations.Count)]
+                : realCandidates[Random.Range(0, realCandidates.Count)];
+
+        _isEvolving = true;
+
+        var consumed = new List<EvolutionCandidate>(realCandidates);
+
+        foreach (PokemonUnit fresh in newUnits)
+            consumed.Add(new EvolutionCandidate(fresh, -1));
+
+        ExecuteMerge(consumed, destination, existingUnits[0].starLevel);
+
+        return true;
+    }
 
     /// <summary>
     /// 벤치의 플러시와마이농(310)을 필드에 올릴 때, 이미 필드에 확정된 폼(플러시/마이농)이
@@ -1044,6 +1193,21 @@ public class BoardManager : MonoBehaviour
             destination = consumed[randomIndex];
         }
 
+        ExecuteMerge(consumed, destination, starLevel);
+
+        return true;
+    }
+
+    /// <summary>
+    /// CheckEvolution과 구매 합체 예외(TryMergePurchasedCopies) 양쪽이 공유하는 실제 병합 실행부.
+    /// consumed 3마리(장착물·상태 수거 후 소멸)와 destination(결과 유닛이 들어갈 자리)을
+    /// 그대로 받아 처리한다 — 후보 수집·목적지 선정 로직은 각 호출측 책임이다.
+    /// </summary>
+    private void ExecuteMerge(
+        List<EvolutionCandidate> consumed,
+        EvolutionCandidate destination,
+        int starLevel)
+    {
         PokemonUnit templateUnit = destination.Unit;
         PokemonData currentSpeciesData = templateUnit.data;
 
@@ -1378,8 +1542,6 @@ public class BoardManager : MonoBehaviour
         //  (2) 연쇄가 더 이어졌다면 더 깊은 호출이 최종 결과로 이미 발화했다.
         //      여기서 또 발화하면 3성 달성 시 중간 2성 자리에서도 이펙트가 난다.
         if (!chained) GameEvents.UnitEvolved(evolvedUnit, true);
-
-        return true;
     }
 
     /// <summary>
