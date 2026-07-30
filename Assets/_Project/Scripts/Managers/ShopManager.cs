@@ -162,6 +162,11 @@ public class ShopManager : MonoBehaviour
     /// <summary>진화체 → 기본종(풀 관리 대상) 역매핑. 진화 유닛 판매 시 소비된 기본종 카피를 올바른 풀로 되돌리기 위함.</summary>
     private readonly Dictionary<PokemonData, PokemonData> _evolvedToBase = new();
 
+    // 플러시와마이농 필드 전용 폼 전환. 신규 유틸 클래스를 만들지 않고 이 클래스 안에서만 쓴다.
+    private const int PLUSLE_MINUN_ID = 310;
+    private const int PLUSLE_ID       = 311;
+    private const int MINUN_ID        = 312;
+
     /// <summary>
     /// 현재 플레이어가 통신진화를 해금한 원본 ID → 통신진화체 ID.
     /// 플레이어별 로컬 상태이며, 파트너에게는 적용되지 않는다.
@@ -279,6 +284,11 @@ public class ShopManager : MonoBehaviour
         }
 
         BuildEvolutionToBaseMap();
+
+        // 플러시/마이농은 필드 전용 폼이라 상점 카드 교체(해금)는 필요 없다 —
+        // 판매·공용 풀 반환 정산용 역매핑만 등록(RegisterEvolvedToBase는 이미 있으면 덮어쓰지 않음).
+        RegisterEvolvedToBase(PLUSLE_ID, PLUSLE_MINUN_ID);
+        RegisterEvolvedToBase(MINUN_ID, PLUSLE_MINUN_ID);
 
         _poolInitialized = true;
 
