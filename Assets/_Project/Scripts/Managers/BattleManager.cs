@@ -754,7 +754,9 @@ public class BattleManager : MonoBehaviour
         if (unit.data != null)
         {
             ApplySkill(bu, unit.EffectiveSkill, unit.EffectiveManaCost);
-            bu.attackVfxId = unit.data.attackVfxId; // 평타 VFX는 종 데이터에서(스킬 테이블 아님)
+            // 평타 VFX는 종 데이터에서(스킬 테이블 아님). 영웅증강으로 역할이 바뀌면
+            // 오버라이드가 우선한다(원거리 _L → 근거리 _S).
+            bu.attackVfxId = unit.EffectiveAttackVfxId;
         }
 
         foreach (var item in unit.items)
@@ -1083,6 +1085,8 @@ public class BattleManager : MonoBehaviour
                     break;
                 case SkillEffectType.Taunt:
                     t.ApplyTaunt(caster, tauntDuration);
+                    // 도발 적용 시 각 대상 위치에 이펙트 재생(스킬 시전 이펙트와 별개).
+                    BattleVfxPlayer.PlayTauntHit(t);
                     break;
                 case SkillEffectType.HpRegen:
                     t.ApplyHeal(caster.spellPower);

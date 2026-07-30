@@ -1062,6 +1062,7 @@ public class BoardManager : MonoBehaviour
         PokemonSkillData resultGrantedSkill = null;
         int resultGrantedSkillManaCost = 0;
         bool resultHasHeroBerry = false;
+        string resultAttackVfxIdOverride = null;
 
         foreach (EvolutionCandidate candidate in consumed)
         {
@@ -1120,6 +1121,9 @@ public class BoardManager : MonoBehaviour
 
             if (unit.hasHeroBerry)
                 resultHasHeroBerry = true;
+
+            if (!string.IsNullOrEmpty(unit.attackVfxIdOverride))
+                resultAttackVfxIdOverride = unit.attackVfxIdOverride;
         }
 
         // 신규 생성 전에 기존 3마리의 논리 위치를 전부 비운다.
@@ -1173,6 +1177,8 @@ public class BoardManager : MonoBehaviour
             resultGrantedSkillManaCost;
         evolvedUnit.hasHeroBerry =
             resultHasHeroBerry;
+        evolvedUnit.attackVfxIdOverride =
+            resultAttackVfxIdOverride;
 
         /*
          * 진화의 돌로 만들어진 현재 종이면 종을 추가로 변경하지 않는다.

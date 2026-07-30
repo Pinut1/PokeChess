@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0f74e46f5f36a743b0b3306ab49a5cd, type: 3}
+  m_Name: AugmentIconDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::AugmentIconDatabase
+  entries:
+  - augmentId: 0
+    icon: {fileID: 607380422, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}
+  - augmentId: 1
+    icon: {fileID: 621092829, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}
+  - augmentId: 2
+    icon: {fileID: -1870430477, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}
+  - augmentId: 3
+    icon: {fileID: 990603499, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}
+  - augmentId: 4
+    icon: {fileID: 1778355819, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}
+  - augmentId: 5
+    icon: {fileID: -1759898771, guid: 028b582ba7c787c4bb8e51d9a1d4219e, type: 3}

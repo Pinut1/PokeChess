@@ -70,6 +70,12 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>파치리스 영웅증강 v2 자뭉열매: true면 전투당 1회 HP 45% 미만 시 언타겟+회복(BattleUnit이 스냅샷).</summary>
     public bool hasHeroBerry;
 
+    /// <summary>
+    /// 영웅증강: 비어있지 않으면 평타 VFX를 이 값으로 대체(원거리 종이 탱커로 바뀔 때 근접 이펙트로 교체).
+    /// 접미 "_L"이 투사체 판정이므로(BattleVfxPlayer.IsRangedVfx) 역할이 바뀌면 이것도 같이 바꿔야 연출이 맞는다.
+    /// </summary>
+    public string attackVfxIdOverride;
+
     /// <summary>주입 스킬이 유효한지(파치리스 도발 등).</summary>
     public bool HasGrantedSkill => grantedSkill != null && grantedSkill.HasSkill;
 
@@ -78,6 +84,11 @@ public class PokemonUnit : MonoBehaviour
 
     /// <summary>EffectiveSkill에 대응하는 마나비용.</summary>
     public int EffectiveManaCost => HasGrantedSkill && grantedSkillManaCost > 0 ? grantedSkillManaCost : ManaCost;
+
+    /// <summary>전투가 실제로 재생할 평타 VFX(오버라이드 우선, 없으면 원본 종 값).</summary>
+    public string EffectiveAttackVfxId =>
+        !string.IsNullOrEmpty(attackVfxIdOverride) ? attackVfxIdOverride
+                                                  : (data != null ? data.attackVfxId : "");
 
     /// <summary>
     /// 이브이 영웅증강 적용(진화잠금 + 스탯 배수 + 역할 전환). Augment Table v2: ×1.4, 역할 → 마법사.
@@ -92,14 +103,16 @@ public class PokemonUnit : MonoBehaviour
         GameEvents.UnitChanged(this);
     }
 
-    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입 + 스탯 배수). Augment Table v2: ×1.4.</summary>
-    public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0, float statMultiplier = 1.4f)
+    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입 + 스탯 배수 + 평타 VFX 교체). Augment Table v2: ×1.4.</summary>
+    public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0,
+                                          float statMultiplier = 1.4f, string attackVfxId = null)
     {
         roleOverride          = newRole;
         grantedSkill          = tauntSkill;
         grantedSkillManaCost  = manaCost;
         heroStatMultiplier    = statMultiplier;
         hasHeroBerry          = true; // v2 자뭉열매(전투당 1회 언타겟+회복)
+        if (!string.IsNullOrEmpty(attackVfxId)) attackVfxIdOverride = attackVfxId;
         currentHp             = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }

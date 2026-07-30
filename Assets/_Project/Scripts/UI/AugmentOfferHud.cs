@@ -11,6 +11,8 @@ using UnityEngine;
 /// </summary>
 public class AugmentOfferHud : MonoBehaviour
 {
+    [SerializeField] private bool _enableDebugUI = false; // Inspector에서 토글 가능 (정식 UI 개발 중에만 사용)
+
     private IReadOnlyList<AugmentData> _offer;
 
     // 모달 바깥 클릭 흡수용 투명 스타일. 병합 과정에서 선언이 유실돼 다시 둔다.
@@ -38,6 +40,9 @@ public class AugmentOfferHud : MonoBehaviour
 
     private void OnGUI()
     {
+        // Inspector 체크박스로 디버그 UI 활성화/비활성화 가능 (정식 UI 개발 중에만 사용)
+        if (!_enableDebugUI) return;
+
         if (_offer == null || _offer.Count == 0) return;
 
         var augment = GameManager.TryGet(out var gm) ? gm.Augment : null;

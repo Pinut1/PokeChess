@@ -39,6 +39,7 @@ public static class AugmentCatalog
         data.augmentNameEn = nameEn;
         data.tier          = AugmentTier.Gold; // 전체 SUPERBALL(=Gold) 고정 — v2 확정
         data.description   = description;
+        data.icon          = AugmentIconDatabase.Find(augmentId); // 미지정이면 null(선택 데이터)
         return data;
     }
 }
