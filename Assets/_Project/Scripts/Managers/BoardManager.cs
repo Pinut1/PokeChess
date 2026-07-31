@@ -70,6 +70,12 @@ public class BoardManager : MonoBehaviour
     // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
     private int _unitCap = 1;
 
+    /// <summary>현재 레벨 기준 보드 배치 상한. 표시용(BoardCapacityLabel 등) 읽기 전용 노출.</summary>
+    public int UnitCap => _unitCap;
+
+    /// <summary>지금 보드 위에 올라간 유닛 수. 표시용 읽기 전용 노출.</summary>
+    public int BoardUnitCount => CountUnitsOnBoard();
+
     private readonly List<PendingStarEvolution> _pendingStarEvolutions = new();
     private bool _isBattlePhase;
 
