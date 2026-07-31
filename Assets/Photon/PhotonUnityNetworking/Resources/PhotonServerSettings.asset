@@ -63,6 +63,8 @@ MonoBehaviour:
   - RPC_RestartGame
   - RPC_TradeQueueAck
   - RPC_TradeQueueReceive
+  - RPC_RequestSharedShopMergePurchase
+  - RPC_ResolveSharedShopMergePurchase
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

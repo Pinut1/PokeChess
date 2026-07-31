@@ -31,8 +31,11 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private BenchTile _benchTilePrefab;
 
     [Header("Bench Layout")]
-    [Tooltip("벤치 슬롯 수입니다.")]
+    [Tooltip("벤치 슬롯 수입니다. 바닥 헥스 타일은 이 수만큼 생성됩니다.")]
     [SerializeField] private int _benchSize = 9;
+    [Tooltip("그중 실제로 유닛을 놓을 수 있는 슬롯 수입니다(앞에서부터). " +
+             "나머지 뒤쪽 칸은 타일만 남고 구매·교환·드래그 어느 경로로도 채워지지 않습니다.")]
+    [SerializeField] private int _usableBenchSize = 8;
     [SerializeField] private float _benchXOffset = 0f;
     [SerializeField] private float _benchYOffset = 0f;
     [SerializeField] private float _benchZOffset = -4f;
@@ -92,6 +95,10 @@ public class BoardManager : MonoBehaviour
 
     private void Awake()
     {
+        // OnValidate는 에디터에서만 도는 데다, 씬을 저장한 뒤 _benchSize를 줄인 경우엔
+        // 사용 가능 슬롯이 배열 밖을 가리킬 수 있어 런타임에서도 한 번 맞춘다.
+        _usableBenchSize = Mathf.Clamp(_usableBenchSize, 1, Mathf.Max(1, _benchSize));
+
         _bench = new PokemonUnit[_benchSize];
 
         if (_itemManager == null)
@@ -104,6 +111,7 @@ public class BoardManager : MonoBehaviour
         _cols = Mathf.Max(1, _cols);
         _rows = Mathf.Max(1, _rows);
         _benchSize = Mathf.Max(1, _benchSize);
+        _usableBenchSize = Mathf.Clamp(_usableBenchSize, 1, _benchSize);
         _benchSpacingMultiplier = Mathf.Max(0.01f, _benchSpacingMultiplier);
     }
 
@@ -344,7 +352,12 @@ public class BoardManager : MonoBehaviour
 
             tile.transform.localPosition = localPos;
             int slot = i; // 클로저 캡처 주의 — 루프 변수 복사
-            tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), $"BenchTile_{slot}");
+
+            // 예약 슬롯도 바닥 타일은 그대로 만든다(줄이 비어 보이지 않게). 이름을 구분해
+            // 하이어라키에서 다른 용도로 쓸 칸을 바로 찾을 수 있게 한다.
+            // 드롭 콜백은 그대로 걸어두고 TryDropOnBench가 거부한다 — 판정을 한 곳에 모으기 위함.
+            string tileName = IsUsableBenchSlot(slot) ? $"BenchTile_{slot}" : $"BenchTile_{slot}_Reserved";
+            tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), tileName);
             _benchTiles[i] = tile;
 
             if (!warnedMissingCollider && tile.GetComponentInChildren<Collider>() == null)
@@ -562,7 +575,7 @@ public class BoardManager : MonoBehaviour
     public bool TryPlaceInBench(PokemonUnit unit, int slot)
     {
         if (unit == null) return false;
-        if (slot < 0 || slot >= _benchSize) return false;
+        if (!IsUsableBenchSlot(slot)) return false; // 예약 슬롯에는 놓을 수 없다
 
         PokemonUnit occupant = _bench[slot];
         if (occupant == unit) return true;        // 같은 자리 멱등
@@ -595,7 +608,7 @@ public class BoardManager : MonoBehaviour
     public bool TryDropOnBench(PokemonUnit unit, int slot)
     {
         if (unit == null) return false;
-        if (slot < 0 || slot >= _benchSize) return false;
+        if (!IsUsableBenchSlot(slot)) return false; // 예약 슬롯에 드롭하면 원위치로 돌아간다
 
         PokemonUnit occupant = _bench[slot];
         if (occupant == unit) return true;            // 같은 자리 멱등
@@ -762,10 +775,21 @@ public class BoardManager : MonoBehaviour
 
     private int FirstEmptyBenchSlot()
     {
-        for (int i = 0; i < _bench.Length; i++)
+        // 예약 슬롯(뒤쪽 _benchSize - _usableBenchSize칸)은 건너뛴다 —
+        // 구매·증강 즉시지급·통신교환 수령이 전부 이 메서드를 통해 자리를 찾으므로
+        // 여기서 한 번만 막으면 "빈 공간"으로 쓰이는 경로가 전부 닫힌다.
+        int limit = UsableBenchSize;
+        for (int i = 0; i < limit; i++)
             if (_bench[i] == null) return i;
         return -1;
     }
+
+    /// <summary>유닛을 놓을 수 있는 슬롯 수. 배열 길이를 넘지 않도록 보정해 반환한다.</summary>
+    public int UsableBenchSize =>
+        _bench != null ? Mathf.Min(_usableBenchSize, _bench.Length) : _usableBenchSize;
+
+    /// <summary>해당 슬롯이 유닛을 놓을 수 있는 칸인지. 예약 슬롯이면 false.</summary>
+    public bool IsUsableBenchSlot(int slot) => slot >= 0 && slot < UsableBenchSize;
 
     /// <summary>벤치에서 해당 유닛 참조를 찾아 비움(있을 때만).</summary>
     private void RemoveFromBenchByRef(PokemonUnit unit)
