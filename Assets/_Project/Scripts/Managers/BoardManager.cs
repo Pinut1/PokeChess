@@ -70,6 +70,12 @@ public class BoardManager : MonoBehaviour
     // BoardManager는 레벨에서 캡을 재유도하지 않고 GameEvents.OnUnitCapChanged로 받은 값을 그대로 사용한다.
     private int _unitCap = 1;
 
+    /// <summary>현재 레벨 기준 보드 배치 상한. 표시용(BoardCapacityLabel 등) 읽기 전용 노출.</summary>
+    public int UnitCap => _unitCap;
+
+    /// <summary>지금 보드 위에 올라간 유닛 수. 표시용 읽기 전용 노출.</summary>
+    public int BoardUnitCount => CountUnitsOnBoard();
+
     private readonly List<PendingStarEvolution> _pendingStarEvolutions = new();
     private bool _isBattlePhase;
 
@@ -1226,6 +1232,7 @@ public class BoardManager : MonoBehaviour
         PokemonSkillData resultGrantedSkill = null;
         int resultGrantedSkillManaCost = 0;
         bool resultHasHeroBerry = false;
+        string resultAttackVfxIdOverride = null;
 
         foreach (EvolutionCandidate candidate in consumed)
         {
@@ -1284,6 +1291,9 @@ public class BoardManager : MonoBehaviour
 
             if (unit.hasHeroBerry)
                 resultHasHeroBerry = true;
+
+            if (!string.IsNullOrEmpty(unit.attackVfxIdOverride))
+                resultAttackVfxIdOverride = unit.attackVfxIdOverride;
         }
 
         // 신규 생성 전에 기존 3마리의 논리 위치를 전부 비운다.
@@ -1337,6 +1347,8 @@ public class BoardManager : MonoBehaviour
             resultGrantedSkillManaCost;
         evolvedUnit.hasHeroBerry =
             resultHasHeroBerry;
+        evolvedUnit.attackVfxIdOverride =
+            resultAttackVfxIdOverride;
 
         /*
          * 진화의 돌로 만들어진 현재 종이면 종을 추가로 변경하지 않는다.

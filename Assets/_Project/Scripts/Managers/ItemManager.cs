@@ -50,13 +50,13 @@ public class ItemManager : MonoBehaviour
     ///
     /// 일반 장비와 진화의 돌은 각각 한 칸을 사용한다.
     /// 제거기는 보유 중이면 한 칸을 사용한다.
-    /// 재조합기는 수량과 관계없이 한 개 이상 보유하면 한 칸을 사용한다.
+    /// 재조합기는 개당 한 칸을 사용한다(중첩하지 않고 낱개로 놓인다).
     /// </summary>
     public int InventoryCount =>
         _items.Count
         + _stones.Count
         + (_hasRemover ? 1 : 0)
-        + (ReforgerCount > 0 ? 1 : 0);
+        + ReforgerCount;
 
     /// <summary>현재 인벤토리의 남은 빈칸 수.</summary>
     public int AvailableInventorySpace =>
@@ -139,20 +139,18 @@ public class ItemManager : MonoBehaviour
     /// <summary>
     /// 재조합기를 획득한다.
     ///
-    /// 재조합기를 이미 보유 중이면 기존 슬롯에 수량만 중첩되므로
-    /// 인벤토리가 가득 차 있어도 추가할 수 있다.
-    ///
-    /// 보유량이 0인 상태에서 처음 획득할 때만
-    /// 인벤토리 빈칸 한 칸이 필요하다.
+    /// 낱개로 칸을 차지하므로(중첩 없음) 개수만큼 빈칸이 필요하다.
+    /// 빈칸이 모자라면 들어갈 수 있는 만큼만 받고 나머지는 유실된다
+    /// (유닛 보상이 벤치 만석에서 유실되는 것과 같은 규칙).
     /// </summary>
     public bool AddReforger(int amount)
     {
         if (amount <= 0)
             return false;
 
-        bool needsNewSlot = ReforgerCount <= 0;
+        int space = AvailableInventorySpace;
 
-        if (needsNewSlot && !HasInventorySpace)
+        if (space <= 0)
         {
             Debug.LogWarning(
                 $"[재조합기] 인벤토리 가득 " +
@@ -161,11 +159,20 @@ public class ItemManager : MonoBehaviour
             return false;
         }
 
-        ReforgerCount += amount;
+        int granted = Mathf.Min(amount, space);
+
+        ReforgerCount += granted;
         GameEvents.InventoryChanged();
 
+        if (granted < amount)
+        {
+            Debug.LogWarning(
+                $"[재조합기] 빈칸 부족 — {amount}개 중 {granted}개만 획득 " +
+                $"({amount - granted}개 유실)");
+        }
+
         Debug.Log(
-            $"[재조합기] +{amount} / " +
+            $"[재조합기] +{granted} / " +
             $"보유 {ReforgerCount}개 / " +
             $"인벤토리 {InventoryCount}/{MAX_INVENTORY_SIZE}");
 
@@ -347,18 +354,6 @@ public class ItemManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 기획에서는 별도 소모품을 사용하지 않는다.
-    /// 기존 호출부 컴파일 호환을 위해 메서드만 유지한다.
-    /// </summary>
-    public bool AddConsumable(ConsumableData consumable)
-    {
-        Debug.LogWarning(
-            "[소모품] 현재 기획에서는 별도 소모품을 사용하지 않습니다.");
-
-        return false;
-    }
-
-    /// <summary>
     /// 영문명으로 일반 장비를 조회해 획득한다.
     /// </summary>
     public bool AddItemByNameEn(string nameEn)
@@ -402,6 +397,19 @@ public class ItemManager : MonoBehaviour
         }
 
         return AddStone(stone);
+    }
+
+    /// <summary>
+    /// 현재 기획에서는 별도 소모품을 사용하지 않는다.
+    /// 제거기/재조합기는 _hasRemover/ReforgerCount로 따로 관리한다.
+    /// 기존 호출부 컴파일 호환을 위해 메서드만 유지한다.
+    /// </summary>
+    public bool AddConsumable(ConsumableData consumable)
+    {
+        Debug.LogWarning(
+            "[소모품] 현재 기획에서는 별도 소모품을 사용하지 않습니다.");
+
+        return false;
     }
 
     /// <summary>

@@ -39,6 +39,15 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     [Tooltip("이 카드를 사면 2성이 되는지 여부를 표시. 현재 BoardManager에 보유 개수 조회 API가 없어 항상 꺼진 채로 둠(TODO).")]
     [SerializeField] private GameObject _choiceCardFrame;    // Choice_CardFrame
 
+    [Header("보유 중 강조 (CardFrame_Effect)")]
+    [Tooltip("필드·벤치에 같은 종을 이미 갖고 있을 때만 켜져 은은하게 페이드되는 테두리 이펙트.")]
+    [SerializeField] private Image _cardFrameEffect;
+    [Tooltip("페이드 인/아웃 속도. 1.1이면 약 0.9초에 한 번 왕복한다.")]
+    [SerializeField] private float _frameEffectPulseSpeed = 1.1f;
+    [Tooltip("최대 알파(0~255). 은은하게 깔리도록 낮게 잡는다.")]
+    [Range(0f, 255f)]
+    [SerializeField] private float _frameEffectMaxAlpha = 80f;
+
     [Header("구매완료 오버레이 (미배치 시 비워둬도 동작)")]
     [SerializeField] private GameObject _soldOverlay;
 
@@ -60,6 +69,29 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     public event Action Clicked;
 
     private void HandleClicked() => Clicked?.Invoke();
+
+    /// <summary>
+    /// 보유 중 강조를 켜고 끈다. 보유 판정은 보드를 아는 컨트롤러가 하고,
+    /// 이 컴포넌트는 켜진 동안의 연출만 맡는다(카드는 매니저를 직접 참조하지 않는다).
+    /// </summary>
+    public void SetOwned(bool owned)
+    {
+        if (_cardFrameEffect == null) return;
+
+        _cardFrameEffect.gameObject.SetActive(owned);
+    }
+
+    private void Update()
+    {
+        if (_cardFrameEffect == null || !_cardFrameEffect.gameObject.activeSelf) return;
+
+        // 0 → 최대 → 0 왕복. 카드마다 Time.time을 공유하므로 5장이 같은 위상으로 숨쉰다.
+        float t = Mathf.PingPong(Time.time * _frameEffectPulseSpeed, 1f);
+
+        Color color = _cardFrameEffect.color;
+        color.a = t * (_frameEffectMaxAlpha / 255f);
+        _cardFrameEffect.color = color;
+    }
 
     public void Bind(PokemonData data)
     {
@@ -142,6 +174,7 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
         _synergySlot1.SetActive(false);
         _synergySlot2.SetActive(false);
         _choiceCardFrame.SetActive(false);
+        SetOwned(false); // 빈 슬롯에 강조가 남지 않도록
         if (_soldOverlay != null) _soldOverlay.SetActive(true);
     }
 

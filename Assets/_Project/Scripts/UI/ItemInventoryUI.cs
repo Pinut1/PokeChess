@@ -18,6 +18,14 @@ public class ItemInventoryUI : MonoBehaviour
     [Tooltip("드래그 중 아이콘을 잠시 옮겨 담을 부모. 보통 최상위 Canvas — 다른 UI에 가려지지 않게 한다.")]
     [SerializeField] private RectTransform _dragLayer;
 
+    [Header("도구 아이콘")]
+    // 제거기/재조합기는 ItemManager가 ConsumableData 리스트가 아니라 bool/int로 들고 있다
+    // (_hasRemover / ReforgerCount). 그래서 칸에 그릴 아이콘만 에셋에서 직접 받는다.
+    [Tooltip("제거기 표시용 ConsumableData(Golden Remover_Consumable). 아이콘만 사용한다.")]
+    [SerializeField] private ConsumableData _removerData;
+    [Tooltip("재조합기 표시용 ConsumableData(Reforger_Consumable). 아이콘만 사용한다.")]
+    [SerializeField] private ConsumableData _reforgerData;
+
     [Header("드롭 판정")]
     [Tooltip("비우면 Camera.main을 쓴다.")]
     [SerializeField] private Camera _camera;
@@ -51,13 +59,17 @@ public class ItemInventoryUI : MonoBehaviour
 
     private void OnDisable() => GameEvents.OnInventoryChanged -= Refresh;
 
-    /// <summary>보유 목록을 앞칸부터 채우고 나머지는 비운다. 아이템 → 진화의 돌 순서.</summary>
+    /// <summary>
+    /// 보유 목록을 앞칸부터 채우고 나머지는 비운다. 아이템 → 진화의 돌 → 도구(제거기·재조합기) 순서.
+    /// 도구 칸 수는 ItemManager.InventoryCount의 계산과 같다 — 재조합기는 수량과 무관하게 한 칸.
+    /// </summary>
     private void Refresh()
     {
         if (!GameManager.TryGet(out var gm) || gm.Item == null) return;
 
-        var items = gm.Item.Items;
-        var stones = gm.Item.Stones;
+        var item = gm.Item;
+        var items = item.Items;
+        var stones = item.Stones;
         int cursor = 0;
 
         for (int i = 0; i < items.Count && cursor < _slots.Length; i++, cursor++)
@@ -65,6 +77,14 @@ public class ItemInventoryUI : MonoBehaviour
 
         for (int i = 0; i < stones.Count && cursor < _slots.Length; i++, cursor++)
             _slots[cursor]?.Bind(stones[i]);
+
+        if (item.HasRemover && _removerData != null && cursor < _slots.Length)
+            _slots[cursor++]?.Bind(_removerData);
+
+        // 재조합기는 중첩하지 않고 개수만큼 낱개로 놓인다(InventoryCount도 같은 기준).
+        if (_reforgerData != null)
+            for (int i = 0; i < item.ReforgerCount && cursor < _slots.Length; i++, cursor++)
+                _slots[cursor]?.Bind(_reforgerData);
 
         for (; cursor < _slots.Length; cursor++)
             _slots[cursor]?.Clear();
@@ -85,6 +105,11 @@ public class ItemInventoryUI : MonoBehaviour
 
         var unit = RaycastUnit(eventData.position);
         if (unit == null) return;
+
+        // 도구는 장착이 아니라 "사용"이라 전용 경로로 보낸다(IMGUI 프로토타입과 동일 규칙).
+        // 어느 도구인지는 인스펙터에 꽂아둔 표시용 데이터와 같은 에셋인지로 가른다.
+        if (slot.CurrentData == _removerData)  { gm.Item.UseRemover(unit);  return; }
+        if (slot.CurrentData == _reforgerData) { gm.Item.UseReforger(unit); return; }
 
         gm.Item.EquipToUnit(slot.CurrentData, unit);
     }

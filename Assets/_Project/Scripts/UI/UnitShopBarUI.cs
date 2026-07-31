@@ -15,12 +15,21 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
     {
         GameEvents.OnShopRerolled += Refresh;
         GameEvents.OnGoldChanged += HandleGoldChanged;
+
+        // 보유 중 강조는 필드·벤치 구성이 바뀔 때마다 다시 판정해야 한다.
+        GameEvents.OnUnitPlaced  += HandleRosterChanged;
+        GameEvents.OnUnitBenched += HandleRosterChanged;
+        GameEvents.OnUnitSold    += HandleRosterChanged;
     }
 
     protected override void Unsubscribe()
     {
         GameEvents.OnShopRerolled -= Refresh;
         GameEvents.OnGoldChanged -= HandleGoldChanged;
+
+        GameEvents.OnUnitPlaced  -= HandleRosterChanged;
+        GameEvents.OnUnitBenched -= HandleRosterChanged;
+        GameEvents.OnUnitSold    -= HandleRosterChanged;
     }
 
     protected override IReadOnlyList<PokemonData> GetSlots()
@@ -35,12 +44,45 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         shop?.Buy(slotIndex);
     }
 
-    /// <summary>바인딩 직후 호출 — 카드 내용은 베이스가 채우고, 살 수 있는지는 여기서 판정한다.</summary>
+    /// <summary>바인딩 직후 호출 — 카드 내용은 베이스가 채우고, 살 수 있는지/보유 중인지는 여기서 판정한다.</summary>
     protected override void AfterBind(ShopCardUI card, PokemonData data)
     {
-        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        bool hasGm = GameManager.TryGet(out var gm);
+
+        var shop = hasGm ? gm.Shop : null;
         card.SetAffordable(shop != null && shop.Gold >= data.cost);
+
+        card.SetOwned(OwnsSpecies(hasGm ? gm.Board : null, data));
+    }
+
+    /// <summary>
+    /// 필드·벤치에 같은 진화 계열을 한 마리라도 갖고 있는지.
+    /// 계열 루트(EvolutionFamily.RootId) 기준이라 합체로 종이 바뀐 유닛도 같은 계열로 잡힌다
+    /// — 이상해풀을 들고 있으면 상점의 이상해씨도 강조된다(SynergyManager의 카운트 기준과 동일).
+    /// </summary>
+    private static bool OwnsSpecies(BoardManager board, PokemonData data)
+    {
+        if (board == null || data == null) return false;
+
+        int rootId = EvolutionFamily.RootId(data);
+
+        return HasFamily(board.GetUnitsOnBoard(), rootId) ||
+               HasFamily(board.GetUnitsInBench(), rootId);
+    }
+
+    private static bool HasFamily(List<PokemonUnit> units, int rootId)
+    {
+        if (units == null) return false;
+
+        foreach (var unit in units)
+            if (unit != null && unit.data != null &&
+                EvolutionFamily.RootId(unit.data) == rootId)
+                return true;
+
+        return false;
     }
 
     private void HandleGoldChanged(int _) => Refresh();
+
+    private void HandleRosterChanged(PokemonUnit _) => Refresh();
 }

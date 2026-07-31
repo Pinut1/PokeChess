@@ -12,12 +12,20 @@ public class HeroPachirisuAugment : HeroAugment
 
     private const float STAT_MULTIPLIER = 1.4f;
 
+    /// <summary>
+    /// 탱커 전환 후의 평타 VFX. 원본 파치리스는 "Electric_L"(원거리 투사체)인데 탱커는 근접이라
+    /// 투사체가 날아가는 연출이 어색해진다 — 접미 "_S"인 근접 타격 이펙트로 바꾼다.
+    /// 다른 이펙트로 바꾸려면 VfxDatabase에 등록된 vfxId를 여기에 적으면 된다.
+    /// </summary>
+    private const string TANKER_ATTACK_VFX_ID = "VFX_Electric_S";
+
     protected override string SpeciesNameEn => "Pachirisu";
 
     protected override void Tag(PokemonUnit unit)
     {
         if (unit.HasGrantedSkill) return; // 이미 적용됨
-        unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), TAUNT_MANA_COST, STAT_MULTIPLIER);
+        unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), TAUNT_MANA_COST,
+                                       STAT_MULTIPLIER, TANKER_ATTACK_VFX_ID);
     }
 
     /// <summary>날따름 스킬 정의(기획 확정 2026-07-10: ENEMY_AREA r4, 시전자 중심 타겟팅은 BattleManager 전용 처리).</summary>
@@ -28,6 +36,7 @@ public class HeroPachirisuAugment : HeroAugment
         effectType = SkillEffectType.Taunt,
         targetType = SkillTargetType.EnemyArea,
         areaRadius = 4,
-        vfxId      = ""
+        // 아트가 VfxDatabase에 등록해둔 전용 이펙트(전기·탱커·도발). 미등록이면 조용히 무시된다.
+        vfxId      = "VFX_Electric_Tanker_TAUNT"
     };
 }

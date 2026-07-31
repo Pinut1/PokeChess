@@ -101,6 +101,16 @@ public static class BattleVfxPlayer
     /// 투사체를 대상 위치에 생성하면 도착지에서 출발해 그 너머로 지나가 버린다.
     /// 그래서 출발점을 공격자로 옮기고, 파티클 수명을 실제 거리에 맞춰 대상에서 멈추게 한다.
     /// </summary>
+    /// <summary>도발 적용 시 대상 머리 위에 재생하는 이펙트(스킬 시전 VFX와 별개).</summary>
+    public static void PlayTauntHit(BattleUnit target)
+    {
+        const string TAUNT_HIT_VFX = "VFX_Electric_Taunt_Hit";
+        var entry = Resolve(TAUNT_HIT_VFX);
+        if (entry == null || target?.visual == null) return;
+
+        Spawn(entry, target.visual.transform.position);
+    }
+
     public static void PlayBasicAttack(string vfxId, BattleUnit attacker, BattleUnit target)
     {
         var entry = Resolve(vfxId);

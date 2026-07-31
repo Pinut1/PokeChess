@@ -315,7 +315,12 @@ MonoBehaviour:
     scaleWithRadius: 0
   - vfxId: VFX_Electric_Tanker_TAUNT
     prefab: {fileID: 3153356435855344799, guid: 2ddd5e2464d5de24dbfddc34b177e15f, type: 3}
-    lifetime: 0
+    lifetime: 2
+    spawnMode: 1
+    scaleWithRadius: 0
+  - vfxId: VFX_Evolve
+    prefab: {fileID: 1948089231559134301, guid: 3fa54182cfbad2843815635a8ffb30c9, type: 3}
+    lifetime: 2
     spawnMode: 0
     scaleWithRadius: 0
   - vfxId: VFX_Evolve
