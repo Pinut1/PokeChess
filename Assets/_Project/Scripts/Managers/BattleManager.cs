@@ -211,6 +211,9 @@ public class BattleManager : MonoBehaviour
             yield break;
         }
 
+        // 실제로 시간을 두고 진행하는 오버타임에 진입할 때만, 이 메서드 호출당 정확히 1회 발행(UI 타이머 전환용).
+        GameEvents.OvertimeStarted(_overtimeDuration);
+
         // 현실 시간 축 — 오버타임이 실제로 유지되는 대기 횟수(배속과 무관).
         int realTicks = Mathf.CeilToInt(_overtimeDuration / TICK_INTERVAL);
 

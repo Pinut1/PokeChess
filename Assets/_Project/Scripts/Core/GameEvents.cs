@@ -54,6 +54,12 @@ public static class GameEvents
     public static event Action<BattleEndReason> OnBattleEnd;
 
     /// <summary>
+    /// 기본 전투 시간 종료 후 오버타임 진입. 인자 = 오버타임 지속시간(초, BattleManager._overtimeDuration).
+    /// 오버타임 종료 전용 이벤트는 없음 — 오버타임이 끝나면(승패 확정) 기존 OnBattleEnd가 발행된다.
+    /// </summary>
+    public static event Action<float> OnOvertimeStarted;
+
+    /// <summary>
     /// 팀(2인) 단위 라운드 결과 확정. MasterClient가 두 플레이어 승패를 집계해 발행.
     /// 라이프 차감은 NetworkManager(권위)가 처리하고, 보상은 RewardManager가 배수로 지급한다.
     /// </summary>
@@ -285,6 +291,7 @@ public static class GameEvents
     public static void PartnerAugmentsChanged(string[] augmentNamesEn) => OnPartnerAugmentsChanged?.Invoke(augmentNamesEn);
     public static void BattleStart()           => OnBattleStart?.Invoke();
     public static void BattleEnd(BattleEndReason reason) => OnBattleEnd?.Invoke(reason);
+    public static void OvertimeStarted(float duration) => OnOvertimeStarted?.Invoke(duration);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();
