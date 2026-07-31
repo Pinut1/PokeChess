@@ -30,6 +30,7 @@ public class RerollTicketAugment : Augment
         if (shop == null) return;
 
         shop.AddReroll(1);
+        GameEvents.RerollRefunded(); // UI 환급 표시 훅 — 환급분을 쓸 때까지 켜둔다
         Debug.Log("[Augment] 하이퍼 티켓 환급 발동 (45%) — 무료 리롤 +1");
     }
 }

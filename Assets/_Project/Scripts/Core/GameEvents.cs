@@ -208,6 +208,12 @@ public static class GameEvents
     /// <summary>수동 리롤 1회가 실제로 소모됨(무료/골드 무관). 리롤 환급 증강 등의 훅 — 구독 측이 확률 판정 후 Shop.AddReroll로 환급.</summary>
     public static event Action OnRerollSpent;
 
+    /// <summary>
+    /// 리롤 환급이 실제로 발동함(하이퍼 티켓 45% 적중). UI 표시 전용 훅 —
+    /// 환급 수량 자체는 OnRerollCountChanged로 이미 전달되므로 여기서는 "방금 환급됐다"만 알린다.
+    /// </summary>
+    public static event Action OnRerollRefunded;
+
     /// <summary>아이템 샵 갱신됨</summary>
     public static event Action OnItemShopRerolled;
 
@@ -318,6 +324,7 @@ public static class GameEvents
     public static void ShopRerolled()               => OnShopRerolled?.Invoke();
     public static void RerollCountChanged(int count) => OnRerollCountChanged?.Invoke(count);
     public static void RerollSpent()                => OnRerollSpent?.Invoke();
+    public static void RerollRefunded()             => OnRerollRefunded?.Invoke();
     public static void ItemShopRerolled() => OnItemShopRerolled?.Invoke();
     public static void ItemPurchased(ScriptableObject item) => OnItemPurchased?.Invoke(item);
     public static void RoundChanged(int round)       => OnRoundChanged?.Invoke(round);

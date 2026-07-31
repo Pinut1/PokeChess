@@ -44,6 +44,16 @@ public class UIManager : MonoBehaviour
     [Tooltip("비어 있으면 ItemStore_Panel 아래의 ShopChange Button을 런타임에 찾습니다.")]
     [SerializeField] private Button _showUnitStoreButton;
 
+    [Header("ReRoll Button 텍스트/이미지")]
+    [Tooltip("리롤 비용 표시 텍스트 (무료 리롤 있을 때 0원, 없을 때 2원)")]
+    [SerializeField] private TextMeshProUGUI _rerollByCoinText;
+    [Tooltip("무료 리롤권 개수 표시 텍스트")]
+    [SerializeField] private TextMeshProUGUI _rerollCountText;
+    [Tooltip("무료 리롤권이 있을 때 보일 이미지 (없으면 숨김, 부드럽게 페이드인/아웃)")]
+    [SerializeField] private GameObject _rerollFreeIndicator;
+    [Tooltip("리롤 표시 이미지의 페이드 인/아웃 속도 (낮을수록 느림, 기본 1.5)")]
+    [SerializeField] private float _rerollIndicatorPulseSpeed = 1.5f;
+
     [Tooltip("골드 부족으로 버튼이 꺼졌을 때 씌울 흑백 머티리얼(PokeChess/UI/Grayscale). " +
              "카드 일러스트와 같은 것을 쓰면 톤이 맞는다. 비워두면 Animator의 Disabled 상태에만 의존한다.")]
     [SerializeField] private Material _disabledGrayscaleMaterial;
@@ -155,6 +165,8 @@ public class UIManager : MonoBehaviour
     private int _requiredXp;
     private int _unitCap = 1;
 
+    private int  _rerollCount;          // 직전 잔여 무료 리롤 — 감소를 "소모"로 판정하는 기준
+
     private int _buyXpCostGold;
     private int _buyXpAmount;
 
@@ -265,6 +277,23 @@ public class UIManager : MonoBehaviour
 
         if (!_canvasProgressTextsReady && BindCanvasProgressTexts())
             RefreshCanvasProgressTexts();
+
+        // 무료 리롤 표시 이미지의 부드러운 페이드 인/아웃 애니메이션.
+        ApplyPulseAlpha(_rerollFreeIndicator,
+                        Mathf.PingPong(Time.time * _rerollIndicatorPulseSpeed, 1f));
+    }
+
+    /// <summary>켜져 있는 표시 이미지의 알파만 갈아끼운다(0 → 1 → 0 반복).</summary>
+    private static void ApplyPulseAlpha(GameObject indicator, float alpha)
+    {
+        if (indicator == null || !indicator.activeSelf) return;
+
+        var image = indicator.GetComponent<Image>();
+        if (image == null) return;
+
+        Color color = image.color;
+        color.a = alpha;
+        image.color = color;
     }
 
     // ──────────────────────────────────────────
@@ -349,7 +378,22 @@ public class UIManager : MonoBehaviour
         var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null) return;
 
-        SetButtonAffordable(_shopRerollButton, shop.RerollCount > 0 || _gold >= shop.RerollCost);
+        // 무료 리롤권이 있는지 확인
+        bool hasFreeReroll = shop.RerollCount > 0;
+
+        // 리롤 텍스트 업데이트: 무료 있으면 0원, 없으면 2원
+        if (_rerollByCoinText != null)
+            _rerollByCoinText.text = hasFreeReroll ? "0" : "2";
+
+        // 무료 리롤권 개수 표시
+        if (_rerollCountText != null)
+            _rerollCountText.text = hasFreeReroll ? $"{shop.RerollCount}" : "";
+
+        // 무료 리롤권 표시 이미지
+        if (_rerollFreeIndicator != null)
+            _rerollFreeIndicator.SetActive(hasFreeReroll);
+
+        SetButtonAffordable(_shopRerollButton, hasFreeReroll || _gold >= shop.RerollCost);
         SetButtonAffordable(_xpPurchaseButton, _requiredXp > 0 && _gold >= shop.BuyXpCostGold);
     }
 
@@ -584,8 +628,18 @@ public class UIManager : MonoBehaviour
         RefreshCanvasProgressTexts();
     }
 
-    /// <summary>무료 리롤 자원 변동. 표시값은 없고 리롤 버튼 활성 여부만 바뀐다.</summary>
-    private void HandleRerollCountChanged(int _) => RefreshShopButtonAffordability();
+    /// <summary>
+    /// 무료 리롤 자원 변동. 버튼 활성 여부와 환급 표시를 함께 갱신한다.
+    ///
+    /// 환급 표시는 "환급분을 쓸 때까지" 유지돼야 하는데, 리롤권은 낱개 구분이 없으므로
+    /// <b>잔여 수가 줄어든 시점</b>을 소모로 본다. OnRerollSpent로 끄면 증강의 환급 호출과
+    /// 구독 순서 경쟁이 생겨(환급이 먼저 켜면 그 뒤에 꺼버림) 표시가 유실된다.
+    /// </summary>
+    private void HandleRerollCountChanged(int count)
+    {
+        _rerollCount = count;
+        RefreshShopButtonAffordability();
+    }
 
     /// <summary>레벨 변경 이벤트를 받아 HUD 표시용 캐시를 갱신한다.</summary>
     private void HandleLevelChanged(int level)

@@ -55,12 +55,13 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         if (_icon != null)
         {
-            // 아이템과 진화의 돌은 표시 방식이 같고 아이콘 필드만 각자 타입에 있다.
+            // 아이템, 진화의 돌, Consumables는 표시 방식이 같고 아이콘 필드만 각자 타입에 있다.
             _icon.sprite = data switch
             {
-                ItemData item            => item.icon,
-                EvolutionStoneData stone => stone.icon,
-                _                        => null
+                ItemData item             => item.icon,
+                EvolutionStoneData stone  => stone.icon,
+                ConsumableData consumable => consumable.icon,
+                _                         => null
             };
 
             _icon.enabled = _icon.sprite != null;
