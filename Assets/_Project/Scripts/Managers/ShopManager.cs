@@ -522,13 +522,8 @@ public class ShopManager : MonoBehaviour
         if (unit == null || unit.data == null)
             return 0;
 
-        // 통신진화/일반 진화 유닛은 공용 풀의 원본 종 가격으로 환급한다.
-        PokemonData priceData =
-            _evolvedToBase.TryGetValue(
-                unit.data,
-                out PokemonData baseData)
-                ? baseData
-                : unit.data;
+        // 통신진화/일반 진화/진화의 돌 유닛은 공용 풀의 원본 종 가격으로 환급한다.
+        PokemonData priceData = ResolveBasePoolData(unit);
 
         int baseUnits = GetBaseUnitCount(unit.starLevel);
         int invested = priceData.cost * baseUnits;
@@ -1165,7 +1160,7 @@ public class ShopManager : MonoBehaviour
 
         if (existingCandidates.Count == 0)
         {
-            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            Debug.Log("[Shop] 합체 구매 불가 — 동일 종·성급 후보 부족");
             return false;
         }
 
@@ -1174,7 +1169,7 @@ public class ShopManager : MonoBehaviour
         if (!TryFindMergeSlots(slot, poolData.id, needed, out List<int> slots) ||
             Gold < poolData.cost * needed)
         {
-            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            Debug.Log("[Shop] 합체 구매 불가 — 상점 슬롯 또는 골드 부족");
             return false;
         }
 
@@ -1315,15 +1310,42 @@ public class ShopManager : MonoBehaviour
         Debug.Log($"[ShopPool] {data.pokemonName} 풀 감소 -{amount} / 남은 수량: {_remainingPool[data]}");
     }
 
+    /// <summary>
+    /// 판매/가격 계산에 쓸 "공용 풀 원본 종"을 구한다.
+    ///
+    /// 진화의 돌은 ItemManager.HandleUnitSold()가 unit.RemoveStone()으로 unit.data를
+    /// 베이스 종으로 원복하는데, 이 처리와 ShopManager.HandleUnitSold()는 같은
+    /// GameEvents.OnUnitSold의 서로 다른 구독자라 실행 순서가 보장되지 않는다.
+    /// 그래서 unit.data를 그대로 믿지 않고, 돌이 아직 장착돼 있으면(=아직 원복 전일 수 있음)
+    /// unit.preStoneData를 먼저 사용한다 — ItemManager가 먼저 실행돼 이미 원복된 경우엔
+    /// equippedStone이 null이라 자연히 unit.data(이미 베이스 종)로 떨어지므로 어느 순서든 결과가 같다.
+    /// 그 위에 일반진화/통신진화/플러시·마이농 역매핑(_evolvedToBase)을 한 번 더 적용해
+    /// 최종 기본종을 얻는다.
+    /// </summary>
+    private PokemonData ResolveBasePoolData(PokemonUnit unit)
+    {
+        PokemonData afterStone =
+            unit.equippedStone != null && unit.preStoneData != null
+                ? unit.preStoneData
+                : unit.data;
+
+        return _evolvedToBase.TryGetValue(afterStone, out var baseData) ? baseData : afterStone;
+    }
+
     private void ReturnToChampionPool(PokemonUnit unit)
     {
         if (unit == null || unit.data == null) return;
 
-        // 진화 유닛(data가 진화체로 스왑됨)이면 소비된 기본종 풀로 되돌린다.
-        PokemonData data = _evolvedToBase.TryGetValue(unit.data, out var baseData) ? baseData : unit.data;
+        PokemonData data = ResolveBasePoolData(unit);
 
         if (!_remainingPool.ContainsKey(data))
+        {
+            Debug.LogWarning(
+                $"[ShopPool] '{data.pokemonName}' 원본 풀 데이터를 찾지 못해 판매 반환을 건너뜀 " +
+                $"(unit.data={unit.data.pokemonName}, shopBuyable 여부/DB 임포트를 확인)"
+            );
             return;
+        }
 
         int amount = GetBaseUnitCount(unit.starLevel);
 
