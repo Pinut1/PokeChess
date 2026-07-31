@@ -183,7 +183,7 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>
     /// 보드에 여유 슬롯(현재 배치 수 &lt; 캡)이 있으면 벤치 앞쪽(슬롯 0,1,2…) 유닛부터
-    /// 빈 보드 타일로 자동 승격한다(롤체식). 레벨업(캡 증가) 시 호출.
+    /// 빈 보드 타일로 자동 승격한다(롤체식). 쇼핑 종료 후 Battle 페이즈 진입 시 호출(HandlePhaseChanged).
     /// TryPlaceUnit을 재사용하므로 캡 검사·UnitPlaced 이벤트·합체 검사가 그대로 적용된다.
     /// 각자 보드 각자 권위라 로컬 처리로 충분하며 파트너 미러는 UnitPlaced로 갱신된다.
     /// </summary>
