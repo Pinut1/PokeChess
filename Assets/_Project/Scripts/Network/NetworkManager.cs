@@ -382,6 +382,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         return true;
     }
 
+    /// <summary>
+    /// 구매 합체 예외(2슬롯 동시 구매)를 하나의 요청으로 보낸다.
+    /// 마스터 클라이언트가 두 슬롯을 모두 검증한 뒤 동시에 승인/거절한다(부분 성공 없음).
+    /// </summary>
+    public bool RequestSharedShopMergePurchase(int revision, int slotA, int slotB)
+    {
+        if (!UsesSharedShopPool) return false;
+        if (IsMasterClient)
+            ProcessSharedShopMergePurchase(PhotonNetwork.LocalPlayer.ActorNumber, revision, slotA, slotB);
+        else
+            photonView.RPC(nameof(RPC_RequestSharedShopMergePurchase), RpcTarget.MasterClient, revision, slotA, slotB);
+        return true;
+    }
+
     public void RequestSharedShopReturn(int pokemonId, int amount)
     {
         if (!UsesSharedShopPool || pokemonId <= 0 || amount <= 0) return;
@@ -507,6 +521,48 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         GameManager.TryGet(out var gm);
         gm?.Shop?.ResolveSharedShopPurchase(revision, slot, pokemonId, success);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopMergePurchase(int revision, int slotA, int slotB, PhotonMessageInfo info)
+    {
+        if (!IsMasterClient || info.Sender == null) return;
+        ProcessSharedShopMergePurchase(info.Sender.ActorNumber, revision, slotA, slotB);
+    }
+
+    /// <summary>
+    /// 마스터 권위로 두 슬롯을 한 번에 검증·소비한다(전체 성공 또는 전체 실패).
+    /// 슬롯별로 나눠 RPC를 두 번 보내지 않고, 이 한 번의 처리 안에서 두 예약을 동시에 소비한다.
+    /// </summary>
+    private void ProcessSharedShopMergePurchase(int actorNumber, int revision, int slotA, int slotB)
+    {
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        int pokemonId = 0;
+        bool success = shop != null && shop.TryAuthorityPurchaseMergeSharedShop(
+            actorNumber, revision, slotA, slotB, out pokemonId);
+
+        Player target = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+        if (target != null)
+            photonView.RPC(nameof(RPC_ResolveSharedShopMergePurchase), target,
+                revision, slotA, slotB, success ? pokemonId : 0, success);
+
+        if (success && shop != null)
+        {
+            foreach (var state in shop.GetSharedReservationsMirror())
+            {
+                if (state.actorNumber != actorNumber) continue;
+                BroadcastSharedPoolMirror(actorNumber, state.revision, state.slots);
+                break;
+            }
+        }
+    }
+
+    [PunRPC]
+    private void RPC_ResolveSharedShopMergePurchase(
+        int revision, int slotA, int slotB, int pokemonId, bool success)
+    {
+        GameManager.TryGet(out var gm);
+        gm?.Shop?.ResolveSharedShopMergePurchase(revision, slotA, slotB, pokemonId, success);
     }
 
     [PunRPC]
@@ -2417,6 +2473,7 @@ public class NetworkManager : MonoBehaviour
     public void SyncLocalAugments(string[] _)   { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
+    public bool RequestSharedShopMergePurchase(int revision, int slotA, int slotB) => false;
     public void RequestSharedShopReturn(int pokemonId, int amount) { }
 
     /// <summary>

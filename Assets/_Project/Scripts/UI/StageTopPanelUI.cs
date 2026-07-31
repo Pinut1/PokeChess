@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +36,9 @@ public class StageTopPanelUI : MonoBehaviour
 
     [Tooltip("켜면 소수점 1자리(29.4), 끄면 정수(29)로 표기.")]
     [SerializeField] private bool _showDecimal;
+
+    [Tooltip("오버타임 중 타이머 텍스트가 깜박이는 간격(초). 작을수록 빨리 깜박인다. 0 이하면 깜박이지 않는다(텍스트는 항상 표시).")]
+    [SerializeField] private float _overtimeBlinkInterval = 0.4f;
 
     [Header("스테이지 아이콘")]
     [Tooltip("좌→우 순서대로. 씬의 StageIRow_Icon (1)~(5)를 순서대로 넣을 것 — 이름이 복제형이라 자동 탐색은 순서를 보장하지 못한다.")]
@@ -83,18 +87,27 @@ public class StageTopPanelUI : MonoBehaviour
     // 감소 중인지. 쇼핑 페이즈에서는 전투 시간을 '대기' 상태로 띄우기만 하므로 false.
     private bool _counting;
 
+    // 오버타임 안내용 깜박임 코루틴. null이면 실행 중이 아님(=오버타임 아님).
+    private Coroutine _overtimeBlinkCoroutine;
+
     private void OnEnable()
     {
-        GameEvents.OnStageEntered += HandleStageEntered;
-        GameEvents.OnPhaseChanged += HandlePhaseChanged;
-        GameEvents.OnBattleEnd    += HandleBattleEnd;
+        GameEvents.OnStageEntered    += HandleStageEntered;
+        GameEvents.OnPhaseChanged    += HandlePhaseChanged;
+        GameEvents.OnBattleEnd       += HandleBattleEnd;
+        GameEvents.OnOvertimeStarted += HandleOvertimeStarted;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnStageEntered -= HandleStageEntered;
-        GameEvents.OnPhaseChanged -= HandlePhaseChanged;
-        GameEvents.OnBattleEnd    -= HandleBattleEnd;
+        GameEvents.OnStageEntered    -= HandleStageEntered;
+        GameEvents.OnPhaseChanged    -= HandlePhaseChanged;
+        GameEvents.OnBattleEnd       -= HandleBattleEnd;
+        GameEvents.OnOvertimeStarted -= HandleOvertimeStarted;
+
+        // 컴포넌트가 꺼지는 시점에 깜박임이 돌고 있었다면(오버타임 도중 비활성화 등) 텍스트가
+        // 꺼진 상태로 남지 않도록 복구한다.
+        StopOvertimeBlink();
     }
 
     private void Start()
@@ -227,6 +240,10 @@ public class StageTopPanelUI : MonoBehaviour
 
     private void HandlePhaseChanged(GamePhase phase)
     {
+        // 오버타임은 GamePhase에 별도 상태가 없다(Battle 페이즈 내부 상태) — 어떤 페이즈로
+        // 전환되든(다음 Shopping/Battle 포함) 이전 전투의 오버타임 표시는 반드시 정리한다.
+        StopOvertimeBlink();
+
         switch (phase)
         {
             // 전투 준비 — 전투 제한시간을 '대기' 상태로 띄워둔다(감소 없음).
@@ -254,8 +271,58 @@ public class StageTopPanelUI : MonoBehaviour
         RefreshTimeText();
     }
 
-    /// <summary>전투가 전멸로 조기 종료된 경우 즉시 정지(Result 진입이 곧 이어진다).</summary>
-    private void HandleBattleEnd(BattleEndReason reason) => _counting = false;
+    /// <summary>전투가 끝나면(조기 종료/오버타임 판정 모두) 즉시 정지(Result 진입이 곧 이어진다).</summary>
+    private void HandleBattleEnd(BattleEndReason reason)
+    {
+        _counting = false;
+        StopOvertimeBlink();
+    }
+
+    /// <summary>
+    /// 기본 전투 시간이 끝나고 오버타임에 진입하면 타이머를 오버타임 지속시간으로 다시 시작한다.
+    /// 표시 전용 카운트다운이므로 BattleManager의 오버타임 시뮬레이션 시간과 정밀 동기화는 하지 않는다
+    /// (클래스 상단 주석과 동일한 전제).
+    /// </summary>
+    private void HandleOvertimeStarted(float duration)
+    {
+        _fightingTime = duration;
+        _counting = true;
+        RefreshTimeText();
+
+        if (_overtimeBlinkCoroutine != null)
+        {
+            StopCoroutine(_overtimeBlinkCoroutine);
+            _overtimeBlinkCoroutine = null;
+        }
+
+        // 0 이하면 깜박임을 아예 비활성화 — 카운트다운은 그대로 진행하되 텍스트는 항상 보이게 둔다.
+        if (_overtimeBlinkInterval > 0f)
+            _overtimeBlinkCoroutine = StartCoroutine(BlinkTimerText());
+        else if (_stageTimeText != null)
+            _stageTimeText.enabled = true;
+    }
+
+    /// <summary>_stageTimeText.enabled를 토글해 깜박인다. Graphic.enabled 토글은 레이아웃에 영향을 주지 않아 안전하다.</summary>
+    private IEnumerator BlinkTimerText()
+    {
+        while (true)
+        {
+            if (_stageTimeText != null) _stageTimeText.enabled = !_stageTimeText.enabled;
+            yield return new WaitForSeconds(_overtimeBlinkInterval);
+        }
+    }
+
+    /// <summary>깜박임 코루틴을 멈추고 텍스트를 항상 보이는 상태로 복구한다. 오버타임이 아니면 아무 일도 하지 않는다.</summary>
+    private void StopOvertimeBlink()
+    {
+        if (_overtimeBlinkCoroutine != null)
+        {
+            StopCoroutine(_overtimeBlinkCoroutine);
+            _overtimeBlinkCoroutine = null;
+        }
+
+        if (_stageTimeText != null) _stageTimeText.enabled = true;
+    }
 
     private void RefreshTimeText()
     {

@@ -63,6 +63,14 @@ public class BattleManager : MonoBehaviour
              "적 진영은 장식 전용이라 드롭 처리와 콜라이더는 자동으로 꺼집니다.")]
     [SerializeField] private HexTile _enemyTilePrefab;
 
+    [Tooltip("30초 기본 전투가 끝났는데 적이 남아있을 때 추가로 주는 오버타임 길이(초). " +
+             "0 이하면 오버타임 없이 그 시점 적 생존 여부로 즉시 판정한다. 기획 미확정 수치(2026-07-30 기준).")]
+    [SerializeField] private float _overtimeDuration = 5f;
+
+    [Tooltip("오버타임 동안 tick을 더 빠르게 소비하는 배속. 1 이하면 기본 전투와 같은 속도로 진행한다. " +
+             "기획 미확정 수치(2026-07-30 기준).")]
+    [SerializeField] private float _overtimeSpeedMultiplier = 2f;
+
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
@@ -128,20 +136,24 @@ public class BattleManager : MonoBehaviour
         Cleanup();
         BattleVfxPlayer.ClearAllActive();
 
-        // 타임아웃으로 승부가 안 났으면 잔여 HP로 판정.
+        // 30초 안에 승부가 안 났으면(조기 종료 없음) 오버타임으로 넘어간다(기획 확정 2026-07-30).
         BattleEndReason reason;
         if (result.allyWon != null)
         {
-            // 조기 종료 (한쪽 전멸)
+            // 기본 30초 이내 조기 종료 (한쪽 전멸)
             reason = result.allyWon.Value ? BattleEndReason.Victory : BattleEndReason.Defeat;
             Debug.Log($"[Battle] 조기 종료 → {reason} (전멸)");
         }
         else
         {
-            // 타임아웃 후 HP 판정
-            bool allyWon = DetermineWinnerByRemainingHp();
+            // 기존: 타임아웃 후 HP 합계 비교로 판정(레퍼런스 게임과 달라 폐기, 롤백 대비 보존).
+            // bool allyWon = DetermineWinnerByRemainingHp();
+            // reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
+
+            // 변경: 30초 후 오버타임 진행, 종료 시 적이 하나라도 살아있으면 무조건 패배.
+            bool allyWon = result.overtimeAllyWon ?? false;
             reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
-            Debug.Log($"[Battle] 타임아웃 30초 경과 → {reason} (HP 판정)");
+            Debug.Log($"[Battle] 타임아웃 30초 경과 → 오버타임 진행 → {reason} (적 생존 여부 판정)");
         }
 
         GameEvents.BattleEnd(reason);
@@ -150,12 +162,13 @@ public class BattleManager : MonoBehaviour
     /// <summary>코루틴은 out 파라미터를 못 쓰므로 루프 결과를 담아 전달하는 홀더.</summary>
     private sealed class BattleLoopResult
     {
-        public bool? allyWon; // null = 타임아웃(미결), true/false = 한쪽 전멸로 확정.
+        public bool? allyWon; // null = 기본 30초 안에 미결(오버타임으로 진행), true/false = 한쪽 전멸로 확정.
+        public bool? overtimeAllyWon; // 오버타임 결과(즉시 전멸 또는 시간 종료 판정). allyWon이 이미 확정됐으면 안 채워짐.
     }
 
     /// <summary>
     /// MAX_TICKS까지 매 틱 시뮬레이션. 한쪽이 전멸하면 result.allyWon에 결과를 담고 종료,
-    /// 타임아웃이면 result.allyWon을 null로 남겨 호출부가 잔여 HP로 판정하게 한다.
+    /// 타임아웃이면 오버타임(RunOvertime)으로 넘어간다.
     /// </summary>
     private IEnumerator SimulateBattleLoop(BattleLoopResult result)
     {
@@ -177,6 +190,60 @@ public class BattleManager : MonoBehaviour
             tick++;
             yield return new WaitForSeconds(TICK_INTERVAL);
         }
+
+        yield return RunOvertime(result);
+    }
+
+    /// <summary>
+    /// 30초 타임아웃 후 오버타임. Duration과 Speed는 서로 다른 축이다 —
+    /// Duration(_overtimeDuration)은 "현실 시간" 기준으로 오버타임이 유지되는 길이이고,
+    /// Speed(_overtimeSpeedMultiplier)는 그 현실 시간 동안 SimulateTick()을 몇 배 더 처리하는지다.
+    /// 대기(WaitForSeconds) 횟수(realTicks)는 오직 Duration/TICK_INTERVAL로만 정해지므로
+    /// Speed를 아무리 올려도 오버타임이 "짧아지지" 않고, 그 안에서 처리되는 전투 계산량만 늘어난다.
+    /// tick 계산(공속/이동/스킬쿨다운/상태이상 등) 자체는 바꾸지 않아 일부 시스템만 빨라지는 불균형이 없다.
+    /// 종료 시 적 생존 여부만으로 판정(아군 생존 수/HP/처치 수는 사용하지 않음).
+    /// </summary>
+    private IEnumerator RunOvertime(BattleLoopResult result)
+    {
+        if (_overtimeDuration <= 0f)
+        {
+            result.overtimeAllyWon = !HasAliveUnit(BattleTeam.Enemy);
+            yield break;
+        }
+
+        // 실제로 시간을 두고 진행하는 오버타임에 진입할 때만, 이 메서드 호출당 정확히 1회 발행(UI 타이머 전환용).
+        GameEvents.OvertimeStarted(_overtimeDuration);
+
+        // 현실 시간 축 — 오버타임이 실제로 유지되는 대기 횟수(배속과 무관).
+        int realTicks = Mathf.CeilToInt(_overtimeDuration / TICK_INTERVAL);
+
+        // 배속 축 — 그 대기 한 번당 SimulateTick()을 몇 번 처리할지(현실 시간과 별개 변수).
+        // 1 이하면 일반 속도(대기 1번당 1틱).
+        int simTicksPerWait = _overtimeSpeedMultiplier > 1f
+            ? Mathf.Max(1, Mathf.RoundToInt(_overtimeSpeedMultiplier))
+            : 1;
+
+        for (int realTick = 0; realTick < realTicks; realTick++)
+        {
+            for (int i = 0; i < simTicksPerWait; i++)
+            {
+                SimulateTick();
+
+                bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
+                bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
+
+                if (!allyAlive || !enemyAlive)
+                {
+                    result.overtimeAllyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리) — 기존 동시 전멸 규칙 유지
+                    yield break;
+                }
+            }
+
+            yield return new WaitForSeconds(TICK_INTERVAL);
+        }
+
+        // 오버타임 실제 시간 종료 — 적이 한 마리라도 살아있으면 무조건 패배(기획 확정). 아군 생존 수/HP 무관.
+        result.overtimeAllyWon = !HasAliveUnit(BattleTeam.Enemy);
     }
 
     // ─────────────────────────────────────────
@@ -1319,7 +1386,11 @@ public class BattleManager : MonoBehaviour
         return false;
     }
 
-    /// <summary>타임아웃 시 남은 총 HP 비율로 승패 결정.</summary>
+    /// <summary>
+    /// 타임아웃 시 남은 총 HP 비율로 승패 결정.
+    /// 오버타임 도입(2026-07-30 기획 확정)으로 RunBattle()에서 더 이상 호출하지 않음 —
+    /// 롤백 대비 보존.
+    /// </summary>
     private bool DetermineWinnerByRemainingHp()
     {
         float allyHp = 0f, enemyHp = 0f;
