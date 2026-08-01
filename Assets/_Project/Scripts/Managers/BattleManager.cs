@@ -79,6 +79,13 @@ public class BattleManager : MonoBehaviour
     // 스탯 스냅샷은 전투 시작 시점 보드/아이템 기준이어야 하므로 미리 만들어 두면 안 된다.
     private readonly List<GameObject> _previewObjects = new();
 
+    // 준비 단계 적 프리뷰의 스탯 사본. 전투 목록(_units)에는 넣지 않으므로 시뮬레이션에 관여하지 않는다.
+    // 스탯창이 준비 단계에도 적 정보를 보여줄 수 있게 두는 읽기 전용 스냅샷이다.
+    private readonly List<BattleUnit> _previewEnemies = new();
+
+    /// <summary>준비 단계에 세워둔 적 프리뷰. 전투 중에는 비어 있다(그때는 Units를 쓸 것).</summary>
+    public IReadOnlyList<BattleUnit> PreviewEnemies => _previewEnemies;
+
     /// <summary>전투 중인 유닛 스냅샷(읽기 전용). BalanceCheckHarness가 실측 스탯을 확인하는 용도.</summary>
     public IReadOnlyList<BattleUnit> Units => _units;
 
@@ -606,6 +613,12 @@ public class BattleManager : MonoBehaviour
                 col.enabled = false;
 
             _previewObjects.Add(visual);
+
+            // 전투 때와 같은 계산(별 배수·스테이지 배수·보유 아이템)으로 스탯 사본을 만들어 둔다.
+            // _units에 넣지 않으므로 시뮬레이션에는 영향이 없고, 스탯창이 준비 단계에도 적을 보여줄 수 있다.
+            BattleUnit preview = CreateEnemyUnit(data, e, coords);
+            preview.visual = visual;
+            _previewEnemies.Add(preview);
         }
     }
 
@@ -623,6 +636,7 @@ public class BattleManager : MonoBehaviour
             if (obj != null) Destroy(obj);
 
         _previewObjects.Clear();
+        _previewEnemies.Clear();
     }
 
     /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
@@ -1093,7 +1107,8 @@ public class BattleManager : MonoBehaviour
 
         var targets = GetSkillTargets(caster, primaryTarget);
         // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
-        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius);
+        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius,
+                                  caster, primaryTarget);
 
         foreach (var t in targets)
         {
@@ -1128,7 +1143,8 @@ public class BattleManager : MonoBehaviour
         // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
         bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
         BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
-                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius);
+                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius,
+                                  caster, primaryTarget);
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
