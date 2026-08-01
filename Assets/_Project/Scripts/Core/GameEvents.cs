@@ -23,7 +23,8 @@ public enum SessionEndReason
     TeamHpZero,        // 팀 공통 HP 소진
     ReconnectFailed,   // 본인 재접속 실패
     PartnerAbandoned,  // 상대 미재접속(협동 불가)
-    BothDisconnected   // 둘 다 연결 끊김
+    BothDisconnected,  // 둘 다 연결 끊김
+    Surrender          // 2인 합의 항복(옵션창)
 }
 
 /// <summary>

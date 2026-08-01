@@ -3,7 +3,7 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 게임 중 열 수 있는 옵션창(IMGUI).
-/// 마스터/배경음/효과음 볼륨, 항복 안내, 타이틀 이동, 게임 종료 기능을 제공한다.
+/// 마스터/배경음/효과음 볼륨, 화면 모드/해상도(적용/취소), 항복 안내, 타이틀 이동, 게임 종료 기능을 제공한다.
 /// </summary>
 public class OptionsPanelUI : MonoBehaviour
 {
@@ -23,6 +23,9 @@ public class OptionsPanelUI : MonoBehaviour
     private const string PREF_BGM_VOLUME = "BgmVolume";
     private const string PREF_SFX_VOLUME = "SfxVolume";
 
+    private const string PREF_FULLSCREEN = "FullScreen";
+    private const string PREF_RESOLUTION_INDEX = "ResolutionIndex";
+
     private const float DEFAULT_SUB_VOLUME = 1f;
 
     private const float MIN_WIDTH = 380f;
@@ -38,8 +41,26 @@ public class OptionsPanelUI : MonoBehaviour
     private float _bgmVolume;
     private float _sfxVolume;
 
+    private Resolution[] _resolutions;
+    private string[] _resolutionLabels;
+
+    // 실제로 적용/저장된 값 (Screen에 반영된 상태)
+    private bool _appliedFullScreen;
+    private int _appliedResolutionIndex;
+
+    // 옵션창에서 편집 중인 임시값 ([적용] 전까지는 Screen/PlayerPrefs에 반영되지 않음)
+    private bool _pendingFullScreen;
+    private int _pendingResolutionIndex;
+
+    private bool _resolutionDropdownOpen;
+    private Vector2 _resolutionScrollPosition;
+    private Rect _resolutionButtonRect;
+    private Rect _resolutionListRect;
+
     private ConfirmMode _confirmMode = ConfirmMode.None;
     private bool _surrenderNoticeShown;
+    private bool _surrenderCrossCancelledNoticeShown;
+    private bool _surrenderRequestModalOpen; // 요청자용 확인 모달(옵션창과 독립)
 
     private void Awake()
     {
@@ -53,6 +74,32 @@ public class OptionsPanelUI : MonoBehaviour
             PlayerPrefs.GetFloat(PREF_SFX_VOLUME, DEFAULT_SUB_VOLUME));
 
         AudioListener.volume = _masterVolume;
+
+        LoadAndApplyDisplaySettings();
+    }
+
+    private void LoadAndApplyDisplaySettings()
+    {
+        bool currentFullScreen = Screen.fullScreen;
+        _appliedFullScreen = PlayerPrefs.GetInt(
+            PREF_FULLSCREEN,
+            currentFullScreen ? 1 : 0) == 1;
+
+        BuildResolutionList();
+        int currentResolutionIndex = FindCurrentResolutionIndex();
+        _appliedResolutionIndex = Mathf.Clamp(
+            PlayerPrefs.GetInt(PREF_RESOLUTION_INDEX, currentResolutionIndex),
+            0,
+            _resolutionLabels.Length - 1);
+
+        if (_appliedFullScreen != currentFullScreen)
+            ApplyScreenMode();
+
+        if (_appliedResolutionIndex != currentResolutionIndex)
+            ApplyResolution();
+
+        _pendingFullScreen = _appliedFullScreen;
+        _pendingResolutionIndex = _appliedResolutionIndex;
     }
 
     private void OnDisable()
@@ -69,6 +116,9 @@ public class OptionsPanelUI : MonoBehaviour
     {
         HandleEscapeKey();
         DrawOpenButton();
+        DrawSurrenderRequestModal();
+        DrawSurrenderRequestConfirmModal();
+        DrawSurrenderRejectedNoticeModal();
 
         if (!_optionsOpen)
             return;
@@ -106,6 +156,131 @@ public class OptionsPanelUI : MonoBehaviour
             ToggleOptions(!_optionsOpen);
     }
 
+    /// <summary>
+    /// 파트너의 항복 요청 전용 모달. 옵션창(_optionsOpen) 여부와 무관하게 항상 그려진다.
+    /// </summary>
+    private void DrawSurrenderRequestModal()
+    {
+        if (!GameManager.TryGet(out var gameManager) || gameManager.Network == null)
+            return;
+
+        if (!gameManager.Network.HasIncomingSurrenderRequest)
+            return;
+
+        const float width = 320f;
+        const float height = 110f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("파트너가 항복을 요청했습니다. 항복하시겠습니까?");
+
+        GUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("항복하기"))
+            gameManager.Network.RespondToSurrender(true);
+
+        if (GUILayout.Button("계속하기"))
+            gameManager.Network.RespondToSurrender(false);
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// 요청자용 항복 확인 모달. 옵션창과 독립적으로 그려지며, [항복] 클릭 시 옵션창을 닫고 이 모달을 연다.
+    /// </summary>
+    private void DrawSurrenderRequestConfirmModal()
+    {
+        if (!_surrenderRequestModalOpen)
+            return;
+
+        // 파트너 수신 모달과 동시에 뜨지 않도록 양보(파트너 요청이 더 우선).
+        if (GameManager.TryGet(out var gameManager) && gameManager.Network != null &&
+            gameManager.Network.HasIncomingSurrenderRequest)
+        {
+            _surrenderRequestModalOpen = false;
+            return;
+        }
+
+        const float width = 320f;
+        const float height = 110f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("파트너에게 항복을 요청하시겠습니까?");
+
+        GUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("요청하기"))
+        {
+            ConfirmRequestSurrender();
+            _surrenderRequestModalOpen = false;
+        }
+
+        if (GUILayout.Button("취소"))
+        {
+            _surrenderRequestModalOpen = false;
+            ToggleOptions(true);
+        }
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// 내가 보낸 항복 요청이 거절됐을 때 표시하는 전용 모달. 옵션창(_optionsOpen) 여부와 무관하게 항상 그려진다.
+    /// </summary>
+    private void DrawSurrenderRejectedNoticeModal()
+    {
+        if (!GameManager.TryGet(out var gameManager) || gameManager.Network == null)
+            return;
+
+        if (gameManager.Network.SurrenderRequestRejected)
+        {
+            gameManager.Network.AcknowledgeSurrenderRejected();
+            _surrenderNoticeShown = true;
+        }
+
+        if (!_surrenderNoticeShown)
+            return;
+
+        // 더 시급한 모달(파트너 수신 요청, 내 요청 확인)이 떠 있으면 양보하고 다음 프레임에 다시 시도.
+        if (gameManager.Network.HasIncomingSurrenderRequest || _surrenderRequestModalOpen)
+            return;
+
+        const float width = 320f;
+        const float height = 110f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("파트너가 항복 요청을 거절했습니다.");
+
+        if (GUILayout.Button("확인"))
+            _surrenderNoticeShown = false;
+
+        GUILayout.EndArea();
+    }
+
     private void HandleEscapeKey()
     {
         Event currentEvent = Event.current;
@@ -116,7 +291,16 @@ public class OptionsPanelUI : MonoBehaviour
             return;
         }
 
-        if (_confirmMode != ConfirmMode.None)
+        if (_surrenderRequestModalOpen)
+        {
+            _surrenderRequestModalOpen = false;
+            ToggleOptions(true);
+        }
+        else if (_surrenderNoticeShown)
+        {
+            _surrenderNoticeShown = false;
+        }
+        else if (_confirmMode != ConfirmMode.None)
         {
             _confirmMode = ConfirmMode.None;
         }
@@ -130,12 +314,26 @@ public class OptionsPanelUI : MonoBehaviour
 
     private void ToggleOptions(bool open)
     {
+        bool wasOpen = _optionsOpen;
         _optionsOpen = open;
+
+        if (_optionsOpen && !wasOpen)
+        {
+            // 창을 열 때: 현재 실제 적용 중인 값으로 편집 상태 초기화
+            _pendingFullScreen = _appliedFullScreen;
+            _pendingResolutionIndex = _appliedResolutionIndex;
+            _resolutionDropdownOpen = false;
+        }
 
         if (!_optionsOpen)
         {
+            // 닫기/ESC/취소 공통: 미적용 임시값 폐기 후 실제 적용값으로 복구
+            _pendingFullScreen = _appliedFullScreen;
+            _pendingResolutionIndex = _appliedResolutionIndex;
+            _resolutionDropdownOpen = false;
+
             _confirmMode = ConfirmMode.None;
-            _surrenderNoticeShown = false;
+            _surrenderCrossCancelledNoticeShown = false;
             PlayerPrefs.Save();
         }
     }
@@ -250,6 +448,9 @@ public class OptionsPanelUI : MonoBehaviour
         DrawVolumeSection();
 
         GUILayout.Space(12f);
+        DrawScreenSection();
+
+        GUILayout.Space(12f);
 
         if (_confirmMode == ConfirmMode.None)
         {
@@ -340,6 +541,133 @@ public class OptionsPanelUI : MonoBehaviour
         applyImmediately?.Invoke(value);
     }
 
+    private void DrawScreenSection()
+    {
+        GUILayout.Label("── 화면 ──");
+
+        DrawFullScreenModeRow();
+        DrawResolutionDropdown();
+
+        GUILayout.Space(6f);
+        DrawScreenApplyCancelRow();
+    }
+
+    private void DrawFullScreenModeRow()
+    {
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label("화면 모드", GUILayout.Width(100f));
+
+        bool wasPendingFullScreen = _pendingFullScreen;
+
+        bool windowedChecked = GUILayout.Toggle(
+            !wasPendingFullScreen, "창모드", GUILayout.Width(100f));
+
+        bool fullScreenChecked = GUILayout.Toggle(
+            wasPendingFullScreen, "전체화면", GUILayout.Width(100f));
+
+        GUILayout.EndHorizontal();
+
+        // 라디오 버튼처럼 상호 배타 처리: 실제로 클릭된 쪽의 값만 반영한다.
+        // (같은 프레임에 두 Toggle을 모두 그리지만, 실제 클릭 이벤트는 마우스 아래
+        // 컨트롤 하나만 소비하므로 클릭되지 않은 쪽은 항상 이전 값 그대로 반환된다.)
+        if (windowedChecked && wasPendingFullScreen)
+            _pendingFullScreen = false;
+        else if (fullScreenChecked && !wasPendingFullScreen)
+            _pendingFullScreen = true;
+    }
+
+    private void DrawResolutionDropdown()
+    {
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label("해상도", GUILayout.Width(100f));
+
+        if (GUILayout.Button(
+                _resolutionLabels[_pendingResolutionIndex],
+                GUILayout.Width(220f)))
+        {
+            _resolutionDropdownOpen = !_resolutionDropdownOpen;
+        }
+
+        if (Event.current.type == EventType.Repaint)
+            _resolutionButtonRect = GUILayoutUtility.GetLastRect();
+
+        GUILayout.EndHorizontal();
+
+        if (_resolutionDropdownOpen)
+            DrawResolutionDropdownList();
+
+        CloseResolutionDropdownOnOutsideClick();
+    }
+
+    private void DrawResolutionDropdownList()
+    {
+        GUILayout.BeginVertical(GUI.skin.box);
+
+        float listHeight = Mathf.Min(140f, _resolutionLabels.Length * 24f);
+
+        _resolutionScrollPosition = GUILayout.BeginScrollView(
+            _resolutionScrollPosition,
+            GUILayout.Height(listHeight));
+
+        for (int i = 0; i < _resolutionLabels.Length; i++)
+        {
+            if (GUILayout.Button(_resolutionLabels[i]))
+            {
+                _pendingResolutionIndex = i;
+                _resolutionDropdownOpen = false;
+            }
+        }
+
+        GUILayout.EndScrollView();
+        GUILayout.EndVertical();
+
+        if (Event.current.type == EventType.Repaint)
+            _resolutionListRect = GUILayoutUtility.GetLastRect();
+    }
+
+    private void CloseResolutionDropdownOnOutsideClick()
+    {
+        if (!_resolutionDropdownOpen)
+            return;
+
+        if (Event.current.type != EventType.MouseDown)
+            return;
+
+        bool insideButton = _resolutionButtonRect.Contains(Event.current.mousePosition);
+        bool insideList = _resolutionListRect.Contains(Event.current.mousePosition);
+
+        if (!insideButton && !insideList)
+            _resolutionDropdownOpen = false;
+    }
+
+    private void DrawScreenApplyCancelRow()
+    {
+        GUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("적용", GUILayout.Width(80f)))
+            ApplyScreenSettings();
+
+        if (GUILayout.Button("취소", GUILayout.Width(80f)))
+            ToggleOptions(false);
+
+        GUILayout.EndHorizontal();
+    }
+
+    private void ApplyScreenSettings()
+    {
+        _appliedFullScreen = _pendingFullScreen;
+        _appliedResolutionIndex = _pendingResolutionIndex;
+
+        ApplyScreenMode();
+        ApplyResolution();
+
+        PlayerPrefs.SetInt(PREF_FULLSCREEN, _appliedFullScreen ? 1 : 0);
+        PlayerPrefs.SetInt(PREF_RESOLUTION_INDEX, _appliedResolutionIndex);
+        PlayerPrefs.Save();
+    }
+
     private void DrawNormalButtons()
     {
         DrawSurrenderSection();
@@ -349,6 +677,7 @@ public class OptionsPanelUI : MonoBehaviour
         if (GUILayout.Button("타이틀로"))
         {
             _surrenderNoticeShown = false;
+            _surrenderCrossCancelledNoticeShown = false;
             _confirmMode = ConfirmMode.ReturnToTitle;
         }
 
@@ -357,24 +686,38 @@ public class OptionsPanelUI : MonoBehaviour
         if (GUILayout.Button("게임 종료"))
         {
             _surrenderNoticeShown = false;
+            _surrenderCrossCancelledNoticeShown = false;
             _confirmMode = ConfirmMode.QuitGame;
         }
     }
 
     private void DrawSurrenderSection()
     {
-        if (GUILayout.Button("항복"))
-        {
-            Debug.Log(
-                "[OptionsPanelUI] 항복 기능은 추후 구현 예정입니다.");
+        if (!GameManager.TryGet(out var gameManager) || gameManager.Network == null)
+            return;
 
-            _surrenderNoticeShown = true;
+        if (gameManager.Network.SurrenderRequestCrossCancelled)
+        {
+            gameManager.Network.AcknowledgeSurrenderCrossCancelled();
+            _surrenderCrossCancelledNoticeShown = true;
         }
 
-        if (_surrenderNoticeShown)
+        // 파트너가 없는 솔로/1인 방에서는 항복이 성립할 수 없으므로 버튼을 숨긴다.
+        if (!gameManager.Network.IsInRoom || gameManager.Network.PlayerCount < 2)
+            return;
+
+        if (GUILayout.Button("항복"))
+        {
+            _surrenderNoticeShown = false;
+            _surrenderCrossCancelledNoticeShown = false;
+            _surrenderRequestModalOpen = true;
+            ToggleOptions(false);
+        }
+
+        if (_surrenderCrossCancelledNoticeShown)
         {
             GUILayout.Label(
-                "항복 기능은 추후 구현 예정입니다.");
+                "항복 요청이 동시에 발생해 취소되었습니다. 다시 요청해주세요.");
         }
     }
 
@@ -441,6 +784,102 @@ public class OptionsPanelUI : MonoBehaviour
         }
 
         SceneManager.LoadScene(_titleSceneName);
+    }
+
+    private void BuildResolutionList()
+    {
+        Resolution[] rawResolutions = Screen.resolutions;
+
+        var widths = new System.Collections.Generic.List<int>();
+        var heights = new System.Collections.Generic.List<int>();
+        var refreshRates = new System.Collections.Generic.List<RefreshRate>();
+
+        for (int i = 0; i < rawResolutions.Length; i++)
+        {
+            Resolution candidate = rawResolutions[i];
+
+            int existingIndex = -1;
+            for (int j = 0; j < widths.Count; j++)
+            {
+                if (widths[j] == candidate.width && heights[j] == candidate.height)
+                {
+                    existingIndex = j;
+                    break;
+                }
+            }
+
+            if (existingIndex < 0)
+            {
+                widths.Add(candidate.width);
+                heights.Add(candidate.height);
+                refreshRates.Add(candidate.refreshRateRatio);
+            }
+            else if (candidate.refreshRateRatio.value > refreshRates[existingIndex].value)
+            {
+                refreshRates[existingIndex] = candidate.refreshRateRatio;
+            }
+        }
+
+        if (widths.Count == 0)
+        {
+            widths.Add(Screen.currentResolution.width);
+            heights.Add(Screen.currentResolution.height);
+            refreshRates.Add(Screen.currentResolution.refreshRateRatio);
+        }
+
+        _resolutions = new Resolution[widths.Count];
+        _resolutionLabels = new string[widths.Count];
+
+        for (int i = 0; i < widths.Count; i++)
+        {
+            _resolutions[i] = new Resolution
+            {
+                width = widths[i],
+                height = heights[i],
+                refreshRateRatio = refreshRates[i]
+            };
+
+            _resolutionLabels[i] =
+                $"{widths[i]}x{heights[i]} @{refreshRates[i].value:0}Hz";
+        }
+    }
+
+    private int FindCurrentResolutionIndex()
+    {
+        for (int i = 0; i < _resolutions.Length; i++)
+        {
+            if (_resolutions[i].width == Screen.currentResolution.width &&
+                _resolutions[i].height == Screen.currentResolution.height)
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private void ApplyScreenMode()
+    {
+        Screen.fullScreenMode = _appliedFullScreen
+            ? FullScreenMode.FullScreenWindow
+            : FullScreenMode.Windowed;
+    }
+
+    private void ApplyResolution()
+    {
+        Resolution resolution = _resolutions[_appliedResolutionIndex];
+
+        Screen.SetResolution(
+            resolution.width,
+            resolution.height,
+            _appliedFullScreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed,
+            resolution.refreshRateRatio);
+    }
+
+    private static void ConfirmRequestSurrender()
+    {
+        if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+            gameManager.Network.RequestSurrender();
     }
 
     private static void QuitGame()

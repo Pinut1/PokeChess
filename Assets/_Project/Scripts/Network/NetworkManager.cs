@@ -783,6 +783,96 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     // ─────────────────────────────────────────
+    // 항복(2인 합의) — 옵션창 [항복]에서 요청, 파트너 동의 시에만 성립.
+    // 마스터 경유 없이 2인 방 상대에게 직접 RPC(패턴: RPC_GoldReceive와 동일).
+    // ─────────────────────────────────────────
+
+    private bool _surrenderRequestSent;         // 내가 보낸 요청이 아직 응답 대기 중
+    private bool _surrenderRequestReceived;     // 파트너가 보낸 요청에 내가 아직 응답하지 않음
+    private bool _surrenderRejectedNotice;      // 내가 보낸 요청이 거절됨 — UI 1회 안내용
+    private bool _surrenderCrossCancelledNotice; // 교차 요청으로 취소됨 — UI 1회 안내용
+
+    /// <summary>파트너의 항복 요청에 아직 응답하지 않았는지. OptionsPanelUI가 매 프레임 폴링해 전용 모달을 띄운다.</summary>
+    public bool HasIncomingSurrenderRequest => _surrenderRequestReceived;
+
+    /// <summary>내가 보낸 항복 요청이 거절됐는지(1회성 안내). OptionsPanelUI가 감지 즉시 AcknowledgeSurrenderRejected로 소비한다.</summary>
+    public bool SurrenderRequestRejected => _surrenderRejectedNotice;
+
+    /// <summary>내 요청이 파트너의 요청과 교차해 취소됐는지(1회성 안내). OptionsPanelUI가 감지 즉시 AcknowledgeSurrenderCrossCancelled로 소비한다.</summary>
+    public bool SurrenderRequestCrossCancelled => _surrenderCrossCancelledNotice;
+
+    /// <summary>
+    /// 옵션창 [항복] 확인 팝업([요청하기])에서 호출. 파트너에게 항복 요청을 보낸다.
+    /// 이미 오가는 요청이 있으면 무시(중복 요청 방지). 솔로/1인 방에서는 무시.
+    /// </summary>
+    public void RequestSurrender()
+    {
+        if (_soloMode) return;
+        if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom.PlayerCount < MAX_PLAYERS) return;
+        if (_surrenderRequestSent || _surrenderRequestReceived) return;
+
+        _surrenderRequestSent = true;
+        photonView.RPC(nameof(RPC_SurrenderRequested), RpcTarget.Others);
+    }
+
+    /// <summary>파트너 요청 전용 모달의 [항복하기]/[계속하기]에서 호출.</summary>
+    public void RespondToSurrender(bool accepted)
+    {
+        if (!_surrenderRequestReceived) return;
+        _surrenderRequestReceived = false;
+
+        if (accepted)
+            photonView.RPC(nameof(RPC_SurrenderResolved), RpcTarget.All, true);
+        else
+            photonView.RPC(nameof(RPC_SurrenderResolved), RpcTarget.Others, false);
+    }
+
+    /// <summary>거절 안내를 표시한 뒤 OptionsPanelUI가 호출해 1회성 알림을 소비한다.</summary>
+    public void AcknowledgeSurrenderRejected() => _surrenderRejectedNotice = false;
+
+    /// <summary>교차 취소 안내를 표시한 뒤 OptionsPanelUI가 호출해 1회성 알림을 소비한다.</summary>
+    public void AcknowledgeSurrenderCrossCancelled() => _surrenderCrossCancelledNotice = false;
+
+    [PunRPC]
+    private void RPC_SurrenderRequested()
+    {
+        // 내가 이미 요청을 보내둔 상태에서 상대 요청도 도착 — 교차 요청. 자동으로 성립시키지 않고
+        // 양쪽 다 취소 처리해 다시 요청할 수 있게 한다(파트너의 명시적 [항복하기]로만 성립해야 함).
+        if (_surrenderRequestSent)
+        {
+            _surrenderRequestSent = false;
+            _surrenderRequestReceived = false;
+            _surrenderRejectedNotice = false;
+            _surrenderCrossCancelledNotice = true;
+            return;
+        }
+
+        // 이미 파트너의 요청에 응답 대기 중인데 추가 요청이 들어옴 — 기존 요청을 유지한 채 조용히 무시.
+        if (_surrenderRequestReceived)
+            return;
+
+        _surrenderRequestReceived = true;
+    }
+
+    [PunRPC]
+    private void RPC_SurrenderResolved(bool accepted)
+    {
+        _surrenderRequestSent = false;
+        _surrenderRequestReceived = false;
+
+        if (accepted)
+        {
+            GameEvents.SessionEnded(SessionEndReason.Surrender);
+
+            // 일반 패배와 달리 항복은 양쪽 합의로 판이 끝난 것이므로 바로 재시작까지 이어간다.
+            // RestartGame() 자체가 마스터 권위 가드를 갖고 있어 비마스터 쪽 호출은 no-op된다.
+            RestartGame();
+        }
+        else
+            _surrenderRejectedNotice = true;
+    }
+
+    // ─────────────────────────────────────────
     // 통신교환
     // 유닛 즉시 전송 → 상대 통신기 대기열 저장 → 수동 수령
     // ─────────────────────────────────────────
@@ -2045,6 +2135,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] {otherPlayer.NickName} 퇴장 (Inactive: {otherPlayer.IsInactive})");
 
+        // 응답 전 상대 이탈 — 항복 상태는 정리만 하고, 실제 패배 처리는 기존 이탈 흐름
+        // (유예 타이머 → GracePeriodExpired → SessionEnded)에 맡긴다.
+        _surrenderRequestSent = false;
+        _surrenderRequestReceived = false;
+        _surrenderRejectedNotice = false;
+        _surrenderCrossCancelledNotice = false;
+
         if (!otherPlayer.IsInactive)
         {
             // 자진 퇴장(룸 영구 이탈) 또는 PlayerTtl 만료로 인한 서버측 제거 — 유예 없이 바로 처리.
@@ -2368,6 +2465,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _gameStarted = false;
         _roundResultResolved = false;
 
+        // 항복 상태 초기화(이전 판의 잔여 요청/알림이 새 판으로 넘어가지 않도록)
+        _surrenderRequestSent = false;
+        _surrenderRequestReceived = false;
+        _surrenderRejectedNotice = false;
+        _surrenderCrossCancelledNotice = false;
+
         _lastKnownRound = 0;
         _localBoardRevision = 0;
         _lastOpponentBoardRevision = -1;
@@ -2536,6 +2639,15 @@ public class NetworkManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
         );
     }
+
+    // 오프라인은 파트너가 없어 항복 요청/응답 자체가 성립하지 않는다(실구현과 동일 공개 API 유지용 스텁).
+    public bool HasIncomingSurrenderRequest    => false;
+    public bool SurrenderRequestRejected       => false;
+    public bool SurrenderRequestCrossCancelled => false;
+    public void RequestSurrender()                    { }
+    public void RespondToSurrender(bool accepted)      { }
+    public void AcknowledgeSurrenderRejected()         { }
+    public void AcknowledgeSurrenderCrossCancelled()   { }
 }
 
 #endif
