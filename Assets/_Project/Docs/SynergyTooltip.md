@@ -32,7 +32,7 @@ SynergyTooltip_Pf     [Image(배경 synPanel_info), VerticalLayoutGroup, Content
   ├ TierLine_1 … _4   [TMP 18pt]   단계 수만큼만 켜진다
   └ UnitSlot_Root     [GridLayoutGroup]  cell 64×64 / 5열 / spacing 6
 
-UnitSlot_Pf           [Image(코스트 테두리), SynergyTooltipUnitSlot]   64×64
+UnitSlot_Pf           [Image(테두리 — 흰색 1장, 색만 교체), SynergyTooltipUnitSlot]   64×64
   └ Unit_Icon         [Image]      Preserve Aspect, 여백 6
 ```
 
@@ -40,7 +40,8 @@ UnitSlot_Pf           [Image(코스트 테두리), SynergyTooltipUnitSlot]   64�
 - 루트 `ContentSizeFitter`: Horizontal Unconstrained / **Vertical Preferred Size**
 - 루트 `VerticalLayoutGroup`: Control Child Size W/H 켬, **Force Expand Height 끔**
 - `UnitSlot_Root`에는 `ContentSizeFitter`를 붙이지 않는다 — 부모 VLG가 GridLayoutGroup의 preferred height를 그대로 쓰기 때문에 중복이다
-- 코스트 테두리는 `Art/UI/Frame/cardframe_sheet`의 `_0/_2/_4/_8/_5`(1~5코스트, ShopCardUI와 같은 매핑), 흑백은 `ui_Grayscale_mat` — 둘 다 배선돼 있다
+- **코스트 구분은 스프라이트가 아니라 색이다.** 테두리 Image에는 흰색 계열 스프라이트 **한 장**만 두고, `Cost Colors`(1~5코스트) 색을 곱한다. `Image.color`가 곱셈이라 원본이 흰색일수록 지정한 색이 그대로 나오고, 원본에 색이 섞여 있으면 곱해진 만큼 탁해진다
+- 미배치 칸은 아이콘만 흑백(`ui_Grayscale_mat`)이 되고 **테두리는 코스트 색을 유지한 채 어두워진다** — 테두리 색 자체가 코스트 정보라 회색이 되면 "안 뽑은 5코스트"와 "1코스트"를 구분할 수 없다
 - `SynergyRow_Pf` 루트 Image의 **Raycast Target은 켜둔 상태로 커밋**돼 있다(호버 판정용, 알파 0이라 보이지 않음)
 
 배경·테두리 스프라이트는 임시다. 전용 아트가 나오면 Image의 Sprite만 갈아끼우면 된다.
