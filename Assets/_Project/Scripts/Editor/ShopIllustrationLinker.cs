@@ -14,7 +14,11 @@ using UnityEngine;
 ///
 /// 두 종류를 연결한다.
 ///   · Link Card Illustrations → icon      (상점 카드·스탯창용 큰 일러스트, Art/UI/Illust)
-///   · Link Unit Icons         → unitIcon  (시너지 툴팁 같은 작은 칸 전용, Art/UI/UnitIcon)
+///   · Link Unit Icons         → unitIcon  (별도 png로 만든 전용 아이콘, Art/UI/UnitIcon)
+///
+/// 일러스트 한 장을 _0(전체)/_1(250×250 아이콘)로 쪼개 쓰는 경로는 이쪽이 아니라
+/// IllustSpriteSplitter가 담당한다 — 그쪽은 같은 파일 안의 서브 스프라이트를 물리므로
+/// 파일명 매칭이 아니라 이름 접미사(_0/_1)로 고른다.
 /// </summary>
 public static class ShopIllustrationLinker
 {
