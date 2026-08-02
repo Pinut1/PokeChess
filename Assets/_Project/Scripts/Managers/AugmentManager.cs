@@ -175,6 +175,39 @@ public class AugmentManager : MonoBehaviour
         GameEvents.AugmentSelected(data);
     }
 
+    /// <summary>
+    /// 재접속 복원 전용 진입점(2단계). 3택1 오퍼 절차 없이, 서버에 저장돼 있던 영문명으로 증강을
+    /// 조용히 재적용한다. SelectAugment()/Apply()는 재사용하지 않는다 — 그 경로를 타면 HeroAugment의
+    /// GrantUnitToBench()/AddReroll() 같은 "선택 시 1회" 지급이 재접속마다 다시 실행되기 때문이다.
+    /// 대신 Augment.Restore()(기본은 아무 것도 안 함, 지속 효과가 있는 증강만 오버라이드)로
+    /// 활성 목록만 복구하고 지속 효과만 재적용한다. GameEvents.AugmentSelected도 발행하지 않는다
+    /// (복원은 "선택"이 아니라 상태 되돌리기이므로 신규 선택 통지와 구분).
+    /// </summary>
+    public void RestoreAugmentByNameEn(string augmentNameEn)
+    {
+        if (string.IsNullOrEmpty(augmentNameEn)) return;
+
+        foreach (var data in AugmentCatalog.All)
+        {
+            if (data == null || data.augmentNameEn != augmentNameEn) continue;
+
+            if (Owns(data.augmentId))
+            {
+                Debug.LogWarning($"[Augment] {data.augmentName} 이미 보유 — 중복 복원 무시");
+                return;
+            }
+
+            var augment = AugmentFactory.Create(data);
+            augment.Restore();
+            _activeAugments.Add(augment);
+
+            Debug.Log($"[Augment] {data.augmentName} 복원(지속 효과만 재적용, 현재 {_activeAugments.Count}/{MAX_AUGMENTS})");
+            return;
+        }
+
+        Debug.LogWarning($"[Augment] 복원 대상 '{augmentNameEn}'을 AugmentCatalog에서 찾지 못함");
+    }
+
     /// <summary>미선택 상태 해소용 랜덤 자동 선택(시간 초과 / Ready). 오퍼 없으면 무시.</summary>
     private void AutoSelectRandom(string reason)
     {

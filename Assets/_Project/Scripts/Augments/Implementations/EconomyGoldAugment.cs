@@ -28,4 +28,21 @@ public class EconomyGoldAugment : Augment
         var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
         shop?.AddInterestPerTenGold(-INTEREST_DELTA); // 즉시지급 골드는 회수하지 않음
     }
+
+    /// <summary>
+    /// 재접속 복원 — 이자율 가산(ShopManager는 씬마다 새로 생성되어 유실됨)만 재적용.
+    /// 즉시 지급 골드는 재지급하지 않는다(이미 복원된 Gold 값에 반영되어 있음 — 재지급 시 중복 지급됨).
+    /// </summary>
+    public override void Restore()
+    {
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        if (shop == null)
+        {
+            Debug.LogWarning("[Augment] ShopManager 없음 — 골드를 획득했다! 복원 실패");
+            return;
+        }
+
+        shop.AddInterestPerTenGold(INTEREST_DELTA);
+        Debug.Log($"[Augment] 골드를 획득했다! 복원: 이자율 +{INTEREST_DELTA}(즉시 골드 재지급 없음)");
+    }
 }
