@@ -60,7 +60,7 @@ public class SynergyTooltipUI : MonoBehaviour
              "그것부터 쓰고, 부족한 만큼만 이걸로 만든다. 둘 다 없으면 아이콘 줄이 비어 보인다.")]
     [SerializeField] private SynergyTooltipUnitSlot _unitSlotPrefab;
 
-    [Tooltip("만들 수 있는 칸의 상한(폭주 방지). 현재 데이터의 최대는 13칸(독)이다.")]
+    [Tooltip("만들 수 있는 칸의 상한(폭주 방지). 현재 데이터의 최대는 10칸(독)이다.")]
     [SerializeField] private int _maxUnitSlots = 24;
 
     /// <summary>지금 그리고 있는 시너지. 컨트롤러가 같은 시너지인지 판단할 때 쓴다.</summary>
