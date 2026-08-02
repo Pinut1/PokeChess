@@ -25,7 +25,7 @@
 `Assets/Art/UI/Ui_Prefabs/` 아래 2개. 컴포넌트·값이 이미 채워져 있으니 씬에 올리기만 하면 된다.
 
 ```
-SynergyTooltip_Pf     [Image(배경 synPanel_info), VerticalLayoutGroup, ContentSizeFitter, SynergyTooltipUI]
+SynergyTooltip_Pf     [Image(배경 9-slice), VerticalLayoutGroup, ContentSizeFitter, SynergyTooltipUI]
   ├ Header_Panel      [HorizontalLayoutGroup]
   │   ├ Symbol_Image  [Image]      40×40, 런타임에 SynergyData.icon으로 교체됨
   │   └ NameText      [TMP 24pt]
@@ -45,6 +45,27 @@ UnitSlot_Pf           [Image(테두리 — 흰색 1장, 색만 교체), SynergyT
 - `SynergyRow_Pf` 루트 Image의 **Raycast Target은 켜둔 상태로 커밋**돼 있다(호버 판정용, 알파 0이라 보이지 않음)
 
 배경·테두리 스프라이트는 임시다. 전용 아트가 나오면 Image의 Sprite만 갈아끼우면 된다.
+
+### ⚠️ 배경 스프라이트의 slice 폭이 패널 높이의 바닥값을 정한다
+
+`Image`도 레이아웃 요소(`ILayoutElement`)라서, `ContentSizeFitter`는 같은 오브젝트에 붙은
+**Vertical Layout Group과 Image 중 큰 값**을 쓴다. 그런데 9-slice Image가 내놓는 preferred 크기는
+"테두리가 안 깨지는 최소 크기" = **border의 합**이다. 그래서 배경의 slice 폭이 넓으면
+내용과 무관하게 패널이 그 크기 밑으로 안 줄어든다.
+
+실제로 배경(`loginPanel_inputFrame_0`, 2001×2001)의 border가 250이던 때는 최소 크기가 **500**이라,
+내용이 326인데도 높이가 500에 묶여 아이콘 아래에 174px 여백이 남았다.
+**border를 100으로 다시 잘라 최소 크기를 200으로 낮춰서 해결했다.**
+
+- 아이콘 아래 여백이 이유 없이 남으면 **먼저 배경 스프라이트의 border부터 확인할 것.**
+  Pixels Per Unit Multiplier는 그리기에만 적용되고 이 계산에는 안 들어간다.
+- 지금 바닥값은 **200**이다. 악·얼음처럼 내용이 150 정도인 시너지는 아래 여백이 조금 남는다.
+  더 줄이려면 border를 더 낮추면 된다.
+- ⚠️ 이 스프라이트는 **`StatInfo_Panel_pf`(우클릭 스탯창)에서도 쓴다.** border를 바꾸면 그쪽
+  테두리 두께도 같이 변하니 함께 확인할 것.
+- 배경을 다른 스프라이트로 갈아끼울 때도 같은 함정이 있다. 정 안 되면 배경 Image를
+  `Background` 자식으로 분리하고 `Layout Element`의 Ignore Layout을 켜는 방법도 있다
+  (레이아웃 계산에서 아예 빠진다).
 
 ### 손대면 깨지는 값
 
