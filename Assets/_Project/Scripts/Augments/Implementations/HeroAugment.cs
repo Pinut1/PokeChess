@@ -24,6 +24,9 @@ public abstract class HeroAugment : Augment
         TagAllOwned();
     }
 
+    /// <summary>재접속 복원 — 1회성 지급(벤치 유닛/리롤)은 재실행하지 않고 스탯 태그만 재적용.</summary>
+    public override void Restore() => TagAllOwned();
+
     public override void OnUnitPlaced(PokemonUnit unit)  => TagIfTarget(unit);
     public override void OnUnitBenched(PokemonUnit unit) => TagIfTarget(unit);
 

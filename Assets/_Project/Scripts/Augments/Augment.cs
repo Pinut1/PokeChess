@@ -15,6 +15,13 @@ public abstract class Augment
     /// <summary>증강 제거 시 1회 호출 (정리 용도)</summary>
     public virtual void Remove() { }
 
+    /// <summary>
+    /// 재접속 복원 전용 진입점. 신규 선택(Apply)과 달리 1회성 지급(무료 유닛/골드/리롤 등)은
+    /// 재실행하지 않고, 씬 재로드로 유실되는 지속 효과(스탯 태그, 이자율 가산 등)만 재적용한다.
+    /// 기본값은 아무 것도 하지 않음(안전한 기본) — 지속 상태를 가진 증강만 오버라이드해서 사용.
+    /// </summary>
+    public virtual void Restore() { }
+
     // ── 라이프사이클 훅 — 필요한 것만 오버라이드 ──────────────────
 
     public virtual void OnRoundChanged(int round) { }

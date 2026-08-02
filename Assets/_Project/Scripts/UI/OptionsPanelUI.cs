@@ -70,6 +70,15 @@ public class OptionsPanelUI : MonoBehaviour
     private bool _partnerDisconnectEndConfirmOpen;
     private static GUIStyle _blockerStyle;
 
+    /// <summary>
+    /// BlockAllInput()이 비활성화하기 직전에 캐싱해 두는 EventSystem 참조.
+    /// EventSystem.enabled=false는 Unity 내부적으로 OnDisable()을 호출해 그 인스턴스를
+    /// EventSystem.current가 참조하는 활성 목록에서 제거한다 — 씬에 EventSystem이 1개뿐이라
+    /// 그 순간부터 EventSystem.current는 null을 반환한다. 나중에 재활성화할 때 current를
+    /// 다시 조회하면 항상 null이라 절대 켜지지 않으므로, 끄기 직전 참조를 여기 보관해 둔다.
+    /// </summary>
+    private static EventSystem _blockedEventSystem;
+
     private void Awake()
     {
         _masterVolume = Mathf.Clamp01(
@@ -123,6 +132,10 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnGracePeriodExpired   -= HandlePartnerGiveUpAvailable;
         GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
 
+        // 오브젝트가 비활성화/파괴되는 시점에도 대기 모달 때문에 꺼둔 EventSystem이 있다면 복구한다
+        // (씬 전환이면 새 EventSystem이 생성되므로 실질적 위험은 낮지만, 방어적으로 처리).
+        RestoreBlockedEventSystem();
+
         PlayerPrefs.Save();
     }
 
@@ -150,9 +163,7 @@ public class OptionsPanelUI : MonoBehaviour
         _partnerDisconnectEndConfirmOpen = false;
 
         // BlockAllInput()이 매 프레임 꺼뒀던 EventSystem을 되돌린다.
-        var eventSystem = EventSystem.current;
-        if (eventSystem != null)
-            eventSystem.enabled = true;
+        RestoreBlockedEventSystem();
     }
 
     private void OnGUI()
@@ -418,6 +429,9 @@ public class OptionsPanelUI : MonoBehaviour
             if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
                 gameManager.Network.ConfirmPartnerDisconnectGiveUp();
 
+            // 이 모달도 BlockAllInput()으로 EventSystem을 꺼둔 채였다 — 씬 전환 전 방어적으로 되돌린다.
+            RestoreBlockedEventSystem();
+
             // 기존 "타이틀로" 흐름을 그대로 재사용(LeaveRoom + 씬 전환) — 이 메서드 자체는 수정하지 않는다.
             ConfirmReturnToTitle();
         }
@@ -426,6 +440,8 @@ public class OptionsPanelUI : MonoBehaviour
         {
             if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
                 gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+
+            RestoreBlockedEventSystem();
 
             // 기존 "게임 종료" 흐름을 그대로 재사용 — 이 메서드 자체는 수정하지 않는다.
             QuitGame();
@@ -466,6 +482,11 @@ public class OptionsPanelUI : MonoBehaviour
             {
                 gameManager.Network.AcknowledgePartnerGaveUpReconnect();
 
+                // 이 모달도 BlockAllInput()으로 EventSystem을 꺼둔 채였다 — 씬 전환(ConfirmReturnToTitle)이
+                // 끝나면 새 EventSystem이 생기긴 하지만, LeaveRoom 완료를 기다리는 동안 현재 씬에 남아있는
+                // 시간이 있으므로 방어적으로 여기서도 되돌린다.
+                RestoreBlockedEventSystem();
+
                 // 기존 패배 처리 흐름 재사용: SessionEnded 발행(전적 저장) → 기존 "타이틀로" 경로
                 // (RequestReturnToTitle → LeaveRoom 완료 → OnLeftRoom에서 씬 전환)를 그대로 탄다.
                 gameManager.Network.ConfirmPartnerDisconnectGiveUp();
@@ -504,7 +525,26 @@ public class OptionsPanelUI : MonoBehaviour
 
         var eventSystem = EventSystem.current;
         if (eventSystem != null && eventSystem.enabled)
+        {
+            // 끄기 직전 참조를 캐싱해 둔다 — 끄고 나면 EventSystem.current가 null이 되어
+            // 나중에 다시 조회하는 방식으로는 되돌릴 수 없다(클래스 상단 필드 설명 참고).
+            _blockedEventSystem = eventSystem;
             eventSystem.enabled = false;
+        }
+    }
+
+    /// <summary>
+    /// BlockAllInput()이 꺼둔 EventSystem을 되돌린다. EventSystem.current를 다시 조회하지 않고
+    /// 끄기 직전에 캐싱해 둔 참조를 그대로 사용한다(current는 비활성화된 순간 null이 되므로).
+    /// </summary>
+    private static void RestoreBlockedEventSystem()
+    {
+        if (_blockedEventSystem == null)
+            return;
+
+        _blockedEventSystem.enabled = true;
+        Debug.Log("[OptionsPanelUI] 파트너 이탈 대기 종료 — 캐싱된 EventSystem 재활성화");
+        _blockedEventSystem = null;
     }
 
     private void HandleEscapeKey()

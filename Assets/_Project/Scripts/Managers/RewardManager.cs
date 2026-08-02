@@ -25,6 +25,15 @@ public class RewardManager : MonoBehaviour
     /// <summary>라운드 진입(전투 전) 시 해당 스테이지 보상을 전액 선지급.</summary>
     private void HandleStageEntered(StageData stage)
     {
+        // 재접속으로 인한 씬 재로드 캐치업(ResyncAfterReconnect의 라운드 복구)이면 보상을 다시 지급하지
+        // 않는다(1단계: 구분만 함 — 실제 골드/유닛 복원은 다음 단계). _paidStages는 이 인스턴스 안에서만
+        // 유효한 중복 방지라 씬이 재생성되는 재접속 케이스는 막지 못해 이 가드가 별도로 필요하다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsResumingRejoinedMatch)
+        {
+            Debug.Log("[Reward] 재접속 복구 중 — 스테이지 보상 재지급 스킵");
+            return;
+        }
+
         if (stage == null)
         {
             Debug.LogWarning("[Reward] StageEntered stage 없음 — 보상 스킵");

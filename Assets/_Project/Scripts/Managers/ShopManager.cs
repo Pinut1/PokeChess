@@ -244,14 +244,37 @@ public class ShopManager : MonoBehaviour
 
         InitializeChampionPool();
 
-        // 초기 UI/상점 상태 동기화.
-        // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
-        GameEvents.GoldChanged(Gold);
-        GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
-        GameEvents.XpChanged(CurrentXp, RequiredXp);
-        GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
+        // 재접속으로 인한 씬 재로드로 이번 씬에 들어왔는지. Start() 시점엔 씬의 모든 오브젝트의
+        // Awake()가 이미 끝났다고 Unity가 보장하므로(오브젝트 간 Awake() 순서 자체는 보장 안 됨),
+        // GameManager.Instance가 이 시점엔 항상 준비돼 있다 — 별도 필드 캐싱 없이 여기서 바로 읽는다.
+        // (과거엔 Awake()에서 캐싱했으나, 그러면 같은 GameObject 위의 GameManager.Awake()가 아직
+        // 안 돌았을 수 있어 GameManager.TryGet이 실패해 false로 잘못 캐싱되는 문제가 있었다.)
+        bool isResumingRejoinedMatch =
+            GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsResumingRejoinedMatch;
 
-        Roll();         // 초기 유닛 상점 공개
+        // 초기 UI/상점 상태 동기화. 재접속으로 인한 씬 재로드라면 스킵한다 — 이 클라이언트의 실제 골드/
+        // 레벨/XP/리롤 자원은 서버(Player CustomProperties 등)에 남아있을 수 있는데, 여기서 신규 매치
+        // 기본값(Gold=_startingGold, Level=1, Xp=0 등)을 그대로 방송해버리면 "새 게임처럼 초기화된 것
+        // 처럼" 보이게 된다. 실제 값을 읽어와 복원하는 로직은 다음 단계에서 추가 예정 — 1단계는 여기서
+        // 잘못된 기본값이 UI/이벤트로 퍼지는 것만 막는다.
+        if (!isResumingRejoinedMatch)
+        {
+            // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
+            GameEvents.GoldChanged(Gold);
+            GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
+            GameEvents.XpChanged(CurrentXp, RequiredXp);
+            GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
+        }
+
+        // 유닛 상점(Roll)은 재접속 시 스킵한다 — 협동 모드에서 Roll()은 로컬 추첨이 아니라
+        // network.RequestSharedShopRoll(...)로 마스터에게 "새로 굴려달라"고 요청하는데,
+        // 마스터의 TryAuthorityRollSharedShop()은 기존 예약을 무조건 반환하고 새로 만든다.
+        // 무조건 Roll()을 부르면 RequestSharedShopRestore()가 복원하려는 기존 예약을 먼저 지워버릴
+        // 수 있다(2026-08 확인). 재접속이면 상점 채우기는 RequestSharedShopRestore 응답에 맡긴다.
+        // 아이템 상점(RollItemShop)은 공유 풀 권위와 무관한 순수 로컬 추첨이라 그대로 둔다.
+        if (!isResumingRejoinedMatch)
+            Roll();         // 초기 유닛 상점 공개
+
         RollItemShop(); // 초기 아이템 상점 공개
     }
 
@@ -345,6 +368,16 @@ public class ShopManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
+        // 재접속 라운드 캐치업(NetworkManager.ResyncAfterReconnect의 RPC_OnRoundStart 로컬 재호출)으로
+        // 인한 재발행이면 여기서 아무것도 하지 않는다 — 이자 재계산/Roll/RollItemShop이 방금 복원된
+        // 골드·상점 상태를 덮어쓰는 문제가 있었다(2026-08 확인). 일반 라운드 진행(마스터가 실제로
+        // BroadcastRoundStart를 전체 방송하는 경우)에는 이 플래그가 켜져 있지 않아 기존 그대로 동작한다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+        {
+            Debug.Log("[Shop] 재접속 라운드 캐치업 — Roll/이자 재계산 스킵(복원된 상점/골드 유지)");
+            return;
+        }
+
         // 라운드별 고정 골드는 보상 테이블 선지급(RewardManager, OnStageEntered)이 담당.
         // 여기선 보유 골드 기반 이자만 지급(밸런스 기획서 §7.5). 1라운드는 이자 없음(4판 = 2~5라운드).
         if (round >= 2)
@@ -1377,6 +1410,24 @@ public class ShopManager : MonoBehaviour
     // ──────────────────────────────────────────
     // 공유 챔피언 풀 (MasterClient 권위)
     // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 재접속 복원 전용(변경 없는 조회) — 이 액터의 기존 상점 예약이 아직 남아있으면 그대로 반환한다.
+    /// TryAuthorityRollSharedShop과 달리 _sharedReservations를 건드리지 않는다(반환/재추첨/풀 차감 없음).
+    /// MasterClient만 호출. 마스터 교체 등으로 예약 자체가 없으면 false.
+    /// </summary>
+    public bool TryAuthorityGetExistingSharedShopReservation(int actorNumber, out int revision, out int[] pokemonIds)
+    {
+        revision = 0;
+        pokemonIds = null;
+
+        if (!_sharedReservations.TryGetValue(actorNumber, out var reservation) || reservation.pokemonIds == null)
+            return false;
+
+        revision = reservation.revision;
+        pokemonIds = (int[])reservation.pokemonIds.Clone();
+        return true;
+    }
 
     /// <summary>기존 미구매 예약을 반환하고 새 상점 5칸을 풀에서 예약한다. MasterClient만 호출.</summary>
     public bool TryAuthorityRollSharedShop(

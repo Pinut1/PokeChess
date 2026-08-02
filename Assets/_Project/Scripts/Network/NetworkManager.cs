@@ -75,6 +75,38 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC와 달리 유예(비활성) 중에도 서버에 보존돼 재접속·마스터 교체에 안전하다.</summary>
     private const string AUGMENTS_PROP_KEY = "Augments";
 
+    /// <summary>내 보드+벤치 유닛 스냅샷(JSON 직렬화된 BoardManager.UnitSaveData[])을 Player
+    /// CustomProperties에 저장할 때 쓰는 키(1차 구현 — 저장/복원 기반만).</summary>
+    private const string UNITS_PROP_KEY = "Units";
+
+    /// <summary>재접속 유닛 스냅샷 복원 중인지. 복원 중엔 BoardManager.TryPlaceUnit/TryPlaceInBench가
+    /// 발생시키는 OnUnitPlaced/OnUnitBenched로 인해 저장 핸들러가 재실행되며 불완전한 스냅샷을
+    /// 덮어쓰는 것을 막는다(2026-08 설계 검토에서 확인된 위험).</summary>
+    private bool _isRestoringUnitSnapshot;
+
+    /// <summary>
+    /// ResyncAfterReconnect()의 라운드 캐치업(RPC_OnRoundStart 로컬 호출) 실행 중인지. 이 호출이
+    /// GameEvents.RoundChanged를 발행해 ShopManager.HandleRoundChanged가 같은 프레임에 동기 실행되는데,
+    /// 그 안의 무조건 Roll()/RollItemShop()/이자 계산이 방금 복원한 상점/골드를 다시 덮어쓰는 문제가
+    /// 있었다(2026-08 확인). s_isResumingRejoinedMatch는 이번 씬의 Start() 단계 내내 유지돼야 하는
+    /// 값이라(ShopManager.Start() 자신의 가드가 이를 그대로 써야 함) 재사용하지 않고, 이 캐치업 호출
+    /// "한 번"만을 좁게 감싸는 별도 플래그를 둔다 — try/finally로 호출 직후 즉시 꺼지므로, 이후
+    /// 이어지는 정상적인 라운드 진행(2→3라운드 등)에는 전혀 영향을 주지 않는다.
+    /// </summary>
+    private bool _isApplyingReconnectRoundCatchup;
+
+    /// <summary>재접속 라운드 캐치업(RPC_OnRoundStart 로컬 재호출)이 지금 진행 중인지. ShopManager 등이
+    /// 이 시점의 RoundChanged를 "복원 중 재발행"으로 구분해 자신의 초기화 로직을 건너뛸 때 쓴다.</summary>
+    public bool IsApplyingReconnectRoundCatchup => _isApplyingReconnectRoundCatchup;
+
+    /// <summary>UnitSaveData[]를 JsonUtility로 직렬화하기 위한 래퍼(JsonUtility는 배열을 루트로 직렬화 못 함).
+    /// 순수 JSON 변환 전용 — BoardManager는 이 타입을 몰라도 된다.</summary>
+    [System.Serializable]
+    private class UnitSnapshotWrapper
+    {
+        public BoardManager.UnitSaveData[] units;
+    }
+
     /// <summary>팀 공통 HP를 Room CustomProperties에 저장할 때 쓰는 키(GDD: 팀 공통 체력).</summary>
     private const string TEAM_HP_PROP_KEY = "TeamHP";
 
@@ -140,6 +172,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private static bool s_resyncAfterRejoinPending;
 
+    /// <summary>
+    /// 재접속으로 인한 씬 재로드로 이번 게임 씬에 들어왔는지(1단계: 구분만 함, 실제 데이터 복원은 다음 단계).
+    /// s_resyncAfterRejoinPending과 달리 NetworkManager 자신의 Start()에서 소비/리셋하지 않는다 —
+    /// BoardManager/ShopManager/RewardManager 등 다른 컴포넌트가 각자의 Awake()에서 이 값을 읽어야 하는데,
+    /// 서로 다른 컴포넌트의 Start() 실행 순서는 Unity가 보장하지 않으므로 NetworkManager.Start()가 먼저
+    /// 이 값을 지워버리면 경쟁이 생긴다(2026-08 설계 검토). Set은 OnJoinedRoom(재접속 씬 이동 예약 시점),
+    /// Clear는 OnJoinedRoom(재접속이 아닌 일반 입장 시점) — OnRoomFull()은 마스터 여부/MATCH_GUID 존재
+    /// 여부에 따라 실행이 갈려 안전한 지점이 아니라 사용하지 않는다.
+    /// </summary>
+    private static bool s_isResumingRejoinedMatch;
+
+    /// <summary>재접속 씬 재로드로 이번 게임 씬에 들어왔는지(읽기 전용). 다른 매니저는 Awake()에서 이 값을
+    /// 로컬 필드로 캐싱해 써야 한다(Start() 시점엔 이미 아래 Clear 위치를 지났을 수 있음).</summary>
+    public bool IsResumingRejoinedMatch => s_isResumingRejoinedMatch;
+
     // ─────────────────────────────────────────
     // 상태 프로퍼티 (읽기 전용)
     // ─────────────────────────────────────────
@@ -161,6 +208,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
         GameEvents.OnGoldTransferRequested += HandleGoldTransferRequested;
         GameEvents.OnPlayerReadyApproved += BroadcastPlayerReady;
+
+        // 유닛 스냅샷 저장 트리거(1차 구현) — 새 이벤트를 만들지 않고 기존 이벤트를 재사용.
+        GameEvents.OnUnitPlaced += HandleUnitSnapshotDirty;
+        GameEvents.OnUnitBenched += HandleUnitSnapshotDirty;
+        GameEvents.OnUnitSold += HandleUnitSnapshotDirty;
+        GameEvents.OnUnitChanged += HandleUnitSnapshotDirty;
+        GameEvents.OnInventoryChanged += HandleUnitSnapshotDirtyNoArg;
     }
 
     public override void OnDisable()
@@ -168,6 +222,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
         GameEvents.OnGoldTransferRequested -= HandleGoldTransferRequested;
         GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+
+        GameEvents.OnUnitPlaced -= HandleUnitSnapshotDirty;
+        GameEvents.OnUnitBenched -= HandleUnitSnapshotDirty;
+        GameEvents.OnUnitSold -= HandleUnitSnapshotDirty;
+        GameEvents.OnUnitChanged -= HandleUnitSnapshotDirty;
+        GameEvents.OnInventoryChanged -= HandleUnitSnapshotDirtyNoArg;
 
         base.OnDisable();
     }
@@ -248,6 +308,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void Start()
     {
+        // 진단 로그(2026-08, 재접속 복원 미실행 문제 추적용) — 로직 변경 없음. 어느 분기가 실제로
+        // 실행되는지(재접속 복원이 왜 안 도는지) 다음 테스트에서 바로 확정하기 위함.
+        Debug.Log($"[Network][Rejoin][Diag] Start() 진입 — _soloMode={_soloMode}, " +
+                  $"PhotonNetwork.IsConnected={PhotonNetwork.IsConnected}, " +
+                  $"s_resyncAfterRejoinPending={s_resyncAfterRejoinPending}, " +
+                  $"s_isResumingRejoinedMatch={s_isResumingRejoinedMatch}");
+
         if (_soloMode)
         {
             Debug.LogWarning("[Network] 솔로 모드 — Photon 미사용, 즉시 라운드 1 시작");
@@ -356,7 +423,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 어떤 시점에 어떤 값인지를 로그로 비교하기 위한 진단 덤프. AttemptRejoinSavedSession 직전,
     /// OnJoinedRoom/OnJoinRoomFailed 진입 시 호출한다.
     /// </summary>
-    private static string DumpNetworkDiagnostics(string tag)
+    private string DumpNetworkDiagnostics(string tag)
     {
         var room = PhotonNetwork.CurrentRoom;
         var local = PhotonNetwork.LocalPlayer;
@@ -366,7 +433,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                $"IsOpen={(room != null ? room.IsOpen.ToString() : "n/a")} " +
                $"MyActor={(local != null ? local.ActorNumber : -1)} MyUserId={ShortUserId(PhotonNetwork.AuthValues?.UserId)}... " +
                $"MasterActor={(master != null ? master.ActorNumber : -1)} AutoSync={PhotonNetwork.AutomaticallySyncScene} " +
-               $"Scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}";
+               $"Scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name} " +
+               $"RejoinPurpose={_rejoinPurpose} ResyncPending={s_resyncAfterRejoinPending} " +
+               $"IsResumingMatch={s_isResumingRejoinedMatch}";
     }
 
     /// <summary>방 입장(신규/재입장 모두)에 성공할 때마다 UserId/RoomName/닉네임을 최신 상태로 저장한다.</summary>
@@ -601,6 +670,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         RejoinFailed = false;
         _rejoinPurpose = RejoinPurpose.EnterGame;
 
+        // AutomaticallySyncScene이 켜진 채로 RejoinRoom에 성공하면, PUN이 룸에 기록된 "현재 씬"
+        // (OnRoomFull이 매치 시작 시 PhotonNetwork.LoadLevel로 세팅해둔 것)을 감지해 이 커스텀 흐름과
+        // 무관하게 자체적으로 GameSceneTest를 먼저 불러올 수 있다 — 그러면 s_resyncAfterRejoinPending/
+        // s_isResumingRejoinedMatch가 세팅되기 전에 씬이 바뀌어 재동기화가 누락된다(2026-08 확인).
+        // AbandonPreviousSession()이 이미 같은 이유로 꺼두는 것과 동일한 조치. 복원은 성공 시
+        // OnJoinedRoom()이 직접 씬을 불러온 뒤 그 씬의 새 NetworkManager.Awake()가 되돌리고,
+        // 실패 시(전송 실패/OnJoinRoomFailed)는 각각 아래에서 명시적으로 되돌린다.
+        PhotonNetwork.AutomaticallySyncScene = false;
+
         Debug.Log(DumpNetworkDiagnostics("AttemptRejoinSavedSession/Before"));
         bool sent = PhotonNetwork.RejoinRoom(_pendingRejoinRoomName);
         Debug.Log($"[Network][Rejoin] 이전 게임 재입장 요청 전송 여부: {sent}");
@@ -609,6 +687,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             _rejoinPurpose = RejoinPurpose.None;
             RejoinFailed = true;
+            PhotonNetwork.AutomaticallySyncScene = true;
         }
     }
 
@@ -747,6 +826,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         return true;
     }
 
+    /// <summary>
+    /// 재접속 복원 전용 — 새로 굴리지 않고, 마스터에게 남아있는 내 기존 상점 예약을 그대로 돌려달라고
+    /// 요청한다. 예약이 없으면(마스터 교체 등) 새 상점으로 대체하지 않고 로그만 남기고 끝낸다.
+    /// </summary>
+    public bool RequestSharedShopRestore()
+    {
+        if (!UsesSharedShopPool) return false;
+        if (IsMasterClient)
+            ProcessSharedShopRestore(PhotonNetwork.LocalPlayer.ActorNumber);
+        else
+            photonView.RPC(nameof(RPC_RequestSharedShopRestore), RpcTarget.MasterClient);
+        return true;
+    }
+
     public bool RequestSharedShopPurchase(int revision, int slot)
     {
         if (!UsesSharedShopPool) return false;
@@ -844,6 +937,38 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         BroadcastSharedPoolMirror(actorNumber, revision, slots);
+        SendSharedShopSnapshot(actorNumber, revision, slots);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSharedShopRestore(PhotonMessageInfo info)
+    {
+        if (!IsMasterClient || info.Sender == null) return;
+        ProcessSharedShopRestore(info.Sender.ActorNumber);
+    }
+
+    /// <summary>
+    /// 재접속 복원 전용 — TryAuthorityRollSharedShop(새 추첨)을 부르지 않고, 조회 전용
+    /// TryAuthorityGetExistingSharedShopReservation으로 기존 예약만 확인한다. 예약이 없으면
+    /// (마스터 교체 등으로 유실된 경우) 새 상점으로 대체하지 않고 로그만 남기고 끝낸다 —
+    /// SendSharedShopSnapshot을 호출하지 않으므로 재접속 클라이언트의 로컬 상점 상태를 건드리지 않는다.
+    /// </summary>
+    private void ProcessSharedShopRestore(int actorNumber)
+    {
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        if (shop == null)
+        {
+            Debug.LogWarning("[SharedShopPool][Restore] ShopManager를 찾을 수 없음 — 상점 복원 생략");
+            return;
+        }
+
+        if (!shop.TryAuthorityGetExistingSharedShopReservation(actorNumber, out int revision, out int[] slots))
+        {
+            Debug.LogWarning($"[SharedShopPool][Restore] actor={actorNumber} 기존 상점 예약 없음 — 복원 생략(신규 롤로 대체하지 않음)");
+            return;
+        }
+
+        Debug.Log($"[SharedShopPool][Restore] actor={actorNumber} 기존 상점 예약 발견 rev={revision} — 스냅샷 재전송");
         SendSharedShopSnapshot(actorNumber, revision, slots);
     }
 
@@ -2467,7 +2592,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (_rejoinPurpose == RejoinPurpose.NotifyAbandonAndLeave)
         {
-            // 게임에 실제로 들어가지 않고 파트너에게 포기 통지만 전달한 뒤 곧바로 다시 나간다.
+            // 게임 재참여가 아닌 포기 통지용 재입장.
+            // 파트너에게 포기 상태만 전달하고 즉시 룸을 나간다.
             Debug.Log("[Network][Rejoin] 포기 통지용 재입장 성공 — 파트너에게 통지 후 재이탈");
 
             if (PhotonNetwork.PlayerListOthers.Length > 0)
@@ -2475,13 +2601,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
             _rejoinPurpose = RejoinPurpose.None;
             PhotonNetwork.AutomaticallySyncScene = true;
-            // "새로 시작하기" 확정 — LeaveRoom()은 더 이상 세션을 지우지 않으므로(2026-08) 여기서 명시적으로 정리한다.
+
+            // 새로 시작하기 확정.
+            // 저장된 재접속 세션을 제거하고 룸 종료.
             ClearSavedRejoinSession("새로 시작하기 확정(포기 통지 완료)");
+
             LeaveRoom();
             return;
         }
 
+        // 이전 게임 재입장 여부 확인.
+        // 이 값은 아래 OnRoomFull()에서 신규 게임 시작과 구분하기 위해 유지한다.
         bool wasRejoiningToEnterGame = _rejoinPurpose == RejoinPurpose.EnterGame;
+
         _rejoinPurpose = RejoinPurpose.None;
         _pendingRejoinRoomName = null;
 
@@ -2489,25 +2621,45 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (wasRejoiningToEnterGame)
         {
-            // AutomaticallySyncScene의 룸-씬 캐치업 타이밍에 의존하지 않고, 재입장 시점에 이미
-            // 게임 씬이 아니면(타이틀=NetworkTest에서 재입장한 경우) NetworkManager가 직접 복귀시킨다.
+            // 이전 게임 재입장 성공.
+            // 타이틀 씬에서 재입장한 경우에는 Photon 씬 동기화를 기다리지 않고
+            // 직접 게임 씬으로 이동한 뒤 상태 복원을 진행한다.
             string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
             if (currentScene != GAME_SCENE_NAME)
             {
                 Debug.Log($"[Network][Rejoin] 재입장 성공 — 게임 씬으로 복귀 예약 ({currentScene} → {GAME_SCENE_NAME})");
+
+                // 씬 이동 완료 후 ResyncAfterReconnect 실행.
                 s_resyncAfterRejoinPending = true;
+                s_isResumingRejoinedMatch = true;
+
                 UnityEngine.SceneManagement.SceneManager.LoadScene(GAME_SCENE_NAME);
             }
             else
             {
                 Debug.Log("[Network] 이전 세션 재입장 성공 — 상태 재동기화");
+
                 _gameStarted = true;
                 ResyncAfterReconnect();
             }
         }
+        else
+        {
+            // 신규 게임 입장.
+            // 이전 재접속 플래그가 남아있다면 제거한다.
+            s_isResumingRejoinedMatch = false;
+        }
 
-        if (PlayerCount == MAX_PLAYERS)
+
+        // 중요:
+        // 재접속으로 룸에 다시 들어온 경우 OnRoomFull()을 호출하면
+        // 기존 게임 복원이 아니라 신규 게임 시작 흐름이 실행될 수 있다.
+        // 따라서 신규 입장일 때만 실행한다.
+        if (!wasRejoiningToEnterGame && PlayerCount == MAX_PLAYERS)
+        {
             OnRoomFull();
+        }
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
@@ -2546,6 +2698,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             Debug.LogWarning("[Network][Rejoin] 재입장 실패");
             _rejoinPurpose = RejoinPurpose.None;
             RejoinFailed = true;
+            // AttemptRejoinSavedSession()에서 꺼뒀던 것을 되돌린다 — 실패했으니 타이틀에 남아 이후
+            // 정상 신규 입장(JoinOrCreateRoom/JoinRandomRoom)을 시도할 수 있고, 그 흐름은 원래대로
+            // AutomaticallySyncScene=true를 전제로 한다.
+            PhotonNetwork.AutomaticallySyncScene = true;
             PhotonNetwork.JoinLobby();
         }
     }
@@ -2609,7 +2765,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_partnerGaveUpReconnectNotice)
             yield break; // 포기 통지가 먼저 도착 — 재접속 성공 처리를 생략한다.
 
-        Debug.Log("[Network] 상대 재접속 성공 — 대기 종료");
+        Debug.Log($"[Network] 상대 재접속 성공 — 대기 종료 (IsAwaitingPartnerReconnect={_opponentDisconnected})");
         GameEvents.OpponentReconnected();
     }
 
@@ -2897,6 +3053,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         GameEvents.BoardResyncRequested();
 
+        // 1) 파트너 정보 복원(기존 로직 유지) — 파트너 CustomProperties는 이벤트로 UI/전적에만 반영.
         foreach (var player in PhotonNetwork.PlayerList)
         {
             if (player == PhotonNetwork.LocalPlayer) continue;
@@ -2909,20 +3066,115 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 GameEvents.PartnerAugmentsChanged(augmentNames);
         }
 
+        // 2) 내 정보 복원(2단계 신규) — 서버(Player CustomProperties)에 남아있는 내 Gold/Augments를
+        // 기존 시스템에 반영한다. 유닛/보드/아이템/레벨·XP는 저장 위치 자체가 없어 이번 단계 범위 밖.
+        RestoreLocalPlayerStateAfterReconnect();
+
         int teamHp = TeamHealth;
         if (teamHp >= 0) GameEvents.HealthChanged(teamHp);
 
         // 끊긴 동안 라운드가 진행됐으면 현재 라운드로 재진입.
         // RPC_OnRoundStart를 로컬 직접 호출해 일반 라운드 시작과 같은 리셋 절차(준비/전투결과 속성 초기화)를 탄다.
+        // 이 호출이 발행하는 RoundChanged를 ShopManager 등이 "복원 중 재발행"으로 구분할 수 있도록
+        // 캐치업 플래그로 감싼다(방금 복원한 상점/골드를 무조건 Roll()/이자 재계산이 덮어쓰는 문제 방지).
         if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundObj))
         {
             int currentRound = (int)roundObj;
             if (currentRound > _lastKnownRound)
             {
                 Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
-                RPC_OnRoundStart(currentRound);
+
+                _isApplyingReconnectRoundCatchup = true;
+                try { RPC_OnRoundStart(currentRound); }
+                finally { _isApplyingReconnectRoundCatchup = false; }
             }
         }
+    }
+
+    /// <summary>
+    /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments Player CustomProperties를 읽어 기존
+    /// 시스템에 반영한다. 새 저장 구조는 만들지 않고 기존 GOLD_PROP_KEY/AUGMENTS_PROP_KEY만 읽는다.
+    /// 유닛/보드/아이템/레벨·XP는 애초에 저장 위치가 없어 이번 단계에서 다루지 않는다.
+    /// </summary>
+    private void RestoreLocalPlayerStateAfterReconnect()
+    {
+        if (!GameManager.TryGet(out var gm)) return;
+
+        var myProps = PhotonNetwork.LocalPlayer.CustomProperties;
+
+        // Gold: ShopManager.Gold는 private set이라 직접 대입할 수 없고, 기존 골드 변경 통로인
+        // AddGold(delta)를 통해서만 값을 바꾼다 — AddGold 자체가 내부에서 GameEvents.GoldChanged를
+        // 발행하므로 "GoldChanged 이벤트 재사용" 요건과 "ShopManager 필드 직접 접근 금지" 요건을
+        // 동시에 만족한다(GoldChanged를 단독으로만 쏘면 UI 표시는 갱신되지만 실제 Gold 값은 그대로라
+        // 구매 판정과 표시가 어긋나는 문제가 있어 이 방식을 택함).
+        if (gm.Shop != null && myProps.TryGetValue(GOLD_PROP_KEY, out object myGold))
+        {
+            int savedGold = (int)myGold;
+            int delta = savedGold - gm.Shop.Gold;
+            if (delta != 0)
+            {
+                gm.Shop.AddGold(delta);
+                Debug.Log($"[Network][Rejoin] 내 골드 복원: {gm.Shop.Gold}G (서버 저장값 {savedGold}G)");
+            }
+        }
+
+        // Augments: 기존 GameEvents 흐름(OnPartnerAugmentsChanged)은 전적 기록 전용이라 실제 효과를
+        // 적용하지 않는다 — AugmentManager에 실제로 적용까지 하는 진입점이 없어 최소 복원 진입점
+        // (RestoreAugmentByNameEn, SelectAugment 재사용)을 새로 추가해 사용한다.
+        if (gm.Augment != null && myProps.TryGetValue(AUGMENTS_PROP_KEY, out object myAugments) &&
+            myAugments is string[] myAugmentNames)
+        {
+            foreach (var nameEn in myAugmentNames)
+                gm.Augment.RestoreAugmentByNameEn(nameEn);
+        }
+
+        // 유닛/보드/벤치(1차 구현) — BoardManager.RestoreFromSnapshot()이 기존 TryPlaceUnit/
+        // TryPlaceInBench를 재사용하며 OnUnitPlaced/OnUnitBenched를 그대로 발생시키므로,
+        // 그 이벤트로 다시 저장 핸들러가 실행돼 불완전한 스냅샷을 덮어쓰지 않도록 가드로 감싼다.
+        if (gm.Board != null && myProps.TryGetValue(UNITS_PROP_KEY, out object myUnitsJson) &&
+            myUnitsJson is string unitsJson && !string.IsNullOrEmpty(unitsJson))
+        {
+            UnitSnapshotWrapper wrapper = null;
+            try { wrapper = JsonUtility.FromJson<UnitSnapshotWrapper>(unitsJson); }
+            catch (System.Exception e) { Debug.LogError($"[Network][Rejoin] 유닛 스냅샷 파싱 실패: {e.Message}"); }
+
+            if (wrapper?.units != null)
+            {
+                _isRestoringUnitSnapshot = true;
+                try { gm.Board.RestoreFromSnapshot(wrapper.units); }
+                finally { _isRestoringUnitSnapshot = false; }
+
+                Debug.Log($"[Network][Rejoin] 유닛 스냅샷 복원 완료: {wrapper.units.Length}개");
+            }
+        }
+
+        // 유닛 상점(공유 챔피언 풀 예약) 복원 — 새로 저장한 데이터가 아니라, 마스터에게 남아있는
+        // 내 기존 예약을 요청만 한다(RequestSharedShopRoll처럼 새로 굴리지 않음).
+        RequestSharedShopRestore();
+    }
+
+    /// <summary>유닛 스냅샷 저장 트리거(PokemonUnit 인자 있는 이벤트용). 복원 중엔 무시한다.</summary>
+    private void HandleUnitSnapshotDirty(PokemonUnit _) => SaveUnitSnapshot();
+
+    /// <summary>유닛 스냅샷 저장 트리거(인자 없는 이벤트용, OnInventoryChanged). 복원 중엔 무시한다.</summary>
+    private void HandleUnitSnapshotDirtyNoArg() => SaveUnitSnapshot();
+
+    /// <summary>
+    /// BoardManager의 현재 보드+벤치 상태를 JSON으로 직렬화해 Player CustomProperties에 저장한다.
+    /// _isRestoringUnitSnapshot이 true인 동안(재접속 복원 중)엔 실행하지 않는다 — 복원이 재배치
+    /// 이벤트를 유발해 이 핸들러를 재호출하더라도, 아직 다 복원되지 않은 불완전한 스냅샷을
+    /// 되돌려 저장하는 것을 막기 위함(2026-08 설계 검토에서 확인된 위험).
+    /// </summary>
+    private void SaveUnitSnapshot()
+    {
+        if (_isRestoringUnitSnapshot) return;
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        if (!GameManager.TryGet(out var gm) || gm.Board == null) return;
+
+        var wrapper = new UnitSnapshotWrapper { units = gm.Board.BuildSnapshot().ToArray() };
+        string json = JsonUtility.ToJson(wrapper);
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { UNITS_PROP_KEY, json } });
     }
 
     // ─────────────────────────────────────────
@@ -3071,6 +3323,8 @@ public class NetworkManager : MonoBehaviour
     public bool RejoinFailed           => false;
     public bool PartnerGaveUpReconnect => false;
     public bool IsAwaitingPartnerReconnect => false; // 오프라인은 파트너 이탈 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsResumingRejoinedMatch => false; // 오프라인은 재접속 개념 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsApplyingReconnectRoundCatchup => false; // 오프라인은 재접속 캐치업 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public void AttemptRejoinSavedSession()          { }
     public void AcknowledgeRejoinFailure()           { }
     public void AbandonPreviousSession()             { }
@@ -3144,6 +3398,7 @@ public class NetworkManager : MonoBehaviour
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
+    public bool RequestSharedShopRestore() => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
     public bool RequestSharedShopMergePurchase(int revision, int slotA, int slotB) => false;
     public void RequestSharedShopReturn(int pokemonId, int amount) { }
