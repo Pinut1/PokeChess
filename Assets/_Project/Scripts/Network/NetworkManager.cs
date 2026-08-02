@@ -79,6 +79,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// CustomProperties에 저장할 때 쓰는 키(1차 구현 — 저장/복원 기반만).</summary>
     private const string UNITS_PROP_KEY = "Units";
 
+    /// <summary>유닛 스냅샷 저장 디바운스 지연(초). 벤치 정리처럼 배치/판매 이벤트가 짧은 시간에
+    /// 연달아 발생해도 SetCustomProperties를 매번 동기 호출하지 않고, 마지막 변경 후 이 시간만큼
+    /// 조용하면 그때 한 번만 저장한다(Photon CustomProperties 갱신 빈도 제한 회피, 2026-08 코드리뷰).</summary>
+    private const float UNIT_SNAPSHOT_SAVE_DELAY = 0.5f;
+
+    /// <summary>디바운스 대기 중인 유닛 스냅샷 저장 코루틴. 새 변경 이벤트가 오면 재시작(타이머 리셋)한다.</summary>
+    private Coroutine _saveUnitSnapshotCoroutine;
+
     /// <summary>재접속 유닛 스냅샷 복원 중인지. 복원 중엔 BoardManager.TryPlaceUnit/TryPlaceInBench가
     /// 발생시키는 OnUnitPlaced/OnUnitBenched로 인해 저장 핸들러가 재실행되며 불완전한 스냅샷을
     /// 덮어쓰는 것을 막는다(2026-08 설계 검토에서 확인된 위험).</summary>
@@ -3154,16 +3162,36 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>유닛 스냅샷 저장 트리거(PokemonUnit 인자 있는 이벤트용). 복원 중엔 무시한다.</summary>
-    private void HandleUnitSnapshotDirty(PokemonUnit _) => SaveUnitSnapshot();
+    private void HandleUnitSnapshotDirty(PokemonUnit _) => RequestSaveUnitSnapshot();
 
     /// <summary>유닛 스냅샷 저장 트리거(인자 없는 이벤트용, OnInventoryChanged). 복원 중엔 무시한다.</summary>
-    private void HandleUnitSnapshotDirtyNoArg() => SaveUnitSnapshot();
+    private void HandleUnitSnapshotDirtyNoArg() => RequestSaveUnitSnapshot();
+
+    /// <summary>
+    /// 유닛 스냅샷 저장을 디바운스로 예약한다. 벤치 정리처럼 배치/판매 이벤트가 한 프레임 사이에
+    /// 여러 번 연달아 발생해도, 매번 직렬화+SetCustomProperties를 동기 호출하지 않고 마지막 요청
+    /// 기준 UNIT_SNAPSHOT_SAVE_DELAY초 뒤 한 번만 저장한다(이미 대기 중이면 타이머를 리셋).
+    /// </summary>
+    private void RequestSaveUnitSnapshot()
+    {
+        if (_isRestoringUnitSnapshot) return;
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+
+        if (_saveUnitSnapshotCoroutine != null) StopCoroutine(_saveUnitSnapshotCoroutine);
+        _saveUnitSnapshotCoroutine = StartCoroutine(SaveUnitSnapshotAfterDelay());
+    }
+
+    private System.Collections.IEnumerator SaveUnitSnapshotAfterDelay()
+    {
+        yield return new WaitForSeconds(UNIT_SNAPSHOT_SAVE_DELAY);
+        _saveUnitSnapshotCoroutine = null;
+        SaveUnitSnapshot();
+    }
 
     /// <summary>
     /// BoardManager의 현재 보드+벤치 상태를 JSON으로 직렬화해 Player CustomProperties에 저장한다.
-    /// _isRestoringUnitSnapshot이 true인 동안(재접속 복원 중)엔 실행하지 않는다 — 복원이 재배치
-    /// 이벤트를 유발해 이 핸들러를 재호출하더라도, 아직 다 복원되지 않은 불완전한 스냅샷을
-    /// 되돌려 저장하는 것을 막기 위함(2026-08 설계 검토에서 확인된 위험).
+    /// RequestSaveUnitSnapshot()의 디바운스 지연 후에만 호출된다 — 재진입 시점의 상태를 다시
+    /// 확인해야 하므로 복원/솔로/방 밖 여부를 여기서도 한 번 더 검사한다.
     /// </summary>
     private void SaveUnitSnapshot()
     {
