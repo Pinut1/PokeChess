@@ -67,9 +67,12 @@ public class SynergyTooltipUnitSlot : MonoBehaviour
 
         if (_icon != null)
         {
-            _icon.sprite = data.icon;
-            // 아이콘이 아직 없는 포켓몬은 흰 사각형 대신 빈 칸으로 둔다(테두리는 남는다).
-            _icon.enabled = data.icon != null;
+            // 전용 아이콘이 있으면 그것, 없으면 상점 일러스트로 폴백한다(PokemonData.UnitIcon).
+            Sprite sprite = data.UnitIcon;
+
+            _icon.sprite = sprite;
+            // 그림이 아직 없는 포켓몬은 흰 사각형 대신 빈 칸으로 둔다(테두리는 남는다).
+            _icon.enabled = sprite != null;
             _icon.color = tint;
             _icon.material = placed ? null : _grayscaleMaterial;
         }

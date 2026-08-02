@@ -1,43 +1,82 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Assets/Art/UI/Illust의 "001bulbasaur_card.png" 식 파일명(앞 3자리 = 도감번호)을
-/// PokemonDatabase의 PokemonData.id와 매칭해 icon(Sprite) 필드를 일괄 연결하는 1회성 툴.
-/// PokeChessImporter의 JSON 재임포트와는 별개 — icon은 임포터가 보호하는 필드라
-/// 이 메뉴로 별도 실행해야 한다. 이미 icon이 채워진 항목은 덮어쓰지 않는다.
+/// 파일명 앞 3자리(도감번호)를 PokemonData.id와 매칭해 스프라이트 필드를 일괄 연결하는 1회성 툴.
+/// 예: "001bulbasaur_card.png" → id 1의 포켓몬.
+///
+/// PokeChessImporter의 JSON 재임포트와는 별개다 — 스프라이트 필드는 임포터가 보호하는(덮어쓰지 않는)
+/// 수동 필드라 이 메뉴로 따로 실행해야 한다. 이미 채워진 항목은 건너뛰므로 손으로 물린 예외는 살아남는다.
+///
+/// 두 종류를 연결한다.
+///   · Link Card Illustrations → icon      (상점 카드·스탯창용 큰 일러스트, Art/UI/Illust)
+///   · Link Unit Icons         → unitIcon  (시너지 툴팁 같은 작은 칸 전용, Art/UI/UnitIcon)
 /// </summary>
 public static class ShopIllustrationLinker
 {
-    private const string IllustFolder = "Assets/Art/UI/Illust";
-    private const string PokemonDbPath = "Assets/Resources/PokemonDatabase.asset";
+    private const string IllustFolder   = "Assets/Art/UI/Illust";
+    private const string UnitIconFolder = "Assets/Art/UI/UnitIcon";
+    private const string PokemonDbPath  = "Assets/Resources/PokemonDatabase.asset";
 
     [MenuItem("PokeChess/Link Card Illustrations")]
     public static void LinkIllustrations()
     {
+        Link("ShopIllustrationLinker", IllustFolder,
+             data => data.icon,
+             (data, sprite) => data.icon = sprite);
+    }
+
+    [MenuItem("PokeChess/Link Unit Icons")]
+    public static void LinkUnitIcons()
+    {
+        Link("UnitIconLinker", UnitIconFolder,
+             data => data.unitIcon,
+             (data, sprite) => data.unitIcon = sprite);
+    }
+
+    /// <summary>
+    /// folder 안의 png를 도감번호로 매칭해 setter가 가리키는 필드를 채운다.
+    /// getter가 이미 값을 반환하는(= 수동으로 물려둔) 항목은 건드리지 않는다.
+    /// </summary>
+    private static void Link(string tag, string folder,
+                             Func<PokemonData, Sprite> getter,
+                             Action<PokemonData, Sprite> setter)
+    {
         var db = AssetDatabase.LoadAssetAtPath<PokemonDatabase>(PokemonDbPath);
         if (db == null || db.all == null)
         {
-            Debug.LogError($"[ShopIllustrationLinker] {PokemonDbPath} 없음 — Import Pokemon JSON 먼저 실행하세요.");
+            Debug.LogError($"[{tag}] {PokemonDbPath} 없음 — Import Pokemon JSON 먼저 실행하세요.");
             return;
         }
 
-        // id(3자리, 예: 001) -> 파일 경로
-        var byId = new System.Collections.Generic.Dictionary<int, string>();
-        string[] files = Directory.GetFiles(IllustFolder, "*.png");
+        if (!Directory.Exists(folder))
+        {
+            Debug.LogError($"[{tag}] {folder} 폴더가 없습니다 — 아이콘 png를 그 경로에 넣고 다시 실행하세요. " +
+                           "파일명 앞 3자리가 도감번호여야 합니다(예: 001bulbasaur_icon.png).");
+            return;
+        }
+
+        // id(3자리, 예: 001) → 파일 경로
+        var byId = new Dictionary<int, string>();
         var idPrefix = new Regex(@"^(\d{3})");
 
-        foreach (var path in files)
+        foreach (var path in Directory.GetFiles(folder, "*.png"))
         {
             string fileName = Path.GetFileNameWithoutExtension(path);
             var m = idPrefix.Match(fileName);
             if (!m.Success) continue;
 
-            int id = int.Parse(m.Groups[1].Value);
-            string unityPath = path.Replace('\\', '/');
-            byId[id] = unityPath;
+            byId[int.Parse(m.Groups[1].Value)] = path.Replace('\\', '/');
+        }
+
+        if (byId.Count == 0)
+        {
+            Debug.LogWarning($"[{tag}] {folder}에서 도감번호로 시작하는 png를 못 찾았습니다 — 파일명을 확인하세요.");
+            return;
         }
 
         int linked = 0, skippedAlreadySet = 0, missing = 0;
@@ -46,7 +85,7 @@ public static class ShopIllustrationLinker
         {
             if (data == null) continue;
 
-            if (data.icon != null)
+            if (getter(data) != null)
             {
                 skippedAlreadySet++;
                 continue;
@@ -54,7 +93,7 @@ public static class ShopIllustrationLinker
 
             if (!byId.TryGetValue(data.id, out string path))
             {
-                Debug.LogWarning($"[ShopIllustrationLinker] id {data.id} ({data.pokemonNameEn}) — 일치하는 일러스트 파일 없음");
+                Debug.LogWarning($"[{tag}] id {data.id} ({data.pokemonNameEn}) — 일치하는 파일 없음");
                 missing++;
                 continue;
             }
@@ -62,17 +101,17 @@ public static class ShopIllustrationLinker
             var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
             if (sprite == null)
             {
-                Debug.LogWarning($"[ShopIllustrationLinker] {path} — Sprite로 로드 실패(임포트 설정 확인 필요)");
+                Debug.LogWarning($"[{tag}] {path} — Sprite로 로드 실패(Texture Type을 Sprite로 바꿨는지 확인)");
                 missing++;
                 continue;
             }
 
-            data.icon = sprite;
+            setter(data, sprite);
             EditorUtility.SetDirty(data);
             linked++;
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[ShopIllustrationLinker] 연결 {linked} / 이미 설정됨(건너뜀) {skippedAlreadySet} / 매칭 실패 {missing}");
+        Debug.Log($"[{tag}] 연결 {linked} / 이미 설정됨(건너뜀) {skippedAlreadySet} / 매칭 실패 {missing}");
     }
 }
