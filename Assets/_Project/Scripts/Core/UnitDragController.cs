@@ -47,6 +47,7 @@ public class UnitDragController : MonoBehaviour
 
     private AugmentManager _augmentManager;
     private UIManager _uiManager;
+    private NetworkManager _network;
 
     private void Awake()
     {
@@ -57,6 +58,7 @@ public class UnitDragController : MonoBehaviour
         {
             _augmentManager = gm.GetComponent<AugmentManager>();
             _uiManager = gm.UI;
+            _network = gm.Network;
         }
     }
 
@@ -96,6 +98,14 @@ public class UnitDragController : MonoBehaviour
 
         // 플러시/마이농 선택창이 펼쳐진 동안 3D 조작 차단(증강과 동일한 방식)
         if (_uiManager != null && _uiManager.IsPlusleMinunChoiceBlocking)
+        {
+            if (_held != null) CancelDrag();
+            return;
+        }
+
+        // 파트너 재접속 대기 중엔 3D 조작 차단(증강/폼 선택창과 동일한 방식). 이 컨트롤러는 새 Input
+        // System을 직접 폴링해 EventSystem.enabled 토글(옵션창의 대기 모달 입력 차단)로는 막히지 않는다.
+        if (_network != null && _network.IsAwaitingPartnerReconnect)
         {
             if (_held != null) CancelDrag();
             return;

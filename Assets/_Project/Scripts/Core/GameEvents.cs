@@ -23,7 +23,8 @@ public enum SessionEndReason
     TeamHpZero,        // 팀 공통 HP 소진
     ReconnectFailed,   // 본인 재접속 실패
     PartnerAbandoned,  // 상대 미재접속(협동 불가)
-    BothDisconnected   // 둘 다 연결 끊김
+    BothDisconnected,  // 둘 다 연결 끊김
+    Surrender          // 2인 합의 항복(옵션창)
 }
 
 /// <summary>
@@ -250,13 +251,20 @@ public static class GameEvents
     // 연결 끊김 / 재접속
     // ──────────────────────────────────────────
 
-    /// <summary>상대방 연결 끊김(재접속 대기 중). 인자 = 유예 시간(초)</summary>
+    /// <summary>
+    /// 상대방 이탈 감지(재접속 대기 시작). 인자 = 참고용 유예 시간(초, RECONNECT_GRACE_PERIOD).
+    /// 의도적 퇴장(타이틀로/게임종료)과 비정상 연결 끊김 모두 동일하게 이 이벤트로 통일된다(2026-08 파트너 이탈 UX).
+    /// </summary>
     public static event Action<float> OnOpponentDisconnected;
 
-    /// <summary>상대방이 유예시간 내 재접속함</summary>
+    /// <summary>상대방이 재접속함(대기 중 언제든 발생 가능 — 시간 제한으로 막지 않음)</summary>
     public static event Action OnOpponentReconnected;
 
-    /// <summary>재접속 유예시간 종료. 인자 = 둘 다 끊겼는지 여부 (true면 세션 종료)</summary>
+    /// <summary>
+    /// 상대방 이탈 후 30초 경과 — [포기하기] 버튼을 노출해도 되는 시점(2026-08 재정의, 과거엔 "유예시간 종료=자동 세션 종료" 의미였음).
+    /// 더 이상 자동으로 세션을 종료하지 않는다 — 사용자가 직접 포기를 선택해야 GameEvents.SessionEnded가 발행된다.
+    /// 인자 bothDisconnected는 발행 시점 참고용(이 시점 기준 분기 처리는 하지 않음 — 동시 이탈 전용 흐름은 범위 밖).
+    /// </summary>
     public static event Action<bool> OnGracePeriodExpired;
 
     /// <summary>세션 종료(패배 처리). 인자 = 종료 사유. RoundPhaseManager(GameOver 전환)·MatchRecorder(전적 기록)가 구독.</summary>

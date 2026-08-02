@@ -11,6 +11,11 @@ using UnityEngine;
 /// </summary>
 public class ShopManager : MonoBehaviour
 {
+    /// <summary>파트너 재접속 대기 중엔 구매/리롤/XP구매를 막는다(2026-08 — 대기 중 입력 차단).</summary>
+    private static bool IsAwaitingPartnerReconnect() =>
+        GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsAwaitingPartnerReconnect;
+
+
     [Header("샵 풀")]
     [Tooltip("켜짐(권장): 중앙 PokemonDatabase의 shopBuyable 종으로 풀을 자동 구성. 데이터 구동이라 인스펙터 수동 할당 불필요.\n" +
              "꺼짐: 아래 _pool 인스펙터 배열만 사용(특정 종만 나오게 하는 디버그/제한 테스트용).")]
@@ -422,6 +427,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool BuyXp()
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_currentLevel >= _maxLevel)
         {
             Debug.Log("[LevelXP] 최대 레벨 — XP 구매 불가");
@@ -965,6 +972,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool Reroll()
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_sharedRollPending || _sharedPurchasePending)
         {
             Debug.Log("[Shop] 이전 공유 풀 요청 처리 중 — 리롤 대기");
@@ -1003,6 +1012,8 @@ public class ShopManager : MonoBehaviour
     /// <summary>슬롯의 포켓몬을 구매해 벤치에 배치. 성공 시 true.</summary>
     public bool Buy(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_slots == null || slot < 0 || slot >= _slots.Length)
             return false;
 
@@ -2410,6 +2421,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool RerollItemSlot(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_itemSlots == null ||
             slot < 0 ||
             slot >= _itemSlots.Length)
@@ -2559,6 +2572,8 @@ public class ShopManager : MonoBehaviour
     /// <summary>아이템 상점 슬롯의 상품을 아이템 쿠폰으로 구매해 인벤토리에 추가. 성공 시 true.</summary>
     public bool BuyItem(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
 
         ScriptableObject product = _itemSlots[slot];
