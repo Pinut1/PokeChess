@@ -25,8 +25,7 @@
 `Assets/Art/UI/Ui_Prefabs/` 아래 2개. 컴포넌트·값이 이미 채워져 있으니 씬에 올리기만 하면 된다.
 
 ```
-SynergyTooltip_Pf     [VerticalLayoutGroup, ContentSizeFitter, SynergyTooltipUI]   ← 배경 Image를 두면 안 된다(아래 ⚠️)
-  ├ Background        [Image(9-slice), LayoutElement(Ignore Layout ✔)]   부모를 꽉 채우는 stretch
+SynergyTooltip_Pf     [Image(배경 synPanel_info), VerticalLayoutGroup, ContentSizeFitter, SynergyTooltipUI]
   ├ Header_Panel      [HorizontalLayoutGroup]
   │   ├ Symbol_Image  [Image]      40×40, 런타임에 SynergyData.icon으로 교체됨
   │   └ NameText      [TMP 24pt]
@@ -46,17 +45,6 @@ UnitSlot_Pf           [Image(테두리 — 흰색 1장, 색만 교체), SynergyT
 - `SynergyRow_Pf` 루트 Image의 **Raycast Target은 켜둔 상태로 커밋**돼 있다(호버 판정용, 알파 0이라 보이지 않음)
 
 배경·테두리 스프라이트는 임시다. 전용 아트가 나오면 Image의 Sprite만 갈아끼우면 된다.
-
-### ⚠️ 레이아웃 그룹이 붙은 오브젝트에 배경 Image를 같이 두지 말 것
-
-`Image`도 레이아웃 요소(`ILayoutElement`)라서 `ContentSizeFitter`는 같은 오브젝트의
-**Vertical Layout Group과 Image 중 큰 값**을 쓴다. 9-slice 배경은 "테두리가 안 깨지는 최소 크기"를
-preferred로 내놓기 때문에, border 250인 스프라이트면 내용과 무관하게 **높이 500이 바닥값이 된다**
-(실제로 이것 때문에 아이콘 아래에 174px 여백이 생겼다).
-
-그래서 배경은 `Background` 자식으로 분리하고 **`Layout Element`의 Ignore Layout을 켜 둔다** —
-안 켜면 이번엔 레이아웃 그룹이 배경까지 세로로 쌓는다. 배경 스프라이트를 바꿀 때는
-루트가 아니라 이 `Background`의 Image를 건드릴 것.
 
 ### 손대면 깨지는 값
 
