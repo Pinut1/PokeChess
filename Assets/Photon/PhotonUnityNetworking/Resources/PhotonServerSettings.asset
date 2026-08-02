@@ -63,6 +63,8 @@ MonoBehaviour:
   - RPC_RestartGame
   - RPC_TradeQueueAck
   - RPC_TradeQueueReceive
+  - RPC_RequestSharedShopMergePurchase
+  - RPC_ResolveSharedShopMergePurchase
   - RPC_SurrenderRequested
   - RPC_SurrenderResolved
   - RPC_PartnerGaveUpReconnect
