@@ -35,7 +35,7 @@ public class EconomyGoldAugment : Augment
     /// </summary>
     public override void Restore()
     {
-        var shop = GameManager.Instance != null ? GameManager.Instance.Shop : null;
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
         if (shop == null)
         {
             Debug.LogWarning("[Augment] ShopManager 없음 — 골드를 획득했다! 복원 실패");

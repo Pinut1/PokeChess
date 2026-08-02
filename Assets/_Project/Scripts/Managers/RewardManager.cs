@@ -25,12 +25,16 @@ public class RewardManager : MonoBehaviour
     /// <summary>라운드 진입(전투 전) 시 해당 스테이지 보상을 전액 선지급.</summary>
     private void HandleStageEntered(StageData stage)
     {
-        // 재접속으로 인한 씬 재로드 캐치업(ResyncAfterReconnect의 라운드 복구)이면 보상을 다시 지급하지
-        // 않는다(1단계: 구분만 함 — 실제 골드/유닛 복원은 다음 단계). _paidStages는 이 인스턴스 안에서만
-        // 유효한 중복 방지라 씬이 재생성되는 재접속 케이스는 막지 못해 이 가드가 별도로 필요하다.
-        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsResumingRejoinedMatch)
+        // 재접속으로 인한 씬 재로드 캐치업(ResyncAfterReconnect의 라운드 복구, RPC_OnRoundStart 로컬
+        // 재호출)이면 보상을 다시 지급하지 않는다. _paidStages는 이 인스턴스 안에서만 유효한 중복
+        // 방지라 씬이 재생성되는 재접속 케이스는 막지 못해 이 가드가 별도로 필요하다.
+        // IsApplyingReconnectRoundCatchup을 쓴다(ShopManager.HandleRoundChanged와 동일 패턴) — 이 값은
+        // RPC_OnRoundStart 호출 하나만 try/finally로 좁게 감싸 자동으로 꺼진다. IsResumingRejoinedMatch는
+        // 재접속 성공 후 되돌아 꺼지는 지점이 없어 그걸 쓰면 재접속 이후 남은 라운드 전부의 보상이
+        // 영구히 스킵되는 회귀가 있었다(2026-08 코드리뷰에서 발견).
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
         {
-            Debug.Log("[Reward] 재접속 복구 중 — 스테이지 보상 재지급 스킵");
+            Debug.Log("[Reward] 재접속 라운드 캐치업 중 — 스테이지 보상 재지급 스킵");
             return;
         }
 
