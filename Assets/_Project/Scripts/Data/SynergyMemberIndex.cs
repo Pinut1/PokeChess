@@ -66,6 +66,11 @@ public static class SynergyMemberIndex
         {
             if (pokemon == null || pokemon.synergies == null) continue;
 
+            // 적(봇) 전용은 뺀다 — 잉어킹(obtainBy=wild)은 플레이어가 얻을 수 없으니
+            // "이 시너지를 채울 수 있는 유닛" 목록에 있으면 안 된다.
+            // 상점에 안 나올 뿐인 진화체(evolution/stone/trade/synergy)는 그대로 남는다.
+            if (!pokemon.IsPlayerObtainable) continue;
+
             foreach (var key in pokemon.synergies)
             {
                 var synergy = synergyDb.GetByKey(key);

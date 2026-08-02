@@ -262,6 +262,10 @@ public static class PokeChessImporter
             so.shopBuyable = string.IsNullOrEmpty(e.obtainBy) ||
                              e.obtainBy.Equals("shop", StringComparison.OrdinalIgnoreCase);
 
+            // 원본 문자열도 보관한다 — shopBuyable만으로는 "적 전용(wild)"과
+            // "상점엔 없지만 플레이어가 얻는 진화체(evolution/stone/trade/synergy)"를 구분할 수 없다.
+            so.obtainBy = e.obtainBy ?? string.Empty;
+
             // modelPrefab / icon 은 덮어쓰지 않음 (Inspector 수동 연결 보호)
             EditorUtility.SetDirty(so);
             imported.Add(so);

@@ -53,6 +53,26 @@ public class PokemonData : ScriptableObject
     /// </summary>
     public bool shopBuyable = true;
 
+    /// <summary>
+    /// 시트의 획득 경로 원본 문자열: shop / evolution / stone / trade / synergy / wild.
+    /// shopBuyable은 여기서 파생된 요약값이라 "상점에 안 나온다"까지만 알 수 있고,
+    /// <b>플레이어가 아예 못 쓰는 적 전용</b>인지는 구분하지 못한다 — 그 판정은 IsPlayerObtainable을 쓸 것.
+    /// (임포터 산출물. 비어 있으면 shop과 같게 취급한다)
+    /// </summary>
+    public string obtainBy;
+
+    /// <summary>
+    /// 플레이어가 어떤 경로로든 보유할 수 있는 포켓몬인지. 적(봇) 전용이면 false.
+    /// 시너지 목록·도감처럼 "내가 쓸 수 있는 유닛"을 보여주는 UI는 이걸로 걸러야 한다.
+    ///
+    /// 현재 적 전용은 obtainBy=wild 하나뿐(잉어킹). evolution·stone·trade·synergy는
+    /// 상점에 안 나올 뿐 플레이어가 얻는 유닛이므로 true다.
+    /// ⚠️ obtainBy가 비어 있으면(구 데이터·미임포트) 안전하게 true로 본다 —
+    /// 새로 추가된 필드라 <b>Import Pokemon JSON을 다시 돌려야</b> 값이 채워진다.
+    /// </summary>
+    public bool IsPlayerObtainable =>
+        !string.Equals(obtainBy, "wild", System.StringComparison.OrdinalIgnoreCase);
+
     [Header("에셋 참조")]
     public GameObject modelPrefab;
     public Sprite icon;
