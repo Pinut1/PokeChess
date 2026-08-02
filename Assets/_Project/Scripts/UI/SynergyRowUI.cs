@@ -1,6 +1,7 @@
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -11,8 +12,13 @@ using UnityEngine.UI;
 /// ⚠️ 이 오브젝트(행 루트)는 자리를 차지하는 껍데기라 절대 SetActive(false) 하지 않는다.
 /// VerticalLayoutGroup에서 루트를 끄면 아래 행들이 위로 밀려 10번째 페이저 자리가 깨진다.
 /// 빈 슬롯은 SetEmpty()로 안쪽 두 그룹만 꺼서 표현한다.
+///
+/// 마우스를 올리면 시너지 설명창(SynergyTooltipUI)을 띄운다. 툴팁 참조는 SynergyPanelUI가
+/// Awake에서 넣어주므로 행마다 따로 배선할 필요가 없다.
+/// ⚠️ 호버가 잡히려면 <b>행 루트에 Raycast Target이 켜진 Graphic</b>이 하나 있어야 한다
+/// (알파 0인 Image면 충분하다). 자식 이미지 위에서 들어온 이벤트는 핸들러가 있는 이 루트로 올라온다.
 /// </summary>
-public class SynergyRowUI : MonoBehaviour
+public class SynergyRowUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("활성 블록 (Synergy_ActiveGroup)")]
     [SerializeField] private GameObject _activeGroup;
@@ -61,6 +67,22 @@ public class SynergyRowUI : MonoBehaviour
 
     public SynergyStatus CurrentStatus { get; private set; }
 
+    // 설명창. SynergyPanelUI가 넣어준다(없으면 호버해도 아무 일도 일어나지 않는다).
+    private SynergyTooltipController _tooltip;
+
+    /// <summary>설명창 연결. SynergyPanelUI가 Awake에서 행 전부에 같은 컨트롤러를 물린다.</summary>
+    public void AttachTooltip(SynergyTooltipController tooltip) => _tooltip = tooltip;
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (_tooltip != null) _tooltip.Show(this, CurrentStatus);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        if (_tooltip != null) _tooltip.Hide(this);
+    }
+
     public void Bind(SynergyStatus status)
     {
         CurrentStatus = status;
@@ -79,6 +101,8 @@ public class SynergyRowUI : MonoBehaviour
 
         if (active) BindActive(status, grade);
         else        BindInactive(status);
+
+        NotifyTooltip();
     }
 
     /// <summary>표시할 시너지가 없는 슬롯. 자리는 유지한 채 안쪽만 비운다.</summary>
@@ -87,6 +111,18 @@ public class SynergyRowUI : MonoBehaviour
         CurrentStatus = null;
         _activeGroup.SetActive(false);
         _inactiveGroup.SetActive(false);
+
+        NotifyTooltip();
+    }
+
+    /// <summary>
+    /// 열려 있는 설명창이 이 행을 보고 있다면 새 내용으로 따라오게 한다.
+    /// 유닛을 배치하면 정렬이 바뀌어 커서 아래 행의 시너지 자체가 바뀌는데,
+    /// 이게 없으면 옛 시너지 설명이 남는다.
+    /// </summary>
+    private void NotifyTooltip()
+    {
+        if (_tooltip != null) _tooltip.RowRebound(this, CurrentStatus);
     }
 
     private void BindActive(SynergyStatus status, SynergyGrade grade)
