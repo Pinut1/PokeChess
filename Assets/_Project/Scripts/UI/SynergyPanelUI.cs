@@ -28,6 +28,11 @@ public class SynergyPanelUI : MonoBehaviour
     [Tooltip("\"+n\" 표시. n은 1페이지에 못 담긴 개수로, 보고 있는 페이지와 무관하게 고정.")]
     [SerializeField] private TextMeshProUGUI _pagerCountText;
 
+    [Header("설명창 (호버 툴팁)")]
+    [Tooltip("행에 마우스를 올렸을 때 띄울 설명창 컨트롤러. 행마다 배선할 필요 없이 여기 하나만 물리면 " +
+             "Awake에서 모든 행에 전달된다. 비워두면 호버해도 아무 일도 일어나지 않는다.")]
+    [SerializeField] private SynergyTooltipController _tooltip;
+
     private readonly List<SynergyStatus> _sorted = new List<SynergyStatus>();
     private int _page;
 
@@ -36,6 +41,10 @@ public class SynergyPanelUI : MonoBehaviour
     private void Awake()
     {
         if (_pagerButton != null) _pagerButton.onClick.AddListener(TogglePage);
+
+        if (_rows != null)
+            foreach (var row in _rows)
+                if (row != null) row.AttachTooltip(_tooltip);
     }
 
     private void OnEnable()
@@ -44,7 +53,13 @@ public class SynergyPanelUI : MonoBehaviour
         Refresh();
     }
 
-    private void OnDisable() => GameEvents.OnSynergyUpdated -= Refresh;
+    private void OnDisable()
+    {
+        GameEvents.OnSynergyUpdated -= Refresh;
+
+        // 패널이 꺼지면 설명창도 같이 닫는다 — 안 그러면 Exit 이벤트를 못 받고 떠 있게 된다.
+        if (_tooltip != null) _tooltip.HideAll();
+    }
 
     private void TogglePage()
     {
