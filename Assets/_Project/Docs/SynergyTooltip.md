@@ -20,15 +20,48 @@
 
 행 쪽 배선은 `SynergyPanelUI`의 **Tooltip 슬롯 하나뿐**이다. 9개 행에는 Awake에서 자동 전달된다.
 
-## 프리팹 조건 (이게 맞아야 "위 고정 / 아래로만 성장"이 성립)
+## 프리팹 (배선 완료본이 저장돼 있음)
 
-- 툴팁 루트 RectTransform **피벗 Y = 1**
-- 툴팁 루트에 `VerticalLayoutGroup` + `ContentSizeFitter(Vertical = Preferred Size)`
-- 유닛 아이콘 부모(`Unit Slot Root`)에 `GridLayoutGroup` + `ContentSizeFitter(Vertical = Preferred Size)`
-- 단계 줄 텍스트는 Auto Size 대신 고정 크기 + Wrapping 권장 (줄이 늘면 패널이 그만큼 길어진다)
-- 툴팁 루트의 **부모에는 레이아웃 그룹을 두지 말 것** — 컨트롤러가 잡은 위치를 매 프레임 되돌린다
-- 시너지 **행 루트에 Raycast Target이 켜진 Graphic**이 하나 있어야 호버가 잡힌다(알파 0 Image면 충분)
+`Assets/Art/UI/Ui_Prefabs/` 아래 2개. 컴포넌트·값이 이미 채워져 있으니 씬에 올리기만 하면 된다.
+
+```
+SynergyTooltip_Pf     [Image(배경 synPanel_info), VerticalLayoutGroup, ContentSizeFitter, SynergyTooltipUI]
+  ├ Header_Panel      [HorizontalLayoutGroup]
+  │   ├ Symbol_Image  [Image]      40×40, 런타임에 SynergyData.icon으로 교체됨
+  │   └ NameText      [TMP 24pt]
+  ├ TierLine_1 … _4   [TMP 18pt]   단계 수만큼만 켜진다
+  └ UnitSlot_Root     [GridLayoutGroup]  cell 64×64 / 5열 / spacing 6
+
+UnitSlot_Pf           [Image(코스트 테두리), SynergyTooltipUnitSlot]   64×64
+  └ Unit_Icon         [Image]      Preserve Aspect, 여백 6
+```
+
+- 폭 380 고정, 피벗 (0, 1) — 위쪽 기준으로 아래로만 자란다
+- 루트 `ContentSizeFitter`: Horizontal Unconstrained / **Vertical Preferred Size**
+- 루트 `VerticalLayoutGroup`: Control Child Size W/H 켬, **Force Expand Height 끔**
+- `UnitSlot_Root`에는 `ContentSizeFitter`를 붙이지 않는다 — 부모 VLG가 GridLayoutGroup의 preferred height를 그대로 쓰기 때문에 중복이다
+- 코스트 테두리는 `Art/UI/Frame/cardframe_sheet`의 `_0/_2/_4/_8/_5`(1~5코스트, ShopCardUI와 같은 매핑), 흑백은 `ui_Grayscale_mat` — 둘 다 배선돼 있다
+- `SynergyRow_Pf` 루트 Image의 **Raycast Target은 켜둔 상태로 커밋**돼 있다(호버 판정용, 알파 0이라 보이지 않음)
+
+배경·테두리 스프라이트는 임시다. 전용 아트가 나오면 Image의 Sprite만 갈아끼우면 된다.
+
+### 손대면 깨지는 값
+
+- 툴팁 루트의 **부모에 레이아웃 그룹을 두지 말 것** — 컨트롤러가 잡은 위치를 매 프레임 되돌린다
+- 단계 줄 TMP의 **Auto Size는 켜지 말 것** — 줄이 늘어도 패널이 안 길어진다
 - 툴팁에 `CanvasGroup`을 붙였다면 `Blocks Raycasts`를 꺼둘 것 — 툴팁이 커서를 가리면 깜빡인다
+
+## 씬에서 할 일 (남은 배선 3개)
+
+씬 기준 위치: 시너지 패널 = `Canvas/Left_PanelGroup/Inventory_Panel/SynergyPanel`,
+컨트롤러류가 모여 있는 곳 = `Canvas` 오브젝트(`StatInfoController`, `AugmentInfoPanel`이 여기 붙어 있다).
+
+1. **툴팁 배치** — `SynergyTooltip_Pf`를 `Canvas/Info_Panel` 아래에 놓는다(레이아웃 그룹이 없는 자리라야 한다).
+   가로 위치를 시너지 패널 오른쪽으로 잡고, **오브젝트를 끈 채로 저장**한다.
+2. **상단 기준선** — 빈 오브젝트 `Tooltip_TopAnchor`를 만들어 툴팁이 시작할 높이에 위쪽 모서리를 맞춘다
+   (시너지 패널 첫 행을 그대로 지정해도 된다).
+3. **컨트롤러** — `Canvas`에 `SynergyTooltipController`를 추가하고 Panel = 1번, Top Anchor = 2번,
+   Bottom Limit = 비움, Bottom Margin = 8. 마지막으로 `SynergyPanel`의 `SynergyPanelUI` → **Tooltip**에 이 컨트롤러를 넣는다.
 
 ## 위치 규칙
 
