@@ -112,5 +112,8 @@ UnitSlot_Pf           [Image(테두리 — 흰색 1장, 색만 교체), SynergyT
 
 ## 남은 것
 
-- **유닛 전용 아이콘 제작** — 지금은 상점 카드와 같은 `PokemonData.icon`(일러스트)을 그대로 쓴다. 전용 아이콘이 나오면 슬롯의 `_icon`에 물리는 소스만 바꾸면 된다.
+- **유닛 전용 아이콘 제작** — 자리는 이미 만들어져 있다.
+  - `PokemonData.unitIcon`(작은 칸 전용) → 비어 있으면 `icon`(상점 일러스트)으로 자동 폴백한다. 읽을 때는 항상 `PokemonData.UnitIcon` 프로퍼티를 쓸 것.
+  - 아이콘 png를 **`Assets/Art/UI/UnitIcon`** 에 넣고 파일명 앞 3자리를 도감번호로 맞춘 뒤(예: `001bulbasaur_icon.png`), 메뉴 **PokeChess → Link Unit Icons** 를 실행하면 141종에 일괄 연결된다. Texture Type은 Sprite여야 한다.
+  - 이미 물려 있는 항목은 건너뛰므로 손으로 예외를 물려둬도 덮어쓰지 않는다. 임포터도 이 필드는 건드리지 않는다.
 - 단계별 효과 설명 문구는 시트 원본이 아직 `atkSpeed 고정값 증가` 같은 임시값이다. 시트가 갱신되면 임포트만 다시 하면 된다.

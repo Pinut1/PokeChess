@@ -75,7 +75,21 @@ public class PokemonData : ScriptableObject
 
     [Header("에셋 참조")]
     public GameObject modelPrefab;
+
+    /// <summary>상점 카드·스탯창에 쓰는 큰 일러스트. (Link Card Illustrations 메뉴가 채운다)</summary>
     public Sprite icon;
+
+    /// <summary>
+    /// 작은 칸에 쓰는 전용 아이콘(시너지 툴팁의 유닛 목록 등).
+    /// 큰 일러스트를 64×64로 줄이면 무엇인지 알아보기 어려워 따로 둔다.
+    /// <b>비어 있으면 icon(일러스트)으로 대체</b>되므로 아이콘이 아직 없어도 화면은 깨지지 않는다.
+    /// 읽을 때는 이 필드가 아니라 <see cref="UnitIcon"/>을 쓸 것.
+    /// (Link Unit Icons 메뉴가 채운다. 임포터가 건드리지 않는 수동 필드)
+    /// </summary>
+    public Sprite unitIcon;
+
+    /// <summary>작은 칸에 그릴 그림. 전용 아이콘이 있으면 그것, 없으면 일러스트로 폴백.</summary>
+    public Sprite UnitIcon => unitIcon != null ? unitIcon : icon;
 
     // ──────────────────────────────────────────
     // 별 강화 스탯
