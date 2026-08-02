@@ -1,9 +1,11 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// 게임 중 열 수 있는 옵션창(IMGUI).
-/// 마스터/배경음/효과음 볼륨, 화면 모드/해상도(적용/취소), 항복 안내, 타이틀 이동, 게임 종료 기능을 제공한다.
+/// 마스터/배경음/효과음 볼륨, 화면 모드/해상도(적용/취소), 항복 안내, 타이틀 이동, 게임 종료,
+/// 파트너 네트워크 이탈 대기 모달 기능을 제공한다.
 /// </summary>
 public class OptionsPanelUI : MonoBehaviour
 {
@@ -62,6 +64,12 @@ public class OptionsPanelUI : MonoBehaviour
     private bool _surrenderCrossCancelledNoticeShown;
     private bool _surrenderRequestModalOpen; // 요청자용 확인 모달(옵션창과 독립)
 
+    // 파트너 네트워크 이탈 대기(옵션창/항복 모달보다 우선. OnGUI 최상단에서 처리).
+    private bool _partnerDisconnectModalOpen;
+    private bool _partnerGiveUpAvailable;
+    private bool _partnerDisconnectEndConfirmOpen;
+    private static GUIStyle _blockerStyle;
+
     private void Awake()
     {
         _masterVolume = Mathf.Clamp01(
@@ -102,8 +110,19 @@ public class OptionsPanelUI : MonoBehaviour
         _pendingResolutionIndex = _appliedResolutionIndex;
     }
 
+    private void OnEnable()
+    {
+        GameEvents.OnOpponentDisconnected += HandlePartnerDisconnected;
+        GameEvents.OnGracePeriodExpired   += HandlePartnerGiveUpAvailable;
+        GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
+    }
+
     private void OnDisable()
     {
+        GameEvents.OnOpponentDisconnected -= HandlePartnerDisconnected;
+        GameEvents.OnGracePeriodExpired   -= HandlePartnerGiveUpAvailable;
+        GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
+
         PlayerPrefs.Save();
     }
 
@@ -112,8 +131,53 @@ public class OptionsPanelUI : MonoBehaviour
         PlayerPrefs.Save();
     }
 
+    private void HandlePartnerDisconnected(float graceSeconds)
+    {
+        _partnerDisconnectModalOpen = true;
+        _partnerGiveUpAvailable = false;
+        _partnerDisconnectEndConfirmOpen = false;
+    }
+
+    private void HandlePartnerGiveUpAvailable(bool bothDisconnected)
+    {
+        _partnerGiveUpAvailable = true;
+    }
+
+    private void HandlePartnerReconnected()
+    {
+        _partnerDisconnectModalOpen = false;
+        _partnerGiveUpAvailable = false;
+        _partnerDisconnectEndConfirmOpen = false;
+
+        // BlockAllInput()이 매 프레임 꺼뒀던 EventSystem을 되돌린다.
+        var eventSystem = EventSystem.current;
+        if (eventSystem != null)
+            eventSystem.enabled = true;
+    }
+
     private void OnGUI()
     {
+        // 파트너가 재접속을 포기했다는 통지가 최우선이다 — 대기/확인 모달 상태를 정리하고 통지만 그린다.
+        // 전투/타이머 재개 이벤트는 여기서 발행하지 않는다(재개하면 안 되므로).
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.PartnerGaveUpReconnect)
+        {
+            _partnerDisconnectModalOpen = false;
+            _partnerGiveUpAvailable = false;
+            _partnerDisconnectEndConfirmOpen = false;
+
+            DrawPartnerGaveUpNoticeModal();
+            return;
+        }
+
+        // 파트너 이탈 대기는 설정 버튼/옵션창/항복 모달 전부보다 우선한다 — 그 외에는 아무것도 그리지 않는다.
+        // ESC도 여기서 소비하지 않고 그냥 무시되므로(HandleEscapeKey 자체를 호출하지 않음) 닫히지 않는다.
+        if (_partnerDisconnectModalOpen)
+        {
+            DrawPartnerDisconnectWaitModal();
+            DrawPartnerDisconnectEndConfirmModal();
+            return;
+        }
+
         HandleEscapeKey();
         DrawOpenButton();
         DrawSurrenderRequestModal();
@@ -279,6 +343,168 @@ public class OptionsPanelUI : MonoBehaviour
             _surrenderNoticeShown = false;
 
         GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// 파트너 네트워크 이탈 대기 모달. 화면 Dim + 전체 입력 차단, ESC로 닫히지 않는다.
+    /// [포기하기]가 나타나기 전까지는 안내 문구만 표시(무한 대기, 타이머 없음).
+    /// </summary>
+    private void DrawPartnerDisconnectWaitModal()
+    {
+        // 종료 확인 모달로 넘어갔으면 대기 모달 대신 그쪽만 그린다.
+        if (_partnerDisconnectEndConfirmOpen)
+            return;
+
+        DrawFullScreenDim();
+
+        const float width = 360f;
+        const float height = 150f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("팀원이 연결 끊김");
+        GUILayout.Label("재접속을 기다리는 중입니다...");
+
+        if (_partnerGiveUpAvailable)
+        {
+            GUILayout.Space(10f);
+
+            if (GUILayout.Button("포기하기"))
+                _partnerDisconnectEndConfirmOpen = true;
+        }
+
+        GUILayout.EndArea();
+
+        // 모달 자체 버튼이 클릭을 먼저 처리하도록 반드시 실제 컨트롤을 그린 다음에 차단한다.
+        // (전체화면 블로커를 버튼보다 먼저 그리면 AugmentOfferHud가 피하려던 것과 같은 문제로
+        // 블로커가 버튼 클릭 자체를 가로채 버린다.)
+        BlockAllInput();
+    }
+
+    /// <summary>
+    /// [포기하기] 이후 종료 확인 모달. 닫기/취소 없이 반드시 둘 중 하나를 선택해야 한다.
+    /// 패배 기록(SessionEnded)은 여기서 실제로 선택한 시점에만 발행된다.
+    /// </summary>
+    private void DrawPartnerDisconnectEndConfirmModal()
+    {
+        if (!_partnerDisconnectEndConfirmOpen)
+            return;
+
+        DrawFullScreenDim();
+
+        const float width = 320f;
+        const float height = 130f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("게임을 종료하시겠습니까?");
+
+        GUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("타이틀로 이동"))
+        {
+            if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+                gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+
+            // 기존 "타이틀로" 흐름을 그대로 재사용(LeaveRoom + 씬 전환) — 이 메서드 자체는 수정하지 않는다.
+            ConfirmReturnToTitle();
+        }
+
+        if (GUILayout.Button("게임 종료"))
+        {
+            if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+                gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+
+            // 기존 "게임 종료" 흐름을 그대로 재사용 — 이 메서드 자체는 수정하지 않는다.
+            QuitGame();
+        }
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
+
+        // 모달 자체 버튼이 클릭을 먼저 처리하도록 반드시 실제 컨트롤을 그린 다음에 차단한다.
+        BlockAllInput();
+    }
+
+    /// <summary>
+    /// 파트너가 재접속을 포기했다는 통지 전용 모달. ESC/바깥 클릭으로 닫히지 않으며([확인]만 유효),
+    /// 이 모달이 떠 있는 동안은 OnGUI가 다른 무엇도 그리지 않으므로 옵션창/항복 모달보다 우선한다.
+    /// </summary>
+    private void DrawPartnerGaveUpNoticeModal()
+    {
+        DrawFullScreenDim();
+
+        const float width = 340f;
+        const float height = 130f;
+
+        Rect modalRect = new Rect(
+            (Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f,
+            width,
+            height);
+
+        GUILayout.BeginArea(modalRect, GUI.skin.box);
+
+        GUILayout.Label("상대방이 재접속을 포기했습니다.");
+
+        if (GUILayout.Button("확인"))
+        {
+            if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+            {
+                gameManager.Network.AcknowledgePartnerGaveUpReconnect();
+
+                // 기존 패배 처리 흐름 재사용: SessionEnded 발행(전적 저장) → 기존 "타이틀로" 경로
+                // (RequestReturnToTitle → LeaveRoom 완료 → OnLeftRoom에서 씬 전환)를 그대로 탄다.
+                gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+                ConfirmReturnToTitle();
+            }
+        }
+
+        GUILayout.EndArea();
+
+        BlockAllInput();
+    }
+
+    /// <summary>화면 전체를 반투명 검은색으로 덮는다(Dim). 새 텍스처 없이 Texture2D.whiteTexture만 사용.</summary>
+    private static void DrawFullScreenDim()
+    {
+        Color previousColor = GUI.color;
+        GUI.color = new Color(0f, 0f, 0f, 0.6f);
+        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = previousColor;
+    }
+
+    /// <summary>
+    /// 전체 입력 차단. AugmentOfferHud의 DrawClickBlocker/AbsorbClicksOutside와 같은 방식(투명 GUI.Button +
+    /// Event.Use())으로 IMGUI 입력(마우스/키보드)을 흡수하고, uGUI(Canvas 버튼)는 IMGUI 블로커로 막히지
+    /// 않으므로 EventSystem 자체를 잠시 꺼서 막는다(HandlePartnerReconnected에서 다시 켠다).
+    /// </summary>
+    private static void BlockAllInput()
+    {
+        _blockerStyle ??= new GUIStyle();
+
+        GUI.Button(new Rect(0f, 0f, Screen.width, Screen.height), GUIContent.none, _blockerStyle);
+
+        Event currentEvent = Event.current;
+        if (currentEvent != null && (currentEvent.isMouse || currentEvent.isKey))
+            currentEvent.Use();
+
+        var eventSystem = EventSystem.current;
+        if (eventSystem != null && eventSystem.enabled)
+            eventSystem.enabled = false;
     }
 
     private void HandleEscapeKey()
@@ -776,14 +1002,14 @@ public class OptionsPanelUI : MonoBehaviour
         PlayerPrefs.Save();
         Time.timeScale = 1f;
 
-        if (GameManager.TryGet(out var gameManager) &&
-            gameManager.Network != null &&
-            gameManager.Network.IsInRoom)
-        {
-            gameManager.Network.LeaveRoom();
-        }
-
-        SceneManager.LoadScene(_titleSceneName);
+        // NetworkManager가 LeaveRoom 완료(Photon 확인) 후에만 씬을 전환한다 — 여기서 직접
+        // LeaveRoom+LoadScene을 연달아 하면 "Leaving" 상태에서 걸린 SetProperties 호출이
+        // 오류를 낼 수 있다(2026-08). 정상 타이틀 이동과 파트너 이탈 포기 후 타이틀 이동 모두
+        // 이 메서드 하나를 공유하므로 양쪽 다 안전한 경로를 탄다.
+        if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+            gameManager.Network.RequestReturnToTitle(_titleSceneName);
+        else
+            SceneManager.LoadScene(_titleSceneName);
     }
 
     private void BuildResolutionList()

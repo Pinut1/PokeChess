@@ -61,7 +61,6 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnPlayerReadyRequested += HandlePlayerReadyRequested;
         GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
         GameEvents.OnOpponentReconnected  += HandleOpponentReconnected;
-        GameEvents.OnGracePeriodExpired   += HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
         GameEvents.OnGameCleared          += HandleGameCleared;
         GameEvents.OnTeamRoundResolved    += HandleTeamRoundResolved;
@@ -75,7 +74,6 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnPlayerReadyRequested -= HandlePlayerReadyRequested;
         GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
         GameEvents.OnOpponentReconnected  -= HandleOpponentReconnected;
-        GameEvents.OnGracePeriodExpired   -= HandleGracePeriodExpired;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
         GameEvents.OnGameCleared          -= HandleGameCleared;
         GameEvents.OnTeamRoundResolved    -= HandleTeamRoundResolved;
@@ -184,20 +182,11 @@ public class RoundPhaseManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 재접속 유예시간 종료. 2인 협동 PVE라 둘 다 끊겼든 한 명만 남았든 공략이 불가능하므로
-    /// 어느 경우든 세션 종료(패배)로 처리한다. (남은 플레이어 솔로 전환/항복 선택지는 기획상 두지 않음.)
-    /// 자기 핸들러 직접 호출이 아니라 이벤트로 발행해야 다른 구독자(MatchRecorder 등)도 종료를 인지한다.
-    /// </summary>
-    private void HandleGracePeriodExpired(bool bothDisconnected)
-    {
-        if (!bothDisconnected)
-            Debug.LogWarning("[Phase] 유예시간 종료 — 상대 미재접속(협동 불가) → 세션 종료");
-
-        GameEvents.SessionEnded(bothDisconnected
-            ? SessionEndReason.BothDisconnected
-            : SessionEndReason.PartnerAbandoned);
-    }
+    // HandleGracePeriodExpired(구 "유예시간 종료 → 자동 SessionEnded")는 2026-08 파트너 이탈 UX 작업에서 제거됨.
+    // 상대 이탈 30초 경과는 이제 자동 패배가 아니라 [포기하기] 버튼 노출 가능 시점일 뿐이며,
+    // 이 화면은 OptionsPanelUI가 GameEvents.OnGracePeriodExpired를 직접 구독해 처리한다(RoundPhaseManager가 할 일 없음).
+    // 실제 세션 종료는 사용자가 [포기하기]→[타이틀로 이동]/[게임 종료]를 선택했을 때만
+    // NetworkManager.ConfirmPartnerDisconnectGiveUp()이 GameEvents.SessionEnded를 발행해 아래 HandleSessionEnded로 흐른다.
 
     /// <summary>세션 종료(패배 처리). 전적 기록은 MatchRecorder가 같은 이벤트를 구독해 담당.</summary>
     private void HandleSessionEnded(SessionEndReason reason)

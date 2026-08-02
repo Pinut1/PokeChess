@@ -26,6 +26,45 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // Photon 플레이어 닉네임 최대 길이.
     private const int   MAX_NICKNAME_LENGTH = 16;
 
+    /// <summary>프로세스 재시작 후 이전 방 재입장을 시도하기 위해 UserId를 보존할 때 쓰는 PlayerPrefs 키.</summary>
+    private const string PREF_LAST_USER_ID = "LastPhotonUserId";
+
+    /// <summary>프로세스 재시작 후 재입장을 시도할 방 이름을 보존할 때 쓰는 PlayerPrefs 키.</summary>
+    private const string PREF_LAST_ROOM_NAME = "LastPhotonRoomName";
+
+    /// <summary>타이틀 화면에 "이전 닉네임: ○○" 표시용으로만 쓰는 닉네임(재접속 인증에는 사용하지 않음).</summary>
+    private const string PREF_LAST_NICKNAME = "LastPhotonNickname";
+
+    /// <summary>Start()에서 저장된 세션을 발견하면 채워지는 재입장 대상 방 이름. null이면 저장된 세션 없음(신규 로그인).
+    /// 2026-08부터 이 값이 채워져 있어도 자동으로 재입장을 시도하지 않는다 — 타이틀 화면에서 사용자가
+    /// AttemptRejoinSavedSession()/AbandonPreviousSession()을 명시적으로 호출할 때만 실제 요청이 나간다.</summary>
+    private string _pendingRejoinRoomName;
+
+    /// <summary>PREF_LAST_NICKNAME에서 읽은 표시 전용 닉네임.</summary>
+    private string _savedNickname;
+
+    /// <summary>지금 어떤 목적으로 RejoinRoom을 시도 중인지. UI 폴링(IsRejoining)과 OnJoinedRoom/OnJoinRoomFailed 분기에 쓴다.</summary>
+    private enum RejoinPurpose { None, EnterGame, NotifyAbandonAndLeave }
+    private RejoinPurpose _rejoinPurpose = RejoinPurpose.None;
+
+    /// <summary>AttemptRejoinSavedSession() 실패 시 true. 타이틀 화면이 안내 팝업을 띄우는 데 쓴다.</summary>
+    public bool RejoinFailed { get; private set; }
+
+    /// <summary>상대가 재입장(재접속 성공)했는지 확정하기 전에 "포기 통지" RPC가 뒤이어 오지 않는지 짧게 기다리는 시간(초).</summary>
+    private const float REJOIN_ABANDON_CHECK_DELAY = 1f;
+
+    private Coroutine _reconnectConfirmRoutine;
+
+    /// <summary>파트너가 재접속을 포기했다는 통지(RPC_PartnerGaveUpReconnect)를 받았는지. OptionsPanelUI가 폴링.</summary>
+    private bool _partnerGaveUpReconnectNotice;
+
+    /// <summary>LeaveRoom() 요청~완료(OnLeftRoom/OnDisconnected) 사이. 이 동안 새 SetCustomProperties 호출을 막는다
+    /// ("Operation SetProperties ... client state: Leaving" 오류 방지, 2026-08).</summary>
+    private bool _isLeavingRoom;
+
+    /// <summary>RequestReturnToTitle()로 예약된 타이틀 씬 이름. LeaveRoom 완료 후에만 실제로 로드한다.</summary>
+    private string _pendingTitleSceneName;
+
     /// <summary>"준비 완료" 여부를 Player CustomProperties에 저장할 때 쓰는 키</summary>
     private const string READY_PROP_KEY = "Ready";
 
@@ -71,11 +110,35 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
-    /// <summary>연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용.</summary>
+    /// <summary>
+    /// 연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용(2026-08 파트너 이탈 UX 작업에서 변경하지 않음).
+    /// ⚠️ 이 값은 Photon 서버가 끊긴 플레이어의 자리를 실제로 보존해주는 한계 시간이다. 남은 플레이어의
+    /// 대기 UI 자체는 GIVE_UP_AVAILABLE_DELAY 이후로 무한정 대기하지만, 그 시점 이후에도 이 60초가 지나면
+    /// Photon 서버가 상대 자리를 회수해 재접속이 물리적으로 불가능해질 수 있다(코드로 해결 불가, 기획 확인 필요).
+    /// </summary>
     private const float RECONNECT_GRACE_PERIOD = 60f;
+
+    /// <summary>
+    /// 상대 이탈 후 [포기하기] 버튼을 노출하기까지 대기 시간(초). RECONNECT_GRACE_PERIOD(60초, PlayerTtl)와는
+    /// 별개의 UI 전용 값 — 이 시간이 지나도 자동 종료하지 않고, 사용자가 직접 포기를 선택해야만 세션이 끝난다.
+    /// </summary>
+    private const float GIVE_UP_AVAILABLE_DELAY = 30f;
+
+    /// <summary>상대가 현재 이탈(재접속 대기) 상태인지. OpponentGraceRoutine 완료 후에도 재접속 시 OnOpponentReconnected를 발행해야 하므로 별도 추적.</summary>
+    private bool _opponentDisconnected;
 
     /// <summary>JoinRandomRoom 실패(빈 방 없음) 시 생성/입장할 고정 방 이름. 양쪽 클라이언트가 같은 이름을 써야 서로 만날 수 있음.</summary>
     private const string FALLBACK_ROOM_NAME = "PokeChessRoom";
+
+    /// <summary>게임 씬 이름(OnRoomFull의 최초 로드, 재입장 복귀 모두 동일 씬을 가리켜야 함).</summary>
+    private const string GAME_SCENE_NAME = "GameSceneTest";
+
+    /// <summary>
+    /// NetworkManager는 씬마다 새 인스턴스가 생성돼(DontDestroyOnLoad 아님) 재입장 성공 시점의 인스턴스와
+    /// 게임 씬 로드 후의 인스턴스가 다르다. 재입장으로 인한 씬 전환이 예약돼 있다는 사실을 새 인스턴스에
+    /// 전달하기 위한 정적 플래그(Start에서 소비 즉시 false로 리셋).
+    /// </summary>
+    private static bool s_resyncAfterRejoinPending;
 
     // ─────────────────────────────────────────
     // 상태 프로퍼티 (읽기 전용)
@@ -137,7 +200,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
     }
     private string _soloMatchGuid = "";
-    private const string MATCH_GUID_ROOM_KEY = "MatchGuid";
+
+    /// <summary>매치 진행 여부 판별 키(public — 로비 방 목록 표시(진행 중 태그)에서 NetworkConnectionTest가 읽음).</summary>
+    public const string MATCH_GUID_ROOM_KEY = "MatchGuid";
+
+    /// <summary>방장 표시 닉네임 Room 속성 키(public — 로비 방 목록 표시에서 NetworkConnectionTest가 읽음).
+    /// 값 자체는 NetworkManager만 쓴다(생성 시/마스터 교체 시) — 다른 곳은 읽기 전용.</summary>
+    public const string HOST_NICKNAME_PROP_KEY = "HostNickname";
     public string PartnerNickname
     {
         get
@@ -168,6 +237,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 같은 GameObject의 다른 컴포넌트(NetworkConnectionTest)가 Start에서 Connect()를 부를 수 있어
         // Start 순서 경합을 피하려고 모든 Start보다 먼저인 Awake에서 켠다.
         if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
+
+        // 재입장 복귀로 로드된 게임 씬 — 내가 마스터를 재획득해도 라운드 1을 다시 시작하면 안 된다.
+        // 다른 매니저의 Start()(예: GameSceneBootstrap.NotifySceneReady)와의 순서 경합을 피하려고
+        // 모든 Start보다 먼저인 Awake에서 즉시 반영한다(실제 재동기화 호출은 Start에서, 다른 매니저의
+        // OnEnable 구독이 끝난 뒤에 함).
+        if (s_resyncAfterRejoinPending)
+            _gameStarted = true;
     }
 
     private void Start()
@@ -181,17 +257,147 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         // 씬 로컬이라 GameManager는 씬마다 새로 생기지만, 이미 연결돼 있으면(로비→게임 전환 후)
         // 닉네임/인증값을 다시 설정하지 않는다(재접속 식별자 보존). 씬 동기화는 Awake에서 이미 켬.
-        if (PhotonNetwork.IsConnected) return;
+        if (PhotonNetwork.IsConnected)
+        {
+            // AuthValues/닉네임은 건드리지 않지만(연결된 세션의 정체성 보존), 저장된 재접속 세션의
+            // 표시 상태(_pendingRejoinRoomName/_savedNickname)는 다시 로드한다. 방만 나가 타이틀로
+            // 돌아온 경우(Photon 연결 자체는 끊기지 않음) 이 값들이 새 씬의 새 인스턴스에서 전혀
+            // 채워지지 않던 문제(2026-08 확인) 수정 — 이 분기 자체를 타는 것과는 무관하게 필요하다.
+            ReloadSavedRejoinSessionDisplayState();
+
+            // 재입장 성공 후 게임 씬으로 명시적으로 복귀한 경우 — 이 씬의 다른 매니저들이 Awake/OnEnable로
+            // GameEvents 구독을 마친 뒤(Start 시점엔 항상 보장됨) 예약된 재동기화를 실행한다.
+            if (s_resyncAfterRejoinPending)
+            {
+                s_resyncAfterRejoinPending = false;
+                Debug.Log("[Network][Rejoin] 게임 씬 로드 완료 — 예약된 재동기화 실행");
+                ResyncAfterReconnect();
+            }
+            return;
+        }
 
         // 실제 로비에서 닉네임이 전달되지 않은 테스트 상황을 대비한 임시값.
         // 이미 로그인/로비 UI에서 닉네임을 설정했다면 해당 값을 덮어쓰지 않는다.
         if (string.IsNullOrWhiteSpace(PhotonNetwork.NickName))
             PhotonNetwork.NickName = $"Player_{System.Guid.NewGuid().ToString()[..4]}";
 
-        // ReconnectAndRejoin이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
+        // ReconnectAndRejoin/RejoinRoom이 같은 플레이어로 인식하려면 재연결 시에도 동일한 UserId가 필요함.
         // AuthValues를 미리 고정해두지 않으면 재접속 시 새 UserId가 발급되어
         // "User does not exist in this game" 오류로 입장이 거부됨.
-        PhotonNetwork.AuthValues = new AuthenticationValues(System.Guid.NewGuid().ToString());
+        //
+        // 프로세스가 완전히 재시작된 경우(강제 종료 후 재실행 등)에도 같은 자리로 재입장을 시도할 수 있도록,
+        // 이전 세션에서 저장해 둔 UserId/RoomName이 있으면 새로 발급하지 않고 그대로 재사용한다.
+        string savedUserId = ReloadSavedRejoinSessionDisplayState();
+
+        string userId = !string.IsNullOrEmpty(savedUserId)
+            ? savedUserId
+            : System.Guid.NewGuid().ToString();
+
+        PhotonNetwork.AuthValues = new AuthenticationValues(userId);
+
+        Debug.Log($"[Network][Rejoin] AuthValues.UserId 설정: {ShortUserId(userId)}... (저장값 재사용: {!string.IsNullOrEmpty(savedUserId)})");
+    }
+
+    /// <summary>
+    /// PlayerPrefs에 저장된 재접속 세션의 표시 상태(_pendingRejoinRoomName/_savedNickname)를 다시 읽어
+    /// 반영한다. AuthValues는 여기서 건드리지 않는다 — Photon 연결이 유지된 채(방만 나가 타이틀로 돌아온
+    /// 경우) 호출해도 안전하도록 Start()의 "연결됨" 분기와 "신규 연결" 분기 양쪽에서 공용으로 쓴다.
+    /// 반환값(저장된 UserId)은 신규 연결 분기에서만 AuthValues 발급에 사용된다.
+    /// </summary>
+    private string ReloadSavedRejoinSessionDisplayState()
+    {
+        string savedUserId = PlayerPrefs.GetString(PREF_LAST_USER_ID, "");
+        string savedRoomName = PlayerPrefs.GetString(PREF_LAST_ROOM_NAME, "");
+        string savedNickname = PlayerPrefs.GetString(PREF_LAST_NICKNAME, "");
+
+        Debug.Log($"[Network][Rejoin] 저장값 읽음: UserId={ShortUserId(savedUserId)}..., RoomName='{savedRoomName}', Nickname='{savedNickname}'");
+
+        // 표시용 닉네임은 재접속 세션(UserId+RoomName) 유무와 무관하게 항상 반영한다 —
+        // 정상 타이틀 이동으로 재접속 세션은 삭제돼도 "마지막으로 쓴 닉네임"은 남아 있어야 하기 때문(2026-08).
+        _savedNickname = savedNickname;
+
+        if (!string.IsNullOrEmpty(savedUserId) && !string.IsNullOrEmpty(savedRoomName))
+        {
+            // 2026-08: 여기서 자동으로 재입장하지 않는다 — 타이틀 화면이 선택지를 보여주고
+            // 사용자가 명시적으로 AttemptRejoinSavedSession()/AbandonPreviousSession()을 호출해야 한다.
+            _pendingRejoinRoomName = savedRoomName;
+            Debug.Log($"[Network][Rejoin] 이전 세션 발견(자동 재입장 없음) — 타이틀 화면에서 사용자 선택 대기: {savedRoomName}");
+        }
+        else
+        {
+            Debug.Log("[Network][Rejoin] 저장된 세션 없음 — 신규 로그인 흐름으로 진행");
+        }
+
+        return savedUserId;
+    }
+
+    /// <summary>타이틀 화면에 저장된 이전 세션(재입장 후보)이 있는지. 있어도 자동으로 재입장하지 않는다.</summary>
+    public bool HasSavedSession => !string.IsNullOrEmpty(_pendingRejoinRoomName);
+
+    /// <summary>표시 전용 이전 닉네임("이전 닉네임: ○○"). 재접속 인증에는 쓰지 않는다.</summary>
+    public string SavedNickname => _savedNickname ?? "";
+
+    /// <summary>AttemptRejoinSavedSession()/AbandonPreviousSession() 요청이 진행 중인지. 타이틀 UI가 버튼 잠금에 쓴다.</summary>
+    public bool IsRejoining => _rejoinPurpose != RejoinPurpose.None;
+
+    /// <summary>파트너가 재접속을 포기했다는 통지를 받았는지. OptionsPanelUI가 폴링.</summary>
+    public bool PartnerGaveUpReconnect => _partnerGaveUpReconnectNotice;
+
+    /// <summary>파트너 연결 끊김으로 재접속을 기다리는 중인지(무한 대기 포함, 30초 유예와 무관하게 true).
+    /// ShopManager/ItemManager/UnitDragController 등 입력 처리부가 공통으로 체크해 대기 중 조작을 막는다(2026-08).</summary>
+    public bool IsAwaitingPartnerReconnect => _opponentDisconnected;
+
+    /// <summary>디버그 로그에 UserId 전체를 남기지 않기 위한 축약 표시(앞 8자).</summary>
+    private static string ShortUserId(string userId) =>
+        string.IsNullOrEmpty(userId) ? "(없음)" : userId[..Mathf.Min(8, userId.Length)];
+
+    /// <summary>
+    /// 재입장 실패 원인 추적용(2026-08). Editor/Build 간 방·계정 식별자가 실제로 같은지, IsOpen/AutoSync가
+    /// 어떤 시점에 어떤 값인지를 로그로 비교하기 위한 진단 덤프. AttemptRejoinSavedSession 직전,
+    /// OnJoinedRoom/OnJoinRoomFailed 진입 시 호출한다.
+    /// </summary>
+    private static string DumpNetworkDiagnostics(string tag)
+    {
+        var room = PhotonNetwork.CurrentRoom;
+        var local = PhotonNetwork.LocalPlayer;
+        var master = PhotonNetwork.MasterClient;
+        return $"[Network][Diag:{tag}] AppVersion={PhotonNetwork.AppVersion} Region={PhotonNetwork.CloudRegion} " +
+               $"Room={(room != null ? room.Name : "(none)")} PlayerCount={(room != null ? room.PlayerCount : 0)}/{MAX_PLAYERS} " +
+               $"IsOpen={(room != null ? room.IsOpen.ToString() : "n/a")} " +
+               $"MyActor={(local != null ? local.ActorNumber : -1)} MyUserId={ShortUserId(PhotonNetwork.AuthValues?.UserId)}... " +
+               $"MasterActor={(master != null ? master.ActorNumber : -1)} AutoSync={PhotonNetwork.AutomaticallySyncScene} " +
+               $"Scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}";
+    }
+
+    /// <summary>방 입장(신규/재입장 모두)에 성공할 때마다 UserId/RoomName/닉네임을 최신 상태로 저장한다.</summary>
+    private void SaveRejoinSession()
+    {
+        string userId = PhotonNetwork.AuthValues.UserId;
+        string roomName = PhotonNetwork.CurrentRoom.Name;
+        string nickname = PhotonNetwork.NickName;
+
+        PlayerPrefs.SetString(PREF_LAST_USER_ID, userId);
+        PlayerPrefs.SetString(PREF_LAST_ROOM_NAME, roomName);
+        PlayerPrefs.SetString(PREF_LAST_NICKNAME, nickname);
+        PlayerPrefs.Save();
+
+        Debug.Log($"[Network][Rejoin] 세션 저장: UserId={ShortUserId(userId)}..., RoomName={roomName}, Nickname={nickname}");
+    }
+
+    /// <summary>의도적 퇴장, 재입장 실패, PlayerTtl 만료, 재접속 포기 확정 등으로 더 이상 유효하지 않은
+    /// 재접속 인증 정보(UserId+RoomName)만 정리한다. 표시용 닉네임(PREF_LAST_NICKNAME/_savedNickname)은
+    /// 재접속 인증과 무관한 별개 값이라 여기서 함께 지우지 않는다(2026-08 — 정상 타이틀 이동 후에도
+    /// 닉네임 입력칸 기본값으로 계속 써야 하므로). HasSavedSession(재입장 가능 여부)은
+    /// _pendingRejoinRoomName 기준이라 이 정리로 정확히 갱신된다.</summary>
+    private void ClearSavedRejoinSession(string reason)
+    {
+        PlayerPrefs.DeleteKey(PREF_LAST_USER_ID);
+        PlayerPrefs.DeleteKey(PREF_LAST_ROOM_NAME);
+        PlayerPrefs.Save();
+
+        _pendingRejoinRoomName = null;
+
+        Debug.Log($"[Network][Rejoin] 저장된 세션 정리 (원인: {reason})");
     }
 
     private Coroutine _connectTimeoutRoutine;
@@ -281,9 +487,38 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // 룸 관리
     // ─────────────────────────────────────────
 
+    /// <summary>
+    /// 타이틀 화면 QA용 방 목록 새로고침. 로비 상태가 아니면 JoinLobby, 이미 로비라면 LeaveLobby 후
+    /// 재입장해 서버로부터 방 목록을 다시 받는다(OnRoomListUpdate로 갱신). 방 생성/입장/재접속 흐름과는
+    /// 무관한 별도 기능이며, JoinRoom 등 입장 관련 호출은 하지 않는다.
+    /// </summary>
+    public void RefreshRoomList()
+    {
+        if (_soloMode || !PhotonNetwork.IsConnectedAndReady) return;
+
+        Debug.Log($"[RoomList] RefreshRoomList 호출 — InLobby={PhotonNetwork.InLobby}, InRoom={PhotonNetwork.InRoom}");
+
+        if (!PhotonNetwork.InLobby)
+            PhotonNetwork.JoinLobby();
+        else
+        {
+            PhotonNetwork.LeaveLobby();
+            PhotonNetwork.JoinLobby();
+        }
+    }
+
     public void CreateRoom(string roomName)
     {
-        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS, IsVisible = true, PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000) };
+        var options = new RoomOptions
+        {
+            MaxPlayers = MAX_PLAYERS,
+            IsVisible = true,
+            PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000),
+            // HostNickname/MatchGuid를 로비 방 목록(RoomInfo.CustomProperties)에도 노출 — 방장 닉네임 표시,
+            // "진행 중" 태그 표시에 씀(둘 다 표시 전용, 입장 가능 여부 판정에는 안 씀).
+            CustomRoomPropertiesForLobby = new[] { HOST_NICKNAME_PROP_KEY, MATCH_GUID_ROOM_KEY },
+            CustomRoomProperties = new Hashtable { { HOST_NICKNAME_PROP_KEY, PhotonNetwork.NickName } }
+        };
         PhotonNetwork.CreateRoom(roomName, options);
     }
 
@@ -294,7 +529,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     public void JoinOrCreateRoom(string roomName)
     {
-        var options = new RoomOptions { MaxPlayers = MAX_PLAYERS, PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000) };
+        // 이 RoomOptions/CustomProperties는 방이 실제로 새로 생성될 때만 적용된다(Photon 사양 —
+        // 이미 있는 방에 입장할 땐 무시됨). 기존 방의 HostNickname을 덮어쓰지 않음.
+        var options = new RoomOptions
+        {
+            MaxPlayers = MAX_PLAYERS,
+            PlayerTtl = (int)(RECONNECT_GRACE_PERIOD * 1000),
+            CustomRoomPropertiesForLobby = new[] { HOST_NICKNAME_PROP_KEY, MATCH_GUID_ROOM_KEY },
+            CustomRoomProperties = new Hashtable { { HOST_NICKNAME_PROP_KEY, PhotonNetwork.NickName } }
+        };
         PhotonNetwork.JoinOrCreateRoom(roomName, options, TypedLobby.Default);
     }
 
@@ -304,9 +547,140 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.JoinRandomRoom();
     }
 
+    /// <summary>
+    /// 방을 나간다. 저장된 재접속 세션(UserId+RoomName)은 여기서 지우지 않는다 — 정상 타이틀 이동
+    /// (RequestReturnToTitle)도 내부적으로 이 메서드를 쓰는데, "이전 게임으로 들어가기" 기능 자체가
+    /// 정상적으로 타이틀로 나간 뒤에도 나중에 복귀할 수 있어야 성립하기 때문이다(2026-08 확인된 회귀 —
+    /// 예전엔 여기서 항상 지워서 타이틀 이동 직후 재접속 세션이 사라져 있었다). 세션을 실제로 지워야
+    /// 하는 경우(새로 시작하기 확정 등)는 호출부가 ClearSavedRejoinSession을 직접 부른다.
+    /// </summary>
     public void LeaveRoom()
     {
+        // Leaving 상태 동안 새 SetCustomProperties 호출이 나가면 서버가 거부하며 오류를 남긴다 — 완료(OnLeftRoom/
+        // OnDisconnected)까지 차단한다.
+        _isLeavingRoom = true;
+
         PhotonNetwork.LeaveRoom();
+    }
+
+    /// <summary>
+    /// 옵션창 "타이틀로" 확인 시 OptionsPanelUI가 호출(정상 종료·파트너 이탈 포기 공용).
+    /// 방에 있으면 LeaveRoom을 요청만 하고, Photon이 실제로 이탈을 완료(OnLeftRoom, 드물게 OnDisconnected)한
+    /// 뒤에야 씬을 전환한다. LeaveRoom 요청과 씬 전환을 같은 프레임에 연달아 하면 아직 "Leaving" 확인이 끝나기
+    /// 전에 씬(및 그 안의 PhotonView)이 파괴되어 SetProperties 오류가 나는 문제(2026-08)가 있어 반드시 이 순서를 지킨다.
+    /// </summary>
+    public void RequestReturnToTitle(string titleSceneName)
+    {
+        if (string.IsNullOrWhiteSpace(titleSceneName))
+            return;
+
+        if (_soloMode || !PhotonNetwork.InRoom)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(titleSceneName);
+            return;
+        }
+
+        // 타이틀 이동은 이 클라이언트 개인의 씬 전환이어야 한다. AutomaticallySyncScene이 켜진 채로
+        // 씬을 바꾸면(특히 내가 마스터 클라이언트일 때) PUN이 이를 룸 전체에 동기화해 방에 남아 있는
+        // 파트너까지 같은 씬으로 끌고 가버린다(2026-08 확인된 회귀). 완료까지 잠깐 꺼둔다 —
+        // 복원은 NetworkTest에서 새로 생성되는 NetworkManager.Awake()가 항상 true로 되돌리므로 별도 처리 불필요.
+        PhotonNetwork.AutomaticallySyncScene = false;
+
+        _pendingTitleSceneName = titleSceneName;
+        LeaveRoom();
+    }
+
+    /// <summary>
+    /// 타이틀 화면 [이전 게임으로 들어가기] 클릭 시 호출. 저장된 UserId(Start()에서 이미 AuthValues에 반영됨)로
+    /// 저장된 RoomName에 재입장을 시도한다. 결과는 OnJoinedRoom(성공)/OnJoinRoomFailed(실패)에서 처리된다.
+    /// </summary>
+    public void AttemptRejoinSavedSession()
+    {
+        if (!HasSavedSession || IsRejoining) return;
+
+        RejoinFailed = false;
+        _rejoinPurpose = RejoinPurpose.EnterGame;
+
+        Debug.Log(DumpNetworkDiagnostics("AttemptRejoinSavedSession/Before"));
+        bool sent = PhotonNetwork.RejoinRoom(_pendingRejoinRoomName);
+        Debug.Log($"[Network][Rejoin] 이전 게임 재입장 요청 전송 여부: {sent}");
+
+        if (!sent)
+        {
+            _rejoinPurpose = RejoinPurpose.None;
+            RejoinFailed = true;
+        }
+    }
+
+    /// <summary>[이전 게임에 접속할 수 없습니다] 팝업의 [확인] 클릭 시 호출. 저장된 세션을 정리하고 일반 로그인으로 전환한다.</summary>
+    public void AcknowledgeRejoinFailure()
+    {
+        RejoinFailed = false;
+        ClearSavedRejoinSession("재입장 실패 확인");
+    }
+
+    /// <summary>
+    /// 타이틀 화면 [새로 시작하기] 확정 시 호출. 저장된 방에 잠깐 재입장해 기다리고 있을 파트너에게
+    /// "재접속 포기" RPC를 전달한 뒤 곧바로 다시 나간다. AutomaticallySyncScene이 켜져 있으면 이 잠깐의
+    /// 재입장만으로 GameSceneTest로 끌려갈 수 있어 통지가 끝날 때까지 임시로 꺼둔다.
+    /// </summary>
+    public void AbandonPreviousSession()
+    {
+        if (!HasSavedSession || IsRejoining) return;
+
+        _rejoinPurpose = RejoinPurpose.NotifyAbandonAndLeave;
+        PhotonNetwork.AutomaticallySyncScene = false;
+
+        bool sent = PhotonNetwork.RejoinRoom(_pendingRejoinRoomName);
+        Debug.Log($"[Network][Rejoin] 포기 통지용 재입장 요청 전송 여부: {sent}");
+
+        if (!sent)
+        {
+            // 알릴 상대에게 접속 자체가 안 됨 — 상대도 이미 나간 것으로 보고 세션만 정리한다.
+            _rejoinPurpose = RejoinPurpose.None;
+            PhotonNetwork.AutomaticallySyncScene = true;
+            ClearSavedRejoinSession("재접속 포기(재입장 요청 전송 실패)");
+        }
+    }
+
+    /// <summary>파트너의 [상대방이 재접속을 포기했습니다] 안내 [확인] 클릭 시 OptionsPanelUI가 호출.</summary>
+    public void AcknowledgePartnerGaveUpReconnect() => _partnerGaveUpReconnectNotice = false;
+
+    /// <summary>LeaveRoom() 완료 시 예약된 타이틀 씬이 있으면 지금 로드한다.</summary>
+    private void TryLoadPendingTitleScene()
+    {
+        if (string.IsNullOrEmpty(_pendingTitleSceneName))
+            return;
+
+        string sceneName = _pendingTitleSceneName;
+        _pendingTitleSceneName = null;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+    }
+
+    public override void OnLeftRoom()
+    {
+        Debug.Log("[Network] 룸 이탈 완료");
+        _isLeavingRoom = false;
+
+        if (!string.IsNullOrEmpty(_pendingTitleSceneName))
+        {
+            TryLoadPendingTitleScene();
+            return;
+        }
+
+        // 씬 전환이 필요 없는 이탈(예: 재접속 포기 통지 후 재이탈) — 타이틀 화면이 방 목록을
+        // 계속 받을 수 있도록 로비로 돌아간다.
+        PhotonNetwork.JoinLobby();
+    }
+
+    /// <summary>
+    /// 파트너 이탈 대기 중 [포기하기]→[타이틀로 이동]/[게임 종료] 선택 시 OptionsPanelUI가 호출.
+    /// 그 이전(대기/포기 버튼 노출)까지는 절대 발행되지 않던 SessionEnded를 이 시점에만 발행해
+    /// 기존 일반 패배 처리(RoundPhaseManager GameOver 전환, MatchRecorder 전적 기록)를 그대로 재사용한다.
+    /// </summary>
+    public void ConfirmPartnerDisconnectGiveUp()
+    {
+        GameEvents.SessionEnded(SessionEndReason.PartnerAbandoned);
     }
 
     // ─────────────────────────────────────────
@@ -353,6 +727,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         // 솔로 모드: 1인 = 전원 준비 완료
         if (_soloMode) { GameEvents.AllPlayersReady(); return; }
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
         var props = new Hashtable { { READY_PROP_KEY, true } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
@@ -777,6 +1152,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             ResolveSoloRound(isWin);
             return;
         }
+
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
@@ -1899,7 +2276,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public void NotifySceneReady()
     {
         if (_soloMode) { BroadcastRoundStart(1); return; }
-        if (!PhotonNetwork.InRoom) return;
+        if (!PhotonNetwork.InRoom || _isLeavingRoom) return;
         var props = new Hashtable { { SCENE_READY_PROP_KEY, true } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
@@ -1907,7 +2284,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>내 골드를 Player CustomProperties에 기록 → 파트너 클라가 표시.</summary>
     public void SyncLocalGold(int gold)
     {
-        if (_soloMode || !PhotonNetwork.InRoom) return;
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
         var props = new Hashtable { { GOLD_PROP_KEY, gold } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
@@ -1915,7 +2292,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>내 누적 증강 목록(영문명, 선택 순)을 Player CustomProperties에 기록 → 파트너 클라가 표시/전적 기록.</summary>
     public void SyncLocalAugments(string[] augmentNamesEn)
     {
-        if (_soloMode || !PhotonNetwork.InRoom) return;
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
         var props = new Hashtable { { AUGMENTS_PROP_KEY, augmentNamesEn ?? System.Array.Empty<string>() } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
@@ -1966,6 +2343,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private void SetTeamHealthProp(int hp)
     {
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
         var props = new Hashtable { { TEAM_HP_PROP_KEY, hp } };
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
@@ -2070,6 +2448,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         Debug.Log("[Network] Photon Master 서버 연결 완료");
+
+        // 2026-08: 저장된 세션이 있어도 여기서 자동으로 재입장하지 않는다 — 타이틀 화면이
+        // [이전 게임으로 들어가기]/[새로 시작하기] 선택지를 보여주고, 사용자가 명시적으로
+        // AttemptRejoinSavedSession()/AbandonPreviousSession()을 호출할 때만 실제 재입장을 시도한다.
         PhotonNetwork.JoinLobby();
     }
 
@@ -2081,6 +2463,49 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnJoinedRoom()
     {
         Debug.Log($"[Network] 룸 입장 완료 | 인원: {PlayerCount}/{MAX_PLAYERS}");
+        Debug.Log(DumpNetworkDiagnostics("OnJoinedRoom"));
+
+        if (_rejoinPurpose == RejoinPurpose.NotifyAbandonAndLeave)
+        {
+            // 게임에 실제로 들어가지 않고 파트너에게 포기 통지만 전달한 뒤 곧바로 다시 나간다.
+            Debug.Log("[Network][Rejoin] 포기 통지용 재입장 성공 — 파트너에게 통지 후 재이탈");
+
+            if (PhotonNetwork.PlayerListOthers.Length > 0)
+                photonView.RPC(nameof(RPC_PartnerGaveUpReconnect), RpcTarget.Others);
+
+            _rejoinPurpose = RejoinPurpose.None;
+            PhotonNetwork.AutomaticallySyncScene = true;
+            // "새로 시작하기" 확정 — LeaveRoom()은 더 이상 세션을 지우지 않으므로(2026-08) 여기서 명시적으로 정리한다.
+            ClearSavedRejoinSession("새로 시작하기 확정(포기 통지 완료)");
+            LeaveRoom();
+            return;
+        }
+
+        bool wasRejoiningToEnterGame = _rejoinPurpose == RejoinPurpose.EnterGame;
+        _rejoinPurpose = RejoinPurpose.None;
+        _pendingRejoinRoomName = null;
+
+        SaveRejoinSession();
+
+        if (wasRejoiningToEnterGame)
+        {
+            // AutomaticallySyncScene의 룸-씬 캐치업 타이밍에 의존하지 않고, 재입장 시점에 이미
+            // 게임 씬이 아니면(타이틀=NetworkTest에서 재입장한 경우) NetworkManager가 직접 복귀시킨다.
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (currentScene != GAME_SCENE_NAME)
+            {
+                Debug.Log($"[Network][Rejoin] 재입장 성공 — 게임 씬으로 복귀 예약 ({currentScene} → {GAME_SCENE_NAME})");
+                s_resyncAfterRejoinPending = true;
+                UnityEngine.SceneManagement.SceneManager.LoadScene(GAME_SCENE_NAME);
+            }
+            else
+            {
+                Debug.Log("[Network] 이전 세션 재입장 성공 — 상태 재동기화");
+                _gameStarted = true;
+                ResyncAfterReconnect();
+            }
+        }
+
         if (PlayerCount == MAX_PLAYERS)
             OnRoomFull();
     }
@@ -2100,6 +2525,29 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
         Debug.LogError($"[Network] 룸 입장 실패 ({returnCode}): {message}");
+        Debug.Log(DumpNetworkDiagnostics("OnJoinRoomFailed"));
+
+        if (_rejoinPurpose == RejoinPurpose.NotifyAbandonAndLeave)
+        {
+            // 방이 없거나 PlayerTtl 만료 등으로 파트너에게 통지할 방법 자체가 사라짐 —
+            // 알릴 상대가 없다고 보고 저장된 세션만 정리한다.
+            Debug.LogWarning("[Network][Rejoin] 포기 통지용 재입장 실패 — 알릴 상대 없음, 세션 정리");
+            _rejoinPurpose = RejoinPurpose.None;
+            PhotonNetwork.AutomaticallySyncScene = true;
+            ClearSavedRejoinSession("재접속 포기(재입장 실패)");
+            PhotonNetwork.JoinLobby();
+            return;
+        }
+
+        if (_rejoinPurpose == RejoinPurpose.EnterGame)
+        {
+            // 저장된 세션으로의 재입장이 실패함(PlayerTtl 만료 등) — 실패 사실만 알리고, 세션 정리는
+            // 사용자가 안내 팝업을 확인(AcknowledgeRejoinFailure)할 때 한다.
+            Debug.LogWarning("[Network][Rejoin] 재입장 실패");
+            _rejoinPurpose = RejoinPurpose.None;
+            RejoinFailed = true;
+            PhotonNetwork.JoinLobby();
+        }
     }
 
     public override void OnJoinRandomFailed(short returnCode, string message)
@@ -2118,8 +2566,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             StopCoroutine(_opponentGraceRoutine);
             _opponentGraceRoutine = null;
-            Debug.Log("[Network] 상대 재접속 성공 — 유예 타이머 취소");
-            GameEvents.OpponentReconnected();
+        }
+
+        // _opponentGraceRoutine은 30초(GIVE_UP_AVAILABLE_DELAY) 후 스스로 null이 되므로,
+        // "재접속했는지"는 코루틴 존재 여부가 아니라 _opponentDisconnected로 판단해야 한다.
+        // 그래야 30초가 지나 무한 대기 중인 상태에서도(코루틴은 이미 끝났지만) 재접속 시 정상적으로 감지된다.
+        if (_opponentDisconnected)
+        {
+            _opponentDisconnected = false;
+
+            // 대기 중 열어뒀던 방을 다시 닫는다(포기 통지용 잠깐 재입장이어도 무해 — 뒤이은 재이탈 시
+            // OnPlayerLeftRoom이 다시 열게 되므로 open/close 대칭이 유지됨).
+            if (IsMasterClient)
+                PhotonNetwork.CurrentRoom.IsOpen = false;
+
+            // 상대가 실제로 게임을 이어가려는 게 아니라 "재접속 포기" 통지만 하러 잠깐 재입장했을 수
+            // 있다 — 곧바로 재접속 성공(전투/타이머 재개)을 확정하지 않고 짧게 기다려, 그 사이
+            // RPC_PartnerGaveUpReconnect가 도착하면 재접속 성공 처리를 취소한다.
+            if (_reconnectConfirmRoutine != null)
+                StopCoroutine(_reconnectConfirmRoutine);
+            _reconnectConfirmRoutine = StartCoroutine(ConfirmReconnectAfterAbandonCheck());
         }
 
         // 진행 중 매치에 파트너가 재입장 — 파트너가 자리를 비운 사이 보낸 내 스냅샷 RPC는
@@ -2131,29 +2597,75 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             OnRoomFull();
     }
 
+    /// <summary>
+    /// 상대 재입장 후 REJOIN_ABANDON_CHECK_DELAY만큼 기다렸다가, 그 사이 포기 통지가 오지 않았으면
+    /// 그때 재접속 성공을 확정 발행한다(전투/타이머 재개, 대기 모달 종료).
+    /// </summary>
+    private System.Collections.IEnumerator ConfirmReconnectAfterAbandonCheck()
+    {
+        yield return new WaitForSeconds(REJOIN_ABANDON_CHECK_DELAY);
+        _reconnectConfirmRoutine = null;
+
+        if (_partnerGaveUpReconnectNotice)
+            yield break; // 포기 통지가 먼저 도착 — 재접속 성공 처리를 생략한다.
+
+        Debug.Log("[Network] 상대 재접속 성공 — 대기 종료");
+        GameEvents.OpponentReconnected();
+    }
+
+    /// <summary>
+    /// 저장된 이전 세션으로 잠깐 재입장한 파트너가 "게임을 이어가지 않고 포기하겠다"고 보내는 통지.
+    /// RpcTarget.Others로 즉시 전송되므로 2인 방에서 상대 1명에게만 전달된다(RPC_GoldReceive와 동일 패턴).
+    /// </summary>
+    [PunRPC]
+    private void RPC_PartnerGaveUpReconnect()
+    {
+        Debug.Log("[Network] 파트너가 재접속을 포기함 — 통지 수신");
+
+        if (_reconnectConfirmRoutine != null)
+        {
+            StopCoroutine(_reconnectConfirmRoutine);
+            _reconnectConfirmRoutine = null;
+        }
+
+        _partnerGaveUpReconnectNotice = true;
+    }
+
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
         Debug.Log($"[Network] {otherPlayer.NickName} 퇴장 (Inactive: {otherPlayer.IsInactive})");
 
-        // 응답 전 상대 이탈 — 항복 상태는 정리만 하고, 실제 패배 처리는 기존 이탈 흐름
-        // (유예 타이머 → GracePeriodExpired → SessionEnded)에 맡긴다.
+        // 응답 전 상대 이탈 — 항복 상태는 정리만 하고, 실제 패배 처리는 남은 이탈 흐름
+        // ([포기하기] 선택 시 ConfirmPartnerDisconnectGiveUp → SessionEnded)에 맡긴다.
         _surrenderRequestSent = false;
         _surrenderRequestReceived = false;
         _surrenderRejectedNotice = false;
         _surrenderCrossCancelledNotice = false;
 
-        if (!otherPlayer.IsInactive)
+        // 이미 판이 끝난 뒤(GameOver/Victory)의 이탈은 새로 대기 흐름을 시작하지 않는다.
+        if (GameManager.TryGet(out var gm) && gm.Phase != null &&
+            (gm.Phase.CurrentPhase == GamePhase.GameOver || gm.Phase.CurrentPhase == GamePhase.Victory))
         {
-            // 자진 퇴장(룸 영구 이탈) 또는 PlayerTtl 만료로 인한 서버측 제거 — 유예 없이 바로 처리.
-            // 후자는 로컬 유예 코루틴과 같은 이탈 건이므로 FireGracePeriodExpired가 중복 발행을 막는다.
-            if (_opponentGraceRoutine != null)
-            {
-                StopCoroutine(_opponentGraceRoutine);
-                _opponentGraceRoutine = null;
-            }
-            FireGracePeriodExpired(false);
             return;
         }
+
+        // 이미 같은 이탈 건을 처리 중이면 무시한다 — Photon은 같은 이탈에 대해 OnPlayerLeftRoom을
+        // 두 번 호출할 수 있다(처음엔 IsInactive=true로 연결 끊김 감지, 이후 PlayerTtl이 실제로
+        // 서버에서 만료될 때 IsInactive=false로 한 번 더). 이 가드가 없으면 두 번째 호출 때마다
+        // 30초 대기 타이머와 [포기하기] 노출 상태가 계속 리셋된다.
+        if (_opponentDisconnected)
+            return;
+
+        // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
+        // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
+        // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
+        _opponentDisconnected = true;
+
+        // OnRoomFull()이 매치 시작 시 방을 닫아둔 채라(IsOpen=false) 상대의 RejoinRoom이 "Game closed"로
+        // 거부될 수 있다 — 대기 중엔 다시 열어 재접속을 허용한다. PlayerCount는 비활성 자리도 포함해
+        // 이미 MAX_PLAYERS이므로 무관한 3자가 랜덤 매칭/방 리스트로 끼어들 위험은 없다("Game full"로 막힘).
+        if (IsMasterClient)
+            PhotonNetwork.CurrentRoom.IsOpen = true;
 
         if (_opponentGraceRoutine != null)
             StopCoroutine(_opponentGraceRoutine);
@@ -2162,18 +2674,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OpponentDisconnected(RECONNECT_GRACE_PERIOD);
     }
 
-    /// <summary>상대방 연결 끊김 후 재접속 유예 타이머. 시간 내 재접속하면 OnPlayerEnteredRoom에서 취소됨.</summary>
+    /// <summary>
+    /// 상대방 이탈 후 [포기하기] 버튼을 노출해도 되는 시점까지의 대기(GIVE_UP_AVAILABLE_DELAY=30초).
+    /// 시간 내 재접속하면 OnPlayerEnteredRoom에서 취소됨. 이 코루틴이 끝나도 자동으로 세션을 종료하지 않는다 —
+    /// 이후로도 무한정 대기하며, 사용자가 [포기하기]→[타이틀로 이동]/[게임 종료]를 직접 선택해야 끝난다.
+    /// </summary>
     private System.Collections.IEnumerator OpponentGraceRoutine()
     {
-        yield return new WaitForSeconds(RECONNECT_GRACE_PERIOD);
+        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
         _opponentGraceRoutine = null;
 
         bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
-        Debug.LogWarning($"[Network] 상대 재접속 유예시간 종료 (둘 다 끊김: {bothDisconnected})");
+        Debug.LogWarning($"[Network] 상대 이탈 30초 경과 — 포기하기 노출 가능 (둘 다 끊김: {bothDisconnected})");
         FireGracePeriodExpired(bothDisconnected);
     }
 
-    /// <summary>같은 이탈 건에 대해 GracePeriodExpired를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
+    /// <summary>같은 이탈 건에 대해 GracePeriodExpired(포기 가능 알림)를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
     private void FireGracePeriodExpired(bool bothDisconnected)
     {
         if (_gracePeriodExpiredFired) return;
@@ -2203,7 +2719,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.SetCustomProperties(
             new Hashtable { { MATCH_GUID_ROOM_KEY, System.Guid.NewGuid().ToString("N") } });
 
-        PhotonNetwork.LoadLevel("GameSceneTest");
+        PhotonNetwork.LoadLevel(GAME_SCENE_NAME);
         // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
         // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
     }
@@ -2315,14 +2831,29 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
         Debug.Log($"[Network] 마스터 클라이언트 변경 → {newMasterClient.NickName}");
+
+        // 로비 방 목록에 표시되는 방장 닉네임(HostNickname)을 새 마스터 닉네임으로 갱신한다.
+        if (_isLeavingRoom) return;
+        if (newMasterClient != PhotonNetwork.LocalPlayer) return;
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(
+            new Hashtable { { HOST_NICKNAME_PROP_KEY, PhotonNetwork.NickName } });
     }
 
     public override void OnDisconnected(DisconnectCause cause)
     {
         Debug.LogWarning($"[Network] 연결 끊김: {cause}");
 
-        // 자진 퇴장(LeaveRoom/Disconnect 직접 호출)은 재접속 시도 안 함
-        if (cause == DisconnectCause.DisconnectByClientLogic) return;
+        _isLeavingRoom = false;
+
+        // 자진 퇴장(LeaveRoom/Disconnect 직접 호출)은 재접속 시도 안 함.
+        // 이 프로젝트에서는 LeaveRoom()이 OnLeftRoom 대신(또는 그 후) 이 콜백으로 이어질 수 있으므로
+        // 예약된 타이틀 씬 로드는 여기서도 시도한다(OnLeftRoom과 이중 실행되지 않도록 내부에서 방어).
+        if (cause == DisconnectCause.DisconnectByClientLogic)
+        {
+            TryLoadPendingTitleScene();
+            return;
+        }
 
         if (_selfReconnectRoutine != null)
             StopCoroutine(_selfReconnectRoutine);
@@ -2471,6 +3002,20 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _surrenderRejectedNotice = false;
         _surrenderCrossCancelledNotice = false;
 
+        // 파트너 이탈 대기 상태도 새 판으로 넘어가지 않도록 초기화
+        _opponentDisconnected = false;
+        if (_opponentGraceRoutine != null)
+        {
+            StopCoroutine(_opponentGraceRoutine);
+            _opponentGraceRoutine = null;
+        }
+        if (_reconnectConfirmRoutine != null)
+        {
+            StopCoroutine(_reconnectConfirmRoutine);
+            _reconnectConfirmRoutine = null;
+        }
+        _partnerGaveUpReconnectNotice = false;
+
         _lastKnownRound = 0;
         _localBoardRevision = 0;
         _lastOpponentBoardRevision = -1;
@@ -2519,6 +3064,18 @@ public class NetworkManager : MonoBehaviour
     public int  PlayerCount    => 1;
     public bool UsesSharedShopPool => false;
 
+    // 오프라인은 저장된 세션/재입장 개념 자체가 없다(실구현과 동일 공개 API 유지용 스텁).
+    public bool HasSavedSession        => false;
+    public string SavedNickname        => "";
+    public bool IsRejoining            => false;
+    public bool RejoinFailed           => false;
+    public bool PartnerGaveUpReconnect => false;
+    public bool IsAwaitingPartnerReconnect => false; // 오프라인은 파트너 이탈 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public void AttemptRejoinSavedSession()          { }
+    public void AcknowledgeRejoinFailure()           { }
+    public void AbandonPreviousSession()             { }
+    public void AcknowledgePartnerGaveUpReconnect()  { }
+
     // 실구현과 동일한 표면(전적 기록 등에서 사용).
     public string RoomName        => "offline";
     public string LocalNickname   => "OfflinePlayer";
@@ -2562,7 +3119,19 @@ public class NetworkManager : MonoBehaviour
     public void JoinRoom(string _)   => Debug.Log("[Network] 오프라인 모드");
     public void JoinOrCreateRoom(string _) => Debug.Log("[Network] 오프라인 모드");
     public void JoinRandomRoom()    => Debug.Log("[Network] 오프라인 모드");
+    public void RefreshRoomList()   => Debug.Log("[Network] 오프라인 모드");
     public void LeaveRoom()         { }
+
+    /// <summary>오프라인은 나갈 방이 없으므로 항상 즉시 씬을 로드한다.</summary>
+    public void RequestReturnToTitle(string titleSceneName)
+    {
+        if (!string.IsNullOrWhiteSpace(titleSceneName))
+            UnityEngine.SceneManagement.SceneManager.LoadScene(titleSceneName);
+    }
+
+    /// <summary>오프라인은 파트너 이탈 자체가 없으므로 실제로 호출될 일은 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void ConfirmPartnerDisconnectGiveUp() { }
+
     public void BroadcastRoundStart(int round) => GameEvents.RoundChanged(round);
     public void BroadcastBattleStart()         => GameEvents.BattleStart();
     public void BroadcastGameCleared()         => GameEvents.GameCleared();
