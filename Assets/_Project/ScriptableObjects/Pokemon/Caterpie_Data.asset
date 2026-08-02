@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Metapod
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 9123399656712176989, guid: 93b7d0d64d1ced847a2c0009c21c7d26, type: 3}
   icon: {fileID: 21300000, guid: 3dfd43831c9587a4b911889dea0d314f, type: 3}
+  unitIcon: {fileID: 0}

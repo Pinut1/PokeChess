@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Fire_S
   evolvesIntoEn: Typhlosion
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 2351950086169380367, guid: 975bd6489144ddc4eb1360017e636be4, type: 3}
   icon: {fileID: 21300000, guid: 8babdaf5586673f4c8d3eca11c62a23d, type: 3}
+  unitIcon: {fileID: 0}

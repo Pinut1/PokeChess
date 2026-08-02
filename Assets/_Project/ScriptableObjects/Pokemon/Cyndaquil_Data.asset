@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Fire_S
   evolvesIntoEn: Quilava
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 8458232803137700985, guid: 30774c36417a90c41bea1e4288caf602, type: 3}
   icon: {fileID: 21300000, guid: 0239d4f21e9112449857f3517cec5bf7, type: 3}
+  unitIcon: {fileID: 0}

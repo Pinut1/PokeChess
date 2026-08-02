@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Ethereal_L
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: synergy
   modelPrefab: {fileID: 2070301872082320055, guid: a98180314130fca4b91b119d4e8598d3, type: 3}
   icon: {fileID: 21300000, guid: cc1ffb4458f6e434486b51452f4bf6d9, type: 3}
+  unitIcon: {fileID: 0}

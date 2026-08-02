@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Electric_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: stone
   modelPrefab: {fileID: 9173616424241331683, guid: 2d3bd7a5b43e1a64d8154bbb31fcead9, type: 3}
   icon: {fileID: 21300000, guid: 7ca5425f022015c4dae3beaa830ea866, type: 3}
+  unitIcon: {fileID: 0}

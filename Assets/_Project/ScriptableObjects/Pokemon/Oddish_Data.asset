@@ -42,5 +42,7 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Gloom
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 6776136845797218827, guid: ef3843fb05a643745a07edc93e9418e0, type: 3}
   icon: {fileID: 21300000, guid: 40f2788058bc48542bf9681273cfdebb, type: 3}
+  unitIcon: {fileID: 0}

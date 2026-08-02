@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Water_L
   evolvesIntoEn: Croconaw
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 192105395500927529, guid: 879a2d79ac1a08a4e9d5264c02aa7a25, type: 3}
   icon: {fileID: 21300000, guid: cccc24a78d0702c4ca528f7a6aa0c534, type: 3}
+  unitIcon: {fileID: 0}

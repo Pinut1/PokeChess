@@ -42,5 +42,7 @@ MonoBehaviour:
   attackVfxId: Normal_L
   evolvesIntoEn: Pidgeot
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 3276046601907615750, guid: 71ebef429a37fc14d9ce842e96a8fa3b, type: 3}
   icon: {fileID: 21300000, guid: b8ac762d3468ba64c879616f5255fba5, type: 3}
+  unitIcon: {fileID: 0}

@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Fire_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: stone
   modelPrefab: {fileID: 8703987149817877392, guid: 7370064e82d84e74aaea04c96983e0c6, type: 3}
   icon: {fileID: 21300000, guid: 2cf0e9405f48c75448c2191a5640f9b7, type: 3}
+  unitIcon: {fileID: 0}

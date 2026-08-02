@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Ground_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: trade
   modelPrefab: {fileID: 1302901500846610223, guid: 9d47b7512cae6c742bafc0717b6a8d17, type: 3}
   icon: {fileID: 21300000, guid: d5f93fb59840dbc418882c9f354c00cf, type: 3}
+  unitIcon: {fileID: 0}

@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Water_S
   evolvesIntoEn: Blastoise
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 8903950263393293202, guid: c2e48f54ec9d56443b1465dcd88574ec, type: 3}
   icon: {fileID: 21300000, guid: c3d981132a0bd9e4a8b2f680d82a4e67, type: 3}
+  unitIcon: {fileID: 0}
