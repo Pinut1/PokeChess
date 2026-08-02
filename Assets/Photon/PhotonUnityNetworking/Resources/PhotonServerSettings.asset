@@ -63,6 +63,9 @@ MonoBehaviour:
   - RPC_RestartGame
   - RPC_TradeQueueAck
   - RPC_TradeQueueReceive
+  - RPC_SurrenderRequested
+  - RPC_SurrenderResolved
+  - RPC_PartnerGaveUpReconnect
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
