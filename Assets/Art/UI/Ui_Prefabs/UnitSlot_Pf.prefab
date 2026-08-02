@@ -76,7 +76,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 12
+  m_PixelsPerUnitMultiplier: 5
 --- !u!114 &7100000000000000005
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -92,15 +92,15 @@ MonoBehaviour:
   _icon: {fileID: 7100000000000000009}
   _costFrame: {fileID: 7100000000000000004}
   _nameText: {fileID: 0}
-  _costFrames:
-  - {fileID: -1213359774, guid: 5635499754aedb941bcce313b446e160, type: 3}
-  - {fileID: 1570180116, guid: 5635499754aedb941bcce313b446e160, type: 3}
-  - {fileID: 1951012781, guid: 5635499754aedb941bcce313b446e160, type: 3}
-  - {fileID: -1374038937, guid: 5635499754aedb941bcce313b446e160, type: 3}
-  - {fileID: 1937826195, guid: 5635499754aedb941bcce313b446e160, type: 3}
+  _costColors:
+  - {r: 0.62, g: 0.66, b: 0.7, a: 1}
+  - {r: 0.2, g: 0.74, b: 0.38, a: 1}
+  - {r: 0.22, g: 0.55, b: 0.92, a: 1}
+  - {r: 0.68, g: 0.33, b: 0.88, a: 1}
+  - {r: 0.96, g: 0.76, b: 0.22, a: 1}
   _grayscaleMaterial: {fileID: 2100000, guid: 14260e36e5de75342936f31c2cfa1414, type: 2}
   _placedTint: {r: 1, g: 1, b: 1, a: 1}
-  _unplacedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+  _unplacedTint: {r: 0.6603774, g: 0.6603774, b: 0.6603774, a: 1}
 --- !u!1 &7100000000000000006
 GameObject:
   m_ObjectHideFlags: 0
@@ -166,7 +166,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: -1099453505717964360, guid: 75ce74841b94cdd45b1bb00f2a18a55c, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1

@@ -42,5 +42,5 @@ MonoBehaviour:
   shopBuyable: 0
   obtainBy: synergy
   modelPrefab: {fileID: 6847240379958895362, guid: c775aab07f322f745b911de460ec023d, type: 3}
-  icon: {fileID: 21300000, guid: 06681a3e74d37b548ac528704b699844, type: 3}
-  unitIcon: {fileID: 0}
+  icon: {fileID: 7888187862262486236, guid: 06681a3e74d37b548ac528704b699844, type: 3}
+  unitIcon: {fileID: 667365108868581521, guid: 06681a3e74d37b548ac528704b699844, type: 3}

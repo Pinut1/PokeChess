@@ -43,5 +43,5 @@ MonoBehaviour:
   shopBuyable: 1
   obtainBy: shop
   modelPrefab: {fileID: 4559591983205366297, guid: bafd60acf88f6644b9f3c596dfd52171, type: 3}
-  icon: {fileID: 21300000, guid: 016a1178535cf3f4d9c512aabb578077, type: 3}
-  unitIcon: {fileID: 0}
+  icon: {fileID: 4768894970209518466, guid: 016a1178535cf3f4d9c512aabb578077, type: 3}
+  unitIcon: {fileID: 1931962372077687883, guid: 016a1178535cf3f4d9c512aabb578077, type: 3}

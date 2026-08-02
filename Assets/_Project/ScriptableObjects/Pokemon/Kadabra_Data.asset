@@ -42,5 +42,5 @@ MonoBehaviour:
   shopBuyable: 0
   obtainBy: evolution
   modelPrefab: {fileID: 4264875335409531482, guid: e004371430ae0f94aa732afebb8b679a, type: 3}
-  icon: {fileID: 21300000, guid: 7c71891f08791fc489abb86942c0a28e, type: 3}
-  unitIcon: {fileID: 0}
+  icon: {fileID: 4985045487557686654, guid: 7c71891f08791fc489abb86942c0a28e, type: 3}
+  unitIcon: {fileID: 8476949734826434595, guid: 7c71891f08791fc489abb86942c0a28e, type: 3}
