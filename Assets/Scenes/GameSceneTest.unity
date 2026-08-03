@@ -19391,10 +19391,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 922713587462212268, guid: ff467e52b4840ff45967616486df5eb8, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8856797927060091946}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ff467e52b4840ff45967616486df5eb8, type: 3}
 --- !u!114 &4859292710623545895 stripped
 MonoBehaviour:
@@ -19412,21 +19409,6 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 4911995020045145707, guid: ff467e52b4840ff45967616486df5eb8, type: 3}
   m_PrefabInstance: {fileID: 4859292710623545894}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &8856797927060091946
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1185547939}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3febf0b7ee5a7af4abea7f2cd644fca9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemTooltipUI
-  _icon: {fileID: 0}
-  _nameText: {fileID: 0}
-  _descriptionText: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
