@@ -81,7 +81,12 @@ public class ItemInventoryUI : MonoBehaviour
         GameEvents.OnInventoryChanged -= Refresh;
 
         // 인벤토리가 닫히는데 설명창만 남는 일이 없도록.
-        if (_tooltip != null) _tooltip.HideAll();
+        // HideAll이 아니라 칸별 Hide인 이유 — 이 컨트롤러는 아이템 상점과 공유하므로
+        // HideAll은 상점이 띄운 툴팁까지 꺼버린다. Hide(owner)는 자기 것이 아니면 무시된다.
+        if (_tooltip == null) return;
+
+        for (int i = 0; i < _slots.Length; i++)
+            if (_slots[i] != null) _tooltip.Hide(_slots[i]);
     }
 
     /// <summary>

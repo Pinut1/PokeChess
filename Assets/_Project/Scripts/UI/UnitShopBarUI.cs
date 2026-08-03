@@ -29,7 +29,17 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         base.OnDisable(); // Unsubscribe
 
         // 상점을 닫는데 설명창만 남는 일이 없도록(아이템 상점으로 전환할 때).
-        if (_roleTooltip != null) _roleTooltip.HideAll();
+        // HideAll이 아니라 카드별 Hide인 이유 — 컨트롤러를 다른 쪽과 공유할 때
+        // HideAll은 남이 띄운 툴팁까지 꺼버린다. Hide(owner)는 자기 것이 아니면 그냥 무시된다.
+        HideTooltipOwnedByCards();
+    }
+
+    private void HideTooltipOwnedByCards()
+    {
+        if (_roleTooltip == null) return;
+
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _roleTooltip.Hide(_cards[i]);
     }
 
     private void OnDestroy()
@@ -89,6 +99,11 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         card.SetAffordable(shop != null && shop.Gold >= data.cost);
 
         card.SetOwned(OwnsSpecies(hasGm ? gm.Board : null, data));
+
+        // 리롤은 카드 위치를 그대로 두고 내용만 갈아끼운다. 커서가 안 움직이면
+        // PointerEnter/Exit이 다시 안 일어나 툴팁에 리롤 전 역할이 남는다 — 여기서 직접 갱신한다.
+        if (card.IsHovered && _roleTooltip != null)
+            _roleTooltip.Show(card, data);
     }
 
     /// <summary>

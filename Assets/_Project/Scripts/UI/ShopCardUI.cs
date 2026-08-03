@@ -75,12 +75,20 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>,
     /// <summary>커서가 들고 날 때 발행(true=들어옴). 역할 설명창은 컨트롤러가 띄운다.</summary>
     public event Action<ShopCardUI, bool> Hovered;
 
+    /// <summary>커서가 이 카드 위에 있는지. 리롤로 내용이 바뀔 때 툴팁을 다시 띄울지 판단하는 데 쓴다.</summary>
+    public bool IsHovered { get; private set; }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
+        IsHovered = true;
         if (CurrentData != null) Hovered?.Invoke(this, true);
     }
 
-    public void OnPointerExit(PointerEventData eventData) => Hovered?.Invoke(this, false);
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        IsHovered = false;
+        Hovered?.Invoke(this, false);
+    }
 
     /// <summary>
     /// 보유 중 강조를 켜고 끈다. 보유 판정은 보드를 아는 컨트롤러가 하고,
@@ -189,6 +197,7 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>,
         _choiceCardFrame.SetActive(false);
         SetOwned(false); // 빈 슬롯에 강조가 남지 않도록
         if (_soldOverlay != null) _soldOverlay.SetActive(true);
+
     }
 
     private static void BindSynergySlot(GameObject slot, TextMeshProUGUI nameText, Image icon,

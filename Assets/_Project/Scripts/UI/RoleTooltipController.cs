@@ -82,7 +82,9 @@ public class RoleTooltipController : MonoBehaviour
 
         if (!_panel.Bind(role))
         {
-            Hide(owner);
+            // Hide(owner)를 쓰면 안 된다 — 아직 _owner를 이 owner로 바꾸기 전이라
+            // "네 것이 아니다"라는 가드에 걸려 무시되고, 이전 유닛의 역할이 화면에 남는다.
+            Close();
             return;
         }
 
@@ -95,12 +97,21 @@ public class RoleTooltipController : MonoBehaviour
     {
         if (owner != null && _owner != owner) return;
 
+        Close();
+    }
+
+    /// <summary>
+    /// 소유자와 무관하게 무조건 닫는다.
+    /// ⚠️ 컨트롤러를 여러 쪽이 공유한다면 이걸 쓰지 말 것 — 남이 띄운 툴팁까지 꺼버린다.
+    /// 자기 것만 닫으려면 소유자별로 <see cref="Hide"/>를 부르면 된다.
+    /// </summary>
+    public void HideAll() => Close();
+
+    private void Close()
+    {
         _owner = null;
         if (_panel != null) _panel.gameObject.SetActive(false);
     }
-
-    /// <summary>소유자와 무관하게 무조건 닫는다(패널이 꺼질 때 등).</summary>
-    public void HideAll() => Hide(null);
 
     // 열려 있는 동안 커서를 따라간다.
     private void LateUpdate()
