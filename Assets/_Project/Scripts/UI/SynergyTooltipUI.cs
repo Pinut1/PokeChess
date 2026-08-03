@@ -38,6 +38,10 @@ public class SynergyTooltipUI : MonoBehaviour
     [Tooltip("보유 수 표기 형식. {0}=현재 계열 수.")]
     [SerializeField] private string _countFormat = "{0}";
 
+    [Tooltip("시너지 전체 설명(SynergyData.description). 단계 줄보다 위에 놓는다. " +
+             "설명이 비어 있으면 이 줄은 꺼져서 그만큼 패널이 짧아진다.")]
+    [SerializeField] private TextMeshProUGUI _descriptionText;
+
     [Header("단계별 효과 줄")]
     [Tooltip("단계 줄 텍스트. 현재 데이터의 최대 단계 수는 4개(풀·독·물·돌연변이)라 4칸이면 충분하다. " +
              "데이터의 단계가 더 많아지면 남는 단계는 표시되지 않고 경고가 한 번 찍힌다.")]
@@ -109,6 +113,15 @@ public class SynergyTooltipUI : MonoBehaviour
 
         if (_countText != null)
             _countText.text = string.Format(_countFormat, status != null ? status.uniqueCount : 0);
+
+        if (_descriptionText != null)
+        {
+            bool hasDescription = !string.IsNullOrWhiteSpace(data.description);
+
+            // 줄 오브젝트를 끄면 VerticalLayoutGroup이 자리를 접는다(단계 줄과 같은 규칙).
+            _descriptionText.gameObject.SetActive(hasDescription);
+            if (hasDescription) _descriptionText.text = data.description;
+        }
 
         BindTierLines(data, status);
         BindUnitSlots(data);

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -12,7 +13,8 @@ using UnityEngine.UI;
 /// 카드 루트(이 컴포넌트가 붙는 오브젝트)는 ItemCardContanier — 프리팹에서 항상 활성 상태로 유지해야
 /// Horizontal Layout Group이 슬롯 자리를 접지 않는다. Sold 상태에서도 이 오브젝트 자체는 끄지 않는다.
 /// </summary>
-public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
+public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>,
+                          IPointerEnterHandler, IPointerExitHandler
 {
     [Header("버튼")]
     [SerializeField] private Button _buyButton;      // ItemCard_Button
@@ -48,6 +50,16 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
 
     /// <summary>리롤 클릭 시 발행. 유닛 카드에는 없는 아이템 카드 전용 동작이라 IShopCardView에는 넣지 않는다.</summary>
     public event Action RerollClicked;
+
+    /// <summary>커서가 들고 날 때 발행(true=들어옴). 설명창은 컨트롤러가 띄운다.</summary>
+    public event Action<ItemCardUI, bool> Hovered;
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (CurrentData != null) Hovered?.Invoke(this, true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData) => Hovered?.Invoke(this, false);
 
     private string _blockReason;
     private Coroutine _reasonRoutine;
@@ -93,6 +105,7 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>
     public void SetSold()
     {
         CurrentData = null;
+        Hovered?.Invoke(this, false); // 산 직후 커서가 그대로면 설명창이 남는다
 
         _buyButton.interactable = false;
         SetContentActive(false);

@@ -11,6 +11,11 @@ using UnityEngine;
 /// </summary>
 public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
 {
+    [Header("설명창")]
+    [Tooltip("카드에 커서를 올리면 띄울 아이템 설명창 컨트롤러. 비우면 설명창이 뜨지 않는다. " +
+             "인벤토리와 같은 컨트롤러를 물려도 된다 — 소유자로 구분하므로 서로 꺼뜨리지 않는다.")]
+    [SerializeField] private ItemTooltipController _tooltip;
+
     protected override void Awake()
     {
         base.Awake(); // 구매 클릭 배선
@@ -19,7 +24,31 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
         {
             int slotIndex = i; // 클로저 캡처용 로컬 복사
             _cards[i].RerollClicked += () => RerollSlot(slotIndex);
+            _cards[i].Hovered += HandleHovered;
         }
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable(); // Unsubscribe
+
+        // 상점을 닫는데 설명창만 남는 일이 없도록(유닛 상점으로 전환할 때).
+        if (_tooltip != null) _tooltip.HideAll();
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _cards[i].Hovered -= HandleHovered;
+    }
+
+    /// <summary>카드에 커서가 들고 날 때 설명창을 여닫는다.</summary>
+    private void HandleHovered(ItemCardUI card, bool entered)
+    {
+        if (_tooltip == null) return;
+
+        if (entered) _tooltip.Show(card, card.CurrentData);
+        else         _tooltip.Hide(card);
     }
 
     protected override void OnEnable()
