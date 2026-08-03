@@ -93,6 +93,26 @@ public class BoardManager : MonoBehaviour
         public int StarLevel;
     }
 
+    /// <summary>
+    /// 재접속 복원용 유닛 스냅샷(1차 구현 — 저장 데이터 구조만). NetworkManager가 이 구조체 목록을
+    /// JSON으로 직렬화해 Photon Player CustomProperties에 저장/복원한다. HP/마나 등 전투 임시값은
+    /// ResetForBattle()로 매 라운드 재계산되므로 포함하지 않는다.
+    /// </summary>
+    [System.Serializable]
+    public struct UnitSaveData
+    {
+        public int PokemonId;          // data.id (도감번호) — PokemonDatabase.GetById로 재조회
+        public int StarLevel;          // 1~3
+        public bool IsOnBoard;         // true=필드, false=벤치
+        public int Q;                  // IsOnBoard일 때만 유효(HexCoords, s는 -Q-R로 유도)
+        public int R;
+        public int BenchSlot;          // IsOnBoard가 false일 때만 유효(배열 인덱스)
+        public bool IsTradeEvolved;
+        public int EquippedStoneId;    // 0=돌 없음 (EvolutionStoneDatabase.GetById 키)
+        public int PreStoneSpeciesId;  // 돌 있을 때만 유효 — 돌 해제 시 되돌아갈 베이스 종
+        public int[] ItemIds;          // 장착 일반 아이템(최대 MaxItemSlots=2, 돌과 슬롯 공유)
+    }
+
     private void Awake()
     {
         // OnValidate는 에디터에서만 도는 데다, 씬을 저장한 뒤 _benchSize를 줄인 경우엔
@@ -197,7 +217,7 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>
     /// 보드에 여유 슬롯(현재 배치 수 &lt; 캡)이 있으면 벤치 앞쪽(슬롯 0,1,2…) 유닛부터
-    /// 빈 보드 타일로 자동 승격한다(롤체식). 레벨업(캡 증가) 시 호출.
+    /// 빈 보드 타일로 자동 승격한다(롤체식). 쇼핑 종료 후 Battle 페이즈 진입 시 호출(HandlePhaseChanged).
     /// TryPlaceUnit을 재사용하므로 캡 검사·UnitPlaced 이벤트·합체 검사가 그대로 적용된다.
     /// 각자 보드 각자 권위라 로컬 처리로 충분하며 파트너 미러는 UnitPlaced로 갱신된다.
     /// </summary>
@@ -450,6 +470,110 @@ public class BoardManager : MonoBehaviour
 
     /// <summary>벤치 슬롯 배열(읽기 전용, 인덱스=슬롯). null=빈 슬롯. BoardView 위치 재배치에 사용.</summary>
     public IReadOnlyList<PokemonUnit> GetBenchSnapshot() => _bench;
+
+    // ──────────────────────────────────────────
+    // 재접속 복원(1차 구현 — 저장 데이터 구조 + 생성/복원 기반만)
+    // ──────────────────────────────────────────
+
+    /// <summary>현재 보드+벤치의 모든 유닛을 UnitSaveData 목록으로 뽑아낸다(NetworkManager가 직렬화해 저장).</summary>
+    public List<UnitSaveData> BuildSnapshot()
+    {
+        var result = new List<UnitSaveData>();
+
+        foreach (var kvp in _battleField)
+        {
+            if (kvp.Value != null)
+                result.Add(BuildUnitSaveData(kvp.Value, true, kvp.Key.q, kvp.Key.r, -1));
+        }
+
+        for (int slot = 0; slot < _bench.Length; slot++)
+        {
+            if (_bench[slot] != null)
+                result.Add(BuildUnitSaveData(_bench[slot], false, 0, 0, slot));
+        }
+
+        return result;
+    }
+
+    private static UnitSaveData BuildUnitSaveData(PokemonUnit unit, bool isOnBoard, int q, int r, int benchSlot)
+    {
+        var itemIds = new int[unit.items.Count];
+        for (int i = 0; i < unit.items.Count; i++)
+            itemIds[i] = unit.items[i] != null ? unit.items[i].id : 0;
+
+        return new UnitSaveData
+        {
+            PokemonId = unit.data != null ? unit.data.id : 0,
+            StarLevel = unit.starLevel,
+            IsOnBoard = isOnBoard,
+            Q = q,
+            R = r,
+            BenchSlot = benchSlot,
+            IsTradeEvolved = unit.isTradeEvolved,
+            EquippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0,
+            PreStoneSpeciesId = unit.preStoneData != null ? unit.preStoneData.id : 0,
+            ItemIds = itemIds
+        };
+    }
+
+    /// <summary>
+    /// UnitSaveData 목록으로부터 유닛을 재생성해 원래 위치(필드 좌표/벤치 슬롯)에 배치한다.
+    /// 기존 배치 로직(TryPlaceUnit/TryPlaceInBench)과 UnitFactory.Create를 그대로 재사용하며,
+    /// 이 메서드 자체는 수정하지 않는다(호출부인 NetworkManager가 저장 이벤트 재실행을 막는 책임을 짐).
+    /// </summary>
+    public void RestoreFromSnapshot(IReadOnlyList<UnitSaveData> units)
+    {
+        if (units == null) return;
+
+        var pokemonDb = PokemonDatabase.Instance;
+
+        foreach (var save in units)
+        {
+            PokemonData data = pokemonDb != null ? pokemonDb.GetById(save.PokemonId) : null;
+            if (data == null)
+            {
+                Debug.LogWarning($"[BoardManager] 복원 실패 — PokemonId {save.PokemonId}를 PokemonDatabase에서 찾지 못함");
+                continue;
+            }
+
+            PokemonUnit unit = UnitFactory.Create(data, save.StarLevel);
+            if (unit == null) continue;
+
+            unit.isTradeEvolved = save.IsTradeEvolved;
+
+            if (save.ItemIds != null)
+            {
+                var itemDb = ItemDatabase.Instance;
+                foreach (int itemId in save.ItemIds)
+                {
+                    if (itemId <= 0) continue;
+                    ItemData item = itemDb != null ? itemDb.GetById(itemId) : null;
+                    if (item != null) unit.TryEquipItem(item);
+                }
+            }
+
+            if (save.EquippedStoneId > 0)
+            {
+                var stoneDb = EvolutionStoneDatabase.Instance;
+                EvolutionStoneData stone = stoneDb != null ? stoneDb.GetById(save.EquippedStoneId) : null;
+                PokemonData originalData = save.PreStoneSpeciesId > 0 && pokemonDb != null
+                    ? pokemonDb.GetById(save.PreStoneSpeciesId) : null;
+
+                if (stone != null && originalData != null)
+                    unit.RestoreStoneStateAfterMerge(stone, originalData);
+            }
+
+            bool placed = save.IsOnBoard
+                ? TryPlaceUnit(unit, new HexCoords(save.Q, save.R, -save.Q - save.R))
+                : TryPlaceInBench(unit, save.BenchSlot);
+
+            if (!placed)
+            {
+                Debug.LogWarning($"[BoardManager] 복원 배치 실패 — PokemonId {save.PokemonId} (OnBoard={save.IsOnBoard})");
+                Destroy(unit.gameObject);
+            }
+        }
+    }
 
     // ──────────────────────────────────────────
     // 보드 배치

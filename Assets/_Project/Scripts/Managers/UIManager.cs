@@ -539,6 +539,11 @@ public class UIManager : MonoBehaviour
         if (_currentPhase != GamePhase.Shopping || _readyRequestSubmitted)
             return;
 
+        // 파트너 재접속 대기 중엔 전투 시작 요청을 막는다(2026-08 — 대기 중 입력 차단).
+        // 옵션창의 EventSystem 비활성화로도 막히지만, 방어적으로 여기서도 확인한다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsAwaitingPartnerReconnect)
+            return;
+
         _readyRequestSubmitted = true;
         UpdateBattleReadyButtonState();
         GameEvents.RequestPlayerReady();

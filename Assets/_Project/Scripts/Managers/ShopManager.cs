@@ -11,6 +11,11 @@ using UnityEngine;
 /// </summary>
 public class ShopManager : MonoBehaviour
 {
+    /// <summary>파트너 재접속 대기 중엔 구매/리롤/XP구매를 막는다(2026-08 — 대기 중 입력 차단).</summary>
+    private static bool IsAwaitingPartnerReconnect() =>
+        GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsAwaitingPartnerReconnect;
+
+
     [Header("샵 풀")]
     [Tooltip("켜짐(권장): 중앙 PokemonDatabase의 shopBuyable 종으로 풀을 자동 구성. 데이터 구동이라 인스펙터 수동 할당 불필요.\n" +
              "꺼짐: 아래 _pool 인스펙터 배열만 사용(특정 종만 나오게 하는 디버그/제한 테스트용).")]
@@ -239,14 +244,37 @@ public class ShopManager : MonoBehaviour
 
         InitializeChampionPool();
 
-        // 초기 UI/상점 상태 동기화.
-        // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
-        GameEvents.GoldChanged(Gold);
-        GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
-        GameEvents.XpChanged(CurrentXp, RequiredXp);
-        GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
+        // 재접속으로 인한 씬 재로드로 이번 씬에 들어왔는지. Start() 시점엔 씬의 모든 오브젝트의
+        // Awake()가 이미 끝났다고 Unity가 보장하므로(오브젝트 간 Awake() 순서 자체는 보장 안 됨),
+        // GameManager.Instance가 이 시점엔 항상 준비돼 있다 — 별도 필드 캐싱 없이 여기서 바로 읽는다.
+        // (과거엔 Awake()에서 캐싱했으나, 그러면 같은 GameObject 위의 GameManager.Awake()가 아직
+        // 안 돌았을 수 있어 GameManager.TryGet이 실패해 false로 잘못 캐싱되는 문제가 있었다.)
+        bool isResumingRejoinedMatch =
+            GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsResumingRejoinedMatch;
 
-        Roll();         // 초기 유닛 상점 공개
+        // 초기 UI/상점 상태 동기화. 재접속으로 인한 씬 재로드라면 스킵한다 — 이 클라이언트의 실제 골드/
+        // 레벨/XP/리롤 자원은 서버(Player CustomProperties 등)에 남아있을 수 있는데, 여기서 신규 매치
+        // 기본값(Gold=_startingGold, Level=1, Xp=0 등)을 그대로 방송해버리면 "새 게임처럼 초기화된 것
+        // 처럼" 보이게 된다. 실제 값을 읽어와 복원하는 로직은 다음 단계에서 추가 예정 — 1단계는 여기서
+        // 잘못된 기본값이 UI/이벤트로 퍼지는 것만 막는다.
+        if (!isResumingRejoinedMatch)
+        {
+            // LevelChanged는 Roll() 전에 발행해야 첫 상점부터 현재 레벨 확률을 사용한다.
+            GameEvents.GoldChanged(Gold);
+            GameEvents.LevelChanged(_currentLevel); // HandleLevelChanged에서 UnitCapChanged까지 발행
+            GameEvents.XpChanged(CurrentXp, RequiredXp);
+            GameEvents.RerollCountChanged(RerollCount); // 무료 리롤 자원 초기 동기화(HUD)
+        }
+
+        // 유닛 상점(Roll)은 재접속 시 스킵한다 — 협동 모드에서 Roll()은 로컬 추첨이 아니라
+        // network.RequestSharedShopRoll(...)로 마스터에게 "새로 굴려달라"고 요청하는데,
+        // 마스터의 TryAuthorityRollSharedShop()은 기존 예약을 무조건 반환하고 새로 만든다.
+        // 무조건 Roll()을 부르면 RequestSharedShopRestore()가 복원하려는 기존 예약을 먼저 지워버릴
+        // 수 있다(2026-08 확인). 재접속이면 상점 채우기는 RequestSharedShopRestore 응답에 맡긴다.
+        // 아이템 상점(RollItemShop)은 공유 풀 권위와 무관한 순수 로컬 추첨이라 그대로 둔다.
+        if (!isResumingRejoinedMatch)
+            Roll();         // 초기 유닛 상점 공개
+
         RollItemShop(); // 초기 아이템 상점 공개
     }
 
@@ -340,6 +368,16 @@ public class ShopManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
+        // 재접속 라운드 캐치업(NetworkManager.ResyncAfterReconnect의 RPC_OnRoundStart 로컬 재호출)으로
+        // 인한 재발행이면 여기서 아무것도 하지 않는다 — 이자 재계산/Roll/RollItemShop이 방금 복원된
+        // 골드·상점 상태를 덮어쓰는 문제가 있었다(2026-08 확인). 일반 라운드 진행(마스터가 실제로
+        // BroadcastRoundStart를 전체 방송하는 경우)에는 이 플래그가 켜져 있지 않아 기존 그대로 동작한다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+        {
+            Debug.Log("[Shop] 재접속 라운드 캐치업 — Roll/이자 재계산 스킵(복원된 상점/골드 유지)");
+            return;
+        }
+
         // 라운드별 고정 골드는 보상 테이블 선지급(RewardManager, OnStageEntered)이 담당.
         // 여기선 보유 골드 기반 이자만 지급(밸런스 기획서 §7.5). 1라운드는 이자 없음(4판 = 2~5라운드).
         if (round >= 2)
@@ -422,6 +460,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool BuyXp()
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_currentLevel >= _maxLevel)
         {
             Debug.Log("[LevelXP] 최대 레벨 — XP 구매 불가");
@@ -522,13 +562,8 @@ public class ShopManager : MonoBehaviour
         if (unit == null || unit.data == null)
             return 0;
 
-        // 통신진화/일반 진화 유닛은 공용 풀의 원본 종 가격으로 환급한다.
-        PokemonData priceData =
-            _evolvedToBase.TryGetValue(
-                unit.data,
-                out PokemonData baseData)
-                ? baseData
-                : unit.data;
+        // 통신진화/일반 진화/진화의 돌 유닛은 공용 풀의 원본 종 가격으로 환급한다.
+        PokemonData priceData = ResolveBasePoolData(unit);
 
         int baseUnits = GetBaseUnitCount(unit.starLevel);
         int invested = priceData.cost * baseUnits;
@@ -970,6 +1005,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool Reroll()
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_sharedRollPending || _sharedPurchasePending)
         {
             Debug.Log("[Shop] 이전 공유 풀 요청 처리 중 — 리롤 대기");
@@ -1008,6 +1045,8 @@ public class ShopManager : MonoBehaviour
     /// <summary>슬롯의 포켓몬을 구매해 벤치에 배치. 성공 시 true.</summary>
     public bool Buy(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_slots == null || slot < 0 || slot >= _slots.Length)
             return false;
 
@@ -1165,7 +1204,7 @@ public class ShopManager : MonoBehaviour
 
         if (existingCandidates.Count == 0)
         {
-            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            Debug.Log("[Shop] 합체 구매 불가 — 동일 종·성급 후보 부족");
             return false;
         }
 
@@ -1174,7 +1213,7 @@ public class ShopManager : MonoBehaviour
         if (!TryFindMergeSlots(slot, poolData.id, needed, out List<int> slots) ||
             Gold < poolData.cost * needed)
         {
-            Debug.Log("[Shop] 벤치가 가득 참 — 구매 불가");
+            Debug.Log("[Shop] 합체 구매 불가 — 상점 슬롯 또는 골드 부족");
             return false;
         }
 
@@ -1315,15 +1354,42 @@ public class ShopManager : MonoBehaviour
         Debug.Log($"[ShopPool] {data.pokemonName} 풀 감소 -{amount} / 남은 수량: {_remainingPool[data]}");
     }
 
+    /// <summary>
+    /// 판매/가격 계산에 쓸 "공용 풀 원본 종"을 구한다.
+    ///
+    /// 진화의 돌은 ItemManager.HandleUnitSold()가 unit.RemoveStone()으로 unit.data를
+    /// 베이스 종으로 원복하는데, 이 처리와 ShopManager.HandleUnitSold()는 같은
+    /// GameEvents.OnUnitSold의 서로 다른 구독자라 실행 순서가 보장되지 않는다.
+    /// 그래서 unit.data를 그대로 믿지 않고, 돌이 아직 장착돼 있으면(=아직 원복 전일 수 있음)
+    /// unit.preStoneData를 먼저 사용한다 — ItemManager가 먼저 실행돼 이미 원복된 경우엔
+    /// equippedStone이 null이라 자연히 unit.data(이미 베이스 종)로 떨어지므로 어느 순서든 결과가 같다.
+    /// 그 위에 일반진화/통신진화/플러시·마이농 역매핑(_evolvedToBase)을 한 번 더 적용해
+    /// 최종 기본종을 얻는다.
+    /// </summary>
+    private PokemonData ResolveBasePoolData(PokemonUnit unit)
+    {
+        PokemonData afterStone =
+            unit.equippedStone != null && unit.preStoneData != null
+                ? unit.preStoneData
+                : unit.data;
+
+        return _evolvedToBase.TryGetValue(afterStone, out var baseData) ? baseData : afterStone;
+    }
+
     private void ReturnToChampionPool(PokemonUnit unit)
     {
         if (unit == null || unit.data == null) return;
 
-        // 진화 유닛(data가 진화체로 스왑됨)이면 소비된 기본종 풀로 되돌린다.
-        PokemonData data = _evolvedToBase.TryGetValue(unit.data, out var baseData) ? baseData : unit.data;
+        PokemonData data = ResolveBasePoolData(unit);
 
         if (!_remainingPool.ContainsKey(data))
+        {
+            Debug.LogWarning(
+                $"[ShopPool] '{data.pokemonName}' 원본 풀 데이터를 찾지 못해 판매 반환을 건너뜀 " +
+                $"(unit.data={unit.data.pokemonName}, shopBuyable 여부/DB 임포트를 확인)"
+            );
             return;
+        }
 
         int amount = GetBaseUnitCount(unit.starLevel);
 
@@ -1344,6 +1410,24 @@ public class ShopManager : MonoBehaviour
     // ──────────────────────────────────────────
     // 공유 챔피언 풀 (MasterClient 권위)
     // ──────────────────────────────────────────
+
+    /// <summary>
+    /// 재접속 복원 전용(변경 없는 조회) — 이 액터의 기존 상점 예약이 아직 남아있으면 그대로 반환한다.
+    /// TryAuthorityRollSharedShop과 달리 _sharedReservations를 건드리지 않는다(반환/재추첨/풀 차감 없음).
+    /// MasterClient만 호출. 마스터 교체 등으로 예약 자체가 없으면 false.
+    /// </summary>
+    public bool TryAuthorityGetExistingSharedShopReservation(int actorNumber, out int revision, out int[] pokemonIds)
+    {
+        revision = 0;
+        pokemonIds = null;
+
+        if (!_sharedReservations.TryGetValue(actorNumber, out var reservation) || reservation.pokemonIds == null)
+            return false;
+
+        revision = reservation.revision;
+        pokemonIds = (int[])reservation.pokemonIds.Clone();
+        return true;
+    }
 
     /// <summary>기존 미구매 예약을 반환하고 새 상점 5칸을 풀에서 예약한다. MasterClient만 호출.</summary>
     public bool TryAuthorityRollSharedShop(
@@ -2388,6 +2472,8 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     public bool RerollItemSlot(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_itemSlots == null ||
             slot < 0 ||
             slot >= _itemSlots.Length)
@@ -2537,6 +2623,8 @@ public class ShopManager : MonoBehaviour
     /// <summary>아이템 상점 슬롯의 상품을 아이템 쿠폰으로 구매해 인벤토리에 추가. 성공 시 true.</summary>
     public bool BuyItem(int slot)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (_itemSlots == null || slot < 0 || slot >= _itemSlots.Length) return false;
 
         ScriptableObject product = _itemSlots[slot];

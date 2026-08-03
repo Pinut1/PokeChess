@@ -18,6 +18,10 @@ public class ItemManager : MonoBehaviour
 {
     private const int MAX_INVENTORY_SIZE = 20;
 
+    /// <summary>파트너 재접속 대기 중엔 장착/해제를 막는다(2026-08 — 대기 중 입력 차단).</summary>
+    private static bool IsAwaitingPartnerReconnect() =>
+        GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsAwaitingPartnerReconnect;
+
     [Header("아이템 쿠폰")]
     [SerializeField] private int _startingItemCoupon;
 
@@ -439,6 +443,8 @@ public class ItemManager : MonoBehaviour
         ScriptableObject equippable,
         PokemonUnit unit)
     {
+        if (IsAwaitingPartnerReconnect()) return false;
+
         if (unit == null || equippable == null)
             return false;
 
@@ -495,6 +501,8 @@ public class ItemManager : MonoBehaviour
         ScriptableObject equippable,
         PokemonUnit unit)
     {
+        if (IsAwaitingPartnerReconnect()) return null;
+
         if (unit == null || equippable == null)
             return null;
 
