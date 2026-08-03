@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -10,7 +11,8 @@ using UnityEngine.UI;
 /// 카드 루트(이 컴포넌트가 붙는 오브젝트)는 CardContanier — 프리팹에서 항상 활성 상태로 유지해야
 /// Horizontal Layout Group이 슬롯 자리를 접지 않는다. Sold 상태에서도 이 오브젝트 자체는 끄지 않는다.
 /// </summary>
-public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
+public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>,
+                          IPointerEnterHandler, IPointerExitHandler
 {
     [Header("프레임 / 버튼")]
     [SerializeField] private Image _cardFrame;   // Card_Frame의 Image
@@ -69,6 +71,24 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     public event Action Clicked;
 
     private void HandleClicked() => Clicked?.Invoke();
+
+    /// <summary>커서가 들고 날 때 발행(true=들어옴). 역할 설명창은 컨트롤러가 띄운다.</summary>
+    public event Action<ShopCardUI, bool> Hovered;
+
+    /// <summary>커서가 이 카드 위에 있는지. 리롤로 내용이 바뀔 때 툴팁을 다시 띄울지 판단하는 데 쓴다.</summary>
+    public bool IsHovered { get; private set; }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        IsHovered = true;
+        if (CurrentData != null) Hovered?.Invoke(this, true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        IsHovered = false;
+        Hovered?.Invoke(this, false);
+    }
 
     /// <summary>
     /// 보유 중 강조를 켜고 끈다. 보유 판정은 보드를 아는 컨트롤러가 하고,
@@ -160,6 +180,7 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
     public void SetSold()
     {
         CurrentData = null;
+        Hovered?.Invoke(this, false); // 산 직후 커서가 그대로면 설명창이 남는다
 
         // 골드 부족으로 컴포넌트를 꺼둔 상태일 수 있어 되살린 뒤 interactable로 막는다
         // (Sold는 Disabled 스프라이트를 쓰는 정상 경로).
@@ -176,6 +197,7 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>
         _choiceCardFrame.SetActive(false);
         SetOwned(false); // 빈 슬롯에 강조가 남지 않도록
         if (_soldOverlay != null) _soldOverlay.SetActive(true);
+
     }
 
     private static void BindSynergySlot(GameObject slot, TextMeshProUGUI nameText, Image icon,

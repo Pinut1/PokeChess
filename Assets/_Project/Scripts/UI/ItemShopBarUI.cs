@@ -33,7 +33,12 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
         base.OnDisable(); // Unsubscribe
 
         // 상점을 닫는데 설명창만 남는 일이 없도록(유닛 상점으로 전환할 때).
-        if (_tooltip != null) _tooltip.HideAll();
+        // HideAll이 아니라 카드별 Hide인 이유 — 이 컨트롤러는 인벤토리와 공유하므로
+        // HideAll은 인벤토리가 띄운 툴팁까지 꺼버린다. Hide(owner)는 자기 것이 아니면 무시된다.
+        if (_tooltip == null) return;
+
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _tooltip.Hide(_cards[i]);
     }
 
     private void OnDestroy()
@@ -49,6 +54,16 @@ public class ItemShopBarUI : ShopBarUIBase<ScriptableObject, ItemCardUI>
 
         if (entered) _tooltip.Show(card, card.CurrentData);
         else         _tooltip.Hide(card);
+    }
+
+    /// <summary>
+    /// 바인딩 직후 호출. 카드별 리롤은 카드 위치를 그대로 두고 내용만 갈아끼우므로,
+    /// 커서가 안 움직이면 PointerEnter/Exit이 다시 안 일어나 툴팁에 리롤 전 아이템이 남는다.
+    /// </summary>
+    protected override void AfterBind(ItemCardUI card, ScriptableObject data)
+    {
+        if (card.IsHovered && _tooltip != null)
+            _tooltip.Show(card, data);
     }
 
     protected override void OnEnable()

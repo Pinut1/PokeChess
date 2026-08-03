@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 유닛 상점 카드 5장. 공통 로직은 ShopBarUIBase가 담당하고,
@@ -11,6 +12,51 @@ using System.Collections.Generic;
 /// </summary>
 public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
 {
+    [Header("역할 설명창")]
+    [Tooltip("카드에 커서를 올리면 커서 오른쪽 위에 띄울 역할 툴팁. 비우면 뜨지 않는다.")]
+    [SerializeField] private RoleTooltipController _roleTooltip;
+
+    protected override void Awake()
+    {
+        base.Awake(); // 구매 클릭 배선
+
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _cards[i].Hovered += HandleHovered;
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable(); // Unsubscribe
+
+        // 상점을 닫는데 설명창만 남는 일이 없도록(아이템 상점으로 전환할 때).
+        // HideAll이 아니라 카드별 Hide인 이유 — 컨트롤러를 다른 쪽과 공유할 때
+        // HideAll은 남이 띄운 툴팁까지 꺼버린다. Hide(owner)는 자기 것이 아니면 그냥 무시된다.
+        HideTooltipOwnedByCards();
+    }
+
+    private void HideTooltipOwnedByCards()
+    {
+        if (_roleTooltip == null) return;
+
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _roleTooltip.Hide(_cards[i]);
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _cards[i].Hovered -= HandleHovered;
+    }
+
+    /// <summary>카드에 커서가 들고 날 때 역할 설명창을 여닫는다.</summary>
+    private void HandleHovered(ShopCardUI card, bool entered)
+    {
+        if (_roleTooltip == null) return;
+
+        if (entered) _roleTooltip.Show(card, card.CurrentData);
+        else         _roleTooltip.Hide(card);
+    }
+
     protected override void Subscribe()
     {
         GameEvents.OnShopRerolled += Refresh;
@@ -53,6 +99,11 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         card.SetAffordable(shop != null && shop.Gold >= data.cost);
 
         card.SetOwned(OwnsSpecies(hasGm ? gm.Board : null, data));
+
+        // 리롤은 카드 위치를 그대로 두고 내용만 갈아끼운다. 커서가 안 움직이면
+        // PointerEnter/Exit이 다시 안 일어나 툴팁에 리롤 전 역할이 남는다 — 여기서 직접 갱신한다.
+        if (card.IsHovered && _roleTooltip != null)
+            _roleTooltip.Show(card, data);
     }
 
     /// <summary>

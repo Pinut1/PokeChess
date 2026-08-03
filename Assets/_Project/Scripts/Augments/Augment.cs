@@ -33,4 +33,18 @@ public abstract class Augment
 
     /// <summary>수동 리롤 1회가 실제로 소모됨(무료/골드 무관) — 리롤 환급 증강용</summary>
     public virtual void OnRerollSpent() { }
+
+    // ── 표시용 조회 ────────────────────────────────────────────
+
+    /// <summary>
+    /// 이 증강이 해당 <b>종</b>의 역할을 바꾸는지. 아직 사지 않아 PokemonUnit이 없는
+    /// 상점 카드에서도 "사면 무엇이 되는지"를 보여주기 위한 조회용이다.
+    /// (이미 산 유닛은 PokemonUnit.Role이 roleOverride를 반영하므로 이 훅이 필요 없다.)
+    /// 기본값은 "바꾸지 않음".
+    /// </summary>
+    public virtual bool TryGetRoleOverride(PokemonData data, out string role)
+    {
+        role = null;
+        return false;
+    }
 }

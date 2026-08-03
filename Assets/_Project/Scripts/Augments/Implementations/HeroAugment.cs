@@ -17,6 +17,22 @@ public abstract class HeroAugment : Augment
     /// <summary>대상 유닛 1기에 영웅증강 효과 적용(이미 적용된 유닛은 스킵 처리 포함).</summary>
     protected abstract void Tag(PokemonUnit unit);
 
+    /// <summary>Tag가 바꿔놓을 역할. 표시용 조회(TryGetRoleOverride)가 쓴다.</summary>
+    protected abstract string OverriddenRole { get; }
+
+    /// <summary>대상 종이면 바뀔 역할을 알려준다 — 상점 카드처럼 아직 유닛이 없는 곳에서 쓴다.</summary>
+    public override bool TryGetRoleOverride(PokemonData data, out string role)
+    {
+        role = null;
+
+        if (data == null ||
+            !string.Equals(data.pokemonNameEn, SpeciesNameEn, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        role = OverriddenRole;
+        return !string.IsNullOrEmpty(role);
+    }
+
     public override void Apply()
     {
         GrantUnitToBench();

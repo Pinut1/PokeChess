@@ -65,7 +65,9 @@ public class ItemTooltipController : MonoBehaviour
 
         if (!_panel.Bind(data)) // 지원하지 않는 타입
         {
-            Hide(owner);
+            // Hide(owner)를 쓰면 안 된다 — 아직 _owner를 이 owner로 바꾸기 전이라
+            // "네 것이 아니다"라는 가드에 걸려 무시되고, 이전 아이템 내용이 화면에 남는다.
+            Close();
             return;
         }
 
@@ -78,12 +80,21 @@ public class ItemTooltipController : MonoBehaviour
     {
         if (owner != null && _owner != owner) return;
 
+        Close();
+    }
+
+    /// <summary>
+    /// 소유자와 무관하게 무조건 닫는다.
+    /// ⚠️ 이 컨트롤러는 인벤토리와 아이템 상점이 공유하므로, 한쪽이 꺼질 때 이걸 부르면
+    /// 다른 쪽이 띄워둔 툴팁까지 꺼진다. 자기 것만 닫으려면 소유자별로 <see cref="Hide"/>를 부를 것.
+    /// </summary>
+    public void HideAll() => Close();
+
+    private void Close()
+    {
         _owner = null;
         if (_panel != null) _panel.gameObject.SetActive(false);
     }
-
-    /// <summary>소유자와 무관하게 무조건 닫는다(패널이 꺼질 때, 드래그 시작 등).</summary>
-    public void HideAll() => Hide(null);
 
     // 열려 있는 동안 커서를 따라간다. 칸 위에서 마우스를 움직여도 창이 따라붙는다.
     private void LateUpdate()

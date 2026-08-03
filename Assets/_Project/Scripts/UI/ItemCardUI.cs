@@ -54,12 +54,20 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>,
     /// <summary>커서가 들고 날 때 발행(true=들어옴). 설명창은 컨트롤러가 띄운다.</summary>
     public event Action<ItemCardUI, bool> Hovered;
 
+    /// <summary>커서가 이 카드 위에 있는지. 리롤로 내용이 바뀔 때 툴팁을 다시 띄울지 판단하는 데 쓴다.</summary>
+    public bool IsHovered { get; private set; }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
+        IsHovered = true;
         if (CurrentData != null) Hovered?.Invoke(this, true);
     }
 
-    public void OnPointerExit(PointerEventData eventData) => Hovered?.Invoke(this, false);
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        IsHovered = false;
+        Hovered?.Invoke(this, false);
+    }
 
     private string _blockReason;
     private Coroutine _reasonRoutine;
