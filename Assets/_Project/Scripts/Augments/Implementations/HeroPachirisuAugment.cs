@@ -20,6 +20,7 @@ public class HeroPachirisuAugment : HeroAugment
     private const string TANKER_ATTACK_VFX_ID = "VFX_Electric_S";
 
     protected override string SpeciesNameEn => "Pachirisu";
+    protected override string OverriddenRole => PokemonRole.Tanker;
 
     protected override void Tag(PokemonUnit unit)
     {

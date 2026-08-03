@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 유닛 상점 카드 5장. 공통 로직은 ShopBarUIBase가 담당하고,
@@ -11,6 +12,41 @@ using System.Collections.Generic;
 /// </summary>
 public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
 {
+    [Header("역할 설명창")]
+    [Tooltip("카드에 커서를 올리면 커서 오른쪽 위에 띄울 역할 툴팁. 비우면 뜨지 않는다.")]
+    [SerializeField] private RoleTooltipController _roleTooltip;
+
+    protected override void Awake()
+    {
+        base.Awake(); // 구매 클릭 배선
+
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _cards[i].Hovered += HandleHovered;
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable(); // Unsubscribe
+
+        // 상점을 닫는데 설명창만 남는 일이 없도록(아이템 상점으로 전환할 때).
+        if (_roleTooltip != null) _roleTooltip.HideAll();
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < _cards.Length; i++)
+            if (_cards[i] != null) _cards[i].Hovered -= HandleHovered;
+    }
+
+    /// <summary>카드에 커서가 들고 날 때 역할 설명창을 여닫는다.</summary>
+    private void HandleHovered(ShopCardUI card, bool entered)
+    {
+        if (_roleTooltip == null) return;
+
+        if (entered) _roleTooltip.Show(card, card.CurrentData);
+        else         _roleTooltip.Hide(card);
+    }
+
     protected override void Subscribe()
     {
         GameEvents.OnShopRerolled += Refresh;

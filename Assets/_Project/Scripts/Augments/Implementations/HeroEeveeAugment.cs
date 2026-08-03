@@ -9,6 +9,7 @@ public class HeroEeveeAugment : HeroAugment
     private const float STAT_MULTIPLIER = 1.4f;
 
     protected override string SpeciesNameEn => "Eevee";
+    protected override string OverriddenRole => PokemonRole.Magician;
 
     protected override void Tag(PokemonUnit unit)
     {
