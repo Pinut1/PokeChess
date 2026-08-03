@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6073666745919545173}
   - component: {fileID: 8200338078130568243}
   - component: {fileID: 8231281181684957754}
+  - component: {fileID: 8155491915660905512}
   m_Layer: 5
   m_Name: ItemTooltip_Pf
   m_TagString: Untagged
@@ -120,6 +121,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!114 &8155491915660905512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 922713587462212268}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3febf0b7ee5a7af4abea7f2cd644fca9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ItemTooltipUI
+  _icon: {fileID: 1054065454523530184}
+  _nameText: {fileID: 4687845151579663480}
+  _descriptionText: {fileID: 8105034816460817963}
 --- !u!1 &2732226087213450518
 GameObject:
   m_ObjectHideFlags: 0
