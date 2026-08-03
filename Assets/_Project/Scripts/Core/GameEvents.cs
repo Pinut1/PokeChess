@@ -168,6 +168,19 @@ public static class GameEvents
     /// </summary>
     public static event Action<PokemonUnit, bool> OnUnitEvolved;
 
+    /// <summary>
+    /// 플러시와마이농(310)이 필드에 올라가 폼(플러시/마이농) 선택 대기 상태가 됨. 인자 = 선택 대상 유닛.
+    /// UIManager가 발행 → 선택 UI가 표시하고, 플레이어가 고르면 UIManager.SelectPlusleMinunForm 호출.
+    /// 증강 오퍼(OnAugmentOfferReady)와 같은 "제시 → UI 표시 → 매니저에 선택 통지" 흐름이다.
+    /// </summary>
+    public static event Action<PokemonUnit> OnPlusleMinunChoiceReady;
+
+    /// <summary>
+    /// 폼 선택 대기 종료. 선택 완료·시간 초과 자동 선택·전투 시작 자동 선택뿐 아니라
+    /// 판매·합체·벤치 복귀로 대상이 사라진 경우에도 발화한다(= 선택 UI를 닫는 단일 신호).
+    /// </summary>
+    public static event Action OnPlusleMinunChoiceClosed;
+
     /// <summary>시너지 재계산 완료. 수신 측은 SynergyManager.GetActiveSynergies()로 pull</summary>
     public static event Action OnSynergyUpdated;
 
@@ -325,6 +338,8 @@ public static class GameEvents
     public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
+    public static void PlusleMinunChoiceReady(PokemonUnit unit) => OnPlusleMinunChoiceReady?.Invoke(unit);
+    public static void PlusleMinunChoiceClosed() => OnPlusleMinunChoiceClosed?.Invoke();
     public static void UnitEvolved(PokemonUnit unit, bool isStarUp) => OnUnitEvolved?.Invoke(unit, isStarUp);
     public static void SynergyUpdated()              => OnSynergyUpdated?.Invoke();
     public static void TradeUnitReceived(PokemonUnit unit) => OnTradeUnitReceived?.Invoke(unit);

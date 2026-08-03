@@ -14,6 +14,25 @@ public enum VfxSpawnMode
 }
 
 /// <summary>
+/// VFX를 어느 방향으로 쏠지. 프리팹에 방향이 있는지(빔·투사체)는 아트만 아는 정보라
+/// spawnMode와 마찬가지로 에셋에서 지정한다.
+/// </summary>
+public enum VfxAimMode
+{
+    /// <summary>회전 없이 제자리 생성(기본). 장판·버프·타격 이펙트처럼 방향이 없는 프리팹용.</summary>
+    None = 0,
+
+    /// <summary>
+    /// 시전자 위치에서 대상 쪽을 보도록 회전해 <b>하나만</b> 생성하고, 파티클 수명을 실제 거리에
+    /// 맞춰 대상에서 멈추게 한다. 마법사 빔(ENEMY_LINE)처럼 한 줄기가 뻗는 연출용.
+    ///
+    /// 이걸 끄면 방향성 프리팹이 대상 위치에 회전 없이 생성돼 프리팹 제작 방향(보통 월드 +Z)으로
+    /// 날아간다 — 원거리 평타에서 겪었던 것과 같은 증상이다(BattleVfxPlayer.IsRangedVfx 주석 참고).
+    /// </summary>
+    FromCaster = 1,
+}
+
+/// <summary>
 /// VFX 항목 1개 — Skill Table의 vfxId와 프리팹을 잇는다.
 /// 아트가 프리팹을 만들면 이 DB에 (vfxId, prefab)만 등록하면 코드 수정 없이 연결된다.
 /// </summary>
@@ -28,8 +47,48 @@ public class VfxEntry
     /// <summary>생성 후 자동 파괴까지의 초. 0 이하면 기본값(BattleVfxPlayer.DEFAULT_LIFETIME).</summary>
     public float lifetime;
 
+    /// <summary>
+    /// 생성 위치 보정(월드 기준). 유닛 발밑이 기준이라 머리 위에 띄우려면 Y를 올린다(도발 표시 등).
+    ///
+    /// 프리팹 <b>루트</b>를 위로 올려두는 방식은 통하지 않는다 — Instantiate가 위치를 인자로 덮어쓰기 때문.
+    /// 프리팹 안에서 해결하려면 루트가 아니라 <b>자식</b>을 올려야 한다(자식 위치는 상대값이라 유지된다).
+    /// </summary>
+    public Vector3 positionOffset;
+
     /// <summary>생성 위치/개수. 기본 PerTarget = 기존 동작이라 기등록 항목은 그대로 둬도 변화 없음.</summary>
     public VfxSpawnMode spawnMode = VfxSpawnMode.PerTarget;
+
+    /// <summary>
+    /// 조준 방식. 기본 None = 기존 동작이라 기등록 항목은 그대로 둬도 변화 없다.
+    /// 방향이 있는 프리팹(빔·투사체)만 FromCaster로 바꾸면 된다.
+    /// FromCaster는 spawnMode보다 우선한다 — 한 줄기만 생성하므로 PerTarget/Center 구분이 의미 없다.
+    /// </summary>
+    public VfxAimMode aimMode = VfxAimMode.None;
+
+    /// <summary>
+    /// 조준형일 때 파티클 수명을 실제 거리에 맞춰 늘릴지(수명 = 거리 / Start Speed).
+    /// <b>단일 투사체</b>가 Start Speed로 날아가는 프리팹에서만 맞는 전제다.
+    ///
+    /// 본체·트레일·잔상이 서브이펙트로 나뉘어 각자 다른 속도·수명을 쓰는 프리팹은 끌 것 —
+    /// 짧게 잡아둔 트레일 수명까지 늘려 잔상이 과하게 길어진다.
+    /// 기본 true(원거리 평타가 이 보정에 의존한다).
+    /// </summary>
+    public bool fitLifetimeToDistance = true;
+
+    /// <summary>
+    /// 조준형일 때 빔 길이를 실제 대상 거리에 맞춰 늘릴지. 시전자와 대상을 잇는 빔(태양빔 등)용.
+    ///
+    /// Stretched Billboard로 그린 파티클의 lengthScale만 비율로 키운다 —
+    /// 트랜스폼 스케일을 키우면 굵기까지 굵어져 빔이 뭉툭해진다.
+    /// 늘리는 방향은 파티클 속도 방향이라 조준 회전이 이미 처리한다.
+    /// </summary>
+    public bool stretchToDistance;
+
+    /// <summary>
+    /// 프리팹이 기본 상태에서 덮는 거리(월드 단위). 빔 길이를 (실제 거리 / 이 값)배로 키운다.
+    /// 씬에 프리팹을 놓고 빔이 닿는 거리를 눈으로 재서 넣으면 된다. 0 이하면 늘리지 않는다.
+    /// </summary>
+    public float referenceDistance = 1f;
 
     /// <summary>
     /// Center 모드에서 스킬 areaRadius에 맞춰 프리팹을 자동 확대할지.

@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Ethereal_S
   evolvesIntoEn: Clefairy
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 5811253845198291556, guid: 3a5a21fd2f3d03040984ede0151a8dd7, type: 3}
-  icon: {fileID: 21300000, guid: 508e7bbf791a0d041a742ea257eb9409, type: 3}
+  icon: {fileID: -8401376630856466493, guid: 508e7bbf791a0d041a742ea257eb9409, type: 3}
+  unitIcon: {fileID: 5106804689874120420, guid: 508e7bbf791a0d041a742ea257eb9409, type: 3}

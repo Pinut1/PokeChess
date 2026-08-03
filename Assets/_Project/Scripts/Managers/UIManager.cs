@@ -184,6 +184,9 @@ public class UIManager : MonoBehaviour
     private PokemonData _plusleFormData;
     private PokemonData _minunFormData;
 
+    // Canvas 선택 패널(PlusleMinunChoicePanel)이 살아 있으면 IMGUI 폴백은 그리지 않는다.
+    private bool _formChoicePanelBound;
+
     // ──────────────────────────────────────────
     // OnGUI 스타일 캐시
     // ──────────────────────────────────────────
@@ -250,7 +253,9 @@ public class UIManager : MonoBehaviour
         GameEvents.OnAllPlayersReady -= HandleAllPlayersReadyForForm;
 
         _isGoldTransferPending = false;
-        _pendingFormUnit = null;
+
+        // 매니저가 꺼지면 선택 UI도 닫아야 한다(패널만 남아 켜져 있으면 조작이 막힌 채 방치된다).
+        CloseFormChoice();
     }
 
     private void Start()
@@ -281,6 +286,8 @@ public class UIManager : MonoBehaviour
         // 무료 리롤 표시 이미지의 부드러운 페이드 인/아웃 애니메이션.
         ApplyPulseAlpha(_rerollFreeIndicator,
                         Mathf.PingPong(Time.time * _rerollIndicatorPulseSpeed, 1f));
+
+        TickFormChoice();
     }
 
     /// <summary>켜져 있는 표시 이미지의 알파만 갈아끼운다(0 → 1 → 0 반복).</summary>
@@ -798,11 +805,18 @@ public class UIManager : MonoBehaviour
     // 여기서는 선택 대기 유닛 참조 보관, 선택 UI 표시, 선택 결과를
     // PokemonUnit.TrySetForm에 전달, OnAllPlayersReady 강제선택, 대기 해제만 담당한다.
     // 매 프레임 GetUnitsOnBoard() 전체를 검색하지 않고 참조 하나만 들고 있는다.
+    //
+    // 표시는 두 갈래다. 정식 UI는 Canvas의 PlusleMinunChoicePanel이고, 아래 IMGUI
+    // (DrawPlusleMinunFormChoicePanel)는 패널이 배선되지 않은 씬을 위한 폴백으로만 남는다.
+    // 어느 쪽이 그리든 상태(대기 유닛·블로킹)의 단일 소스는 이 매니저다.
     // ──────────────────────────────────────────
 
-    /// <summary>PokemonDatabase에서 플러시(311)/마이농(312) 데이터를 1회만 캐시한다.</summary>
+    /// <summary>PokemonDatabase에서 플러시(311)/마이농(312) 데이터를 캐시한다. 이미 캐시됐으면 아무 일도 하지 않는다.</summary>
     private void CachePlusleMinunFormData()
     {
+        if (_plusleFormData != null && _minunFormData != null)
+            return;
+
         if (PokemonDatabase.Instance == null)
             return;
 
@@ -810,20 +824,40 @@ public class UIManager : MonoBehaviour
         _minunFormData = PokemonDatabase.Instance.GetById(MINUN_ID);
     }
 
-    /// <summary>배치된 유닛이 아직 미결정(310)이면 선택 대기 참조로 보관한다.</summary>
+    /// <summary>플러시(311) 폼 데이터. 선택 UI가 아이콘·이름·스킬 설명을 읽어간다.</summary>
+    public PokemonData PlusleFormData => _plusleFormData;
+
+    /// <summary>마이농(312) 폼 데이터.</summary>
+    public PokemonData MinunFormData => _minunFormData;
+
+    /// <summary>현재 선택 대기 중인 유닛. 대기 중이 아니면 null.</summary>
+    public PokemonUnit PendingFormUnit => IsPendingFormUnitValid() ? _pendingFormUnit : null;
+
+    /// <summary>
+    /// Canvas 선택 패널이 자기 존재를 알린다(활성 시 true, 비활성 시 false).
+    /// 켜져 있는 동안 IMGUI 폴백은 그리지 않는다 — 같은 창이 두 번 뜨는 걸 막기 위함.
+    /// </summary>
+    public void SetFormChoicePanelBound(bool bound) => _formChoicePanelBound = bound;
+
+    /// <summary>배치된 유닛이 아직 미결정(310)이면 선택 대기 참조로 보관하고 선택 UI에 알린다.</summary>
     private void HandleUnitPlacedForForm(PokemonUnit unit)
     {
         if (unit == null || unit.data == null || unit.data.id != PLUSLE_MINUN_ID)
             return;
 
+        // 씬 초기화 순서로 Start의 캐시가 비어 있었을 수 있어 여기서 한 번 더 시도한다.
+        CachePlusleMinunFormData();
+
         _pendingFormUnit = unit;
+
+        GameEvents.PlusleMinunChoiceReady(unit);
     }
 
     /// <summary>선택 대기 중이던 유닛이 벤치로 내려가면(BoardManager가 이미 310으로 복원한 뒤) 대기 상태를 해제한다.</summary>
     private void HandleUnitBenchedForForm(PokemonUnit unit)
     {
         if (unit == _pendingFormUnit)
-            _pendingFormUnit = null;
+            CloseFormChoice();
     }
 
     /// <summary>
@@ -832,11 +866,14 @@ public class UIManager : MonoBehaviour
     /// 동일한 "대기 중이던 것 하나를 무작위 자동확정" 패턴을 재사용한다.
     /// 필드 전체를 다시 검색하지 않고 보관된 참조만 사용한다.
     /// </summary>
-    private void HandleAllPlayersReadyForForm()
+    private void HandleAllPlayersReadyForForm() => AutoSelectRandomForm();
+
+    /// <summary>미선택 상태의 대기 유닛을 두 폼 중 하나로 무작위 확정한다. 대기 중이 아니면 정리만 한다.</summary>
+    private void AutoSelectRandomForm()
     {
         if (!IsPendingFormUnitValid())
         {
-            _pendingFormUnit = null;
+            CloseFormChoice();
             return;
         }
 
@@ -846,7 +883,41 @@ public class UIManager : MonoBehaviour
         if (picked != null)
             _pendingFormUnit.TrySetForm(picked, notifyChange: true);
 
+        CloseFormChoice();
+    }
+
+    /// <summary>
+    /// 선택 UI에서 플레이어가 폼을 골랐을 때 호출한다(Canvas 패널·IMGUI 폴백 공용 진입점).
+    /// 대기 상태가 이미 풀렸으면(판매·합체 등) 무시하고 창만 닫는다.
+    /// </summary>
+    public void SelectPlusleMinunForm(PokemonData formData)
+    {
+        if (IsPendingFormUnitValid() && formData != null)
+            _pendingFormUnit.TrySetForm(formData, notifyChange: true);
+
+        CloseFormChoice();
+    }
+
+    /// <summary>대기 상태를 비우고 선택 UI에 닫으라고 알린다. 대기 중이 아니었으면 이벤트를 내지 않는다.</summary>
+    private void CloseFormChoice()
+    {
+        if (_pendingFormUnit == null) return;
+
         _pendingFormUnit = null;
+        GameEvents.PlusleMinunChoiceClosed();
+    }
+
+    /// <summary>
+    /// 매 프레임 대기 상태를 점검해, 판매·합체 등으로 대상이 사라졌으면 창을 닫는다.
+    /// IMGUI는 그리는 김에 검사했지만 Canvas 패널은 스스로 폴링하지 않으므로 여기서 닫아줘야 한다.
+    /// 제한 시간은 없다 — 미선택 강제 확정은 전원 Ready(전투 시작) 시점 하나뿐이다.
+    /// </summary>
+    private void TickFormChoice()
+    {
+        if (_pendingFormUnit == null) return;
+
+        if (!IsPendingFormUnitValid())
+            CloseFormChoice();
     }
 
     /// <summary>
@@ -867,13 +938,14 @@ public class UIManager : MonoBehaviour
     /// <summary>선택 UI가 떠 있는 동안 3D 조작(드래그)을 막기 위해 UnitDragController가 참조한다.</summary>
     public bool IsPlusleMinunChoiceBlocking => IsPendingFormUnitValid();
 
+    /// <summary>
+    /// Canvas 패널이 없는 씬을 위한 IMGUI 폴백. 패널이 배선돼 있으면 그리지 않는다.
+    /// 상태 갱신(대기 해제·타이머)은 TickFormChoice가 하므로 여기서는 표시와 입력만 다룬다.
+    /// </summary>
     private void DrawPlusleMinunFormChoicePanel()
     {
-        if (!IsPendingFormUnitValid())
-        {
-            _pendingFormUnit = null;
-            return;
-        }
+        if (_formChoicePanelBound) return;
+        if (!IsPendingFormUnitValid()) return;
 
         GUI.depth = -100; // 증강 선택창과 동일하게 다른 OnGUI보다 먼저 입력을 받는다.
 
@@ -890,19 +962,13 @@ public class UIManager : MonoBehaviour
 
         if (GUI.Button(plusleRect, "플러시"))
         {
-            if (IsPendingFormUnitValid() && _plusleFormData != null)
-                _pendingFormUnit.TrySetForm(_plusleFormData, notifyChange: true);
-
-            _pendingFormUnit = null;
+            SelectPlusleMinunForm(_plusleFormData);
             return;
         }
 
         if (GUI.Button(minunRect, "마이농"))
         {
-            if (IsPendingFormUnitValid() && _minunFormData != null)
-                _pendingFormUnit.TrySetForm(_minunFormData, notifyChange: true);
-
-            _pendingFormUnit = null;
+            SelectPlusleMinunForm(_minunFormData);
             return;
         }
     }

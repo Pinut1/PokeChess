@@ -262,13 +262,18 @@ public static class PokeChessImporter
             so.shopBuyable = string.IsNullOrEmpty(e.obtainBy) ||
                              e.obtainBy.Equals("shop", StringComparison.OrdinalIgnoreCase);
 
+            // 원본 문자열도 보관한다 — shopBuyable만으로는 "적 전용(wild)"과
+            // "상점엔 없지만 플레이어가 얻는 진화체(evolution/stone/trade/synergy)"를 구분할 수 없다.
+            so.obtainBy = e.obtainBy ?? string.Empty;
+
             // modelPrefab / icon 은 덮어쓰지 않음 (Inspector 수동 연결 보호)
             EditorUtility.SetDirty(so);
             imported.Add(so);
         }
 
         UpdatePokemonDatabase(imported);
-        EvolutionFamily.Invalidate(); // 진화 사슬(evolvesInto)이 바뀌었을 수 있음
+        EvolutionFamily.Invalidate();    // 진화 사슬(evolvesInto)이 바뀌었을 수 있음
+        SynergyMemberIndex.Invalidate(); // 포켓몬의 시너지 목록·계열이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         int withSkill = imported.FindAll(p => p.skill != null && p.skill.HasSkill).Count;
@@ -454,7 +459,8 @@ public static class PokeChessImporter
         }
 
         UpdateEvolutionStoneDatabase(imported);
-        EvolutionFamily.Invalidate(); // 돌 진화 매핑이 바뀌었을 수 있음
+        EvolutionFamily.Invalidate();    // 돌 진화 매핑이 바뀌었을 수 있음
+        SynergyMemberIndex.Invalidate(); // 계열이 바뀌면 시너지 카운트 키도 바뀐다
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 진화의 돌 {groups.Count}종 Import 완료 (EvolutionStoneDatabase 갱신)");
@@ -503,6 +509,7 @@ public static class PokeChessImporter
         }
 
         UpdateSynergyDatabase(imported);
+        SynergyMemberIndex.Invalidate(); // 시너지 구성(countPerSpecies 등)이 바뀌었을 수 있음
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 시너지 {db.synergies.Count}종 Import 완료 (SynergyDatabase 갱신)");
@@ -693,7 +700,8 @@ public static class PokeChessImporter
                     });
 
         EditorUtility.SetDirty(so);
-        EvolutionFamily.Invalidate(); // 통신교환 매핑이 바뀌었을 수 있음
+        EvolutionFamily.Invalidate();    // 통신교환 매핑이 바뀌었을 수 있음
+        SynergyMemberIndex.Invalidate(); // 계열이 바뀌면 시너지 카운트 키도 바뀐다
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[PokeChess] 통신진화 매핑 {so.mappings.Count}개 Import 완료");

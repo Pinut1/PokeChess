@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Grass_S
   evolvesIntoEn: Sceptile
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 35087842278221214, guid: 909924a409e9f4a45b2dbf78d8ff9c27, type: 3}
-  icon: {fileID: 21300000, guid: 0cc353652ad1517418dd320897c30924, type: 3}
+  icon: {fileID: -3073372809884973072, guid: 0cc353652ad1517418dd320897c30924, type: 3}
+  unitIcon: {fileID: -4258862175518417763, guid: 0cc353652ad1517418dd320897c30924, type: 3}

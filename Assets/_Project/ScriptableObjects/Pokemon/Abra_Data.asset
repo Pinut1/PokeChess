@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Ethereal_S
   evolvesIntoEn: Kadabra
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 4795675843607342007, guid: ae650a0cba93a234198345095a58845f, type: 3}
-  icon: {fileID: 21300000, guid: 319dc9af6d09a3f43b656eeff2407dac, type: 3}
+  icon: {fileID: -5178514685919978892, guid: 319dc9af6d09a3f43b656eeff2407dac, type: 3}
+  unitIcon: {fileID: -8595724240938778544, guid: 319dc9af6d09a3f43b656eeff2407dac, type: 3}

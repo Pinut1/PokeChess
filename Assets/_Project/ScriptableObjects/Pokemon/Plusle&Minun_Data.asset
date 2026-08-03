@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: 
   evolvesIntoEn: 
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 5094012104270938135, guid: 7ae9e5a79550fb04fba1cd4c3be0b7fd, type: 3}
-  icon: {fileID: 21300000, guid: 3c9bb1ea14f2de144b09a469d68f6756, type: 3}
+  icon: {fileID: -1023652292834994737, guid: 3c9bb1ea14f2de144b09a469d68f6756, type: 3}
+  unitIcon: {fileID: -4312994271712411142, guid: 3c9bb1ea14f2de144b09a469d68f6756, type: 3}

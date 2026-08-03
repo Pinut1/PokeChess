@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Ice_S
   evolvesIntoEn: Weavile
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 5864177176959718239, guid: 89b6b30d4489a6d4a9db232618df3105, type: 3}
-  icon: {fileID: 21300000, guid: c1f5fc16aa4129b4daf2b1edd9bb953a, type: 3}
+  icon: {fileID: 7636146036322145149, guid: c1f5fc16aa4129b4daf2b1edd9bb953a, type: 3}
+  unitIcon: {fileID: -2979296713493673745, guid: c1f5fc16aa4129b4daf2b1edd9bb953a, type: 3}

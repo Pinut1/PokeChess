@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Fire_S
   evolvesIntoEn: Combusken
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 5994694742954403698, guid: 861e51d91b3809f489a55aa983a01635, type: 3}
-  icon: {fileID: 21300000, guid: d75b6ed1f9a184043af5118e59eec25b, type: 3}
+  icon: {fileID: 4666009886345343485, guid: d75b6ed1f9a184043af5118e59eec25b, type: 3}
+  unitIcon: {fileID: 6882673917260290110, guid: d75b6ed1f9a184043af5118e59eec25b, type: 3}

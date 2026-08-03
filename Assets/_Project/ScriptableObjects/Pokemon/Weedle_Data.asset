@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Bug_S
   evolvesIntoEn: Kakuna
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 8708942870633045429, guid: ce8e2119461f5b347916eb82d4bd9fa0, type: 3}
-  icon: {fileID: 21300000, guid: ad714ad567ac7ea4f93e12762c9076b6, type: 3}
+  icon: {fileID: -2140286059046147194, guid: ad714ad567ac7ea4f93e12762c9076b6, type: 3}
+  unitIcon: {fileID: -4672198463126680777, guid: ad714ad567ac7ea4f93e12762c9076b6, type: 3}

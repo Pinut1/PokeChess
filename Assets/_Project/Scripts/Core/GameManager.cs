@@ -60,6 +60,11 @@ public class GameManager : Singleton<GameManager>
         if (_rewardManager     == null) Debug.LogWarning("[GameManager] RewardManager 미연결 (게임 씬이 아니면 정상)");
         if (_synergyManager    == null) Debug.LogWarning("[GameManager] SynergyManager 미연결 (게임 씬이 아니면 정상)");
         if (_playerHealthManager == null) Debug.LogWarning("[GameManager] PlayerHealthManager 미연결 (게임 씬이 아니면 정상)");
-        // ItemManager/AugmentManager/UIManager는 아직 스텁 — 검증 생략.
+
+        // UIManager는 자기 OnGUI로 그리기 때문에 참조가 비어 있어도 화면은 멀쩡해 보인다.
+        // 대신 gm.UI를 보는 쪽(UnitDragController의 선택창 드래그 차단, PlusleMinunChoicePanel)이
+        // 조용히 무력화되므로 반드시 경고를 남긴다.
+        if (_uiManager         == null) Debug.LogWarning("[GameManager] UIManager 미연결 (게임 씬이 아니면 정상)");
+        // ItemManager/AugmentManager는 아직 스텁 — 검증 생략.
     }
 }

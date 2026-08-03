@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Butterfree
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 5229838017512152102, guid: 9874c1b248dd32b45be82f54b5bb5c06, type: 3}
-  icon: {fileID: 21300000, guid: 8d40d1e07f7b4d749aba2b83cedbfb67, type: 3}
+  icon: {fileID: 6672006065014357091, guid: 8d40d1e07f7b4d749aba2b83cedbfb67, type: 3}
+  unitIcon: {fileID: -6462141660003923865, guid: 8d40d1e07f7b4d749aba2b83cedbfb67, type: 3}

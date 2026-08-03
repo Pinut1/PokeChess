@@ -42,5 +42,7 @@ MonoBehaviour:
   attackVfxId: Cheer_L
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: synergy
   modelPrefab: {fileID: 1469424305684025822, guid: 006fd09c94a694042bfb29648fc442da, type: 3}
-  icon: {fileID: 21300000, guid: 714a725d7bbddfc419a8ac84e03dc527, type: 3}
+  icon: {fileID: -774372371, guid: 714a725d7bbddfc419a8ac84e03dc527, type: 3}
+  unitIcon: {fileID: -1947250265, guid: 714a725d7bbddfc419a8ac84e03dc527, type: 3}

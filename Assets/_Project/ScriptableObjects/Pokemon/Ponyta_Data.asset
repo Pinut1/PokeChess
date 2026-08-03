@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Fire_L
   evolvesIntoEn: Rapidash
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 2994006558296384088, guid: 70c229b485c978647890e20d3ddcb22c, type: 3}
-  icon: {fileID: 21300000, guid: 1b890eb68380a7541a4c6e2950706fe0, type: 3}
+  icon: {fileID: -7967888256973984178, guid: 1b890eb68380a7541a4c6e2950706fe0, type: 3}
+  unitIcon: {fileID: -4735347293180789068, guid: 1b890eb68380a7541a4c6e2950706fe0, type: 3}

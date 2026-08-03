@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Breaker_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 454375899719532133, guid: 6a00ef6c9c8dab944ac47b54cc4cb2a1, type: 3}
-  icon: {fileID: 21300000, guid: b1acf6e339bd88740ab02506a2b54bb9, type: 3}
+  icon: {fileID: -3539605561978719922, guid: b1acf6e339bd88740ab02506a2b54bb9, type: 3}
+  unitIcon: {fileID: 5914818114294746685, guid: b1acf6e339bd88740ab02506a2b54bb9, type: 3}

@@ -12,6 +12,7 @@ public static class BattleVfxPlayer
     /// <summary>VfxEntry.lifetime이 0 이하일 때 쓰는 자동 파괴 시간(초).</summary>
     public const float DEFAULT_LIFETIME = 2f;
 
+
     /// <summary>VfxDatabase 키 접두어. 시트의 attackVfxId가 이걸 빼먹고 오는 경우를 폴백 조회로 흡수한다.</summary>
     public const string VFX_ID_PREFIX = "VFX_";
 
@@ -45,11 +46,23 @@ public static class BattleVfxPlayer
     /// <param name="center">범위 중심이 되는 유닛. 타겟팅 기준과 일치시켜 호출측이 넘긴다
     /// (대상 기준 스킬=피격 대상, 시전자 기준 스킬=시전자).</param>
     /// <param name="areaRadiusInTiles">스킬 areaRadius(칸). scaleWithRadius가 켜진 항목만 사용.</param>
+    /// <param name="caster">시전자. aimMode가 FromCaster인 항목의 출발점.</param>
+    /// <param name="aimTarget">조준 대상(보통 primaryTarget). aimMode가 FromCaster일 때만 쓴다.</param>
     public static void PlaySkill(string vfxId, IReadOnlyList<BattleUnit> targets,
-                                 BattleUnit center, int areaRadiusInTiles)
+                                 BattleUnit center, int areaRadiusInTiles,
+                                 BattleUnit caster = null, BattleUnit aimTarget = null)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
+
+        // 조준형(빔·투사체)은 시전자에서 대상 쪽으로 한 줄기만. spawnMode보다 우선한다.
+        // 대상마다 하나씩 회전 없이 놓으면 프리팹 제작 방향으로 제각각 날아간다.
+        if (entry.aimMode == VfxAimMode.FromCaster &&
+            caster?.visual != null && aimTarget?.visual != null)
+        {
+            SpawnAimed(entry, caster.visual.transform.position, aimTarget.visual.transform.position);
+            return;
+        }
 
         if (entry.spawnMode == VfxSpawnMode.PerTarget || center?.visual == null)
         {
@@ -125,18 +138,49 @@ public static class BattleVfxPlayer
             return;
         }
 
-        Vector3 d = hit - attacker.visual.transform.position;
+        SpawnAimed(entry, attacker.visual.transform.position, hit);
+    }
+
+    /// <summary>
+    /// from에서 to 쪽을 보도록 회전해 하나 생성하고, 파티클 수명을 실제 거리에 맞춰 to에서 멈추게 한다.
+    /// 원거리 평타(_L)와 조준형 스킬(aimMode=FromCaster)이 공유하는 투사체 연출 처리다.
+    /// </summary>
+    private static void SpawnAimed(VfxEntry entry, Vector3 from, Vector3 to)
+    {
+        Vector3 d = to - from;
         d.y = 0f;
         float distance = d.magnitude;
 
         // 같은 자리(예외)면 투사체가 의미 없으니 타격 이펙트로 폴백.
-        if (distance < 0.01f) { Spawn(entry, hit); return; }
+        if (distance < 0.01f) { Spawn(entry, to); return; }
 
-        var go = Create(entry, attacker.visual.transform.position,
-                             Quaternion.LookRotation(d / distance, Vector3.up), 1f);
+        var go = Create(entry, from, Quaternion.LookRotation(d / distance, Vector3.up), 1f);
 
-        float travel = FitProjectileTravel(go, distance);
+        if (entry.stretchToDistance) StretchBeam(go, distance, entry.referenceDistance);
+
+        // 수명 보정은 "단일 투사체" 전제라 프리팹에 따라 끌 수 있다(VfxEntry 주석 참고).
+        float travel = entry.fitLifetimeToDistance ? FitProjectileTravel(go, distance) : 0f;
         ScheduleDestroy(go, entry, travel);
+    }
+
+    /// <summary>
+    /// Stretched Billboard로 그린 빔의 길이를 실제 거리에 맞춘다(시전자~대상을 잇는 연출).
+    ///
+    /// 늘어나는 방향은 파티클 속도 방향이라 조준 회전이 이미 맞춰놨고, 길이만 비율로 키우면 된다.
+    /// 트랜스폼 스케일이 아니라 lengthScale을 건드리는 이유는 굵기를 그대로 두기 위해서다.
+    /// Stretch 모드가 아닌 파츠(착탄 마커·바닥 원 등)는 건드리지 않는다 — 늘어나면 안 되는 것들이다.
+    /// </summary>
+    private static void StretchBeam(GameObject go, float distance, float referenceDistance)
+    {
+        if (referenceDistance <= 0.01f) return;
+
+        float ratio = distance / referenceDistance;
+
+        foreach (var renderer in go.GetComponentsInChildren<ParticleSystemRenderer>(true))
+        {
+            if (renderer.renderMode != ParticleSystemRenderMode.Stretch) continue;
+            renderer.lengthScale *= ratio;
+        }
     }
 
     /// <summary>
@@ -225,9 +269,21 @@ public static class BattleVfxPlayer
         ScheduleDestroy(go, entry, 0f);
     }
 
+    /// <summary>
+    /// 프리팹 루트에 잡아둔 회전. 아트가 프리팹에서 방향을 맞춰둔 경우 그 값이 기준이 된다.
+    /// Instantiate에 회전을 넘기면 루트 회전을 <b>덮어쓰므로</b>, 여기에 조준 회전을 곱해서 보존해야 한다.
+    /// (이걸 안 하면 프리팹에서 X를 기울여 방향을 맞춰도 게임에서는 그대로 무시된다)
+    /// </summary>
+    private static Quaternion PrefabRotation(VfxEntry entry)
+        => entry.prefab != null ? entry.prefab.transform.rotation : Quaternion.identity;
+
     private static GameObject Create(VfxEntry entry, Vector3 position, Quaternion rotation, float scale)
     {
-        var go = Object.Instantiate(entry.prefab, position, rotation);
+        // positionOffset은 월드 기준으로 더한다 — 조준 회전을 따라 돌면 "머리 위"가 대상 방향에 따라
+        // 흔들려서, 높이 보정으로 쓰기 어려워진다.
+        var go = Object.Instantiate(entry.prefab,
+                                    position + entry.positionOffset,
+                                    rotation * PrefabRotation(entry));
         if (!Mathf.Approximately(scale, 1f)) go.transform.localScale *= scale;
         _activeVfx.Add(go);
         return go;

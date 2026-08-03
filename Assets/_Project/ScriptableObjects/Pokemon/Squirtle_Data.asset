@@ -40,5 +40,7 @@ MonoBehaviour:
   attackVfxId: Fire_S
   evolvesIntoEn: Wartortle
   shopBuyable: 1
+  obtainBy: shop
   modelPrefab: {fileID: 7353108165567176764, guid: a71aaee47a86be44495b6ab3f453dba6, type: 3}
-  icon: {fileID: 21300000, guid: 55d8c20826a06a94da08b2c5b0cc5aef, type: 3}
+  icon: {fileID: 2007347895975837009, guid: 55d8c20826a06a94da08b2c5b0cc5aef, type: 3}
+  unitIcon: {fileID: -4133674414149658202, guid: 55d8c20826a06a94da08b2c5b0cc5aef, type: 3}

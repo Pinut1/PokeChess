@@ -11,7 +11,8 @@ using UnityEngine.UI;
 /// 실제 장착 처리(레이캐스트로 유닛 찾기 → ItemManager.EquipToUnit)는 상위 컨트롤러(ItemInventoryUI)가 맡는다.
 /// 상점 카드(ShopCardUI/ItemCardUI)가 매니저를 직접 참조하지 않는 것과 같은 구조.
 /// </summary>
-public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
+                          IPointerEnterHandler, IPointerExitHandler
 {
     [Tooltip("아이템 일러스트. 스프라이트는 Bind에서 데이터로 갈아끼운다.")]
     [SerializeField] private Image _icon;
@@ -27,6 +28,9 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     /// <summary>드래그를 놓았을 때 발행. 인자는 드롭 지점(스크린 좌표)을 담은 이벤트 데이터.</summary>
     public event Action<ItemSlotUI, PointerEventData> Dropped;
+
+    /// <summary>커서가 들어오고 나갈 때 발행(true=들어옴). 설명창은 컨트롤러가 띄운다.</summary>
+    public event Action<ItemSlotUI, bool> Hovered;
 
     private RectTransform _dragLayer;
     private Transform _viewHome;      // 아이템 표시부의 원래 부모(이 칸)
@@ -88,12 +92,20 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (view != null) view.SetActive(false);
     }
 
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (!IsEmpty && !_dragging) Hovered?.Invoke(this, true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData) => Hovered?.Invoke(this, false);
+
     public void OnBeginDrag(PointerEventData eventData)
     {
         var view = ViewObject;
         if (IsEmpty || view == null) return;
 
         _dragging = true;
+        Hovered?.Invoke(this, false); // 드래그 중에는 설명창이 커서를 가린다
 
         // 표시부(테두리 포함)를 칸 밖으로 꺼내 최상위에 올린다 — 원래 칸은 빈 상태로 보인다.
         if (_dragLayer != null) view.transform.SetParent(_dragLayer, true);

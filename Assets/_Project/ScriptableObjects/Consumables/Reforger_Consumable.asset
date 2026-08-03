@@ -18,4 +18,4 @@ MonoBehaviour:
   consumableType: reforge_item
   description: "\uC7A5\uCC29 \uC911\uC778 \uC544\uC774\uD15C\uC744 \uC81C\uAC70\uD558\uACE0
     \uC0C8\uB85C\uC6B4 \uC544\uC774\uD15C\uC73C\uB85C \uC7AC\uAD6C\uC131\uD569\uB2C8\uB2E4."
-  icon: {fileID: 21300000, guid: ffef0c485cab96d4c982e1343a1ad303, type: 3}
+  icon: {fileID: 431121071, guid: ffef0c485cab96d4c982e1343a1ad303, type: 3}

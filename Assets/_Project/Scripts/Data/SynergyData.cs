@@ -29,6 +29,14 @@ public class SynergyData : ScriptableObject
     [Header("발동 조건별 효과")]
     public List<SynergyTier> tiers = new();
 
-    [Header("에셋 참조")]
+    [Header("손으로 채우는 값 (임포터가 덮어쓰지 않음)")]
+    /// <summary>
+    /// 시너지 전체를 한 줄로 설명하는 문구. 툴팁에서 단계별 효과보다 위에 나온다.
+    /// 시트에 없는 항목이라 임포터가 건드리지 않는다 — icon과 같은 규칙이라
+    /// 여기에 적어두면 재임포트해도 지워지지 않는다.
+    /// </summary>
+    [TextArea]
+    public string description;
+
     public Sprite icon;
 }

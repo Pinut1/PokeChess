@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: stone
   modelPrefab: {fileID: 7284758918367136271, guid: 670b2c6f13f3faa4c99adabce4194ded, type: 3}
-  icon: {fileID: 21300000, guid: 88071c764895da94f86f4391c0273e81, type: 3}
+  icon: {fileID: -5384909006384005124, guid: 88071c764895da94f86f4391c0273e81, type: 3}
+  unitIcon: {fileID: -8482879630372946753, guid: 88071c764895da94f86f4391c0273e81, type: 3}

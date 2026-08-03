@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Dragon_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 1646915185308650817, guid: fc42e64fbdb06134c895279924f0d380, type: 3}
-  icon: {fileID: 21300000, guid: 6dafe303f925c9a45aea1a3479f60cd6, type: 3}
+  icon: {fileID: -3812486816164893538, guid: 6dafe303f925c9a45aea1a3479f60cd6, type: 3}
+  unitIcon: {fileID: 6938339591561511865, guid: 6dafe303f925c9a45aea1a3479f60cd6, type: 3}

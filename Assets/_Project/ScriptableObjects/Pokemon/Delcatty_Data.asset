@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Normal_S
   evolvesIntoEn: 
   shopBuyable: 0
+  obtainBy: stone
   modelPrefab: {fileID: 4998501122570794065, guid: 8d3bfc9fbc59bc246acff2088e2699f2, type: 3}
-  icon: {fileID: 21300000, guid: bea2fa46c355bcf429d0e45772329e23, type: 3}
+  icon: {fileID: -8233619400423453859, guid: bea2fa46c355bcf429d0e45772329e23, type: 3}
+  unitIcon: {fileID: -8664371112149925831, guid: bea2fa46c355bcf429d0e45772329e23, type: 3}

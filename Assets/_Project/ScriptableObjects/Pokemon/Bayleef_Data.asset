@@ -41,5 +41,7 @@ MonoBehaviour:
   attackVfxId: Grass_L
   evolvesIntoEn: Meganium
   shopBuyable: 0
+  obtainBy: evolution
   modelPrefab: {fileID: 7731529886549625414, guid: 1cc372aee849e724aac9f2581341e301, type: 3}
-  icon: {fileID: 21300000, guid: dffdab651c3acad48b4d14a8ef7e2644, type: 3}
+  icon: {fileID: 8267924787271439107, guid: dffdab651c3acad48b4d14a8ef7e2644, type: 3}
+  unitIcon: {fileID: 9086033349761243560, guid: dffdab651c3acad48b4d14a8ef7e2644, type: 3}

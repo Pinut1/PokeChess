@@ -26,6 +26,10 @@ public class ItemInventoryUI : MonoBehaviour
     [Tooltip("재조합기 표시용 ConsumableData(Reforger_Consumable). 아이콘만 사용한다.")]
     [SerializeField] private ConsumableData _reforgerData;
 
+    [Header("설명창")]
+    [Tooltip("칸에 커서를 올리면 띄울 아이템 설명창 컨트롤러. 비우면 설명창이 뜨지 않는다.")]
+    [SerializeField] private ItemTooltipController _tooltip;
+
     [Header("드롭 판정")]
     [Tooltip("비우면 Camera.main을 쓴다.")]
     [SerializeField] private Camera _camera;
@@ -42,13 +46,28 @@ public class ItemInventoryUI : MonoBehaviour
 
             _slots[i].Initialize(_dragLayer);
             _slots[i].Dropped += HandleDropped;
+            _slots[i].Hovered += HandleHovered;
         }
     }
 
     private void OnDestroy()
     {
         for (int i = 0; i < _slots.Length; i++)
-            if (_slots[i] != null) _slots[i].Dropped -= HandleDropped;
+        {
+            if (_slots[i] == null) continue;
+
+            _slots[i].Dropped -= HandleDropped;
+            _slots[i].Hovered -= HandleHovered;
+        }
+    }
+
+    /// <summary>칸에 커서가 들고 날 때 설명창을 여닫는다.</summary>
+    private void HandleHovered(ItemSlotUI slot, bool entered)
+    {
+        if (_tooltip == null) return;
+
+        if (entered) _tooltip.Show(slot, slot.CurrentData);
+        else         _tooltip.Hide(slot);
     }
 
     private void OnEnable()
@@ -57,7 +76,13 @@ public class ItemInventoryUI : MonoBehaviour
         Refresh();
     }
 
-    private void OnDisable() => GameEvents.OnInventoryChanged -= Refresh;
+    private void OnDisable()
+    {
+        GameEvents.OnInventoryChanged -= Refresh;
+
+        // 인벤토리가 닫히는데 설명창만 남는 일이 없도록.
+        if (_tooltip != null) _tooltip.HideAll();
+    }
 
     /// <summary>
     /// 보유 목록을 앞칸부터 채우고 나머지는 비운다. 아이템 → 진화의 돌 → 도구(제거기·재조합기) 순서.

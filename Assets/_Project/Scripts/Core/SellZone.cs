@@ -28,30 +28,54 @@ public class SellZone : MonoBehaviour, IDropTarget
     private Color _tradeHoverColor =
         new Color(0.3f, 0.9f, 1f);
 
+    // 강조 표시 방식(화면 발광 등)은 IHoverHighlight 구현체가 담당한다.
+    // 자식에 하나라도 있으면 그쪽에 맡기고, 없으면 예전처럼 첫 Renderer의 색을 직접 바꾼다.
+    private IHoverHighlight _highlight;
+
     private Renderer _renderer;
     private Color _defaultColor;
 
     private void Awake()
     {
+        _highlight = GetComponentInChildren<IHoverHighlight>();
+
+        // 전용 강조가 있으면 원본 머티리얼을 건드리지 않는다 — 색 캐시도 필요 없다.
+        if (_highlight != null) return;
+
         _renderer = GetComponentInChildren<Renderer>();
 
         if (_renderer != null)
             _defaultColor = _renderer.material.color;
     }
 
+    /// <summary>이 존의 강조 색(판매=빨강 / 교환=하늘).</summary>
+    private Color HoverColor =>
+        _zoneType == DropZoneType.Trade
+            ? _tradeHoverColor
+            : _sellHoverColor;
+
     public void OnHoverEnter()
     {
+        if (_highlight != null)
+        {
+            _highlight.Show(HoverColor);
+            return;
+        }
+
         if (_renderer == null)
             return;
 
-        _renderer.material.color =
-            _zoneType == DropZoneType.Trade
-                ? _tradeHoverColor
-                : _sellHoverColor;
+        _renderer.material.color = HoverColor;
     }
 
     public void OnHoverExit()
     {
+        if (_highlight != null)
+        {
+            _highlight.Hide();
+            return;
+        }
+
         if (_renderer != null)
             _renderer.material.color = _defaultColor;
     }
