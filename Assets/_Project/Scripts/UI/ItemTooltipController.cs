@@ -72,6 +72,11 @@ public class ItemTooltipController : MonoBehaviour
         }
 
         _owner = owner;
+
+        // 형제 중 맨 뒤(= 맨 앞에 그려짐)로 올린다. 툴팁은 무엇을 가리키든 그 위에 떠야 하는데,
+        // 씬에서는 상세창(StatInfo_Panel_pf)이 이 툴팁보다 뒤 형제라 그대로 두면 창 뒤로 숨는다.
+        _panel.transform.SetAsLastSibling();
+
         Place(Input.mousePosition);
     }
 

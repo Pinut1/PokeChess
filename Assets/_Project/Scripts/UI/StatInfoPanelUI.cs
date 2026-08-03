@@ -24,6 +24,10 @@ using TMPro;
 ///   info_Panel의 텍스트 2개            → Placement Text / Range Text
 ///   Stat_Text                          → Stat Text (방어력·공격력·공격속도·주문력)
 ///   info_Panel/itemSlot_Image (1)(2)   → Item Icons
+///     (Item Icons에 물리는 건 칸 테두리(1)(2)가 아니라 그 안의 아이콘 Image — itemSlot_Image (3)(4))
+///
+/// 장착 아이템 칸에 커서를 올리면 아이템 상점·인벤토리와 같은 설명창(ItemTooltipUI)이 뜬다.
+/// 칸마다 ItemHoverTarget을 런타임에 붙이므로 프리팹 배선은 늘지 않는다 — 자세한 건 SetupItemHovers.
 /// </summary>
 public class StatInfoPanelUI : MonoBehaviour
 {
@@ -115,13 +119,20 @@ public class StatInfoPanelUI : MonoBehaviour
         "방어력: {0}\n평타데미지: {1}\n공격속도: {2}\n스킬데미지: {3}";
 
     [Header("장착 아이템")]
-    [Tooltip("itemSlot_Image (1)(2). 착용한 개수만큼만 켜진다. 진화의 돌도 한 칸을 차지한다.")]
+    [Tooltip("itemSlot_Image (1)(2) 안의 아이콘 Image. 착용한 개수만큼만 켜진다. 진화의 돌도 한 칸을 차지한다.")]
     [SerializeField] private Image[] _itemIcons;
+
+    [Tooltip("아이템 칸에 커서를 올렸을 때 띄울 설명창 컨트롤러(아이템 상점·인벤토리와 같은 것을 쓰면 된다).\n" +
+             "비워두면 씬에서 찾아 쓴다 — 이 패널을 프리팹에서 생성하는 경우 씬 오브젝트를 인스펙터에 꽂을 수 없기 때문.")]
+    [SerializeField] private ItemTooltipController _itemTooltip;
 
     // 보드 유닛으로 열었으면 _unit, 전투 유닛(적 포함)으로 열었으면 _battleUnit 하나만 채워진다.
     private PokemonUnit _unit;
     private BattleUnit _battleUnit;
     private RectTransform _rect;
+
+    // 아이콘 칸마다 하나씩. _itemIcons와 같은 순서다(Awake에서 붙인다).
+    private ItemHoverTarget[] _itemHovers;
 
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
 
@@ -185,6 +196,77 @@ public class StatInfoPanelUI : MonoBehaviour
         _unit = null;
         _battleUnit = null;
         gameObject.SetActive(false);
+    }
+
+    // ─────────────────────────────────────────
+    // 아이템 설명창 (호버)
+    // ─────────────────────────────────────────
+
+    private void Awake()
+    {
+        // 씬 배치본이면 인스펙터에 꽂아둔 게 쓰이고, 프리팹에서 생성한 경우엔 여기서 찾는다
+        // (프리팹은 씬 오브젝트를 참조할 수 없어 인스펙터에 꽂아둘 방법이 없다).
+        if (_itemTooltip == null)
+            _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
+
+        SetupItemHovers();
+    }
+
+    /// <summary>
+    /// 아이콘 칸마다 커서 감지기를 붙인다. 프리팹에 미리 달지 않는 건 배선을 늘리지 않기 위해서다 —
+    /// 이미 Item Icons에 물려 있는 아이콘 오브젝트를 그대로 쓴다.
+    ///
+    /// 아이콘 오브젝트는 빈 칸일 때도 살아 있어(FillItems는 오브젝트가 아니라 Image만 끈다)
+    /// 컴포넌트가 유지된다. 대신 꺼진 Image는 레이캐스트에 안 걸리므로 빈 칸에는 설명창이 뜨지 않는다.
+    /// </summary>
+    private void SetupItemHovers()
+    {
+        if (_itemIcons == null || _itemIcons.Length == 0) return;
+
+        _itemHovers = new ItemHoverTarget[_itemIcons.Length];
+
+        for (int i = 0; i < _itemIcons.Length; i++)
+        {
+            Image icon = _itemIcons[i];
+            if (icon == null) continue;
+
+            // Raycast Target이 꺼져 있으면 커서 이벤트가 아예 오지 않는다 — 여기서 보장한다.
+            icon.raycastTarget = true;
+
+            ItemHoverTarget hover = icon.GetComponent<ItemHoverTarget>();
+            if (hover == null) hover = icon.gameObject.AddComponent<ItemHoverTarget>();
+
+            hover.Hovered += HandleItemHovered;
+            _itemHovers[i] = hover;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_itemHovers == null) return;
+
+        foreach (ItemHoverTarget hover in _itemHovers)
+            if (hover != null) hover.Hovered -= HandleItemHovered;
+    }
+
+    private void OnDisable()
+    {
+        // 상세창이 닫히는데 아이템 설명창만 남지 않게.
+        // HideAll이 아니라 칸별 Hide인 이유 — 컨트롤러를 인벤토리·아이템 상점과 공유하므로
+        // HideAll은 그쪽이 띄운 설명창까지 꺼버린다(ItemInventoryUI.OnDisable과 같은 규칙).
+        if (_itemTooltip == null || _itemHovers == null) return;
+
+        foreach (ItemHoverTarget hover in _itemHovers)
+            if (hover != null) _itemTooltip.Hide(hover);
+    }
+
+    /// <summary>아이템 칸에 커서가 들고 날 때 설명창을 여닫는다(인벤토리·아이템 상점과 같은 방식).</summary>
+    private void HandleItemHovered(ItemHoverTarget hover, bool entered)
+    {
+        if (_itemTooltip == null) return;
+
+        if (entered) _itemTooltip.Show(hover, hover.Data);
+        else         _itemTooltip.Hide(hover);
     }
 
     private void Update()
@@ -336,25 +418,56 @@ public class StatInfoPanelUI : MonoBehaviour
 
         // 진화의 돌도 슬롯을 차지하므로 함께 보여준다(PokemonUnit.UsedSlots와 같은 기준).
         // 돌을 앞에 두는 순서는 머리 위 바(UnitStatusBarUI.SetItems)와 맞춘 것이다.
-        var icons = new List<Sprite>();
-        if (stone != null) icons.Add(stone.icon);
+        // 스프라이트가 아니라 데이터 자체를 모으는 건 호버 설명창이 이름·설명까지 필요로 하기 때문.
+        var entries = new List<ScriptableObject>();
+        if (stone != null) entries.Add(stone);
 
         if (items != null)
             foreach (ItemData item in items)
-                if (item != null) icons.Add(item.icon);
+                if (item != null) entries.Add(item);
 
         for (int i = 0; i < _itemIcons.Length; i++)
         {
-            if (_itemIcons[i] == null) continue;
+            ScriptableObject entry = i < entries.Count ? entries[i] : null;
 
-            bool used = i < icons.Count;
+            if (_itemIcons[i] != null)
+            {
+                // 오브젝트를 끄지 않고 Image만 끈다.
+                // 오브젝트째 끄면 뒷배경까지 사라지고, Grid Layout이 빈 칸을 접어버려
+                // 두 번째 슬롯이 첫 번째 자리로 밀려 위치가 흔들린다.
+                _itemIcons[i].enabled = entry != null;
+                if (entry != null) _itemIcons[i].sprite = IconOf(entry);
+            }
 
-            // 오브젝트를 끄지 않고 Image만 끈다.
-            // 오브젝트째 끄면 뒷배경까지 사라지고, Grid Layout이 빈 칸을 접어버려
-            // 두 번째 슬롯이 첫 번째 자리로 밀려 위치가 흔들린다.
-            _itemIcons[i].enabled = used;
-            if (used) _itemIcons[i].sprite = icons[i];
+            BindItemHover(i, entry);
         }
+    }
+
+    private static Sprite IconOf(ScriptableObject data) => data switch
+    {
+        ItemData item            => item.icon,
+        EvolutionStoneData stone => stone.icon,
+        _                        => null
+    };
+
+    /// <summary>
+    /// 칸 내용이 바뀔 때 커서 감지기도 같이 갱신한다.
+    /// 커서를 올려둔 채 다른 유닛으로 다시 열면 Enter/Exit이 다시 오지 않으므로,
+    /// 그때는 설명창을 직접 갈아끼운다(아이템 상점의 카드별 리롤과 같은 이유 — ItemShopBarUI.AfterBind).
+    /// </summary>
+    private void BindItemHover(int index, ScriptableObject data)
+    {
+        if (_itemHovers == null || index >= _itemHovers.Length) return;
+
+        ItemHoverTarget hover = _itemHovers[index];
+        if (hover == null) return;
+
+        hover.SetData(data);
+
+        if (!hover.IsHovered || _itemTooltip == null) return;
+
+        if (data != null) _itemTooltip.Show(hover, data);
+        else              _itemTooltip.Hide(hover);
     }
 
     // ─────────────────────────────────────────
