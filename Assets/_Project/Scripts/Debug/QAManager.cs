@@ -205,7 +205,13 @@ public class QAManager : MonoBehaviour
     // 아이템 탭
     // ─────────────────────────────────────────
 
-    private enum ItemCategory { All, Equipment, Stone }
+    private enum ItemCategory { All, Equipment, Stone, Tool }
+
+    [Header("아이템 탭 — 도구 지급용 데이터")]
+    [Tooltip("재조합기 표시/지급용 실제 ConsumableData. ItemInventoryUI의 같은 필드와 동일한 에셋" +
+             "(Reforger_Consumable)을 연결할 것 — 여기서 새로 만들거나 이름으로 검색하지 않는다.\n" +
+             "제거기는 시작부터 보유하는 무제한 도구라(소비되지 않음) QA 지급 대상에서 제외한다.")]
+    [SerializeField] private ConsumableData _reforgerData;
 
     private ItemCategory _itemCategory = ItemCategory.All;
     private string _itemQuery = "";
@@ -214,6 +220,9 @@ public class QAManager : MonoBehaviour
     private Vector2 _itemListScroll;
     private Vector2 _myInventoryScroll;
     private Vector2 _equippedScroll;
+
+    // 도구 데이터 미배선 경고가 검색할 때마다(키 입력마다) 반복 출력되지 않도록 세션당 1회만 남긴다.
+    private bool _toolDataMissingWarned;
 
     // ─────────────────────────────────────────
     // 공용 풀 탭
@@ -1789,6 +1798,7 @@ public class QAManager : MonoBehaviour
         DrawItemCategoryToggle(ItemCategory.All, "전체");
         DrawItemCategoryToggle(ItemCategory.Equipment, "일반 장비");
         DrawItemCategoryToggle(ItemCategory.Stone, "진화의 돌");
+        DrawItemCategoryToggle(ItemCategory.Tool, "도구");
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
@@ -1817,7 +1827,13 @@ public class QAManager : MonoBehaviour
 
         string query = (_itemQuery ?? "").Trim();
 
-        if (_itemCategory != ItemCategory.Stone)
+        // 분류가 2종일 때는 "다른 한쪽이 아니면 포함" 방식(!=)도 성립했지만, Tool이 늘어난
+        // 뒤로는 분류별로 명시적으로 포함 조건을 검사해야 한다.
+        bool includeEquipment = _itemCategory == ItemCategory.All || _itemCategory == ItemCategory.Equipment;
+        bool includeStone     = _itemCategory == ItemCategory.All || _itemCategory == ItemCategory.Stone;
+        bool includeTool      = _itemCategory == ItemCategory.All || _itemCategory == ItemCategory.Tool;
+
+        if (includeEquipment)
         {
             ItemDatabase db = ItemDatabase.Instance;
             if (db != null && db.all != null)
@@ -1829,7 +1845,7 @@ public class QAManager : MonoBehaviour
                 }
         }
 
-        if (_itemCategory != ItemCategory.Equipment)
+        if (includeStone)
         {
             EvolutionStoneDatabase db = EvolutionStoneDatabase.Instance;
             if (db != null && db.all != null)
@@ -1839,6 +1855,20 @@ public class QAManager : MonoBehaviour
                     if (!MatchesItemQuery(query, data.id, data.stoneName, data.stoneNameEn)) continue;
                     _itemResults.Add(data);
                 }
+        }
+
+        if (includeTool)
+        {
+            if (_reforgerData != null && MatchesItemQuery(query, _reforgerData.id, _reforgerData.consumableName, _reforgerData.consumableNameEn))
+                _itemResults.Add(_reforgerData);
+
+            // 참조 누락 시 도구 분류가 조용히 비어 보이면 원인 파악이 어려우므로 한 번은 알려준다
+            // (RunItemSearch는 매 프레임이 아니라 검색어/분류가 바뀔 때만 호출되지만, 그마저도 세션당 1회로 더 제한한다).
+            if (!_toolDataMissingWarned && _reforgerData == null)
+            {
+                Debug.LogWarning("[QAManager] 재조합기 지급용 ConsumableData(_reforgerData)가 Inspector에 연결되지 않았습니다 — 도구 분류에 표시되지 않습니다.");
+                _toolDataMissingWarned = true;
+            }
         }
     }
 
@@ -1876,6 +1906,7 @@ public class QAManager : MonoBehaviour
         {
             ItemData it => $"[장비] {it.itemName} (ID {it.id})",
             EvolutionStoneData st => $"[돌] {st.stoneName} (ID {st.id})",
+            ConsumableData tool => $"[도구] {tool.consumableName} (ID {tool.id})",
             _ => obj.name
         };
 
@@ -1898,7 +1929,13 @@ public class QAManager : MonoBehaviour
 
         if (!item.HasInventorySpace)
         {
-            string label = obj switch { ItemData it => it.itemName, EvolutionStoneData st => st.stoneName, _ => obj.name };
+            string label = obj switch
+            {
+                ItemData it => it.itemName,
+                EvolutionStoneData st => st.stoneName,
+                ConsumableData tool => tool.consumableName,
+                _ => obj.name
+            };
             LogFailure($"아이템 지급 - {label}", "인벤토리가 가득 참");
             return;
         }
@@ -1917,6 +1954,12 @@ public class QAManager : MonoBehaviour
             {
                 bool success = item.AddStone(st);
                 LogGrantResult($"아이템 지급 - {st.stoneName}", success, before, item.InventoryCount, item.InventoryCount + item.AvailableInventorySpace);
+                break;
+            }
+            case ConsumableData tool when tool == _reforgerData:
+            {
+                bool success = item.AddReforger(1);
+                LogGrantResult($"아이템 지급 - {tool.consumableName}", success, before, item.InventoryCount, item.InventoryCount + item.AvailableInventorySpace);
                 break;
             }
         }
