@@ -30,6 +30,13 @@ public enum VfxAimMode
     /// 날아간다 — 원거리 평타에서 겪었던 것과 같은 증상이다(BattleVfxPlayer.IsRangedVfx 주석 참고).
     /// </summary>
     FromCaster = 1,
+
+    /// <summary>
+    /// 오브젝트 자체를 시전자 위치에서 대상 위치까지 실제로 이동시킨다(코드 제어, VfxTravelMover).
+    /// 파티클 자체에 전진 속도가 없는 프리팹(정지형 버스트 등)도 이 모드면 화면에서 실제로 날아간다.
+    /// spawnMode보다 우선한다(FromCaster와 동일한 이유 — 한 줄기만 생성).
+    /// </summary>
+    TravelToTarget = 2,
 }
 
 /// <summary>
@@ -96,6 +103,31 @@ public class VfxEntry
     /// 기본 false — 기존 프리팹 크기를 건드리지 않는다.
     /// </summary>
     public bool scaleWithRadius;
+
+    /// <summary>
+    /// TravelToTarget 전용 — 시전자에서 대상까지 이동하는 데 걸리는 시간(초).
+    /// 전투 데미지는 이동 완료를 기다리지 않고 스킬 시전 즉시 적용되므로(BattleManager.CastSkill),
+    /// 너무 길게 잡으면 "맞기 전에 이미 데미지가 들어간 것처럼" 보인다. 0.15초 이하 권장.
+    /// </summary>
+    public float travelDuration = 0.12f;
+
+    /// <summary>TravelToTarget 전용 — 도착 후 그 자리에 머무는 시간(초). 착탄 연출 여유용.</summary>
+    public float arrivalHoldDuration = 0.15f;
+
+    /// <summary>
+    /// FromCaster + stretchToDistance 조합 전용 — 빔 길이(lengthScale)를 0에서 목표값까지
+    /// 이 시간(초) 동안 애니메이션으로 늘린다("빔이 뻗어나가는" 연출). 0이면 기존처럼
+    /// 즉시 완성된 길이로 생성(변화 없음 — 기존 등록 항목은 전부 이 값이 0이라 영향 없음).
+    /// </summary>
+    public float beamGrowDuration;
+
+    /// <summary>
+    /// 조준형(FromCaster/TravelToTarget) 전용 — 스폰 위치를 "시전자→대상 방향"을 따라 이 값(월드 단위)만큼
+    /// 앞으로 민다. positionOffset(월드 고정 오프셋)과 달리 캐스터가 어느 쪽을 보고 있든 항상
+    /// 타겟 방향(=대체로 캐스터 정면)으로 밀리므로, 캐스터 visual 피벗이 얼굴/몸 중심이 아니라
+    /// 머리 뒤쪽 등에 있어 스폰 지점이 안쪽으로 파묻혀 보일 때 이걸로 보정한다. 기본 0(변화 없음).
+    /// </summary>
+    public float forwardOffset;
 }
 
 /// <summary>

@@ -55,6 +55,14 @@ public static class BattleVfxPlayer
         var entry = Resolve(vfxId);
         if (entry == null) return;
 
+        // 실제 이동형(물/독/드래곤/벌레 등) — 파티클 내부 속도와 무관하게 오브젝트 자체를 옮긴다.
+        if (entry.aimMode == VfxAimMode.TravelToTarget &&
+            caster?.visual != null && aimTarget?.visual != null)
+        {
+            SpawnTraveling(entry, caster.visual.transform.position, aimTarget.visual.transform.position);
+            return;
+        }
+
         // 조준형(빔·투사체)은 시전자에서 대상 쪽으로 한 줄기만. spawnMode보다 우선한다.
         // 대상마다 하나씩 회전 없이 놓으면 프리팹 제작 방향으로 제각각 날아간다.
         if (entry.aimMode == VfxAimMode.FromCaster &&
@@ -154,13 +162,47 @@ public static class BattleVfxPlayer
         // 같은 자리(예외)면 투사체가 의미 없으니 타격 이펙트로 폴백.
         if (distance < 0.01f) { Spawn(entry, to); return; }
 
-        var go = Create(entry, from, Quaternion.LookRotation(d / distance, Vector3.up), 1f);
+        Vector3 dir = d / distance;
+        var go = Create(entry, from + dir * entry.forwardOffset, Quaternion.LookRotation(dir, Vector3.up), 1f);
 
-        if (entry.stretchToDistance) StretchBeam(go, distance, entry.referenceDistance);
+        if (entry.stretchToDistance)
+        {
+            if (entry.beamGrowDuration > 0f)
+            {
+                float ratio = distance / Mathf.Max(0.01f, entry.referenceDistance);
+                go.AddComponent<VfxBeamGrow>().Begin(ratio, entry.beamGrowDuration);
+            }
+            else
+            {
+                StretchBeam(go, distance, entry.referenceDistance); // 기존 동작 그대로(즉시 완성)
+            }
+        }
 
         // 수명 보정은 "단일 투사체" 전제라 프리팹에 따라 끌 수 있다(VfxEntry 주석 참고).
         float travel = entry.fitLifetimeToDistance ? FitProjectileTravel(go, distance) : 0f;
         ScheduleDestroy(go, entry, travel);
+    }
+
+    /// <summary>
+    /// from에서 to까지 오브젝트 자체를 실제로 이동시킨다(파티클 내부 속도와 무관).
+    /// VfxTravelMover가 이동+도착 후 유지+파괴까지 전부 담당하므로, 여기서는 ScheduleDestroy를
+    /// 별도로 걸지 않는다(파괴 타이머 중복 방지).
+    /// </summary>
+    private static void SpawnTraveling(VfxEntry entry, Vector3 from, Vector3 to)
+    {
+        Vector3 d = to - from;
+        d.y = 0f;
+        float distance = d.magnitude;
+
+        // 같은 자리면 이동이 의미 없으니 기존 타격 이펙트로 폴백(자체 lifetime로 파괴됨).
+        if (distance < 0.01f) { Spawn(entry, to); return; }
+
+        Vector3 dir = d / distance;
+        Vector3 pushedFrom = from + dir * entry.forwardOffset;
+        var go = Create(entry, pushedFrom, Quaternion.LookRotation(dir, Vector3.up), 1f);
+
+        var mover = go.AddComponent<VfxTravelMover>();
+        mover.Begin(pushedFrom, to, entry.travelDuration, entry.arrivalHoldDuration);
     }
 
     /// <summary>
