@@ -758,22 +758,40 @@ public class OptionsPanelUI : MonoBehaviour
             "마스터 볼륨",
             ref _masterVolume,
             PREF_MASTER_VOLUME,
-            value => AudioListener.volume = value);
+            ApplyMasterVolume);
 
         DrawVolumeRow(
             "배경음",
             ref _bgmVolume,
             PREF_BGM_VOLUME,
-            null);
+            ApplyBgmVolume);
 
         DrawVolumeRow(
             "효과음",
             ref _sfxVolume,
             PREF_SFX_VOLUME,
-            null);
+            ApplySfxVolume);
+    }
 
-        GUILayout.Label(
-            "배경음·효과음은 현재 설정값만 저장됩니다.");
+    /// <summary>SoundManager가 씬에 없을 때도(아직 배치 전 등) 기존 마스터 볼륨 동작이 그대로 유지되도록 폴백한다.</summary>
+    private static void ApplyMasterVolume(float value)
+    {
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetMasterVolume(value);
+        else
+            AudioListener.volume = value;
+    }
+
+    private static void ApplyBgmVolume(float value)
+    {
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetBgmVolume(value);
+    }
+
+    private static void ApplySfxVolume(float value)
+    {
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetSfxVolume(value);
     }
 
     private static void DrawVolumeRow(
