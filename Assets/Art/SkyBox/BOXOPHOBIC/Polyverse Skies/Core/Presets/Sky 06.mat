@@ -15,7 +15,6 @@ Material:
   - _BACKGROUNDMODE_COLORS
   - _ENABLEBUILTINFOG_ON
   - _ENABLECLOUDS_ON
-  - _ENABLESTARS_ON
   - _ENABLESUN_ON
   m_InvalidKeywords:
   - _BUILTINFOG_ON
@@ -227,7 +226,7 @@ Material:
     - _EnablePattern: 1
     - _EnablePatternOverlay: 0
     - _EnableSkyPatternOverlay: 1
-    - _EnableStars: 1
+    - _EnableStars: 0
     - _EnableStarsHeightMask: 0
     - _EnableStarsRotation: 0
     - _EnableStarsSunMask: 1

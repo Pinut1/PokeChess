@@ -52,6 +52,9 @@ public class BoardManager : MonoBehaviour
     // 💡 금고: 타일의 논리적 위치와 그 위 앉아있는 유닛을 매핑하는 딕셔너리
     private Dictionary<HexCoords, PokemonUnit> _battleField = new Dictionary<HexCoords, PokemonUnit>();
 
+    // 좌표 → 시각 타일. 빈 칸/유닛 칸 색을 갈아끼우기 위한 조회용이며 배치 판정에는 쓰지 않는다.
+    private readonly Dictionary<HexCoords, HexTile> _tiles = new Dictionary<HexCoords, HexTile>();
+
     // 벤치 슬롯. 인덱스 = 슬롯 번호. null = 빈 슬롯.
     private PokemonUnit[] _bench;
 
@@ -159,6 +162,11 @@ public class BoardManager : MonoBehaviour
     private void HandlePhaseChanged(GamePhase phase)
     {
         _isBattlePhase = phase == GamePhase.Battle;
+
+        // 전투 중에는 빈 칸/유닛 칸 구분을 끄고 전부 Default Color로 고정한다.
+        // (전투 중 자동 승격 등으로 점유가 바뀌어도 기록만 되고, 전투가 끝나면 그 배치대로 다시 칠해진다)
+        foreach (HexTile tile in _tiles.Values)
+            if (tile != null) tile.SetBattleLocked(_isBattlePhase);
 
         if (phase == GamePhase.Shopping)
             ApplyPendingStarEvolutions();
@@ -275,6 +283,7 @@ public class BoardManager : MonoBehaviour
         }
 
         _battleField.Clear();
+        _tiles.Clear();
 
         // 1. 쟁반(Anchor) 생성
         GameObject boardAnchor = new GameObject("BoardAnchor");
@@ -311,6 +320,7 @@ public class BoardManager : MonoBehaviour
 
                 // 금고에 빈 타일 등록
                 _battleField.Add(coords, null);
+                _tiles[coords] = newTile;
 
                 // 평균 위치 계산을 위해 누적
                 battleAreaPositionSum += worldPos;
@@ -652,10 +662,10 @@ public class BoardManager : MonoBehaviour
     /// <summary>빈 보드 타일로 단순 이동/신규 배치. 들어온 출처(보드/벤치)에 따라 원위치를 비운다.</summary>
     private bool PlaceOnEmptyTile(PokemonUnit unit, HexCoords targetCoords, bool fromBoard, HexCoords fromCoords)
     {
-        if (fromBoard) _battleField[fromCoords] = null;
+        if (fromBoard) SetOccupant(fromCoords, null);
         else RemoveFromBenchByRef(unit); // 벤치에서 온 경우 벤치 슬롯 비움
 
-        _battleField[targetCoords] = unit;
+        SetOccupant(targetCoords, unit);
         unit.isOnBoard = true;
         return true;
     }
@@ -663,8 +673,8 @@ public class BoardManager : MonoBehaviour
     /// <summary>보드 ↔ 보드 스왑. 두 유닛 모두 보드에 남는다.</summary>
     private bool SwapOnBoard(PokemonUnit unit, HexCoords targetCoords, HexCoords fromCoords, PokemonUnit occupant)
     {
-        _battleField[fromCoords] = occupant;
-        _battleField[targetCoords] = unit;
+        SetOccupant(fromCoords, occupant);
+        SetOccupant(targetCoords, unit);
         return true;
     }
 
@@ -684,7 +694,7 @@ public class BoardManager : MonoBehaviour
             return false;
         }
 
-        _battleField[targetCoords] = unit;
+        SetOccupant(targetCoords, unit);
         unit.isOnBoard = true;
         _bench[benchSlot] = occupant;
         occupant.isOnBoard = false;
@@ -741,7 +751,7 @@ public class BoardManager : MonoBehaviour
         // 점유됨 — 들어오는 유닛의 원위치로 occupant를 보내고 교체
         if (TryFindBoardCoords(unit, out HexCoords fromCoords))
         {
-            _battleField[fromCoords] = occupant;
+            SetOccupant(fromCoords, occupant);
             occupant.isOnBoard = true;
         }
         else
@@ -815,7 +825,7 @@ public class BoardManager : MonoBehaviour
         int slot = onBoard ? -1 : FindBenchSlot(unit);
         if (!onBoard && slot < 0) return false; // 보드/벤치 어디에도 없음
 
-        if (onBoard) _battleField[coords] = null;
+        if (onBoard) SetOccupant(coords, null);
         else         _bench[slot] = null;
 
         GameEvents.UnitSold(unit); // ShopManager(환급) · SynergyManager(재계산) · BoardView(resync)
@@ -836,7 +846,7 @@ public class BoardManager : MonoBehaviour
 
         if (TryFindBoardCoords(unit, out HexCoords coords))
         {
-            _battleField[coords] = null;
+            SetOccupant(coords, null);
             GameEvents.BoardResyncRequested();
 
             Debug.Log(
@@ -922,11 +932,24 @@ public class BoardManager : MonoBehaviour
         if (slot >= 0) _bench[slot] = null;
     }
 
+    /// <summary>
+    /// 보드 한 칸의 점유자를 바꾸는 <b>유일한 통로</b>. 논리 상태(_battleField)와 타일 색을 같이 갱신한다.
+    /// <c>_battleField[coords] = unit</c>을 직접 쓰면 타일 색이 옛 상태로 남으므로 반드시 이 함수를 쓸 것.
+    /// (배치/스왑/판매/교환/합체 등 상태를 바꾸는 경로가 열 곳이 넘어 한 곳으로 모았다)
+    /// </summary>
+    private void SetOccupant(HexCoords coords, PokemonUnit unit)
+    {
+        _battleField[coords] = unit;
+
+        if (_tiles.TryGetValue(coords, out HexTile tile) && tile != null)
+            tile.SetOccupied(unit != null);
+    }
+
     /// <summary>유닛이 현재 어디(보드/벤치)에 있든 그 자리를 비움.</summary>
     private void RemoveUnitFromCurrentLocation(PokemonUnit unit)
     {
         if (TryFindBoardCoords(unit, out HexCoords coords))
-            _battleField[coords] = null;
+            SetOccupant(coords, null);
         else
             RemoveFromBenchByRef(unit);
     }
@@ -1449,7 +1472,7 @@ public class BoardManager : MonoBehaviour
         {
             if (candidate.IsOnBoard)
             {
-                _battleField[candidate.BoardCoords] = null;
+                SetOccupant(candidate.BoardCoords, null);
             }
             else if (candidate.BenchSlot >= 0 &&
                      candidate.BenchSlot < _bench.Length)
@@ -1647,8 +1670,7 @@ public class BoardManager : MonoBehaviour
         // 신규 유닛을 선택된 위치에 등록한다.
         if (destination.IsOnBoard)
         {
-            _battleField[destination.BoardCoords] =
-                evolvedUnit;
+            SetOccupant(destination.BoardCoords, evolvedUnit);
 
             evolvedUnit.isOnBoard = true;
         }

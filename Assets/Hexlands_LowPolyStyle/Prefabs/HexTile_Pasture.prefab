@@ -96,8 +96,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b8ce3f49e18a394797371c82a892c60, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HexTile
-  _defaultColor: {r: 1, g: 1, b: 1, a: 1}
-  _hoverColor: {r: 0, g: 1, b: 1, a: 1}
+  _defaultColor: {r: 0.6017255, g: 0.78431374, b: 0.32784313, a: 1}
+  _occupiedColor: {r: 0, g: 1, b: 0.29786587, a: 1}
+  _hoverColor: {r: 0, g: 1, b: 0.90439177, a: 1}
+  _useOccupiedColor: 1
 --- !u!1 &1920513786959524
 GameObject:
   m_ObjectHideFlags: 0
