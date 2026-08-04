@@ -163,7 +163,13 @@ public static class BattleVfxPlayer
         if (distance < 0.01f) { Spawn(entry, to); return; }
 
         Vector3 dir = d / distance;
-        var go = Create(entry, from + dir * entry.forwardOffset, Quaternion.LookRotation(dir, Vector3.up), 1f);
+        var go = Create(
+            entry,
+            from + dir * entry.forwardOffset,
+            Quaternion.LookRotation(dir, Vector3.up),
+            1f);
+
+        FixGrassBeamParticleVelocity(entry, go, dir);
 
         if (entry.stretchToDistance)
         {
@@ -340,4 +346,132 @@ public static class BattleVfxPlayer
         if (minLifetime > 0f) lifetime = Mathf.Max(lifetime, minLifetime + 0.3f); // 도착 직후 잔여 연출 여유
         Object.Destroy(go, lifetime);
     }
+
+    /// <summary>
+    /// 라플레시아 Grass 솔라빔에만 파티클 방향 보정 컴포넌트를 추가한다.
+    ///
+    /// Grass 솔라빔은 Stretched Billboard 방식으로 광선을 표현한다.
+    /// 이 방식은 파티클의 velocity를 기준으로 광선을 길게 표시하는데,
+    /// 해당 프리팹은 화면에 표시되는 광선이 velocity의 반대 방향으로 뻗는다.
+    ///
+    /// 따라서 최종 광선이 타겟 방향을 향하도록
+    /// 파티클 velocity를 타겟 반대 방향(-dir)으로 지속해서 보정한다.
+    /// </summary>
+    private static void FixGrassBeamParticleVelocity(
+        VfxEntry entry,
+        GameObject go,
+        Vector3 dir)
+    {
+        // 다른 빔·투사체에는 적용하지 않고
+        // 문제가 발생한 Grass Magician 스킬에만 적용한다.
+        if (!string.Equals(
+                entry.vfxId,
+                "VFX_Grass_Magician_SPELL",
+                System.StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        go.AddComponent<GrassBeamVelocityCorrector>()
+          .Initialize(dir);
+    }
+
+    /// <summary>
+    /// Grass 솔라빔의 실제 광선을 구성하는
+    /// beam_glow와 beam_shadow 파티클의 velocity 방향을 보정한다.
+    ///
+    /// 파티클은 VFX 생성 직후 바로 존재하지 않을 수 있고,
+    /// 재생 도중 새로 생성될 수도 있으므로 한 번만 검사하고 제거하지 않는다.
+    /// VFX 오브젝트가 파괴될 때까지 살아 있으면서 현재 존재하는 파티클을 보정한다.
+    ///
+    /// 파티클 속도의 크기는 유지하고 방향만 바꾸므로
+    /// Start Speed, 빔 길이, 거리 비례 계산에는 영향을 주지 않는다.
+    /// </summary>
+    private sealed class GrassBeamVelocityCorrector : MonoBehaviour
+    {
+        private const string BEAM_GLOW_NAME = "beam_glow";
+        private const string BEAM_SHADOW_NAME = "beam_shadow";
+
+        // 라플레시아에서 타겟으로 향하는 월드 방향.
+        private Vector3 _targetDirection;
+
+        // 실제 빔을 구성하는 두 ParticleSystem만 캐시한다.
+        private ParticleSystem _beamGlow;
+        private ParticleSystem _beamShadow;
+
+        /// <summary>
+        /// SpawnAimed에서 계산한 타겟 방향을 전달받고
+        /// 빔 파티클 시스템을 찾아 캐시한다.
+        /// </summary>
+        public void Initialize(Vector3 targetDirection)
+        {
+            _targetDirection = targetDirection.normalized;
+
+            foreach (var ps in GetComponentsInChildren<ParticleSystem>(true))
+            {
+                if (ps.transform.name == BEAM_GLOW_NAME)
+                {
+                    _beamGlow = ps;
+                }
+                else if (ps.transform.name == BEAM_SHADOW_NAME)
+                {
+                    _beamShadow = ps;
+                }
+            }
+        }
+        private void Update()
+        {
+            // 빛과 그림자 파티클을 각각 보정한다.
+            // 아직 파티클이 생성되지 않았다면 해당 프레임은 조용히 넘어가고,
+            // 다음 프레임에 다시 시도한다.
+            CorrectVelocity(_beamGlow);
+            CorrectVelocity(_beamShadow);
+        }
+
+        /// <summary>
+        /// 살아 있는 파티클의 속도 크기는 유지하고 방향만 변경한다.
+        /// </summary>
+        private void CorrectVelocity(ParticleSystem ps)
+        {
+            if (ps == null)
+                return;
+
+            int particleCount = ps.particleCount;
+            if (particleCount == 0)
+                return;
+
+            var particles = new ParticleSystem.Particle[particleCount];
+            int aliveCount = ps.GetParticles(particles);
+
+            if (aliveCount == 0)
+                return;
+
+            // 이 Grass 빔은 velocity의 반대편으로 길게 표시되므로,
+            // 최종 빔이 타겟 방향을 향하게 하려면
+            // 파티클 velocity는 타겟 반대 방향으로 설정해야 한다.
+            Vector3 velocityDirection = -_targetDirection;
+
+            // Local Simulation Space라면 Particle.velocity도
+            // 해당 ParticleSystem의 로컬 좌표 기준으로 저장해야 한다.
+            if (ps.main.simulationSpace == ParticleSystemSimulationSpace.Local)
+            {
+                velocityDirection =
+                    ps.transform.InverseTransformDirection(velocityDirection);
+            }
+
+            for (int i = 0; i < aliveCount; i++)
+            {
+                // 기존 Start Speed에서 만들어진 속도 크기는 그대로 보존한다.
+                float speed = particles[i].velocity.magnitude;
+
+                if (speed <= Mathf.Epsilon)
+                    continue;
+
+                particles[i].velocity = velocityDirection * speed;
+            }
+
+            ps.SetParticles(particles, aliveCount);
+        }
+    }
 }
+
