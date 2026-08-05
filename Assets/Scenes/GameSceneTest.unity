@@ -1390,6 +1390,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: -164.185
       objectReference: {fileID: 0}
+    - target: {fileID: 3621520502550224727, guid: 6b90e2f5a1d34e77b3c6d9082fa1c5e2, type: 3}
+      propertyPath: _descriptionText
+      value: 
+      objectReference: {fileID: 1815271557}
     - target: {fileID: 3707815054567535571, guid: 6b90e2f5a1d34e77b3c6d9082fa1c5e2, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1
@@ -1870,10 +1874,6 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: -233.92499
       objectReference: {fileID: 0}
-    - target: {fileID: 3621520502550224727, guid: 6b90e2f5a1d34e77b3c6d9082fa1c5e2, type: 3}
-      propertyPath: _descriptionText
-      value: 
-      objectReference: {fileID: 1815271557}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11925,7 +11925,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uD30C\uD2B8\uB108 \uD654\uBA74 \uBCF4\uAE30(\uC900\uBE44\uC911)"
+  m_text: "\uD30C\uD2B8\uB108 \uD654\uBA74 \uBCF4\uAE30(\uAD6C\uD604\uC911)"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: f4657157d8e5f584eb2e48a8fc16ba60, type: 2}
   m_sharedMaterial: {fileID: -2358274254732736215, guid: f4657157d8e5f584eb2e48a8fc16ba60, type: 2}
@@ -11952,8 +11952,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24
-  m_fontSizeBase: 24
+  m_fontSize: 18
+  m_fontSizeBase: 18
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -15015,8 +15015,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 700, y: -220}
-  m_SizeDelta: {x: 300, y: 50}
+  m_AnchoredPosition: {x: 400, y: -50}
+  m_SizeDelta: {x: 100, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1118178793
 MonoBehaviour:
@@ -19880,7 +19880,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1554637179
 RectTransform:
   m_ObjectHideFlags: 0
@@ -24299,6 +24299,7 @@ GameObject:
   - component: {fileID: 1915979503}
   - component: {fileID: 1915979504}
   - component: {fileID: 1915979505}
+  - component: {fileID: 1915979506}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -24628,6 +24629,23 @@ MonoBehaviour:
   _panel: {fileID: 4859292710623545895}
   _cursorOffset: {x: 18, y: -18}
   _screenMargin: 8
+--- !u!114 &1915979506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1915979494}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7b854a111958754596ff5a8086581d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PartnerSpectateView
+  _pipPanel: {fileID: 1554637179}
+  _pipRawImage: {fileID: 778121248}
+  _pipLabel: {fileID: 284082741}
+  _externalViewButton: {fileID: 1118178793}
+  _debugShowPip: 0
 --- !u!1 &1924281625
 GameObject:
   m_ObjectHideFlags: 0
@@ -27669,4 +27687,3 @@ SceneRoots:
   - {fileID: 1788756592}
   - {fileID: 1915979498}
   - {fileID: 1524564248}
-

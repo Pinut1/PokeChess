@@ -42,16 +42,39 @@ public class OpponentBoardView : MonoBehaviour
     /// <summary>해석 실패를 이미 경고한 speciesId — 스냅샷마다 반복 경고(스팸) 방지.</summary>
     private readonly HashSet<int> _warnedSpecies = new();
 
+    /// <summary>파트너 미러 전투 QA 테스트 등 다른 곳에서 같은 오프셋 위치에 그릴 때 재사용할 수 있게 공개.</summary>
+    public Vector3 BoardOffset => _boardOffset;
+
+    /// <summary>true면 Render를 호출해도 아무것도 그리지 않는다(파트너 미러 전투와 동시 표시되는 것 방지용).</summary>
+    private bool _suppressed;
+
+    /// <summary>Render가 마지막으로 받은 스냅샷. 억제 해제 시 다시 그리기 위해 보관.</summary>
+    private BoardSnapshot _lastSnapshot;
+
     private void OnEnable()  => GameEvents.OnOpponentBoardChanged += Render;
     private void OnDisable() => GameEvents.OnOpponentBoardChanged -= Render;
 
+    /// <summary>
+    /// 표시를 일시적으로 끄거나 켠다. 끄면 현재 활성 비주얼을 전부 풀로 반환하고,
+    /// 새 스냅샷이 도착해도 억제 중엔 그리지 않는다. 다시 켜면 마지막 스냅샷을 즉시 재렌더한다.
+    /// 이번 QA 테스트 범위에서만 쓰는 용도라 GameEvents/자동 페이즈 연결은 하지 않는다(호출측 책임).
+    /// </summary>
+    public void SetSuppressed(bool suppressed)
+    {
+        _suppressed = suppressed;
+        if (suppressed) ReleaseActive();
+        else if (_lastSnapshot != null) Render(_lastSnapshot);
+    }
+
     private void Render(BoardSnapshot snap)
     {
+        _lastSnapshot = snap;
+
         var board = GameManager.Instance != null ? GameManager.Instance.Board : null;
 
         // 활성분 전부 풀로 반환 후 스냅샷 기준으로 다시 배치.
         ReleaseActive();
-        if (board == null || snap == null) return;
+        if (_suppressed || board == null || snap == null) return;
 
         foreach (BoardSnapshot.Entry e in snap.entries)
         {

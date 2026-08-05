@@ -84,6 +84,28 @@ public class BattleManager : MonoBehaviour
     /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
     private Coroutine _mirrorBattleCoroutine;
 
+    /// <summary>
+    /// 이 인스턴스의 시각 오브젝트(visual)에만 적용하는 월드 오프셋. 실전투 인스턴스는 항상
+    /// Vector3.zero(기존 동작과 완전히 동일) — ConfigureMirrorVisuals를 호출한 미러 인스턴스만
+    /// 값이 채워진다. BattleUnit.coords(판정 좌표)에는 전혀 영향 없다.
+    /// </summary>
+    private Vector3 _visualOffset = Vector3.zero;
+
+    /// <summary>
+    /// 이 인스턴스가 생성하는 visual의 부모 Transform. null이면(실전투 기본값) 기존과 동일하게
+    /// 씬 루트에 생성된다 — 미러 인스턴스만 자기 자신의 Transform으로 설정해 미러 visual을
+    /// 전부 그 아래로 모으고, 실전투 visual과 계층으로도 확실히 구분·정리되게 한다.
+    /// </summary>
+    private Transform _visualParent;
+
+    /// <summary>
+    /// true면(기본값 = 실전투) BattleVfxPlayer.Play*를 기존과 동일하게 호출한다. 미러 인스턴스만
+    /// ConfigureMirrorVisuals에서 false로 설정한다 — BattleVfxPlayer._activeVfx가 static 전역이라
+    /// 실전투와 미러가 서로의 VFX를 지울 수 있어(ClearAllActive가 실전투 종료 시 전체를 지움),
+    /// 모델·이동·방향·사망 visual은 그대로 유지하되 평타/스킬/투사체/타격 VFX만 미러에서 생성하지 않는다.
+    /// </summary>
+    private bool _playBattleVfx = true;
+
     /// <summary>파트너 이탈 대기 중 전투 일시정지. Time.timeScale을 쓰지 않고 틱 루프 진입 자체를 막는다.</summary>
     private bool _isPaused;
 
@@ -939,11 +961,13 @@ public class BattleManager : MonoBehaviour
         GameObject visual;
         if (bu.data != null && bu.data.modelPrefab != null)
         {
-            visual = Instantiate(bu.data.modelPrefab);
+            // _visualParent가 null이면(실전투) 기존과 동일하게 씬 루트에 생성된다.
+            visual = Instantiate(bu.data.modelPrefab, _visualParent);
         }
         else
         {
             visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            if (_visualParent != null) visual.transform.SetParent(_visualParent, false);
             visual.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
             visual.GetComponent<Renderer>().material.color =
                 bu.team == BattleTeam.Ally ? Color.blue : Color.red;
@@ -978,8 +1002,10 @@ public class BattleManager : MonoBehaviour
     {
         if (bu.visual == null) return;
         // 적도 아군과 동일한 좌표 변환으로 그린다 — 적 좌표가 이미 rows 4~7(아군 너머)라
-        // 한 보드의 먼 절반으로 자연스럽게 이어진다. 별도 시각 오프셋 불필요.
-        Vector3 pos = GameManager.Instance.Board.CoordsToWorldPosition(bu.coords);
+        // 한 보드의 먼 절반으로 자연스럽게 이어진다. 별도 시각 오프셋 불필요(실전투 기준).
+        // _visualOffset은 실전투에서 항상 Vector3.zero라 이 한 줄은 실전투 결과에 영향 없다 —
+        // 미러 인스턴스만 파트너 보드 위치로 시각 오브젝트를 밀어서 그린다(판정 좌표는 그대로).
+        Vector3 pos = GameManager.Instance.Board.CoordsToWorldPosition(bu.coords) + _visualOffset;
         bu.visual.transform.position = pos + Vector3.up * 0.5f;
     }
 
@@ -1041,8 +1067,11 @@ public class BattleManager : MonoBehaviour
             // 노리는 대상을 바라보게 한다. 사거리 안이든 밖이든(=이동 중이든) 대상 기준이라
             // 원거리 유닛도 제자리에서 표적을 향하고, 도발당하면 도발자 쪽으로 돌아선다.
             // (?. 는 파괴된 UnityEngine.Object를 못 걸러내므로 != null 로 검사한다)
+            // FaceTowards는 (전달값 - 자기 visual.position)으로 방향을 계산한다. 자기 위치가
+            // 이미 _visualOffset만큼 밀려 있으므로(미러 인스턴스), 대상 좌표도 같은 오프셋을
+            // 더해야 방향이 어긋나지 않는다. 실전투는 _visualOffset이 항상 0이라 영향 없다.
             if (bu.facing != null)
-                bu.facing.FaceTowards(GameManager.Instance.Board.CoordsToWorldPosition(target.coords));
+                bu.facing.FaceTowards(GameManager.Instance.Board.CoordsToWorldPosition(target.coords) + _visualOffset);
 
             int distance = bu.coords.DistanceTo(target.coords);
 
@@ -1139,7 +1168,9 @@ public class BattleManager : MonoBehaviour
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
-        BattleVfxPlayer.PlayBasicAttack(attacker.attackVfxId, attacker, target);
+        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        if (_playBattleVfx)
+            BattleVfxPlayer.PlayBasicAttack(attacker.attackVfxId, attacker, target);
 
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
@@ -1183,8 +1214,10 @@ public class BattleManager : MonoBehaviour
 
         var targets = GetSkillTargets(caster, primaryTarget);
         // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
-        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius,
-                                  caster, primaryTarget);
+        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        if (_playBattleVfx)
+            BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius,
+                                      caster, primaryTarget);
 
         foreach (var t in targets)
         {
@@ -1218,9 +1251,11 @@ public class BattleManager : MonoBehaviour
 
         // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
         bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
-        BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
-                                  centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius,
-                                  caster, primaryTarget);
+        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        if (_playBattleVfx)
+            BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
+                                      centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius,
+                                      caster, primaryTarget);
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
@@ -1245,7 +1280,10 @@ public class BattleManager : MonoBehaviour
                 case SkillEffectType.Taunt:
                     t.ApplyTaunt(caster, tauntDuration);
                     // 도발 적용 시 각 대상 위치에 이펙트 재생(스킬 시전 이펙트와 별개).
-                    BattleVfxPlayer.PlayTauntHit(t);
+                    // _playBattleVfx가 false인 미러 인스턴스는 판정(ApplyTaunt는 이미 위에서 처리됨)에
+                    // 전혀 영향 없이 이 호출만 건너뛴다.
+                    if (_playBattleVfx)
+                        BattleVfxPlayer.PlayTauntHit(t);
                     break;
                 case SkillEffectType.HpRegen:
                     t.ApplyHeal(caster.spellPower);
@@ -1563,9 +1601,12 @@ public class BattleManager : MonoBehaviour
     // 격리 실행하려면 반드시 별도 GameObject의 별도 BattleManager 컴포넌트에서 호출해야 한다
     // (PartnerBattleMirrorController가 그 인스턴스 생성·생명주기를 담당).
     //
-    // visual/BattleVfxPlayer는 전혀 쓰지 않는다 — SimulateTick/UpdateVisualPosition/
-    // BattleVfxPlayer.Play*가 전부 visual==null에 안전(조용히 no-op)함을 확인했으므로,
-    // 미러 전투는 판정만 하고 화면에는 아무것도 그리지 않는다(이번 단계 범위 밖).
+    // visual은 SpawnVisual/UpdateVisualPosition을 그대로 재사용해 만든다 — _visualOffset/
+    // _visualParent(ConfigureMirrorVisuals가 세팅)만큼 실전투와 다른 위치·부모에 그려진다.
+    // 판정 좌표(BattleUnit.coords)는 절대 건드리지 않는다. BattleVfxPlayer(평타/스킬 VFX)는
+    // 이번 단계에서도 호출하지 않는다 — static _activeVfx 하나를 실전투와 공유해 서로의
+    // VFX를 지울 위험이 있는데(BattleManager.ClearAllActive 확인됨), 이번 범위(모델·이동·
+    // 방향전환·사망)에는 VFX가 필수가 아니라 안전한 쪽(호출 자체를 안 함)을 선택했다.
     //
     // GameEvents.BattleStart/BattleEnd는 발행하지 않는다 — onComplete/onFailed 콜백으로만
     // 결과를 알린다. PlayerHealthManager/RoundPhaseManager/AugmentManager 등 이 두 이벤트를
@@ -1581,6 +1622,34 @@ public class BattleManager : MonoBehaviour
     /// </summary>
     public bool IsMirrorBattleRunning => _isMirrorBattleRunning;
     private bool _isMirrorBattleRunning;
+
+    /// <summary>현재 _units 중 visual이 만들어져 있는 유닛 수(QA 상태 표시용).</summary>
+    public int VisualUnitCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var bu in _units)
+                if (bu.visual != null) count++;
+            return count;
+        }
+    }
+
+    /// <summary>
+    /// 이 인스턴스를 미러 전투 전용으로 설정한다 — 이후 생성되는 모든 visual이 offset만큼
+    /// 이동해 표시되고 parent 아래로 모인다. 동시에 _playBattleVfx를 false로 꺼서
+    /// BattleVfxPlayer(static _activeVfx 공유) 호출을 전부 건너뛰게 한다 — 실전투 종료 시
+    /// ClearAllActive()가 미러 VFX까지 지우는 간섭을 막기 위함(모델·이동·방향·사망 visual은
+    /// BattleVfxPlayer를 거치지 않으므로 이 플래그와 무관하게 그대로 유지된다).
+    /// 실전투 인스턴스는 절대 호출하지 않는다(기본값 Vector3.zero/null/true를 그대로 유지해야
+    /// 기존 동작이 보존된다). PartnerBattleMirrorController가 미러 BattleManager를 만든 직후 1회만 호출한다.
+    /// </summary>
+    public void ConfigureMirrorVisuals(Vector3 offset, Transform parent)
+    {
+        _visualOffset = offset;
+        _visualParent = parent;
+        _playBattleVfx = false;
+    }
 
     /// <summary>
     /// 파트너 BattleSnapshot으로 미러 전투를 시작한다. 이미 실행 중이거나 snapshot이 없거나
@@ -1605,7 +1674,7 @@ public class BattleManager : MonoBehaviour
 
         if (!SetupMirrorUnits(snapshot, out string failReason))
         {
-            _units.Clear();
+            Cleanup(); // 실패 시점까지 만들어진 부분 유닛(대부분 visual 없음)까지 한 번에 정리.
             onFailed?.Invoke(failReason);
             return;
         }
@@ -1617,7 +1686,8 @@ public class BattleManager : MonoBehaviour
         _mirrorBattleCoroutine = StartCoroutine(RunMirrorBattleTickLoop(onComplete));
     }
 
-    /// <summary>실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 파트너 이탈 등에서 호출.</summary>
+    /// <summary>실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 파트너 이탈 등에서 호출.
+    /// Cleanup()이 남아있는 미러 visual을 전부 파괴한다(bu.source는 전부 null이라 실제 PokemonUnit엔 영향 없음).</summary>
     public void AbortMirrorBattle()
     {
         if (!_isMirrorBattleRunning) return;
@@ -1625,7 +1695,7 @@ public class BattleManager : MonoBehaviour
         if (_mirrorBattleCoroutine != null) StopCoroutine(_mirrorBattleCoroutine);
         _mirrorBattleCoroutine = null;
         _isMirrorBattleRunning = false;
-        _units.Clear();
+        Cleanup();
     }
 
     /// <summary>
@@ -1662,7 +1732,7 @@ public class BattleManager : MonoBehaviour
 
     /// <summary>
     /// 미러 전투 결과 집계(아군 생존 수/잔여 HP 합 — 스냅샷 원본이 파트너 진영이므로 "아군"이 곧 파트너 팀).
-    /// visual/_mirrorTiles를 만들지 않았으므로 Cleanup() 대신 _units만 비운다.
+    /// 집계를 마친 뒤 Cleanup()으로 미러 visual을 전부 파괴하고 _units를 비운다.
     /// </summary>
     private void FinishMirrorBattle(BattleEndReason outcome, int ticks, System.Action<MirrorBattleResult> onComplete)
     {
@@ -1675,7 +1745,7 @@ public class BattleManager : MonoBehaviour
             hpSum += Mathf.Max(0f, bu.currentHp);
         }
 
-        _units.Clear();
+        Cleanup();
         _mirrorBattleCoroutine = null;
         _isMirrorBattleRunning = false;
 
@@ -1726,6 +1796,13 @@ public class BattleManager : MonoBehaviour
         }
 
         ApplyOnCombatStartEffects();
+
+        // 실전투 SetupUnits()의 마지막 단계(SetupVisuals)와 같은 순서 — 아이템 효과 적용까지
+        // 끝난 뒤에 visual을 만든다. SpawnMirrorBoard(적 보드 바닥 타일)는 이번 단계 범위 밖이라
+        // 호출하지 않는다(유닛 모델만 표시 대상).
+        foreach (var bu in _units)
+            SpawnVisual(bu);
+
         return true;
     }
 
@@ -1983,7 +2060,9 @@ public class BattleManager : MonoBehaviour
                 continue;
             }
 
-            _units.Add(CreateBotUnit(data, empty[placed++]));
+            BattleUnit bot = CreateBotUnit(data, empty[placed++]);
+            _units.Add(bot);
+            SpawnVisual(bot); // 실전투 SpawnMutantBots와 동일 — 이후 소환이라 SetupMirrorUnits의 일괄 스폰을 못 타서 개별 호출.
         }
     }
 
