@@ -138,6 +138,28 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>상대 보드 스냅샷의 마지막 적용 revision. 새 판(라운드 1) 시작 시 리셋.</summary>
     private int _lastOpponentBoardRevision = -1;
 
+    /// <summary>내 BattleSnapshot 송출 revision(단조 증가). BoardSnapshot의 revision과 별도 필드로 관리한다.</summary>
+    private int _localBattleSnapshotRevision;
+
+    /// <summary>파트너 BattleSnapshot의 마지막 적용 revision. 새 판(라운드 1)·파트너 이탈 시 리셋.</summary>
+    private int _lastPartnerBattleSnapshotRevision = -1;
+
+    /// <summary>수신에 성공한 파트너 BattleSnapshot. 저장·조회만 제공 — 이번 단계는 미러 전투를 만들지 않는다.</summary>
+    private BattleSnapshot _partnerBattleSnapshot;
+
+    /// <summary>파트너 BattleSnapshot을 한 번이라도 정상 수신했는지.</summary>
+    public bool HasPartnerBattleSnapshot => _partnerBattleSnapshot != null;
+
+    /// <summary>수신한 파트너 BattleSnapshot(읽기 전용 참조). 수신 전이거나 파트너 이탈로 초기화됐으면 null.
+    /// 외부에서 재대입할 수 있는 public setter는 없다 — 내용을 바꾸려면 RPC 수신 경로를 통해서만 갱신된다.</summary>
+    public BattleSnapshot PartnerBattleSnapshot => _partnerBattleSnapshot;
+
+    /// <summary>마지막으로 적용된 파트너 BattleSnapshot revision. 수신 전이면 -1(QA 표시용).</summary>
+    public int PartnerBattleSnapshotRevision => _lastPartnerBattleSnapshotRevision;
+
+    /// <summary>지금까지 내가 보낸 BattleSnapshot revision(단조 증가, 아직 한 번도 안 보냈으면 0). QA 표시용.</summary>
+    public int LocalBattleSnapshotRevision => _localBattleSnapshotRevision;
+
     /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
     private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
 
@@ -2418,6 +2440,30 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 로컬 BattleSnapshot을 파트너에게 1회 전송한다. BroadcastBoardSnapshot과 같은 가드/전송 패턴
+    /// (_soloMode/InRoom 체크, RpcTarget.Others, revision 단조 증가)을 따르되, 호출측(QA 진입점)이
+    /// 성공 여부를 바로 로그로 남길 수 있도록 bool을 반환한다.
+    /// 이번 단계에서는 자동 트리거가 없다 — 오직 명시적으로 호출됐을 때만 전송한다.
+    /// </summary>
+    public bool BroadcastBattleSnapshot(BattleSnapshot snapshot)
+    {
+        if (snapshot == null) return false;
+        if (_soloMode) return false;      // 파트너 없음 — 송출 불가
+        if (!PhotonNetwork.InRoom) return false;
+
+        BattleSnapshotCodec.EncodedPayload payload = BattleSnapshotCodec.Encode(snapshot);
+        photonView.RPC(
+            nameof(RPC_OnBattleSnapshot),
+            RpcTarget.Others,
+            ++_localBattleSnapshotRevision,
+            payload.ints,
+            payload.floats,
+            payload.strings
+        );
+        return true;
+    }
+
+    /// <summary>
     /// 게임 씬 로드 완료를 알림(라운드 시작 핸드셰이크). GameSceneBootstrap이 GameScene 진입 시 호출.
     /// 두 클라가 모두 준비되면 MasterClient가 라운드 1을 시작한다.
     /// (로비→게임 전환 중 라운드 시작 RPC가 유실되는 레이스 방지)
@@ -2515,6 +2561,31 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OpponentBoardChanged(BoardSnapshot.Decode(data));
     }
 
+    /// <summary>
+    /// 파트너 BattleSnapshot 수신. RPC_OnBoardSnapshot과 같은 원칙 — 과거 revision은 버려 최신을 보존한다.
+    /// Decode 실패는 저장하지 않고 경고만 남긴다(기존 네트워크 로그 방식 — Debug.LogWarning).
+    /// 이번 단계는 저장·이벤트 발행까지만 한다 — 미러 전투를 만들거나 전투 시작을 지연시키지 않는다.
+    /// </summary>
+    [PunRPC]
+    private void RPC_OnBattleSnapshot(int revision, int[] ints, float[] floats, string[] strings)
+    {
+        if (revision <= _lastPartnerBattleSnapshotRevision)
+        {
+            Debug.Log($"[Network] 과거 BattleSnapshot 무시 (rev {revision} ≤ {_lastPartnerBattleSnapshotRevision})");
+            return;
+        }
+
+        if (!BattleSnapshotCodec.TryDecode(ints, floats, strings, out BattleSnapshot decoded, out string error))
+        {
+            Debug.LogWarning($"[Network] BattleSnapshot Decode 실패(rev {revision}): {error}");
+            return;
+        }
+
+        _lastPartnerBattleSnapshotRevision = revision;
+        _partnerBattleSnapshot = decoded;
+        GameEvents.PartnerBattleSnapshotChanged(decoded);
+    }
+
     /// <summary>비마스터의 패배 데미지 요청을 마스터가 수신 → 팀 HP에 반영.</summary>
     [PunRPC]
     private void RPC_ReportBattleLoss(int damage)
@@ -2544,6 +2615,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // 새 판 — 보드 스냅샷 revision 리셋(이전 판의 revision과 비교되지 않도록)
             _localBoardRevision = 0;
             _lastOpponentBoardRevision = -1;
+
+            // BattleSnapshot도 별도 필드로 관리하므로 새 판 시작 시 함께 리셋한다.
+            _localBattleSnapshotRevision = 0;
+            _lastPartnerBattleSnapshotRevision = -1;
+            _partnerBattleSnapshot = null;
         }
 
         GameEvents.RoundChanged(round);
@@ -2840,6 +2916,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
         // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
         _opponentDisconnected = true;
+
+        // 파트너가 없는 동안 저장된 BattleSnapshot을 그대로 들고 있으면 재접속 후(또는 새 스냅샷을
+        // 아직 못 받은 상태에서) 이전 라운드의 오래된 상태를 쓸 위험이 있다 — 이탈 시점에 비운다.
+        // revision도 함께 리셋해야 재접속 후 재전송이 "과거 revision"으로 잘못 걸러지지 않는다.
+        _partnerBattleSnapshot = null;
+        _lastPartnerBattleSnapshotRevision = -1;
 
         // OnRoomFull()이 매치 시작 시 방을 닫아둔 채라(IsOpen=false) 상대의 RejoinRoom이 "Game closed"로
         // 거부될 수 있다 — 대기 중엔 다시 열어 재접속을 허용한다. PlayerCount는 비활성 자리도 포함해
@@ -3315,6 +3397,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _lastKnownRound = 0;
         _localBoardRevision = 0;
         _lastOpponentBoardRevision = -1;
+        _localBattleSnapshotRevision = 0;
+        _lastPartnerBattleSnapshotRevision = -1;
+        _partnerBattleSnapshot = null;
 
         // 통신교환 상태 초기화
         _pendingOutgoingTrades.Clear();
@@ -3439,6 +3524,13 @@ public class NetworkManager : MonoBehaviour
 
     // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
     public void BroadcastBoardSnapshot(int[] _) { }
+
+    // 오프라인은 파트너가 없어 BattleSnapshot 송수신 자체가 없다(실구현과 동일 공개 API 유지용 스텁).
+    public bool HasPartnerBattleSnapshot => false;
+    public BattleSnapshot PartnerBattleSnapshot => null;
+    public int PartnerBattleSnapshotRevision => -1;
+    public int LocalBattleSnapshotRevision => 0;
+    public bool BroadcastBattleSnapshot(BattleSnapshot _) => false;
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds) => false;

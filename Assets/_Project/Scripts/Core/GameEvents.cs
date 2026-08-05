@@ -142,6 +142,13 @@ public static class GameEvents
     /// </summary>
     public static event Action OnBoardResyncRequested;
 
+    /// <summary>
+    /// 파트너 BattleSnapshot을 정상 수신(TryDecode 성공 + revision 최신)했을 때만 발행.
+    /// NetworkManager.RPC_OnBattleSnapshot이 발행 — 이번 단계는 구독자가 없다(파트너 관전 후속 단계에서 소비 예정).
+    /// Decode 실패·과거 revision일 때는 발행하지 않는다.
+    /// </summary>
+    public static event Action<BattleSnapshot> OnPartnerBattleSnapshotChanged;
+
     /// <summary>유닛 보드에 배치됨</summary>
     public static event Action<PokemonUnit> OnUnitPlaced;
 
@@ -333,6 +340,7 @@ public static class GameEvents
     public static void InventoryChanged() => OnInventoryChanged?.Invoke();
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void BoardResyncRequested() => OnBoardResyncRequested?.Invoke();
+    public static void PartnerBattleSnapshotChanged(BattleSnapshot snapshot) => OnPartnerBattleSnapshotChanged?.Invoke(snapshot);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);

@@ -2191,7 +2191,170 @@ public class QAManager : MonoBehaviour
         DrawActorNumbers();
 
         GUILayout.Space(6f);
+        if (GUILayout.Button("BattleSnapshot 왕복 테스트", GUILayout.Width(220f)))
+            HandleBattleSnapshotRoundTrip();
+        if (GUILayout.Button("BattleSnapshot 전송 테스트", GUILayout.Width(220f)))
+            HandleBattleSnapshotSendTest();
+
+        GUILayout.Space(6f);
+        GUILayout.Label("파트너 BattleSnapshot 상태");
+        DrawPartnerBattleSnapshotStatus(net);
+
+        GUILayout.Space(6f);
+        DrawPartnerMirrorBattleButton(net);
+
+        GUILayout.Space(6f);
         GUILayout.Label("네트워크 조작(강제 연결/해제, RPC 실행, 파트너 데이터 변경 등)은 지원하지 않습니다.");
+    }
+
+    /// <summary>
+    /// 파트너 미러 전투 테스트 버튼. HasPartnerBattleSnapshot이 false이거나 이미 미러 전투가
+    /// 실행 중이면 비활성화된다(GUI.enabled로 클릭 자체를 막음 — 예외로 막지 않음).
+    /// </summary>
+    private void DrawPartnerMirrorBattleButton(NetworkManager net)
+    {
+        PartnerBattleMirrorController controller = PartnerBattleMirrorController.GetOrCreate();
+        bool canRun = net.HasPartnerBattleSnapshot && !controller.IsRunning;
+
+        bool prevEnabled = GUI.enabled;
+        GUI.enabled = canRun;
+        if (GUILayout.Button("파트너 미러 전투 테스트", GUILayout.Width(220f)))
+            HandlePartnerMirrorBattleTest(net, controller);
+        GUI.enabled = prevEnabled;
+    }
+
+    /// <summary>
+    /// 저장된 파트너 BattleSnapshot으로 미러 전투를 시작한다. 실제 전투 흐름·GameEvents.BattleStart/
+    /// BattleEnd와는 무관하다 — 시작/종료 결과를 전부 QA 로그로만 남긴다(화면 표시 없음, 이번 단계 범위 밖).
+    /// </summary>
+    private void HandlePartnerMirrorBattleTest(NetworkManager net, PartnerBattleMirrorController controller)
+    {
+        const string action = "파트너 미러 전투 테스트";
+
+        BattleSnapshot snapshot = net.PartnerBattleSnapshot;
+        if (snapshot == null)
+        {
+            LogFailure(action, "파트너 BattleSnapshot 없음");
+            return;
+        }
+
+        string stageLabel = string.IsNullOrEmpty(snapshot.stageId) ? "-" : snapshot.stageId;
+
+        controller.StartMirrorBattle(
+            snapshot,
+            result => LogSuccess(action,
+                $"종료 | Outcome={result.outcome} | Ticks={result.elapsedTicks} | " +
+                $"Survivors={result.survivorCount} | RemainingHp={result.remainingHpSum:0}"),
+            error => LogFailure(action, error)
+        );
+
+        // StartMirrorBattle이 "이미 실행 중" 등으로 즉시 실패했을 수도 있어, 시작 로그는
+        // 실행 중 여부를 다시 확인한 뒤에만 남긴다(실패인데 시작 로그가 먼저 찍히는 것 방지).
+        if (controller.IsRunning)
+            LogSuccess(action, $"시작 | Actor={snapshot.playerActorNumber} | Units={snapshot.units.Count} | Stage={stageLabel}");
+    }
+
+    /// <summary>
+    /// 현재 로컬 상태(필드 유닛/스테이지/라운드/치어리더 선택/활성 시너지)로 BattleSnapshot을 만든다.
+    /// 왕복 테스트·전송 테스트 두 QA 진입점이 공용으로 쓰는 조립 로직 — 중복 작성하지 않기 위해 분리했다.
+    /// </summary>
+    private static BattleSnapshot BuildLocalBattleSnapshot(GameManager gm)
+    {
+        StageData stage = gm.Phase != null ? gm.Phase.CurrentStage : null;
+        int roundIndex = gm.Phase != null ? gm.Phase.CurrentRound : 0;
+        IReadOnlyList<SynergyStatus> activeSynergies = gm.Synergy != null ? gm.Synergy.GetActiveSynergies() : null;
+
+        // 미러 desync 위험이 확인된 CheerleaderChoice.Current(static)는 BattleSnapshotCodec.Create가
+        // 직접 읽지 않으므로, 여기(호출측)에서 읽어 인자로 넘긴다.
+        int playerActorNumber = -1;
+#if PHOTON_UNITY_NETWORKING
+        if (PhotonNetwork.LocalPlayer != null)
+            playerActorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+#endif
+
+        return BattleSnapshotCodec.Create(
+            gm.Board, stage, roundIndex, playerActorNumber, CheerleaderChoice.Current, activeSynergies);
+    }
+
+    /// <summary>
+    /// BattleSnapshot Create→Encode→TryDecode→EquivalentTo 왕복 검증(QA 전용 진입점).
+    /// 실제 전투 시작 흐름·네트워크 RPC와는 무관하다 — 현재 로컬 상태를 스냅샷화해서
+    /// 직렬화 왕복이 값 손실 없이 되는지만 로컬에서 확인한다(BattleSnapshotCodec.cs 참고).
+    /// </summary>
+    private void HandleBattleSnapshotRoundTrip()
+    {
+        const string action = "BattleSnapshot 왕복 테스트";
+
+        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+        {
+            LogFailure(action, "BoardManager 연결 안 됨");
+            return;
+        }
+
+        BattleSnapshot snapshot = BuildLocalBattleSnapshot(gm);
+
+        if (!BattleSnapshotCodec.VerifyRoundTrip(snapshot, out string error))
+        {
+            LogFailure(action, error ?? "알 수 없는 오류");
+            return;
+        }
+
+        string stageLabel = string.IsNullOrEmpty(snapshot.stageId) ? "-" : snapshot.stageId;
+        LogSuccess(action, $"성공 | Units={snapshot.units.Count} | Synergies={snapshot.activeSynergies.Count} | Stage={stageLabel}");
+    }
+
+    /// <summary>
+    /// 로컬 상태로 BattleSnapshot을 만들어 Round-trip 검증까지 통과한 경우에만
+    /// NetworkManager.BroadcastBattleSnapshot으로 실제 RPC 전송을 수행하는 QA 전용 진입점.
+    /// 자동 전송 트리거가 아니다 — 이 버튼을 눌렀을 때만 1회 전송한다. 솔로 상태에서는
+    /// BroadcastBattleSnapshot 자체가 false를 반환하므로 예외 없이 "전송 실패"로 처리된다.
+    /// </summary>
+    private void HandleBattleSnapshotSendTest()
+    {
+        const string action = "BattleSnapshot 전송 테스트";
+
+        if (!GameManager.TryGet(out var gm) || gm.Board == null || gm.Network == null)
+        {
+            LogFailure(action, "BoardManager 또는 NetworkManager 연결 안 됨");
+            return;
+        }
+
+        BattleSnapshot snapshot = BuildLocalBattleSnapshot(gm);
+
+        if (!BattleSnapshotCodec.VerifyRoundTrip(snapshot, out string error))
+        {
+            LogFailure(action, error ?? "알 수 없는 오류");
+            return;
+        }
+
+        if (!gm.Network.BroadcastBattleSnapshot(snapshot))
+        {
+            LogFailure(action, "전송 불가(파트너 없음 또는 방 미입장)");
+            return;
+        }
+
+        string stageLabel = string.IsNullOrEmpty(snapshot.stageId) ? "-" : snapshot.stageId;
+        LogSuccess(action,
+            $"Revision={gm.Network.LocalBattleSnapshotRevision} | Units={snapshot.units.Count} | " +
+            $"Synergies={snapshot.activeSynergies.Count} | Stage={stageLabel}");
+    }
+
+    /// <summary>파트너 BattleSnapshot 수신 상태 표시(조회 전용). 수신 전에는 Units/Synergies 등을 확인 불가로 표시한다.</summary>
+    private static void DrawPartnerBattleSnapshotStatus(NetworkManager net)
+    {
+        GUILayout.Label($"수신 여부: {(net.HasPartnerBattleSnapshot ? "수신함" : "없음")}");
+        GUILayout.Label($"최신 revision: {net.PartnerBattleSnapshotRevision}");
+
+        BattleSnapshot snap = net.PartnerBattleSnapshot;
+        if (snap == null)
+        {
+            GUILayout.Label("playerActorNumber/roundIndex/Stage/Units/Synergies: 확인 불가(수신 전)");
+            return;
+        }
+
+        GUILayout.Label($"playerActorNumber: {snap.playerActorNumber} | roundIndex: {snap.roundIndex}");
+        GUILayout.Label($"Stage: {(string.IsNullOrEmpty(snap.stageId) ? "-" : snap.stageId)}");
+        GUILayout.Label($"Units: {snap.units.Count} | Synergies: {snap.activeSynergies.Count}");
     }
 
     private static void DrawActorNumbers()
