@@ -156,9 +156,25 @@ public class StatInfoPanelUI : MonoBehaviour
         gameObject.SetActive(true);
 
         FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
-        FillStats(unit.Range, unit.Defense, unit.Attack, unit.AttackSpeed, unit.SpellPower);
-        FillItems(unit.items, unit.equippedStone);
+        RefreshUnitStatsAndItems();
         RefreshGauges(); // 켜는 프레임에 빈 게이지가 보이지 않게
+    }
+
+    /// <summary>
+    /// 스탯 텍스트·장착 아이템 칸을 _unit 기준으로 다시 채운다. Bind 직후는 물론, 장착·해제 등으로
+    /// GameEvents.OnInventoryChanged/OnUnitChanged가 뜰 때도 같은 경로로 재사용한다(중복 구현 금지).
+    /// 장비 보너스는 PokemonUnit.ComputeFinalStats(공용 계산, Combat/ItemStatEffect와 동일 공식)로 구한다.
+    /// </summary>
+    private void RefreshUnitStatsAndItems()
+    {
+        if (_unit == null) return;
+
+        _unit.ComputeFinalStats(
+            out _, out _,
+            out float finalAttack, out float finalSpellPower, out float finalAttackSpeed, out float finalDefense);
+
+        FillStats(_unit.Range, finalDefense, finalAttack, finalAttackSpeed, finalSpellPower);
+        FillItems(_unit.items, _unit.equippedStone);
     }
 
     /// <summary>
@@ -249,8 +265,24 @@ public class StatInfoPanelUI : MonoBehaviour
             if (hover != null) hover.Hovered -= HandleItemHovered;
     }
 
+    /// <summary>
+    /// 창이 열려 있는 동안만 구독한다(Bind가 SetActive(true)를 해야 OnEnable이 돎).
+    /// 장착·해제(InventoryChanged) / 진화·돌 장착 등(UnitChanged) 기존 이벤트를 그대로 재사용 —
+    /// Update 폴링을 새로 추가하지 않는다.
+    /// </summary>
+    private void OnEnable()
+    {
+        GameEvents.OnInventoryChanged += HandleInventoryChanged;
+        GameEvents.OnUnitChanged += HandleUnitChanged;
+        GameEvents.OnUnitSold += HandleUnitSold;
+    }
+
     private void OnDisable()
     {
+        GameEvents.OnInventoryChanged -= HandleInventoryChanged;
+        GameEvents.OnUnitChanged -= HandleUnitChanged;
+        GameEvents.OnUnitSold -= HandleUnitSold;
+
         // 상세창이 닫히는데 아이템 설명창만 남지 않게.
         // HideAll이 아니라 칸별 Hide인 이유 — 컨트롤러를 인벤토리·아이템 상점과 공유하므로
         // HideAll은 그쪽이 띄운 설명창까지 꺼버린다(ItemInventoryUI.OnDisable과 같은 규칙).
@@ -258,6 +290,32 @@ public class StatInfoPanelUI : MonoBehaviour
 
         foreach (ItemHoverTarget hover in _itemHovers)
             if (hover != null) _itemTooltip.Hide(hover);
+    }
+
+    /// <summary>장비/진화의 돌 장착·해제 시 인벤토리가 바뀌면 뜬다. 지금 열려 있는 유닛일 때만 재계산한다.</summary>
+    private void HandleInventoryChanged()
+    {
+        if (_unit == null) return;
+        RefreshUnitStatsAndItems();
+    }
+
+    /// <summary>
+    /// 진화의 돌 장착/해제·통신진화·영웅증강 역할전환 등으로 unit.data/roleOverride 자체가 바뀔 때 뜬다.
+    /// 종·역할이 바뀌면 이름·일러스트·역할·성급 아이콘·시너지·판매가도 같이 달라지므로
+    /// FillIdentity도 다시 불러야 한다 — Bind()와 같은 인자 구성이라 여기서도 그대로 재사용한다.
+    /// </summary>
+    private void HandleUnitChanged(PokemonUnit unit)
+    {
+        if (_unit == null || _unit != unit) return;
+
+        FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
+        RefreshUnitStatsAndItems();
+    }
+
+    /// <summary>선택된 유닛이 판매되면 뜬다. 판매된 게 지금 열려 있는 유닛이면 창을 닫는다.</summary>
+    private void HandleUnitSold(PokemonUnit unit)
+    {
+        if (_unit == unit) Hide();
     }
 
     /// <summary>아이템 칸에 커서가 들고 날 때 설명창을 여닫는다(인벤토리·아이템 상점과 같은 방식).</summary>
@@ -273,6 +331,15 @@ public class StatInfoPanelUI : MonoBehaviour
     {
         // 전투 유닛이 죽으면 visual이 파괴된다 — 빈 창이 남지 않게 닫는다.
         if (_battleUnit != null && (!_battleUnit.IsAlive || _battleUnit.visual == null))
+        {
+            Hide();
+            return;
+        }
+
+        // 보드 유닛으로 열려 있던 대상이 합체·판매 등으로 Destroy되면 Unity가 _unit을
+        // "가짜 null"로 만든다(== null은 true, 그러나 실제 C# 참조는 아직 남아있음).
+        // ReferenceEquals로 "애초에 바인딩된 적 없음"과 구분해야 한 번도 안 연 패널까지 닫히지 않는다.
+        if (!ReferenceEquals(_unit, null) && _unit == null)
         {
             Hide();
             return;
@@ -489,11 +556,21 @@ public class StatInfoPanelUI : MonoBehaviour
         }
         else if (_unit != null)
         {
-            // 전투 중이면 실제로 깎이는 값은 BattleUnit에 있다. 없으면(전투 외) 원본 값을 쓴다.
+            // 전투 중이면 실제로 깎이는 값은 BattleUnit에 있다(그 값도 결국 ItemStatFormula로 계산됨).
+            // 없으면(전투 외, 쇼핑 단계) PokemonUnit.ComputeFinalStats로 같은 공식을 직접 적용한다 —
+            // 장비 미포함 원본 값(_unit.currentHp/_unit.MaxHp)을 쓰지 않는다.
             BattleUnit battleUnit = FindBattleUnit(_unit);
 
-            hp      = battleUnit != null ? battleUnit.currentHp   : _unit.currentHp;
-            maxHp   = battleUnit != null ? battleUnit.maxHp       : _unit.MaxHp;
+            if (battleUnit != null)
+            {
+                hp = battleUnit.currentHp;
+                maxHp = battleUnit.maxHp;
+            }
+            else
+            {
+                _unit.ComputeFinalStats(out maxHp, out hp, out _, out _, out _, out _);
+            }
+
             mana    = battleUnit != null ? battleUnit.currentMana : _unit.currentMana;
             maxMana = battleUnit != null ? battleUnit.maxMana     : _unit.EffectiveManaCost;
         }
