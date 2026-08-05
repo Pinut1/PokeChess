@@ -918,6 +918,110 @@ public class ItemManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 유닛 없이, 인벤토리에 있는 진화의 돌 하나를 재조합기로 직접 재조합한다.
+    ///
+    /// 장착할 유닛이 없어 장착 경로(UseReforger)를 쓸 수 없는 진화의 돌을 위한 보조 경로 —
+    /// 인벤토리 UI에서 재조합기를 다른 슬롯의 진화의 돌 위로 끌어다 놓는 조작에서 호출된다.
+    /// 대상 돌은 결과 후보에서 반드시 제외한다(같은 돌 재당첨 없음). UseReforger(유닛 대상)는
+    /// 이 제외 규칙을 적용하지 않으므로 그대로 둔다 — 이번 변경 범위 밖이다.
+    ///
+    /// 모든 검증을 통과했을 때만 대상 돌을 결과로 교체하고 재조합기 1개를 소모한다.
+    /// </summary>
+    public bool ReforgeStoneInInventory(EvolutionStoneData targetStone)
+    {
+        if (ReforgerCount <= 0)
+        {
+            Debug.LogWarning(
+                "[재조합기] 재조합기를 보유하고 있지 않습니다."
+            );
+
+            return false;
+        }
+
+        if (targetStone == null || !_stones.Contains(targetStone))
+        {
+            Debug.LogWarning(
+                "[재조합기] 대상 진화의 돌이 인벤토리에 없습니다."
+            );
+
+            return false;
+        }
+
+        EvolutionStoneDatabase stoneDatabase =
+            EvolutionStoneDatabase.Instance;
+
+        if (stoneDatabase == null ||
+            stoneDatabase.all == null)
+        {
+            Debug.LogWarning(
+                "[재조합기] EvolutionStoneDatabase를 불러올 수 없습니다."
+            );
+
+            return false;
+        }
+
+        List<EvolutionStoneData> candidates =
+            GetValidStoneCandidates(
+                stoneDatabase.all,
+                targetStone
+            );
+
+        if (candidates.Count <= 0)
+        {
+            Debug.LogWarning(
+                "[재조합기] 재조합 가능한 진화의 돌이 없습니다."
+            );
+
+            return false;
+        }
+
+        EvolutionStoneData result =
+            candidates[
+                Random.Range(
+                    0,
+                    candidates.Count
+                )
+            ];
+
+        // 실제 적용 직전에 대상이 여전히 같은 자리에 있는지 다시 확인한다(UseReforger와 동일한 순서).
+        int index = _stones.IndexOf(targetStone);
+
+        if (index < 0)
+        {
+            Debug.LogWarning(
+                "[재조합기] 처리 중 대상 진화의 돌이 사라졌습니다."
+            );
+
+            return false;
+        }
+
+        // 제거와 추가를 한 번의 대입으로 처리해 중간에 "돌이 없는" 상태가 생기지 않게 한다.
+        _stones[index] = result;
+
+        /*
+         * 모든 변경이 완료된 후에만 재조합기를 소모한다.
+         * SpendReforger 내부에서 InventoryChanged 이벤트를 호출한다.
+         */
+        if (!SpendReforger(1))
+        {
+            Debug.LogError(
+                "[재조합기] 결과 적용 후 재조합기 소모에 실패했습니다."
+            );
+
+            return false;
+        }
+
+        Debug.Log(
+            $"[재조합기] 인벤토리 직접 재조합 완료 — " +
+            $"'{targetStone.stoneName}' → '{result.stoneName}' / " +
+            $"남은 재조합기 {ReforgerCount}개 / " +
+            $"인벤토리 {InventoryCount}/{MAX_INVENTORY_SIZE}"
+        );
+
+        return true;
+    }
+
+    /// <summary>
     /// ItemDatabase의 전체 목록에서 null이 아닌 일반 장비만 반환한다.
     /// 동일한 아이템이 다시 등장하는 것은 허용한다.
     /// </summary>
@@ -942,10 +1046,13 @@ public class ItemManager : MonoBehaviour
     /// <summary>
     /// EvolutionStoneDatabase의 전체 목록에서
     /// null이 아닌 진화의 돌만 반환한다.
-    /// 동일한 돌이 다시 등장하는 것은 허용한다.
+    ///
+    /// excludedStone이 null이면(기존 유닛 대상 재조합) 동일한 돌이 다시 등장하는 것도 허용한다.
+    /// excludedStone을 넘기면(인벤토리 직접 재조합) 그 돌만 후보에서 제외한다.
     /// </summary>
     private static List<EvolutionStoneData> GetValidStoneCandidates(
-        List<EvolutionStoneData> allStones)
+        List<EvolutionStoneData> allStones,
+        EvolutionStoneData excludedStone = null)
     {
         var candidates =
             new List<EvolutionStoneData>();
@@ -955,8 +1062,13 @@ public class ItemManager : MonoBehaviour
 
         foreach (EvolutionStoneData stone in allStones)
         {
-            if (stone != null)
-                candidates.Add(stone);
+            if (stone == null)
+                continue;
+
+            if (excludedStone != null && stone == excludedStone)
+                continue;
+
+            candidates.Add(stone);
         }
 
         return candidates;
