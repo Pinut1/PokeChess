@@ -20,6 +20,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnGoldChanged     += HandleGoldChanged;
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested += MarkBoardDirtyForResync;
+        GameEvents.OnXpChanged       += HandleXpChanged;
     }
 
     private void OnDisable()
@@ -31,6 +32,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnGoldChanged     -= HandleGoldChanged;
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested -= MarkBoardDirtyForResync;
+        GameEvents.OnXpChanged       -= HandleXpChanged;
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
@@ -60,6 +62,17 @@ public class BoardSyncBroadcaster : MonoBehaviour
             if (!string.IsNullOrEmpty(name)) names.Add(name);
         }
         gm.Network.SyncLocalAugments(names.ToArray());
+    }
+
+    /// <summary>
+    /// 레벨/XP 저장 트리거. ShopManager.AddXp()는 레벨업이 발생하면 OnLevelChanged를 (레벨업 횟수만큼)
+    /// 먼저 쏘고 OnXpChanged를 마지막에 한 번만 쏜다 — 그래서 OnLevelChanged는 구독하지 않고
+    /// OnXpChanged만 구독해 최종 확정된 레벨/XP를 한 번만 저장한다(중복 저장 방지).
+    /// </summary>
+    private void HandleXpChanged(int currentXp, int _)
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Shop == null || gm.Network == null) return;
+        gm.Network.SyncLocalProgression(gm.Shop.CurrentLevel, currentXp);
     }
 
     private void LateUpdate()

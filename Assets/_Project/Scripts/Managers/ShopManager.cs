@@ -482,6 +482,26 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 재접속 복원 전용 — 저장된 레벨/XP를 부작용 없이 직접 반영한다. AddXp()/TryLevelUp()과 달리
+    /// 레벨업 판정·골드 차감을 거치지 않는다 — 재접속 때마다 정상 레벨업 이벤트가 반복 실행되면
+    /// 이후 추가될 수 있는 레벨업 보상 로직이 중복 실행될 위험이 있어 분리했다.
+    /// 최대 레벨에서의 XP 처리(0으로 고정)는 TryLevelUp()과 동일한 정책을 따른다.
+    /// </summary>
+    public void RestoreProgressionState(int level, int currentXp)
+    {
+        _currentLevel = Mathf.Clamp(level, 1, _maxLevel);
+
+        int restoredXp = Mathf.Max(0, currentXp);
+        CurrentXp = _currentLevel >= _maxLevel ? 0 : restoredXp;
+
+        Debug.Log($"[LevelXP] 재접속 복원: Lv.{_currentLevel}, XP {CurrentXp}/{RequiredXp}");
+
+        // LevelChanged는 ShopManager 자신의 HandleLevelChanged를 거쳐 UnitCapChanged까지 발행한다.
+        GameEvents.LevelChanged(_currentLevel);
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
+    }
+
+    /// <summary>
     /// 현재 XP가 필요 XP 이상이면 레벨업한다.
     /// 여러 레벨을 한 번에 넘길 수 있으므로 while로 처리한다.
     /// </summary>

@@ -75,6 +75,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC와 달리 유예(비활성) 중에도 서버에 보존돼 재접속·마스터 교체에 안전하다.</summary>
     private const string AUGMENTS_PROP_KEY = "Augments";
 
+    /// <summary>플레이어 레벨을 Player CustomProperties에 저장할 때 쓰는 키(재접속 복원용).</summary>
+    private const string LEVEL_PROP_KEY = "Level";
+
+    /// <summary>플레이어 현재 XP(레벨 내 진행도)를 Player CustomProperties에 저장할 때 쓰는 키(재접속 복원용).</summary>
+    private const string XP_PROP_KEY = "CurrentXp";
+
     /// <summary>내 보드+벤치 유닛 스냅샷(JSON 직렬화된 BoardManager.UnitSaveData[])을 Player
     /// CustomProperties에 저장할 때 쓰는 키(1차 구현 — 저장/복원 기반만).</summary>
     private const string UNITS_PROP_KEY = "Units";
@@ -2492,6 +2498,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    /// <summary>내 레벨/현재 XP를 Player CustomProperties에 기록(재접속 복원용). 두 값은 서로 연관돼
+    /// 있으므로 한 번의 SetCustomProperties 호출로 함께 저장한다.</summary>
+    public void SyncLocalProgression(int level, int currentXp)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        var props = new Hashtable { { LEVEL_PROP_KEY, level }, { XP_PROP_KEY, currentXp } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
     /// <summary>팀 공통 HP 초기화(MasterClient만, 아직 미설정일 때). PlayerHealthManager가 게임 시작 시 호출.</summary>
     public void InitTeamHealth(int hp)
     {
@@ -3172,8 +3187,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 GameEvents.PartnerAugmentsChanged(augmentNames);
         }
 
-        // 2) 내 정보 복원(2단계 신규) — 서버(Player CustomProperties)에 남아있는 내 Gold/Augments를
-        // 기존 시스템에 반영한다. 유닛/보드/아이템/레벨·XP는 저장 위치 자체가 없어 이번 단계 범위 밖.
+        // 2) 내 정보 복원(2단계 신규) — 서버(Player CustomProperties)에 남아있는 내 Gold/Augments/레벨·XP를
+        // 기존 시스템에 반영한다. 유닛 인벤토리/무료 리롤 자원은 저장 위치 자체가 없어 이번 단계 범위 밖.
         RestoreLocalPlayerStateAfterReconnect();
 
         int teamHp = TeamHealth;
@@ -3198,9 +3213,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments Player CustomProperties를 읽어 기존
-    /// 시스템에 반영한다. 새 저장 구조는 만들지 않고 기존 GOLD_PROP_KEY/AUGMENTS_PROP_KEY만 읽는다.
-    /// 유닛/보드/아이템/레벨·XP는 애초에 저장 위치가 없어 이번 단계에서 다루지 않는다.
+    /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments/레벨·XP Player CustomProperties를 읽어
+    /// 기존 시스템에 반영한다. GOLD_PROP_KEY/AUGMENTS_PROP_KEY/UNITS_PROP_KEY에 이어 LEVEL_PROP_KEY/
+    /// XP_PROP_KEY를 추가로 읽는다. 유닛 인벤토리/무료 리롤 자원은 애초에 저장 위치가 없어 다루지 않는다.
     /// </summary>
     private void RestoreLocalPlayerStateAfterReconnect()
     {
@@ -3222,6 +3237,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 gm.Shop.AddGold(delta);
                 Debug.Log($"[Network][Rejoin] 내 골드 복원: {gm.Shop.Gold}G (서버 저장값 {savedGold}G)");
             }
+        }
+
+        // Level/XP: ShopManager.CurrentLevel/CurrentXp는 private set이라 직접 대입할 수 없다. AddXp()는
+        // 정상 XP 획득 경로라 레벨업 판정·이벤트를 동반하므로 재접속 복원에는 쓰지 않고, 부작용 없는
+        // 전용 진입점(RestoreProgressionState)만 사용한다. 두 키가 모두 있을 때만 복원한다 — 구버전
+        // 세션이나 값이 아직 한 번도 저장되지 않은 신규 게임에서는 조용히 건너뛴다(예외 없음).
+        if (gm.Shop != null &&
+            myProps.TryGetValue(LEVEL_PROP_KEY, out object myLevel) &&
+            myProps.TryGetValue(XP_PROP_KEY, out object myXp))
+        {
+            gm.Shop.RestoreProgressionState((int)myLevel, (int)myXp);
+            Debug.Log($"[Network][Rejoin] 내 레벨/XP 복원: Lv.{gm.Shop.CurrentLevel}, {gm.Shop.CurrentXp}/{gm.Shop.RequiredXp} (서버 저장값 Lv.{myLevel}, XP {myXp})");
         }
 
         // Augments: 기존 GameEvents 흐름(OnPartnerAugmentsChanged)은 전적 기록 전용이라 실제 효과를
@@ -3533,6 +3560,7 @@ public class NetworkManager : MonoBehaviour
     public bool BroadcastBattleSnapshot(BattleSnapshot _) => false;
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
+    public void SyncLocalProgression(int _, int __) { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds) => false;
     public bool RequestSharedShopRestore() => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
