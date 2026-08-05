@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -32,10 +33,24 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     /// <summary>커서가 들어오고 나갈 때 발행(true=들어옴). 설명창은 컨트롤러가 띄운다.</summary>
     public event Action<ItemSlotUI, bool> Hovered;
 
+    /// <summary>
+    /// 드래그가 시작될 때 발행(무엇을 드래그 중인지 알려주는 용도).
+    /// 재조합기를 다른 인벤토리 슬롯(진화의 돌) 위로 끌 때처럼, 다른 슬롯이 "지금 드래그 중인 원본이
+    /// 자신인지"를 판별해야 하는 경우에만 쓴다. 드래그 종료 시점은 기존 Dropped가 그대로 겸한다
+    /// (성공/취소 모두 OnEndDrag에서 무조건 발행되므로 별도 DragEnded는 두지 않는다).
+    /// </summary>
+    public event Action<ItemSlotUI> DragBegan;
+
     private RectTransform _dragLayer;
     private Transform _viewHome;      // 아이템 표시부의 원래 부모(이 칸)
     private int _viewHomeSiblingIndex;
     private bool _dragging;
+
+    // 드래그 중인 아이콘(_itemView)이 커서를 그대로 따라다니며 항상 최상단 형제로 올라가므로,
+    // raycastTarget을 켜둔 채면 GraphicRaycaster가 커서 바로 아래의 대상 슬롯 대신 이 아이콘 자신을
+    // 맞혀버려 다른 슬롯의 OnPointerEnter/Exit가 아예 발생하지 않는다. 드래그 중엔 꺼두고 종료 시 복구한다.
+    private readonly List<Graphic> _dragRaycastGraphics = new();
+    private readonly List<bool> _dragRaycastOriginalValues = new();
 
     /// <summary>테두리까지 묶어서 옮기고 토글해야 하므로, 지정돼 있으면 _itemView가 기준이 된다.</summary>
     private GameObject ViewObject => _itemView != null ? _itemView : _icon?.gameObject;
@@ -105,7 +120,19 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (IsEmpty || view == null) return;
 
         _dragging = true;
+        DragBegan?.Invoke(this);
         Hovered?.Invoke(this, false); // 드래그 중에는 설명창이 커서를 가린다
+
+        // 커서를 따라다니는 아이콘 자신이 레이캐스트를 먹지 않도록 끈다 — 안 그러면 이 아이콘이
+        // 항상 커서 바로 아래 최상단이라 다른 슬롯의 OnPointerEnter/Exit가 발생하지 못한다.
+        _dragRaycastGraphics.Clear();
+        _dragRaycastOriginalValues.Clear();
+        view.GetComponentsInChildren(true, _dragRaycastGraphics);
+        foreach (var graphic in _dragRaycastGraphics)
+        {
+            _dragRaycastOriginalValues.Add(graphic.raycastTarget);
+            graphic.raycastTarget = false;
+        }
 
         // 표시부(테두리 포함)를 칸 밖으로 꺼내 최상위에 올린다 — 원래 칸은 빈 상태로 보인다.
         if (_dragLayer != null) view.transform.SetParent(_dragLayer, true);
@@ -127,6 +154,13 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (!_dragging) return;
 
         _dragging = false;
+
+        // 드래그 중 꺼뒀던 raycastTarget을 원래 값으로 되돌린다(원래 칸 안에서 다시 호버 가능해야 한다).
+        for (int i = 0; i < _dragRaycastGraphics.Count; i++)
+            if (_dragRaycastGraphics[i] != null) _dragRaycastGraphics[i].raycastTarget = _dragRaycastOriginalValues[i];
+
+        _dragRaycastGraphics.Clear();
+        _dragRaycastOriginalValues.Clear();
 
         // 성공하든 실패하든 일단 제자리로 돌려놓는다.
         // 장착에 성공하면 GameEvents.OnInventoryChanged로 목록이 다시 그려지면서 이 칸이 비워진다.
