@@ -77,6 +77,7 @@ public class RewardManager : MonoBehaviour
         }
 
         Debug.Log($"[Reward] '{stage.stageId}' 보상 선지급: {table.label} ({table.rewards.Count}항목)");
+
         foreach (var entry in table.rewards)
             GrantEntry(entry, stage);
     }

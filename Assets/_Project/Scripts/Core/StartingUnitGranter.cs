@@ -25,6 +25,12 @@ public class StartingUnitGranter : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
+        // 재접속 라운드 캐치업(NetworkManager.ResyncAfterReconnect의 RPC_OnRoundStart 로컬 재호출) 중이면
+        // 시작 유닛을 다시 지급하지 않는다 — ShopManager.HandleRoundChanged/RewardManager.HandleStageEntered와
+        // 동일 패턴(2026-08 확인: 이 가드가 없어 재접속마다 벤치에 1코스트 유닛이 하나씩 더 생기는 버그가 있었음).
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+            return;
+
         if (round != 1 || _granted) return;
         _granted = true;
         GrantStartingUnits();
