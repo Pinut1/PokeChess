@@ -18,6 +18,7 @@ MonoBehaviour:
   countPerSpecies: 0
   tiers:
   - count: 1
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uD6C4 \uCCAB \uC2A4\uD0AC \uC0AC\uC6A9
-      \uC2DC STUN 1.5\uCD08 (\uACE0\uC720)"
+    effectDescription: "\uAE30\uC808: 1.5\uCD08"
+  description: "\uC804\uD22C \uC2DC\uC791: \uCCAB \uC2A4\uD0AC \uC0AC\uC6A9 \uC2DC
+    \uBAA8\uB4E0 \uC801 \uD3EC\uCF13\uBAAC\uC744 \uAE30\uC808 \uC2DC\uD0B5\uB2C8\uB2E4."
   icon: {fileID: 405411562, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

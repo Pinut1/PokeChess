@@ -13,19 +13,12 @@ public class ItemStatEffect : ICombatEffect
     {
         if (_item == null) return;
 
-        // ItemData의 *Pct/*Percent류는 0~100 정수 퍼센트로 저장됨(예: maxHpPct=18 → +18%) — /100 필요.
-        float bonusHp = _item.hpBonus + self.maxHp * (_item.maxHpPct * 0.01f);
-        self.maxHp += bonusHp;
-        self.currentHp += bonusHp;
-
-        self.attack      += _item.attackBonus;
-        self.spellPower  += self.spellPower * (_item.spAtkPct * 0.01f);
-        self.attackSpeed += self.attackSpeed * (_item.attackSpeedBonus * 0.01f);
-
-        // spDef 폐지(v9) — defenseBonus/spDefBonus 둘 다 단일 defense로 합산. (둘 다 flat 보너스, % 아님)
-        self.defense += _item.defenseBonus + _item.spDefBonus;
-
-        self.critChance     += _item.criPct * 0.01f;
-        self.critMultiplier  += _item.criDmgPct * 0.01f;
+        // 실제 공식은 Data/ItemStatFormula(공용)에 있다 — 정보창(PokemonUnit.ComputeFinalStats)과
+        // 같은 코드를 쓰므로 전투 계산과 정보창 표시가 어긋나지 않는다.
+        ItemStatFormula.Apply(
+            _item,
+            ref self.maxHp, ref self.currentHp,
+            ref self.attack, ref self.spellPower, ref self.attackSpeed, ref self.defense,
+            ref self.critChance, ref self.critMultiplier);
     }
 }

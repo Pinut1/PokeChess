@@ -18,9 +18,11 @@ MonoBehaviour:
   countPerSpecies: 0
   tiers:
   - count: 2
-    effectDescription: "hp \uBE44\uC728 \uC99D\uAC00"
+    effectDescription: +15%
   - count: 3
-    effectDescription: "hp \uBE44\uC728 \uC99D\uAC00"
+    effectDescription: +30%
   - count: 4
-    effectDescription: "hp \uBE44\uC728 \uC99D\uAC00"
+    effectDescription: +50%
+  description: "\uB300\uC9C0 \uD0C0\uC785 \uD3EC\uCF13\uBAAC\uC774 \uB298\uC5B4\uB0A0\uC218\uB85D
+    \uCCB4\uB825\uC774 \uC99D\uAC00\uD569\uB2C8\uB2E4."
   icon: {fileID: 2088867353, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

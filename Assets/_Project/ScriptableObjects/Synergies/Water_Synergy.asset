@@ -18,15 +18,16 @@ MonoBehaviour:
   countPerSpecies: 0
   tiers:
   - count: 3
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
-      \uBCF4\uD638\uB9C9"
+    effectDescription: +20%
   - count: 5
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
-      \uBCF4\uD638\uB9C9"
+    effectDescription: +35%
   - count: 7
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
-      \uBCF4\uD638\uB9C9"
+    effectDescription: +50%
   - count: 9
-    effectDescription: "\uC804\uD22C \uC2DC\uC791 \uC2DC spellPower \uAE30\uBC18
-      \uBCF4\uD638\uB9C9"
+    effectDescription: +70%
+  description: "\uC804\uD22C \uC2DC\uC791: \uC2A4\uD0AC \uD53C\uD574\uB7C9\uC5D0
+    \uB530\uB978 \uBCF4\uD638\uB9C9\uC744 \uC0DD\uC131\uD569\uB2C8\uB2E4.\r\n\r\n\uBCF4\uD638\uB9C9\uC774
+    \uC0DD\uC131\uB418\uBA74 \uC18C\uBAA8\uB420 \uB54C\uAE4C\uC9C0 \uC720\uC9C0 \uB429\uB2C8\uB2E4.\r\n\uBB3C
+    \uD0C0\uC785 \uD3EC\uCF13\uBAAC\uC774 \uB298\uC5B4\uB0A0 \uC218\uB85D \uC720\uC9C0
+    \uC2DC\uAC04\uC774 \uC99D\uAC00\uB429\uB2C8\uB2E4."
   icon: {fileID: -1759050134, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

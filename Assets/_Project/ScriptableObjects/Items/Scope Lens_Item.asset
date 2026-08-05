@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: "\uCD08\uC810\uB80C\uC988"
   itemNameEn: Scope Lens
   description: "\uC804\uD22C \uC2DC\uC791: \uC804\uD22C \uC911 5\uCD08\uB9C8\uB2E4
-    \uC8FC\uBB38\uB825 20% \uC99D\uAC00"
+    \uC2A4\uD0AC \uD53C\uD574\uB7C9 20% \uC99D\uAC00"
   sourceStats:
   - key: AP
     value: 30

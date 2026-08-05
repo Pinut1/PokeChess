@@ -18,11 +18,13 @@ MonoBehaviour:
   countPerSpecies: 0
   tiers:
   - count: 2
-    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
+    effectDescription: +0.1
   - count: 4
-    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
+    effectDescription: +0.2
   - count: 6
-    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
+    effectDescription: +0.3
   - count: 8
-    effectDescription: "atkSpeed \uACE0\uC815\uAC12 \uC99D\uAC00"
+    effectDescription: +0.4
+  description: "\uD480 \uD0C0\uC785 \uD3EC\uCF13\uBAAC\uC774 \uB298\uC5B4\uB0A0\uC218\uB85D
+    \uCD5C\uB300 \uAE30\uBCF8 \uACF5\uACA9 \uC18D\uB3C4\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4."
   icon: {fileID: 1589223451, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}

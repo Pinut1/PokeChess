@@ -584,7 +584,12 @@ public class ShopManager : MonoBehaviour
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
             _sharedRollPending = true;
-            if (!network.RequestSharedShopRoll(_currentLevel, _cost4ForceOpen))
+
+            // 공유 풀에서는 MasterClient가 내 벤치/필드를 조회할 방법이 없으므로,
+            // 요청자인 내가 직접 계산해 배열로 실어 보낸다(MasterClient는 이 배열만 사용).
+            int[] excludedBaseIds = ToIdArray(ComputeThreeStarOwnedBaseIds());
+
+            if (!network.RequestSharedShopRoll(_currentLevel, _cost4ForceOpen, false, excludedBaseIds))
                 _sharedRollPending = false;
             return;
         }
@@ -600,6 +605,9 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
+        // 3성 보유 진화 라인의 기본종은 이번 Roll의 새 후보에서만 제외한다(기존 진열은 건드리지 않음).
+        HashSet<int> excludedBaseIdsLocal = ComputeThreeStarOwnedBaseIds();
+
         ReturnLocalShopSlotsToPool();
         for (int i = 0; i < _slots.Length; i++)
         {
@@ -607,7 +615,8 @@ public class ShopManager : MonoBehaviour
             PokemonData poolData =
                 RollOnePokemonWeighted(
                     _currentLevel,
-                    _cost4ForceOpen
+                    _cost4ForceOpen,
+                    excludedBaseIdsLocal
                 );
 
             _slotPoolPokemonIds[i] =
@@ -646,21 +655,28 @@ public class ShopManager : MonoBehaviour
         {
             if (_sharedRollPending || _sharedPurchasePending) return;
             _sharedRollPending = true;
-            if (!network.RequestSharedShopRoll(_currentLevel, false, true))
+
+            int[] excludedBaseIds = ToIdArray(ComputeThreeStarOwnedBaseIds());
+
+            if (!network.RequestSharedShopRoll(_currentLevel, false, true, excludedBaseIds))
                 _sharedRollPending = false;
             return;
         }
 
         ReturnLocalShopSlotsToPool();
 
-        // 서로 다른 4코스트 원본 유닛을 우선 선택한다.
+        HashSet<int> excludedBaseIdsLocal = ComputeThreeStarOwnedBaseIds();
+
+        // 서로 다른 4코스트 원본 유닛을 우선 선택한다. distinct는 PickWeightedByRemaining을 거치지 않는
+        // _remainingPool 직접 순회라 여기서도 같은 제외 조건을 적용해야 한다.
         var distinct = new List<PokemonData>();
 
         foreach (var pair in _remainingPool)
         {
             if (pair.Key != null &&
                 pair.Key.cost == 4 &&
-                pair.Value > 0)
+                pair.Value > 0 &&
+                !excludedBaseIdsLocal.Contains(pair.Key.id))
             {
                 distinct.Add(pair.Key);
             }
@@ -684,7 +700,8 @@ public class ShopManager : MonoBehaviour
                     RollOnePokemonOfCostWeighted(
                         4,
                         _currentLevel,
-                        false
+                        false,
+                        excludedBaseIdsLocal
                     );
             }
 
@@ -1429,9 +1446,15 @@ public class ShopManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>기존 미구매 예약을 반환하고 새 상점 5칸을 풀에서 예약한다. MasterClient만 호출.</summary>
+    /// <summary>
+    /// 기존 미구매 예약을 반환하고 새 상점 5칸을 풀에서 예약한다. MasterClient만 호출.
+    ///
+    /// excludedBaseIds는 요청자(actorNumber)가 자기 벤치/필드를 직접 스캔해 계산한 뒤 NetworkManager를
+    /// 거쳐 전달한 값을 그대로 쓴다 — 이 메서드는 actorNumber의 보드를 조회하지 않는다(조회할 방법 자체가 없음).
+    /// null/빈 집합이면 기존 동작과 완전히 동일하다.
+    /// </summary>
     public bool TryAuthorityRollSharedShop(
-        int actorNumber, int level, bool forceCostFour, bool onlyCostFour,
+        int actorNumber, int level, bool forceCostFour, bool onlyCostFour, HashSet<int> excludedBaseIds,
         out int revision, out int[] pokemonIds)
     {
         EnsureChampionPoolInitialized();
@@ -1448,8 +1471,8 @@ public class ShopManager : MonoBehaviour
         for (int i = 0; i < slots.Length; i++)
         {
             PokemonData selected = onlyCostFour
-                ? RollOnePokemonOfCostWeighted(4, level, forceCostFour)
-                : RollOnePokemonWeighted(level, forceCostFour);
+                ? RollOnePokemonOfCostWeighted(4, level, forceCostFour, excludedBaseIds)
+                : RollOnePokemonWeighted(level, forceCostFour, excludedBaseIds);
             if (selected == null) continue;
 
             slots[i] = selected.id;
@@ -2367,38 +2390,101 @@ public class ShopManager : MonoBehaviour
         }
     }
 
-    private PokemonData RollOnePokemonWeighted(int level, bool forceCostFour)
+    private PokemonData RollOnePokemonWeighted(int level, bool forceCostFour, HashSet<int> excludedBaseIds = null)
     {
         for (int attempt = 0; attempt < 10; attempt++)
         {
-            PokemonData selected = PickWeightedByRemaining(RollCostByLevel(level, forceCostFour));
+            PokemonData selected = PickWeightedByRemaining(RollCostByLevel(level, forceCostFour), excludedBaseIds);
             if (selected != null) return selected;
         }
-        return PickWeightedByRemaining(0);
+        // 전체 코스트 폴백에도 반드시 같은 제외 목록을 넘긴다 — 안 그러면 이 경로에서만 새어나갈 수 있다.
+        return PickWeightedByRemaining(0, excludedBaseIds);
     }
 
-    private PokemonData RollOnePokemonOfCostWeighted(int cost, int fallbackLevel, bool forceCostFour)
+    private PokemonData RollOnePokemonOfCostWeighted(int cost, int fallbackLevel, bool forceCostFour, HashSet<int> excludedBaseIds = null)
     {
-        return PickWeightedByRemaining(cost) ?? RollOnePokemonWeighted(fallbackLevel, forceCostFour);
+        return PickWeightedByRemaining(cost, excludedBaseIds) ?? RollOnePokemonWeighted(fallbackLevel, forceCostFour, excludedBaseIds);
     }
 
-    /// <summary>같은 코스트에서는 종 균등이 아니라 남은 카피 수 비례로 뽑는다.</summary>
-    private PokemonData PickWeightedByRemaining(int cost)
+    /// <summary>
+    /// 같은 코스트에서는 종 균등이 아니라 남은 카피 수 비례로 뽑는다.
+    ///
+    /// excludedBaseIds(3성 보유 진화 라인의 기본종 id)에 해당하는 후보는 이번 추첨에서만 제외한다.
+    /// null이거나 비어 있으면 기존 동작과 완전히 동일하다 — _remainingPool 수량 자체는 건드리지 않는다.
+    /// </summary>
+    private PokemonData PickWeightedByRemaining(int cost, HashSet<int> excludedBaseIds = null)
     {
+        bool hasExclusions = excludedBaseIds != null && excludedBaseIds.Count > 0;
+
         int totalCopies = 0;
         foreach (var pair in _remainingPool)
-            if (pair.Key != null && pair.Value > 0 && (cost <= 0 || pair.Key.cost == cost))
-                totalCopies += pair.Value;
+        {
+            if (pair.Key == null || pair.Value <= 0 || (cost > 0 && pair.Key.cost != cost)) continue;
+            if (hasExclusions && excludedBaseIds.Contains(pair.Key.id))
+            {
+                // TEMP DEBUG — 3성 상점 제외 확인용. 정상 동작 확인 후 제거.
+                Debug.Log($"[Shop][TEMP DEBUG] 후보에서 제외됨 — id={pair.Key.id} ({pair.Key.pokemonName})");
+                continue;
+            }
+            totalCopies += pair.Value;
+        }
         if (totalCopies <= 0) return null;
 
         int roll = Random.Range(0, totalCopies);
         foreach (var pair in _remainingPool)
         {
             if (pair.Key == null || pair.Value <= 0 || (cost > 0 && pair.Key.cost != cost)) continue;
+            if (hasExclusions && excludedBaseIds.Contains(pair.Key.id)) continue;
             if (roll < pair.Value) return pair.Key;
             roll -= pair.Value;
         }
         return null;
+    }
+
+    /// <summary>
+    /// 현재 내(로컬) 벤치+필드에 실제로 존재하는 3성 유닛의 기본종(공용 풀 원본) id 집합을
+    /// 그 자리에서 계산해 반환한다. 필드에 보관하지 않고 호출될 때마다 새로 계산한다 —
+    /// "3성 보유 유닛 상점 노출 제외" 기능의 유일한 판정 기준(Roll 시점 조회).
+    /// </summary>
+    private HashSet<int> ComputeThreeStarOwnedBaseIds()
+    {
+        var result = new HashSet<int>();
+
+        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+            return result;
+
+        CollectThreeStarBaseIds(gm.Board.GetUnitsOnBoard(), result);
+        CollectThreeStarBaseIds(gm.Board.GetUnitsInBench(), result);
+
+        // TEMP DEBUG — 3성 상점 제외 확인용. 정상 동작 확인 후 제거.
+        if (result.Count > 0)
+            Debug.Log($"[Shop][TEMP DEBUG] 3성 상점 제외 대상 기본종 id: {string.Join(",", result)}");
+
+        return result;
+    }
+
+    private void CollectThreeStarBaseIds(List<PokemonUnit> units, HashSet<int> result)
+    {
+        if (units == null) return;
+
+        foreach (PokemonUnit unit in units)
+        {
+            if (unit == null || unit.data == null) continue;
+            if (unit.starLevel != 3) continue;
+
+            PokemonData baseData = ResolveBasePoolData(unit);
+            if (baseData != null) result.Add(baseData.id);
+        }
+    }
+
+    /// <summary>int[]로 직렬화(네트워크 전송용). null/빈 집합이면 System.Array.Empty로 null 전달을 피한다.</summary>
+    private static int[] ToIdArray(HashSet<int> ids)
+    {
+        if (ids == null || ids.Count == 0) return System.Array.Empty<int>();
+
+        var array = new int[ids.Count];
+        ids.CopyTo(array);
+        return array;
     }
 
     private int RollCostByLevel(int level, bool forceCostFour)

@@ -824,13 +824,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     // 공유 챔피언 풀 / 상점 예약 (MasterClient 권위)
     // ─────────────────────────────────────────
 
-    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false)
+    /// <summary>
+    /// excludedBaseIds: 요청자(나) 자신의 벤치+필드를 스캔해 ShopManager가 계산한 3성 보유 진화 라인의
+    /// 기본종 id 배열("3성 보유 유닛 상점 노출 제외" 기능). 이 메서드는 그 배열을 그대로 실어 보낼 뿐,
+    /// NetworkManager는 BoardManager를 조회하거나 ShopManager의 계산 로직을 대신 수행하지 않는다.
+    /// null이면 System.Array.Empty로 정규화해 RPC에 null이 실리지 않게 한다.
+    /// </summary>
+    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds)
     {
         if (!UsesSharedShopPool) return false;
+
+        excludedBaseIds ??= System.Array.Empty<int>();
+
         if (IsMasterClient)
-            ProcessSharedShopRoll(PhotonNetwork.LocalPlayer.ActorNumber, level, forceCostFour, onlyCostFour);
+            ProcessSharedShopRoll(PhotonNetwork.LocalPlayer.ActorNumber, level, forceCostFour, onlyCostFour, excludedBaseIds);
         else
-            photonView.RPC(nameof(RPC_RequestSharedShopRoll), RpcTarget.MasterClient, level, forceCostFour, onlyCostFour);
+            photonView.RPC(nameof(RPC_RequestSharedShopRoll), RpcTarget.MasterClient, level, forceCostFour, onlyCostFour, excludedBaseIds);
         return true;
     }
 
@@ -928,17 +937,24 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     [PunRPC]
-    private void RPC_RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, PhotonMessageInfo info)
+    private void RPC_RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds, PhotonMessageInfo info)
     {
         if (!IsMasterClient || info.Sender == null) return;
-        ProcessSharedShopRoll(info.Sender.ActorNumber, level, forceCostFour, onlyCostFour);
+        ProcessSharedShopRoll(info.Sender.ActorNumber, level, forceCostFour, onlyCostFour, excludedBaseIds);
     }
 
-    private void ProcessSharedShopRoll(int actorNumber, int level, bool forceCostFour, bool onlyCostFour)
+    private void ProcessSharedShopRoll(int actorNumber, int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds)
     {
+        // TEMP DEBUG — 3성 상점 제외 확인용. 정상 동작 확인 후 제거.
+        Debug.Log($"[Shop][TEMP DEBUG] ProcessSharedShopRoll — actor={actorNumber}, excluded=[{string.Join(",", excludedBaseIds ?? System.Array.Empty<int>())}]");
+
         var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+
+        // RPC/로컬 호출 양쪽에서 받은 배열을 이번 처리에서만 쓸 지역 HashSet으로 변환한다 — 필드로 저장하지 않는다.
+        var excludedSet = new HashSet<int>(excludedBaseIds ?? System.Array.Empty<int>());
+
         if (shop == null || !shop.TryAuthorityRollSharedShop(
-                actorNumber, level, forceCostFour, onlyCostFour, out int revision, out int[] slots))
+                actorNumber, level, forceCostFour, onlyCostFour, excludedSet, out int revision, out int[] slots))
         {
             SendSharedShopSnapshot(actorNumber, 0, System.Array.Empty<int>());
             return;
@@ -3425,7 +3441,7 @@ public class NetworkManager : MonoBehaviour
     public void BroadcastBoardSnapshot(int[] _) { }
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
-    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour = false) => false;
+    public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds) => false;
     public bool RequestSharedShopRestore() => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;
     public bool RequestSharedShopMergePurchase(int revision, int slotA, int slotB) => false;

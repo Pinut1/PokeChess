@@ -1,11 +1,18 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 /// <summary>
-/// 게임 중 열 수 있는 옵션창(IMGUI).
-/// 마스터/배경음/효과음 볼륨, 화면 모드/해상도(적용/취소), 항복 안내, 타이틀 이동, 게임 종료,
-/// 파트너 네트워크 이탈 대기 모달 기능을 제공한다.
+/// 게임 중 열 수 있는 옵션창.
+/// 마스터/배경음/효과음 볼륨, 화면 모드/해상도(적용/취소), 항복 안내, 타이틀 이동, 게임 종료 기능을 제공한다.
+///
+/// 옵션 본문/확인 모달(ConfirmModal)은 uGUI 오브젝트 참조로 제어한다(IMGUI로 그리지 않음).
+/// 옵션 패널은 _optionsPanelRoot.SetActive(true/false)로 여닫는다.
+/// 파트너 네트워크 이탈 대기·항복 요청/거절 통지는 옵션창과 무관하게 언제든 떠야 하는 별도 기능이라
+/// 이번 전환 범위 밖이며 기존 IMGUI(OnGUI)를 그대로 유지한다.
 /// </summary>
 public class OptionsPanelUI : MonoBehaviour
 {
@@ -21,6 +28,43 @@ public class OptionsPanelUI : MonoBehaviour
              "비어 있거나 Build Settings에 등록되지 않은 경우 이동하지 않습니다.")]
     [SerializeField] private string _titleSceneName = "";
 
+    [Header("옵션 패널 (uGUI)")]
+    [Tooltip("옵션 패널 루트. SetActive(true/false)로 여닫는다.")]
+    [SerializeField] private GameObject _optionsPanelRoot;
+    [Tooltip("설정 버튼. 클릭 시 uGUI 옵션 패널을 연다.")]
+    [SerializeField] private Button _openOptionsButton;
+
+    [Header("옵션 패널 — 볼륨")]
+    [SerializeField] private Slider _masterVolumeSlider;
+    [SerializeField] private Slider _bgmVolumeSlider;
+    [SerializeField] private Slider _sfxVolumeSlider;
+    [SerializeField] private TMP_Text _masterVolumeValueText;
+    [SerializeField] private TMP_Text _bgmVolumeValueText;
+    [SerializeField] private TMP_Text _sfxVolumeValueText;
+
+    [Header("옵션 패널 — 화면")]
+    [SerializeField] private Toggle _windowedToggle;
+    [SerializeField] private Toggle _fullscreenToggle;
+    [SerializeField] private TMP_Dropdown _resolutionDropdown;
+
+    [Header("옵션 패널 — 버튼")]
+    [SerializeField] private Button _applyButton;
+    [SerializeField] private Button _cancelOptionsButton;
+    [SerializeField] private Button _closeButton;
+    [SerializeField] private Button _returnTitleButton;
+    [SerializeField] private Button _quitButton;
+
+    [Header("확인 모달 (uGUI)")]
+    [Tooltip("타이틀로/게임 종료 확인 팝업의 루트(ConfirmModal). 씬에는 비활성화 상태로 배치해 둘 것 — " +
+             "Awake에서도 다시 꺼서 보정한다.")]
+    [SerializeField] private GameObject _confirmModal;
+    [Tooltip("팝업 안내 문구(MessageText).")]
+    [SerializeField] private TMP_Text _confirmMessageText;
+    [Tooltip("확인 버튼 — 클릭 시 열려 있던 확인 종류(타이틀로/게임 종료)에 해당하는 기존 로직만 실행.")]
+    [SerializeField] private Button _confirmButton;
+    [Tooltip("취소 버튼 — 아무 로직도 실행하지 않고 모달만 닫는다.")]
+    [SerializeField] private Button _cancelButton;
+
     private const string PREF_MASTER_VOLUME = "MasterVolume";
     private const string PREF_BGM_VOLUME = "BgmVolume";
     private const string PREF_SFX_VOLUME = "SfxVolume";
@@ -30,18 +74,16 @@ public class OptionsPanelUI : MonoBehaviour
 
     private const float DEFAULT_SUB_VOLUME = 1f;
 
-    private const float MIN_WIDTH = 380f;
-    private const float MIN_HEIGHT = 300f;
-    private const float RESIZE_HANDLE_SIZE = 16f;
-
     private bool _optionsOpen;
-    private bool _optionsRectInitialized;
-
-    private Rect _optionsRect = new Rect(0f, 0f, 420f, 360f);
 
     private float _masterVolume;
     private float _bgmVolume;
     private float _sfxVolume;
+
+    // 패널을 열 때의 스냅샷 — 취소 시 이 값으로 되돌린다("취소 시 저장하지 않음" 요구사항).
+    private float _masterVolumeBeforeOpen;
+    private float _bgmVolumeBeforeOpen;
+    private float _sfxVolumeBeforeOpen;
 
     private Resolution[] _resolutions;
     private string[] _resolutionLabels;
@@ -53,11 +95,6 @@ public class OptionsPanelUI : MonoBehaviour
     // 옵션창에서 편집 중인 임시값 ([적용] 전까지는 Screen/PlayerPrefs에 반영되지 않음)
     private bool _pendingFullScreen;
     private int _pendingResolutionIndex;
-
-    private bool _resolutionDropdownOpen;
-    private Vector2 _resolutionScrollPosition;
-    private Rect _resolutionButtonRect;
-    private Rect _resolutionListRect;
 
     private ConfirmMode _confirmMode = ConfirmMode.None;
     private bool _surrenderNoticeShown;
@@ -93,6 +130,46 @@ public class OptionsPanelUI : MonoBehaviour
         AudioListener.volume = _masterVolume;
 
         LoadAndApplyDisplaySettings();
+
+        if (_openOptionsButton != null) _openOptionsButton.onClick.AddListener(OpenOptionsPanel);
+        if (_applyButton != null) _applyButton.onClick.AddListener(HandleApplyButtonClicked);
+        if (_cancelOptionsButton != null) _cancelOptionsButton.onClick.AddListener(HandleCancelOptionsButtonClicked);
+        if (_closeButton != null) _closeButton.onClick.AddListener(HandleCloseButtonClicked);
+        if (_returnTitleButton != null) _returnTitleButton.onClick.AddListener(HandleReturnTitleButtonClicked);
+        if (_quitButton != null) _quitButton.onClick.AddListener(HandleQuitButtonClicked);
+
+        ConfigureSlider(_masterVolumeSlider);
+        ConfigureSlider(_bgmVolumeSlider);
+        ConfigureSlider(_sfxVolumeSlider);
+
+        if (_masterVolumeSlider != null) _masterVolumeSlider.onValueChanged.AddListener(HandleMasterVolumeChanged);
+        if (_bgmVolumeSlider != null) _bgmVolumeSlider.onValueChanged.AddListener(HandleBgmVolumeChanged);
+        if (_sfxVolumeSlider != null) _sfxVolumeSlider.onValueChanged.AddListener(HandleSfxVolumeChanged);
+
+        if (_windowedToggle != null) _windowedToggle.onValueChanged.AddListener(HandleWindowedToggleChanged);
+        if (_fullscreenToggle != null) _fullscreenToggle.onValueChanged.AddListener(HandleFullscreenToggleChanged);
+
+        if (_resolutionDropdown != null) _resolutionDropdown.onValueChanged.AddListener(HandleResolutionDropdownChanged);
+
+        if (_confirmButton != null) _confirmButton.onClick.AddListener(HandleConfirmButtonClicked);
+        if (_cancelButton != null) _cancelButton.onClick.AddListener(HandleCancelButtonClicked);
+
+        // Dropdown Caption이 디자인 시점 기본 문구("New Text")로 남지 않도록, 패널을 열기 전에도
+        // 한 번 현재 해상도 기준으로 채워둔다.
+        RefreshScreenUI();
+
+        // 씬에 켜둔 채 저장했더라도 시작은 닫힌 상태로 맞춘다(다른 컨트롤러들과 동일 관례).
+        if (_confirmModal != null) _confirmModal.SetActive(false);
+        SetOptionsPanelVisible(false);
+    }
+
+    private static void ConfigureSlider(Slider slider)
+    {
+        if (slider == null) return;
+
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.wholeNumbers = false;
     }
 
     private void LoadAndApplyDisplaySettings()
@@ -166,6 +243,10 @@ public class OptionsPanelUI : MonoBehaviour
         RestoreBlockedEventSystem();
     }
 
+    /// <summary>
+    /// 옵션 본문/ConfirmModal은 더 이상 여기서 그리지 않는다(uGUI 전환 완료).
+    /// 파트너 이탈 대기·항복 요청/거절 통지만 이번 전환 범위 밖이라 IMGUI로 남아 있다.
+    /// </summary>
     private void OnGUI()
     {
         // 파트너가 재접속을 포기했다는 통지가 최우선이다 — 대기/확인 모달 상태를 정리하고 통지만 그린다.
@@ -180,7 +261,7 @@ public class OptionsPanelUI : MonoBehaviour
             return;
         }
 
-        // 파트너 이탈 대기는 설정 버튼/옵션창/항복 모달 전부보다 우선한다 — 그 외에는 아무것도 그리지 않는다.
+        // 파트너 이탈 대기는 옵션창/항복 모달 전부보다 우선한다 — 그 외에는 아무것도 그리지 않는다.
         // ESC도 여기서 소비하지 않고 그냥 무시되므로(HandleEscapeKey 자체를 호출하지 않음) 닫히지 않는다.
         if (_partnerDisconnectModalOpen)
         {
@@ -190,45 +271,14 @@ public class OptionsPanelUI : MonoBehaviour
         }
 
         HandleEscapeKey();
-        DrawOpenButton();
         DrawSurrenderRequestModal();
         DrawSurrenderRequestConfirmModal();
         DrawSurrenderRejectedNoticeModal();
 
-        if (!_optionsOpen)
-            return;
-
-        if (!_optionsRectInitialized)
-        {
-            _optionsRect.x = (Screen.width - _optionsRect.width) * 0.5f;
-            _optionsRect.y = (Screen.height - _optionsRect.height) * 0.5f;
-            _optionsRectInitialized = true;
-        }
-
-        ClampRectSize(ref _optionsRect, MIN_WIDTH, MIN_HEIGHT);
-
-        _optionsRect = GUILayout.Window(
-            GetInstanceID(),
-            _optionsRect,
-            DrawOptionsWindow,
-            "옵션");
-
-        ClampRectToScreen(ref _optionsRect);
-    }
-
-    private void DrawOpenButton()
-    {
-        const float width = 70f;
-        const float height = 28f;
-
-        Rect buttonRect = new Rect(
-            8f,
-            Screen.height - height - 8f,
-            width,
-            height);
-
-        if (GUI.Button(buttonRect, "설정"))
-            ToggleOptions(!_optionsOpen);
+        // 항복 요청 버튼: 현재 uGUI Hierarchy에 대응 오브젝트가 없어 이번 전환 범위 밖으로 남긴다.
+        // 옵션 패널이 열려 있는 동안에만 우측 상단에 작은 독립 IMGUI로 띄운다(옵션 본문과 겹치지 않음).
+        if (_optionsOpen)
+            DrawSurrenderFloatingSection();
     }
 
     /// <summary>
@@ -352,6 +402,48 @@ public class OptionsPanelUI : MonoBehaviour
 
         if (GUILayout.Button("확인"))
             _surrenderNoticeShown = false;
+
+        GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// 항복 요청 버튼(및 교차취소 안내). 옵션 패널이 uGUI로 전환되며 본문 내부(IMGUI 창) 자리를
+    /// 잃어 독립된 작은 영역으로 옮겼다 — 대응하는 uGUI 오브젝트가 Hierarchy에 없어 이번 범위 밖이다.
+    /// </summary>
+    private void DrawSurrenderFloatingSection()
+    {
+        if (!GameManager.TryGet(out var gameManager) || gameManager.Network == null)
+            return;
+
+        if (gameManager.Network.SurrenderRequestCrossCancelled)
+        {
+            gameManager.Network.AcknowledgeSurrenderCrossCancelled();
+            _surrenderCrossCancelledNoticeShown = true;
+        }
+
+        // 파트너가 없는 솔로/1인 방에서는 항복이 성립할 수 없으므로 버튼을 숨긴다.
+        if (!gameManager.Network.IsInRoom || gameManager.Network.PlayerCount < 2)
+            return;
+
+        const float width = 160f;
+        const float height = 80f;
+
+        Rect areaRect = new Rect(Screen.width - width - 16f, 16f, width, height);
+
+        GUILayout.BeginArea(areaRect, GUI.skin.box);
+
+        if (GUILayout.Button("항복"))
+        {
+            _surrenderNoticeShown = false;
+            _surrenderCrossCancelledNoticeShown = false;
+            _surrenderRequestModalOpen = true;
+            ToggleOptions(false);
+        }
+
+        if (_surrenderCrossCancelledNoticeShown)
+        {
+            GUILayout.Label("항복 요청이 동시에 발생해 취소되었습니다.");
+        }
 
         GUILayout.EndArea();
     }
@@ -568,7 +660,8 @@ public class OptionsPanelUI : MonoBehaviour
         }
         else if (_confirmMode != ConfirmMode.None)
         {
-            _confirmMode = ConfirmMode.None;
+            // ConfirmModal이 열려 있으면 모달만 닫는다 — OptionsPanel 본문은 그대로 유지.
+            CloseConfirmModal();
         }
         else
         {
@@ -578,347 +671,188 @@ public class OptionsPanelUI : MonoBehaviour
         currentEvent.Use();
     }
 
+    /// <summary>기존 호출부(ESC/항복 모달 취소 등) 호환용 얇은 래퍼 — 실제 동작은 Open/CloseOptionsPanel.</summary>
     private void ToggleOptions(bool open)
     {
-        bool wasOpen = _optionsOpen;
-        _optionsOpen = open;
-
-        if (_optionsOpen && !wasOpen)
-        {
-            // 창을 열 때: 현재 실제 적용 중인 값으로 편집 상태 초기화
-            _pendingFullScreen = _appliedFullScreen;
-            _pendingResolutionIndex = _appliedResolutionIndex;
-            _resolutionDropdownOpen = false;
-        }
-
-        if (!_optionsOpen)
-        {
-            // 닫기/ESC/취소 공통: 미적용 임시값 폐기 후 실제 적용값으로 복구
-            _pendingFullScreen = _appliedFullScreen;
-            _pendingResolutionIndex = _appliedResolutionIndex;
-            _resolutionDropdownOpen = false;
-
-            _confirmMode = ConfirmMode.None;
-            _surrenderCrossCancelledNoticeShown = false;
-            PlayerPrefs.Save();
-        }
+        if (open) OpenOptionsPanel();
+        else CloseOptionsPanel();
     }
 
-    private static void ClampRectSize(
-        ref Rect rect,
-        float minimumWidth,
-        float minimumHeight)
+    // ─────────────────────────────────────────
+    // 옵션 패널 열기/닫기 (uGUI)
+    // ─────────────────────────────────────────
+
+    /// <summary>설정 버튼/ESC로 옵션 패널을 연다. 현재 저장된 값을 스냅샷으로 남기고 uGUI에 반영한다.</summary>
+    private void OpenOptionsPanel()
     {
-        float maximumWidth = Mathf.Max(
-            minimumWidth,
-            Screen.width - 10f);
+        if (_optionsOpen) return;
+        _optionsOpen = true;
 
-        float maximumHeight = Mathf.Max(
-            minimumHeight,
-            Screen.height - 10f);
+        _pendingFullScreen = _appliedFullScreen;
+        _pendingResolutionIndex = _appliedResolutionIndex;
 
-        rect.width = Mathf.Clamp(
-            rect.width,
-            minimumWidth,
-            maximumWidth);
+        _masterVolumeBeforeOpen = _masterVolume;
+        _bgmVolumeBeforeOpen = _bgmVolume;
+        _sfxVolumeBeforeOpen = _sfxVolume;
 
-        rect.height = Mathf.Clamp(
-            rect.height,
-            minimumHeight,
-            maximumHeight);
+        RefreshVolumeUI();
+        RefreshScreenUI();
+
+        SetOptionsPanelVisible(true);
     }
 
-    private static void ClampRectToScreen(ref Rect rect)
+    /// <summary>
+    /// Close 버튼 / Cancel 버튼 / ESC가 모두 이 메서드 하나로 모인다.
+    /// Apply를 하지 않았으면 화면 설정 임시값과 볼륨을 패널을 열기 전 값으로 되돌린 뒤 패널을 닫는다.
+    /// </summary>
+    private void CloseOptionsPanel()
     {
-        const float visibleMargin = 60f;
+        if (!_optionsOpen) return;
+        _optionsOpen = false;
 
-        rect.x = Mathf.Clamp(
-            rect.x,
-            -(rect.width - visibleMargin),
-            Screen.width - visibleMargin);
+        _pendingFullScreen = _appliedFullScreen;
+        _pendingResolutionIndex = _appliedResolutionIndex;
 
-        rect.y = Mathf.Clamp(
-            rect.y,
-            0f,
-            Screen.height - visibleMargin);
+        _masterVolume = _masterVolumeBeforeOpen;
+        _bgmVolume = _bgmVolumeBeforeOpen;
+        _sfxVolume = _sfxVolumeBeforeOpen;
+        ApplyMasterVolume(_masterVolume);
+        ApplyBgmVolume(_bgmVolume);
+        ApplySfxVolume(_sfxVolume);
+
+        RefreshVolumeUI();
+        RefreshScreenUI();
+
+        CloseConfirmModal();
+        _surrenderCrossCancelledNoticeShown = false;
+        PlayerPrefs.Save();
+
+        SetOptionsPanelVisible(false);
     }
 
-    private static void DrawResizeHandle(
-        ref Rect rect,
-        float minimumWidth,
-        float minimumHeight)
+    /// <summary>옵션 패널 루트를 SetActive(true/false)로 여닫는다.</summary>
+    private void SetOptionsPanelVisible(bool visible)
     {
-        Rect handleRect = new Rect(
-            rect.width - RESIZE_HANDLE_SIZE,
-            rect.height - RESIZE_HANDLE_SIZE,
-            RESIZE_HANDLE_SIZE,
-            RESIZE_HANDLE_SIZE);
-
-        GUI.Box(handleRect, "◢");
-
-        Event currentEvent = Event.current;
-        int controlId = GUIUtility.GetControlID(FocusType.Passive);
-
-        switch (currentEvent.GetTypeForControl(controlId))
-        {
-            case EventType.MouseDown:
-                if (handleRect.Contains(currentEvent.mousePosition))
-                {
-                    GUIUtility.hotControl = controlId;
-                    currentEvent.Use();
-                }
-                break;
-
-            case EventType.MouseDrag:
-                if (GUIUtility.hotControl == controlId)
-                {
-                    float maximumWidth = Mathf.Max(
-                        minimumWidth,
-                        Screen.width - 10f);
-
-                    float maximumHeight = Mathf.Max(
-                        minimumHeight,
-                        Screen.height - 10f);
-
-                    rect.width = Mathf.Clamp(
-                        rect.width + currentEvent.delta.x,
-                        minimumWidth,
-                        maximumWidth);
-
-                    rect.height = Mathf.Clamp(
-                        rect.height + currentEvent.delta.y,
-                        minimumHeight,
-                        maximumHeight);
-
-                    currentEvent.Use();
-                }
-                break;
-
-            case EventType.MouseUp:
-                if (GUIUtility.hotControl == controlId)
-                {
-                    GUIUtility.hotControl = 0;
-                    currentEvent.Use();
-                }
-                break;
-        }
+        if (_optionsPanelRoot != null)
+            _optionsPanelRoot.SetActive(visible);
     }
 
-    private void DrawOptionsWindow(int windowId)
+    // ─────────────────────────────────────────
+    // 볼륨 (uGUI)
+    // ─────────────────────────────────────────
+
+    /// <summary>SoundManager가 씬에 없을 때도(아직 배치 전 등) 기존 마스터 볼륨 동작이 그대로 유지되도록 폴백한다.</summary>
+    private static void ApplyMasterVolume(float value)
     {
-        GUILayout.BeginVertical();
-
-        DrawHeader();
-
-        GUILayout.Space(6f);
-        DrawVolumeSection();
-
-        GUILayout.Space(12f);
-        DrawScreenSection();
-
-        GUILayout.Space(12f);
-
-        if (_confirmMode == ConfirmMode.None)
-        {
-            DrawNormalButtons();
-        }
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetMasterVolume(value);
         else
+            AudioListener.volume = value;
+    }
+
+    private static void ApplyBgmVolume(float value)
+    {
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetBgmVolume(value);
+    }
+
+    private static void ApplySfxVolume(float value)
+    {
+        if (SoundManager.TryGet(out var soundManager))
+            soundManager.SetSfxVolume(value);
+    }
+
+    private void HandleMasterVolumeChanged(float value)
+    {
+        _masterVolume = value;
+        ApplyMasterVolume(value);
+        UpdateVolumeValueText(_masterVolumeValueText, value);
+    }
+
+    private void HandleBgmVolumeChanged(float value)
+    {
+        _bgmVolume = value;
+        ApplyBgmVolume(value);
+        UpdateVolumeValueText(_bgmVolumeValueText, value);
+    }
+
+    private void HandleSfxVolumeChanged(float value)
+    {
+        _sfxVolume = value;
+        ApplySfxVolume(value);
+        UpdateVolumeValueText(_sfxVolumeValueText, value);
+    }
+
+    private void RefreshVolumeUI()
+    {
+        SetSliderValueSilently(_masterVolumeSlider, _masterVolume);
+        SetSliderValueSilently(_bgmVolumeSlider, _bgmVolume);
+        SetSliderValueSilently(_sfxVolumeSlider, _sfxVolume);
+
+        UpdateVolumeValueText(_masterVolumeValueText, _masterVolume);
+        UpdateVolumeValueText(_bgmVolumeValueText, _bgmVolume);
+        UpdateVolumeValueText(_sfxVolumeValueText, _sfxVolume);
+    }
+
+    private static void SetSliderValueSilently(Slider slider, float value)
+    {
+        if (slider == null) return;
+        slider.SetValueWithoutNotify(value);
+    }
+
+    private static void UpdateVolumeValueText(TMP_Text text, float value)
+    {
+        if (text == null) return;
+        text.text = $"{Mathf.RoundToInt(value * 100f)}%";
+    }
+
+    // ─────────────────────────────────────────
+    // 화면 모드 / 해상도 (uGUI)
+    // ─────────────────────────────────────────
+
+    private void HandleWindowedToggleChanged(bool isOn)
+    {
+        // ToggleGroup이 "최소 1개 선택" 상호 배타를 보장하므로 켜지는 이벤트만 반영한다.
+        if (!isOn) return;
+        _pendingFullScreen = false;
+    }
+
+    private void HandleFullscreenToggleChanged(bool isOn)
+    {
+        if (!isOn) return;
+        _pendingFullScreen = true;
+    }
+
+    private void HandleResolutionDropdownChanged(int index)
+    {
+        _pendingResolutionIndex = index;
+    }
+
+    private void RefreshScreenUI()
+    {
+        if (_windowedToggle != null) _windowedToggle.SetIsOnWithoutNotify(!_pendingFullScreen);
+        if (_fullscreenToggle != null) _fullscreenToggle.SetIsOnWithoutNotify(_pendingFullScreen);
+
+        RefreshResolutionDropdownOptions();
+
+        if (_resolutionDropdown != null)
         {
-            DrawConfirmSection();
+            _resolutionDropdown.SetValueWithoutNotify(_pendingResolutionIndex);
+            _resolutionDropdown.RefreshShownValue();
         }
-
-        GUILayout.EndVertical();
-
-        DrawResizeHandle(
-            ref _optionsRect,
-            MIN_WIDTH,
-            MIN_HEIGHT);
-
-        GUI.DragWindow(new Rect(0f, 0f, 10000f, 20f));
     }
 
-    private void DrawHeader()
+    /// <summary>
+    /// 실제 Screen.resolutions 기준으로 Dropdown 옵션을 다시 채운다(ClearOptions → AddOptions).
+    /// 중복 해상도/주사율 병합 정책은 BuildResolutionList(기존 로직)를 그대로 재사용한다.
+    /// </summary>
+    private void RefreshResolutionDropdownOptions()
     {
-        GUILayout.BeginHorizontal();
+        if (_resolutionDropdown == null) return;
+        if (_resolutionLabels == null) BuildResolutionList();
 
-        GUILayout.Label("옵션", GUILayout.Width(200f));
-        GUILayout.FlexibleSpace();
-
-        if (GUILayout.Button("닫기", GUILayout.Width(60f)))
-            ToggleOptions(false);
-
-        GUILayout.EndHorizontal();
-    }
-
-    private void DrawVolumeSection()
-    {
-        GUILayout.Label("── 볼륨 ──");
-
-        DrawVolumeRow(
-            "마스터 볼륨",
-            ref _masterVolume,
-            PREF_MASTER_VOLUME,
-            value => AudioListener.volume = value);
-
-        DrawVolumeRow(
-            "배경음",
-            ref _bgmVolume,
-            PREF_BGM_VOLUME,
-            null);
-
-        DrawVolumeRow(
-            "효과음",
-            ref _sfxVolume,
-            PREF_SFX_VOLUME,
-            null);
-
-        GUILayout.Label(
-            "배경음·효과음은 현재 설정값만 저장됩니다.");
-    }
-
-    private static void DrawVolumeRow(
-        string label,
-        ref float value,
-        string preferenceKey,
-        System.Action<float> applyImmediately)
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label(label, GUILayout.Width(100f));
-
-        float newValue = GUILayout.HorizontalSlider(
-            value,
-            0f,
-            1f,
-            GUILayout.Width(160f));
-
-        GUILayout.Label(
-            $"{Mathf.RoundToInt(newValue * 100f)}%",
-            GUILayout.Width(50f));
-
-        GUILayout.EndHorizontal();
-
-        if (Mathf.Approximately(newValue, value))
-            return;
-
-        value = newValue;
-
-        PlayerPrefs.SetFloat(preferenceKey, value);
-        applyImmediately?.Invoke(value);
-    }
-
-    private void DrawScreenSection()
-    {
-        GUILayout.Label("── 화면 ──");
-
-        DrawFullScreenModeRow();
-        DrawResolutionDropdown();
-
-        GUILayout.Space(6f);
-        DrawScreenApplyCancelRow();
-    }
-
-    private void DrawFullScreenModeRow()
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label("화면 모드", GUILayout.Width(100f));
-
-        bool wasPendingFullScreen = _pendingFullScreen;
-
-        bool windowedChecked = GUILayout.Toggle(
-            !wasPendingFullScreen, "창모드", GUILayout.Width(100f));
-
-        bool fullScreenChecked = GUILayout.Toggle(
-            wasPendingFullScreen, "전체화면", GUILayout.Width(100f));
-
-        GUILayout.EndHorizontal();
-
-        // 라디오 버튼처럼 상호 배타 처리: 실제로 클릭된 쪽의 값만 반영한다.
-        // (같은 프레임에 두 Toggle을 모두 그리지만, 실제 클릭 이벤트는 마우스 아래
-        // 컨트롤 하나만 소비하므로 클릭되지 않은 쪽은 항상 이전 값 그대로 반환된다.)
-        if (windowedChecked && wasPendingFullScreen)
-            _pendingFullScreen = false;
-        else if (fullScreenChecked && !wasPendingFullScreen)
-            _pendingFullScreen = true;
-    }
-
-    private void DrawResolutionDropdown()
-    {
-        GUILayout.BeginHorizontal();
-
-        GUILayout.Label("해상도", GUILayout.Width(100f));
-
-        if (GUILayout.Button(
-                _resolutionLabels[_pendingResolutionIndex],
-                GUILayout.Width(220f)))
-        {
-            _resolutionDropdownOpen = !_resolutionDropdownOpen;
-        }
-
-        if (Event.current.type == EventType.Repaint)
-            _resolutionButtonRect = GUILayoutUtility.GetLastRect();
-
-        GUILayout.EndHorizontal();
-
-        if (_resolutionDropdownOpen)
-            DrawResolutionDropdownList();
-
-        CloseResolutionDropdownOnOutsideClick();
-    }
-
-    private void DrawResolutionDropdownList()
-    {
-        GUILayout.BeginVertical(GUI.skin.box);
-
-        float listHeight = Mathf.Min(140f, _resolutionLabels.Length * 24f);
-
-        _resolutionScrollPosition = GUILayout.BeginScrollView(
-            _resolutionScrollPosition,
-            GUILayout.Height(listHeight));
-
-        for (int i = 0; i < _resolutionLabels.Length; i++)
-        {
-            if (GUILayout.Button(_resolutionLabels[i]))
-            {
-                _pendingResolutionIndex = i;
-                _resolutionDropdownOpen = false;
-            }
-        }
-
-        GUILayout.EndScrollView();
-        GUILayout.EndVertical();
-
-        if (Event.current.type == EventType.Repaint)
-            _resolutionListRect = GUILayoutUtility.GetLastRect();
-    }
-
-    private void CloseResolutionDropdownOnOutsideClick()
-    {
-        if (!_resolutionDropdownOpen)
-            return;
-
-        if (Event.current.type != EventType.MouseDown)
-            return;
-
-        bool insideButton = _resolutionButtonRect.Contains(Event.current.mousePosition);
-        bool insideList = _resolutionListRect.Contains(Event.current.mousePosition);
-
-        if (!insideButton && !insideList)
-            _resolutionDropdownOpen = false;
-    }
-
-    private void DrawScreenApplyCancelRow()
-    {
-        GUILayout.BeginHorizontal();
-
-        if (GUILayout.Button("적용", GUILayout.Width(80f)))
-            ApplyScreenSettings();
-
-        if (GUILayout.Button("취소", GUILayout.Width(80f)))
-            ToggleOptions(false);
-
-        GUILayout.EndHorizontal();
+        _resolutionDropdown.ClearOptions();
+        _resolutionDropdown.AddOptions(new List<string>(_resolutionLabels));
     }
 
     private void ApplyScreenSettings()
@@ -934,91 +868,84 @@ public class OptionsPanelUI : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    private void DrawNormalButtons()
+    // ─────────────────────────────────────────
+    // 버튼 (uGUI)
+    // ─────────────────────────────────────────
+
+    /// <summary>적용 — 볼륨/화면 설정을 저장·적용한다. 패널은 닫지 않는다(기존 IMGUI 적용 버튼과 동일 정책).</summary>
+    private void HandleApplyButtonClicked()
     {
-        DrawSurrenderSection();
+        PlayerPrefs.SetFloat(PREF_MASTER_VOLUME, _masterVolume);
+        PlayerPrefs.SetFloat(PREF_BGM_VOLUME, _bgmVolume);
+        PlayerPrefs.SetFloat(PREF_SFX_VOLUME, _sfxVolume);
 
-        GUILayout.Space(10f);
+        ApplyScreenSettings();
 
-        if (GUILayout.Button("타이틀로"))
-        {
-            _surrenderNoticeShown = false;
-            _surrenderCrossCancelledNoticeShown = false;
-            _confirmMode = ConfirmMode.ReturnToTitle;
-        }
+        PlayerPrefs.Save();
 
-        GUILayout.Space(10f);
-
-        if (GUILayout.Button("게임 종료"))
-        {
-            _surrenderNoticeShown = false;
-            _surrenderCrossCancelledNoticeShown = false;
-            _confirmMode = ConfirmMode.QuitGame;
-        }
+        // 적용 시점 기준으로 취소 스냅샷도 갱신한다 — 적용 직후 취소를 눌러도 방금 적용한 값이 유지된다.
+        _masterVolumeBeforeOpen = _masterVolume;
+        _bgmVolumeBeforeOpen = _bgmVolume;
+        _sfxVolumeBeforeOpen = _sfxVolume;
     }
 
-    private void DrawSurrenderSection()
+    /// <summary>옵션 취소 — Close/Cancel/ESC가 공유하는 CloseOptionsPanel()을 그대로 호출한다.</summary>
+    private void HandleCancelOptionsButtonClicked() => CloseOptionsPanel();
+
+    /// <summary>닫기 — Close/Cancel/ESC가 공유하는 CloseOptionsPanel()을 그대로 호출한다.</summary>
+    private void HandleCloseButtonClicked() => CloseOptionsPanel();
+
+    private void HandleReturnTitleButtonClicked()
     {
-        if (!GameManager.TryGet(out var gameManager) || gameManager.Network == null)
-            return;
-
-        if (gameManager.Network.SurrenderRequestCrossCancelled)
-        {
-            gameManager.Network.AcknowledgeSurrenderCrossCancelled();
-            _surrenderCrossCancelledNoticeShown = true;
-        }
-
-        // 파트너가 없는 솔로/1인 방에서는 항복이 성립할 수 없으므로 버튼을 숨긴다.
-        if (!gameManager.Network.IsInRoom || gameManager.Network.PlayerCount < 2)
-            return;
-
-        if (GUILayout.Button("항복"))
-        {
-            _surrenderNoticeShown = false;
-            _surrenderCrossCancelledNoticeShown = false;
-            _surrenderRequestModalOpen = true;
-            ToggleOptions(false);
-        }
-
-        if (_surrenderCrossCancelledNoticeShown)
-        {
-            GUILayout.Label(
-                "항복 요청이 동시에 발생해 취소되었습니다. 다시 요청해주세요.");
-        }
+        _surrenderNoticeShown = false;
+        _surrenderCrossCancelledNoticeShown = false;
+        OpenConfirmModal(ConfirmMode.ReturnToTitle, "타이틀 화면으로 이동하시겠습니까?");
     }
 
-    private void DrawConfirmSection()
+    private void HandleQuitButtonClicked()
     {
-        string message = _confirmMode switch
-        {
-            ConfirmMode.ReturnToTitle =>
-                "타이틀 화면으로 이동하시겠습니까?",
+        _surrenderNoticeShown = false;
+        _surrenderCrossCancelledNoticeShown = false;
+        OpenConfirmModal(ConfirmMode.QuitGame, "게임을 종료하시겠습니까?");
+    }
 
-            ConfirmMode.QuitGame =>
-                "게임을 종료하시겠습니까?",
+    // ─────────────────────────────────────────
+    // ConfirmModal (uGUI)
+    // ─────────────────────────────────────────
 
-            _ => ""
-        };
+    /// <summary>ConfirmModal(uGUI)을 연다 — 옵션 본문(OptionsPanel)은 그대로 둔 채 위에 겹쳐 띄운다.</summary>
+    private void OpenConfirmModal(ConfirmMode mode, string message)
+    {
+        _confirmMode = mode;
 
-        GUILayout.Label(message);
+        if (_confirmMessageText != null) _confirmMessageText.text = message;
+        if (_confirmModal != null) _confirmModal.SetActive(true);
+    }
 
-        GUILayout.BeginHorizontal();
+    /// <summary>ConfirmModal만 닫는다. 옵션 본문(OptionsPanel)의 열림 상태는 건드리지 않는다.</summary>
+    private void CloseConfirmModal()
+    {
+        _confirmMode = ConfirmMode.None;
 
-        if (GUILayout.Button("확인", GUILayout.Width(80f)))
-        {
-            ConfirmMode selectedMode = _confirmMode;
-            _confirmMode = ConfirmMode.None;
+        if (_confirmModal != null) _confirmModal.SetActive(false);
+    }
 
-            if (selectedMode == ConfirmMode.ReturnToTitle)
-                ConfirmReturnToTitle();
-            else if (selectedMode == ConfirmMode.QuitGame)
-                QuitGame();
-        }
+    /// <summary>ConfirmModal의 확인 버튼. 열려 있던 확인 종류에 해당하는 기존 로직만 실행한다.</summary>
+    private void HandleConfirmButtonClicked()
+    {
+        ConfirmMode selectedMode = _confirmMode;
+        CloseConfirmModal();
 
-        if (GUILayout.Button("취소", GUILayout.Width(80f)))
-            _confirmMode = ConfirmMode.None;
+        if (selectedMode == ConfirmMode.ReturnToTitle)
+            ConfirmReturnToTitle();
+        else if (selectedMode == ConfirmMode.QuitGame)
+            QuitGame();
+    }
 
-        GUILayout.EndHorizontal();
+    /// <summary>ConfirmModal의 취소 버튼. 아무 로직도 실행하지 않고 모달만 닫는다.</summary>
+    private void HandleCancelButtonClicked()
+    {
+        CloseConfirmModal();
     }
 
     private void ConfirmReturnToTitle()
@@ -1056,9 +983,9 @@ public class OptionsPanelUI : MonoBehaviour
     {
         Resolution[] rawResolutions = Screen.resolutions;
 
-        var widths = new System.Collections.Generic.List<int>();
-        var heights = new System.Collections.Generic.List<int>();
-        var refreshRates = new System.Collections.Generic.List<RefreshRate>();
+        var widths = new List<int>();
+        var heights = new List<int>();
+        var refreshRates = new List<RefreshRate>();
 
         for (int i = 0; i < rawResolutions.Length; i++)
         {
