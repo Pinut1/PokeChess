@@ -213,13 +213,24 @@ public class QAManager : MonoBehaviour
              "제거기는 시작부터 보유하는 무제한 도구라(소비되지 않음) QA 지급 대상에서 제외한다.")]
     [SerializeField] private ConsumableData _reforgerData;
 
+    /// <summary>
+    /// 검색 결과 한 줄 + 보조 설명 캐시. UnitSearchEntry(풀 정보)와 같은 패턴 —
+    /// RunItemSearch가 실행될 때 한 번만 채우고, DrawItemResultRow는 매 프레임 그대로 읽기만 한다.
+    /// </summary>
+    private struct ItemSearchEntry
+    {
+        public ScriptableObject data;
+        public string description; // 장비/도구=ItemData.description, 돌=설명+진화 가능 대상(BuildStoneDescription)
+    }
+
     private ItemCategory _itemCategory = ItemCategory.All;
     private string _itemQuery = "";
     private string _itemSearchedQuery;
-    private readonly List<ScriptableObject> _itemResults = new();
+    private readonly List<ItemSearchEntry> _itemResults = new();
     private Vector2 _itemListScroll;
     private Vector2 _myInventoryScroll;
     private Vector2 _equippedScroll;
+    private GUIStyle _wrapLabelStyle; // 지급 목록 보조 설명용 줄바꿈 라벨(OnGUI 중 1회 생성 후 재사용)
 
     // 도구 데이터 미배선 경고가 검색할 때마다(키 입력마다) 반복 출력되지 않도록 세션당 1회만 남긴다.
     private bool _toolDataMissingWarned;
@@ -1841,7 +1852,8 @@ public class QAManager : MonoBehaviour
                 {
                     if (data == null) continue;
                     if (!MatchesItemQuery(query, data.id, data.itemName, data.itemNameEn)) continue;
-                    _itemResults.Add(data);
+                    // 기존 아이템 툴팁(ItemTooltipUI)이 읽는 것과 같은 필드를 그대로 재사용한다.
+                    _itemResults.Add(new ItemSearchEntry { data = data, description = data.description });
                 }
         }
 
@@ -1853,14 +1865,14 @@ public class QAManager : MonoBehaviour
                 {
                     if (data == null) continue;
                     if (!MatchesItemQuery(query, data.id, data.stoneName, data.stoneNameEn)) continue;
-                    _itemResults.Add(data);
+                    _itemResults.Add(new ItemSearchEntry { data = data, description = BuildStoneDescription(data) });
                 }
         }
 
         if (includeTool)
         {
             if (_reforgerData != null && MatchesItemQuery(query, _reforgerData.id, _reforgerData.consumableName, _reforgerData.consumableNameEn))
-                _itemResults.Add(_reforgerData);
+                _itemResults.Add(new ItemSearchEntry { data = _reforgerData, description = _reforgerData.description });
 
             // 참조 누락 시 도구 분류가 조용히 비어 보이면 원인 파악이 어려우므로 한 번은 알려준다
             // (RunItemSearch는 매 프레임이 아니라 검색어/분류가 바뀔 때만 호출되지만, 그마저도 세션당 1회로 더 제한한다).
@@ -1881,6 +1893,46 @@ public class QAManager : MonoBehaviour
                (!string.IsNullOrEmpty(nameEn) && nameEn.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
+    /// <summary>돌 자체 설명(있으면) + "진화 가능: 유닛명…" 두 줄을 합친다. 돌 설명이 없으면 진화 대상 줄만 반환.</summary>
+    private static string BuildStoneDescription(EvolutionStoneData stone)
+    {
+        string evolutionLine = BuildStoneEvolutionTargets(stone);
+
+        if (string.IsNullOrWhiteSpace(stone.description))
+            return evolutionLine;
+
+        return $"{stone.description}\n{evolutionLine}";
+    }
+
+    /// <summary>
+    /// EvolutionStoneData.mappings의 targetPokemon(진화 전 종, 영문명)을 PokemonDatabase.GetByNameEn으로
+    /// 한글명(pokemonName)으로 바꿔 매핑 순서 그대로 나열한다. 중복 이름만 제거한다.
+    /// PokemonDatabase에 없는 영문명은 대상을 알 수 없으므로 추측하지 않고 결과에서 제외한다.
+    /// </summary>
+    private static string BuildStoneEvolutionTargets(EvolutionStoneData stone)
+    {
+        if (stone.mappings == null || stone.mappings.Count == 0)
+            return "진화 가능 대상 없음";
+
+        PokemonDatabase db = PokemonDatabase.Instance;
+        if (db == null) return "진화 가능 대상 없음";
+
+        var names = new List<string>();
+
+        foreach (EvolutionMapping mapping in stone.mappings)
+        {
+            if (mapping == null || string.IsNullOrEmpty(mapping.targetPokemon)) continue;
+
+            PokemonData target = db.GetByNameEn(mapping.targetPokemon);
+            if (target == null || string.IsNullOrEmpty(target.pokemonName)) continue;
+
+            if (!names.Contains(target.pokemonName))
+                names.Add(target.pokemonName);
+        }
+
+        return names.Count > 0 ? $"진화 가능: {string.Join(", ", names)}" : "진화 가능 대상 없음";
+    }
+
     private void DrawItemResultList()
     {
         GUILayout.Label($"검색 결과 ({_itemResults.Count}개)");
@@ -1893,15 +1945,16 @@ public class QAManager : MonoBehaviour
         }
         else
         {
-            foreach (ScriptableObject obj in _itemResults)
-                DrawItemResultRow(obj);
+            foreach (ItemSearchEntry entry in _itemResults)
+                DrawItemResultRow(entry);
         }
 
         GUILayout.EndScrollView();
     }
 
-    private void DrawItemResultRow(ScriptableObject obj)
+    private void DrawItemResultRow(ItemSearchEntry entry)
     {
+        ScriptableObject obj = entry.data;
         string label = obj switch
         {
             ItemData it => $"[장비] {it.itemName} (ID {it.id})",
@@ -1910,12 +1963,24 @@ public class QAManager : MonoBehaviour
             _ => obj.name
         };
 
-        GUILayout.BeginHorizontal();
-        GUILayout.Label(label, GUILayout.Width(300f));
-        if (GUILayout.Button("지급", GUILayout.Width(60f)))
+        GUILayout.BeginHorizontal(GUI.skin.box);
+
+        GUILayout.BeginVertical();
+        GUILayout.Label(label, GUILayout.ExpandWidth(true));
+        if (!string.IsNullOrWhiteSpace(entry.description))
+            GUILayout.Label(entry.description, WrapLabelStyle, GUILayout.ExpandWidth(true));
+        GUILayout.EndVertical();
+
+        GUILayout.FlexibleSpace();
+
+        if (GUILayout.Button("지급", GUILayout.Width(60f), GUILayout.Height(24f)))
             HandleGrantItem(obj);
+
         GUILayout.EndHorizontal();
     }
+
+    /// <summary>보조 설명 줄바꿈용 라벨 스타일. GUI.skin은 OnGUI 중에만 유효해 최초 사용 시 1회만 생성한다.</summary>
+    private GUIStyle WrapLabelStyle => _wrapLabelStyle ??= new GUIStyle(GUI.skin.label) { wordWrap = true };
 
     private void HandleGrantItem(ScriptableObject obj)
     {
