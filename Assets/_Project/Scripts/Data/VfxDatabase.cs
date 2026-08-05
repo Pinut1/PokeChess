@@ -105,14 +105,18 @@ public class VfxEntry
     public bool scaleWithRadius;
 
     /// <summary>
-    /// TravelToTarget 전용 — 시전자에서 대상까지 이동하는 데 걸리는 시간(초).
+    /// TravelToTarget 전용 — 시전자에서 대상까지 도달하는 데 걸리는 시간(초). 이 페이스로 계산한
+    /// 속도를 대상 도착 이후에도 그대로 유지하며 화면 밖으로 나갈 때까지 계속 날아간다(VfxTravelMover).
     /// 전투 데미지는 이동 완료를 기다리지 않고 스킬 시전 즉시 적용되므로(BattleManager.CastSkill),
     /// 너무 길게 잡으면 "맞기 전에 이미 데미지가 들어간 것처럼" 보인다. 0.15초 이하 권장.
     /// </summary>
     public float travelDuration = 0.12f;
 
-    /// <summary>TravelToTarget 전용 — 도착 후 그 자리에 머무는 시간(초). 착탄 연출 여유용.</summary>
-    public float arrivalHoldDuration = 0.15f;
+    /// <summary>
+    /// TravelToTarget 전용 — 대상 지점에 도달한 뒤의 동작. 기본 false = 도달 즉시 파괴("맞고 사라짐").
+    /// true면 멈추지 않고 같은 속도로 계속 직진하다가 화면 밖으로 나갈 때 파괴("관통해서 날아감").
+    /// </summary>
+    public bool travelPastTarget;
 
     /// <summary>
     /// FromCaster + stretchToDistance 조합 전용 — 빔 길이(lengthScale)를 0에서 목표값까지

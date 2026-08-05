@@ -191,8 +191,9 @@ public static class BattleVfxPlayer
 
     /// <summary>
     /// from에서 to까지 오브젝트 자체를 실제로 이동시킨다(파티클 내부 속도와 무관).
-    /// VfxTravelMover가 이동+도착 후 유지+파괴까지 전부 담당하므로, 여기서는 ScheduleDestroy를
-    /// 별도로 걸지 않는다(파괴 타이머 중복 방지).
+    /// 도착 후 그대로 파괴할지, 관통해서 화면 밖으로 나갈 때까지 계속 날아갈지는
+    /// entry.travelPastTarget이 정한다. VfxTravelMover가 이동+파괴까지 전부 담당하므로,
+    /// 여기서는 ScheduleDestroy를 별도로 걸지 않는다(파괴 타이머 중복 방지).
     /// </summary>
     private static void SpawnTraveling(VfxEntry entry, Vector3 from, Vector3 to)
     {
@@ -208,7 +209,7 @@ public static class BattleVfxPlayer
         var go = Create(entry, pushedFrom, Quaternion.LookRotation(dir, Vector3.up), 1f);
 
         var mover = go.AddComponent<VfxTravelMover>();
-        mover.Begin(pushedFrom, to, entry.travelDuration, entry.arrivalHoldDuration);
+        mover.Begin(pushedFrom, to, entry.travelDuration, entry.travelPastTarget);
     }
 
     /// <summary>

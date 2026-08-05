@@ -693,7 +693,7 @@ MonoBehaviour:
     lifetime: 0
     positionOffset: {x: 0, y: 0, z: 0}
     spawnMode: 0
-    aimMode: 0
+    aimMode: 2
     fitLifetimeToDistance: 1
     stretchToDistance: 0
     referenceDistance: 1
@@ -723,13 +723,13 @@ MonoBehaviour:
     lifetime: 0.67
     positionOffset: {x: 0, y: 0, z: 0}
     spawnMode: 0
-    aimMode: 1
+    aimMode: 2
     fitLifetimeToDistance: 0
     stretchToDistance: 0
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 1
     beamGrowDuration: 0
     forwardOffset: 0
     rotationCorrection: {x: 0, y: 0, z: 0}
@@ -835,7 +835,7 @@ MonoBehaviour:
     scaleWithRadius: 0
     travelDuration: 0.12
     arrivalHoldDuration: 0.15
-    beamGrowDuration: 0
+    beamGrowDuration: 0.15
     forwardOffset: 0.3
     rotationCorrection: {x: -2.79, y: -14.13, z: 151.1}
   - vfxId: VFX_Ice_Assassin_SPELL
@@ -888,7 +888,7 @@ MonoBehaviour:
     lifetime: 0
     positionOffset: {x: 0, y: 0, z: 0}
     spawnMode: 0
-    aimMode: 0
+    aimMode: 2
     fitLifetimeToDistance: 1
     stretchToDistance: 0
     referenceDistance: 1
@@ -903,7 +903,7 @@ MonoBehaviour:
     lifetime: 0
     positionOffset: {x: 0, y: 0, z: 0}
     spawnMode: 0
-    aimMode: 1
+    aimMode: 2
     fitLifetimeToDistance: 1
     stretchToDistance: 0
     referenceDistance: 1
