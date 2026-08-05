@@ -2204,7 +2204,47 @@ public class QAManager : MonoBehaviour
         DrawPartnerMirrorBattleButton(net);
 
         GUILayout.Space(6f);
+        DrawPartnerSpectateDebugButtons();
+
+        GUILayout.Space(6f);
         GUILayout.Label("네트워크 조작(강제 연결/해제, RPC 실행, 파트너 데이터 변경 등)은 지원하지 않습니다.");
+    }
+
+    // 씬에 배치된 PartnerSpectateView 캐시. PartnerBattleMirrorController와 달리 런타임 생성
+    // 싱글턴이 아니라 씬 오브젝트(Canvas)에 붙는 컴포넌트라 FindFirstObjectByType으로 찾는다.
+    private PartnerSpectateView _partnerSpectateView;
+
+    private PartnerSpectateView FindPartnerSpectateView()
+    {
+        if (_partnerSpectateView == null)
+            _partnerSpectateView = FindFirstObjectByType<PartnerSpectateView>();
+        return _partnerSpectateView;
+    }
+
+    /// <summary>
+    /// 디버그 PIP(우측 상단 미니 프리뷰) 표시를 QA 패널에서만 켤 수 있게 하는 버튼 2개.
+    /// 일반 플레이에서는 PartnerSpectateView._debugShowPip 기본값이 false라 자동으로는 절대 뜨지 않고,
+    /// 오직 이 버튼을 눌러 PartnerSpectateView.SetDebugPipVisible을 호출했을 때만 보인다.
+    /// 카메라/RenderTexture 생성이나 미러 전투 로직에는 전혀 관여하지 않는다(표시 여부만 토글).
+    /// </summary>
+    private void DrawPartnerSpectateDebugButtons()
+    {
+        PartnerSpectateView view = FindPartnerSpectateView();
+
+        bool prevEnabled = GUI.enabled;
+        GUI.enabled = view != null;
+        bool showClicked = GUILayout.Button("PIP 보기", GUILayout.Width(220f));
+        bool hideClicked = GUILayout.Button("PIP 숨기기", GUILayout.Width(220f));
+        GUI.enabled = prevEnabled;
+
+        if (view == null)
+        {
+            GUILayout.Label("PartnerSpectateView를 씬에서 찾지 못함(Canvas에 배치·연결 필요)");
+            return;
+        }
+
+        if (showClicked) view.SetDebugPipVisible(true);
+        if (hideClicked) view.SetDebugPipVisible(false);
     }
 
     /// <summary>
@@ -2221,11 +2261,15 @@ public class QAManager : MonoBehaviour
         if (GUILayout.Button("파트너 미러 전투 테스트", GUILayout.Width(220f)))
             HandlePartnerMirrorBattleTest(net, controller);
         GUI.enabled = prevEnabled;
+
+        GUILayout.Label($"미러 visual 수: {controller.MirrorVisualCount}");
     }
 
     /// <summary>
     /// 저장된 파트너 BattleSnapshot으로 미러 전투를 시작한다. 실제 전투 흐름·GameEvents.BattleStart/
-    /// BattleEnd와는 무관하다 — 시작/종료 결과를 전부 QA 로그로만 남긴다(화면 표시 없음, 이번 단계 범위 밖).
+    /// BattleEnd와는 무관하다 — 시작/종료 결과를 전부 QA 로그로만 남긴다.
+    /// 파트너 보드 영역에 미러 유닛 모델이 실제로 생성되어 이동·공격·스킬·사망까지 표시된다
+    /// (카메라 전환·PIP·HUD는 이번 단계 범위 밖 — 기존 게임 화면에서 직접 봐야 한다).
     /// </summary>
     private void HandlePartnerMirrorBattleTest(NetworkManager net, PartnerBattleMirrorController controller)
     {
