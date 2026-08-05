@@ -206,43 +206,6 @@ public class PokemonUnit : MonoBehaviour
     public int   ManaCost     => data != null ? data.manaCost : 0;
     public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");
 
-    /// <summary>
-    /// 장착 아이템 보너스까지 반영한 최종 스탯을 계산한다.
-    ///
-    /// Combat/ItemStatEffect(전투 시작 1회)와 같은 공식(Data/ItemStatFormula)을 쓰므로,
-    /// 전투 계산과 정보창 표시가 항상 같은 결과를 낸다. currentHp/MaxHp 등 원본 필드는
-    /// 건드리지 않는 순수 계산이라, 장비를 해제하면(= items에서 빠지면) 다음 호출에서
-    /// 자동으로 원래 값으로 돌아온다 — 별도 복원 처리가 필요 없다.
-    /// </summary>
-    public void ComputeFinalStats(
-        out float finalMaxHp, out float finalCurrentHp,
-        out float finalAttack, out float finalSpellPower, out float finalAttackSpeed, out float finalDefense)
-    {
-        finalMaxHp = MaxHp;
-        finalCurrentHp = currentHp;
-        finalAttack = Attack;
-        finalSpellPower = SpellPower;
-        finalAttackSpeed = AttackSpeed;
-        finalDefense = Defense;
-
-        // 정보창은 치명타를 표시하지 않지만 공용 공식 시그니처상 필요한 버림값.
-        float critChance = 0f;
-        float critMultiplier = 0f;
-
-        if (items == null) return;
-
-        foreach (ItemData item in items)
-        {
-            if (item == null) continue;
-
-            ItemStatFormula.Apply(
-                item,
-                ref finalMaxHp, ref finalCurrentHp,
-                ref finalAttack, ref finalSpellPower, ref finalAttackSpeed, ref finalDefense,
-                ref critChance, ref critMultiplier);
-        }
-    }
-
     private void Start()
     {
         ResetForBattle();
