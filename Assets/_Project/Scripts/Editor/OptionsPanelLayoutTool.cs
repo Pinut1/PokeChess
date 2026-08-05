@@ -43,9 +43,8 @@ public static class OptionsPanelLayoutTool
         ApplyBackground(root);
         ApplyTitleText(root);
         ApplyCloseButton(root);
-        ApplyVolumeRow(root, "MasterVolumeLabel", "MasterVolumeSlider", "MasterVolumeValueText", "마스터 볼륨", -105f);
-        ApplyVolumeRow(root, "BgmVolumeLabel", "BgmVolumeSlider", "BgmVolumeValueText", "배경음", -150f);
-        ApplyVolumeRow(root, "SfxVolumeLabel", "SfxVolumeSlider", "SfxVolumeValueText", "효과음", -195f);
+        // 볼륨 3행은 VolumeRow_Pf 인스턴스(Sound_Page/MasterVolume 등)로 바뀌었다 — 배치·문구·슬라이더
+        // 범위를 전부 프리팹과 VolumeRowUI가 들고 있으므로 이 도구가 좌표를 덮어쓰지 않는다.
         ApplyWindowedToggle(root);
         ApplyFullscreenToggle(root);
         ApplyToggleGroup(root);
@@ -246,24 +245,6 @@ public static class OptionsPanelLayoutTool
         EditorUtility.SetDirty(image);
     }
 
-    private static void ApplySliderRange(Transform t)
-    {
-        if (t == null) return;
-
-        var slider = t.GetComponent<Slider>();
-        if (slider == null)
-        {
-            Debug.LogWarning($"[OptionsPanelLayoutTool] Slider 컴포넌트를 찾지 못했습니다: {t.name}");
-            return;
-        }
-
-        Undo.RecordObject(slider, UNDO_NAME);
-        slider.minValue = 0f;
-        slider.maxValue = 1f;
-        slider.wholeNumbers = false;
-        EditorUtility.SetDirty(slider);
-    }
-
     /// <summary>버튼의 "Text (TMP)" 자식을 Full Stretch + 지정 문구/정렬/크기로 맞춘다.</summary>
     private static void ApplyButtonText(Transform buttonRoot, string content, float fontSize)
     {
@@ -336,37 +317,6 @@ public static class OptionsPanelLayoutTool
         ApplyRect(t.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
             posX: -15f, posY: -15f, width: 70f, height: 34f);
         ApplyButtonText(t, "닫기", 18f);
-    }
-
-    // ─────────────────────────────────────────
-    // 볼륨 행 (Label / Slider / ValueText)
-    // ─────────────────────────────────────────
-
-    private static void ApplyVolumeRow(Transform root, string labelName, string sliderName, string valueTextName, string labelText, float y)
-    {
-        Transform label = FindChild(root, labelName);
-        if (label != null)
-        {
-            ApplyRect(label.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f),
-                posX: 25f, posY: y, width: 110f, height: 30f);
-            ApplyText(label, labelText, TextAlignmentOptions.Left, 18f);
-        }
-
-        Transform slider = FindChild(root, sliderName);
-        if (slider != null)
-        {
-            ApplyRect(slider.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f),
-                left: 145f, right: 80f, posY: y, height: 22f);
-            ApplySliderRange(slider);
-        }
-
-        Transform valueText = FindChild(root, valueTextName);
-        if (valueText != null)
-        {
-            ApplyRect(valueText.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0.5f),
-                posX: -20f, posY: y, width: 55f, height: 30f);
-            ApplyText(valueText, "100%", TextAlignmentOptions.Right, 18f);
-        }
     }
 
     // ─────────────────────────────────────────
@@ -664,12 +614,11 @@ public static class OptionsPanelLayoutTool
         Transform confirmButton = popup != null ? popup.Find("ConfirmButton") : null;
         Transform modalCancelButton = popup != null ? popup.Find("CancelButton") : null;
 
-        Transform masterVolumeSlider = root.Find("MasterVolumeSlider");
-        Transform bgmVolumeSlider = root.Find("BgmVolumeSlider");
-        Transform sfxVolumeSlider = root.Find("SfxVolumeSlider");
-        Transform masterVolumeValueText = root.Find("MasterVolumeValueText");
-        Transform bgmVolumeValueText = root.Find("BgmVolumeValueText");
-        Transform sfxVolumeValueText = root.Find("SfxVolumeValueText");
+        // 볼륨은 행 프리팹(VolumeRow_Pf) 단위로 바뀌었다 — 슬라이더/텍스트를 따로 찾지 않는다.
+        Transform masterRow = root.Find("Sound_Page/MasterVolume");
+        Transform bgmRow = root.Find("Sound_Page/BgmVolume");
+        Transform sfxRow = root.Find("Sound_Page/SfxVolume");
+
         Transform windowedToggle = root.Find("WindowedToggle");
         Transform fullscreenToggle = root.Find("FullscreenToggle");
         Transform resolutionDropdown = root.Find("ResolutionDropdown");
@@ -687,12 +636,9 @@ public static class OptionsPanelLayoutTool
         // 표시/숨김은 SetActive가 아니라 CanvasGroup으로 처리하므로 자기 자신 참조가 안전하다).
         WireField(so, "_optionsPanelRoot", optionsPanelGO);
 
-        WireField(so, "_masterVolumeSlider", masterVolumeSlider != null ? masterVolumeSlider.GetComponent<Slider>() : null);
-        WireField(so, "_bgmVolumeSlider", bgmVolumeSlider != null ? bgmVolumeSlider.GetComponent<Slider>() : null);
-        WireField(so, "_sfxVolumeSlider", sfxVolumeSlider != null ? sfxVolumeSlider.GetComponent<Slider>() : null);
-        WireField(so, "_masterVolumeValueText", masterVolumeValueText != null ? masterVolumeValueText.GetComponent<TMP_Text>() : null);
-        WireField(so, "_bgmVolumeValueText", bgmVolumeValueText != null ? bgmVolumeValueText.GetComponent<TMP_Text>() : null);
-        WireField(so, "_sfxVolumeValueText", sfxVolumeValueText != null ? sfxVolumeValueText.GetComponent<TMP_Text>() : null);
+        WireField(so, "_masterRow", masterRow != null ? masterRow.GetComponent<VolumeRowUI>() : null);
+        WireField(so, "_bgmRow", bgmRow != null ? bgmRow.GetComponent<VolumeRowUI>() : null);
+        WireField(so, "_sfxRow", sfxRow != null ? sfxRow.GetComponent<VolumeRowUI>() : null);
 
         WireField(so, "_windowedToggle", windowedToggle != null ? windowedToggle.GetComponent<Toggle>() : null);
         WireField(so, "_fullscreenToggle", fullscreenToggle != null ? fullscreenToggle.GetComponent<Toggle>() : null);
