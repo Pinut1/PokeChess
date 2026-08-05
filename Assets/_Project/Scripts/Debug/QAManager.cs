@@ -1872,7 +1872,7 @@ public class QAManager : MonoBehaviour
         if (includeTool)
         {
             if (_reforgerData != null && MatchesItemQuery(query, _reforgerData.id, _reforgerData.consumableName, _reforgerData.consumableNameEn))
-                _itemResults.Add(_reforgerData);
+                _itemResults.Add(new ItemSearchEntry { data = _reforgerData, description = _reforgerData.description });
 
             // 참조 누락 시 도구 분류가 조용히 비어 보이면 원인 파악이 어려우므로 한 번은 알려준다
             // (RunItemSearch는 매 프레임이 아니라 검색어/분류가 바뀔 때만 호출되지만, 그마저도 세션당 1회로 더 제한한다).
