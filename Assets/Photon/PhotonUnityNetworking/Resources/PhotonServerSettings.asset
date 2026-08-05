@@ -69,6 +69,7 @@ MonoBehaviour:
   - RPC_SurrenderResolved
   - RPC_PartnerGaveUpReconnect
   - RPC_RequestSharedShopRestore
+  - RPC_OnBattleSnapshot
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
