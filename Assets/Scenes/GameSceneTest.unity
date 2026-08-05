@@ -10692,6 +10692,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4093390248596953786, guid: d2bb44036bf78a348bf91e8ed23263a3, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: e1b93b5e651131b42a17d380c597c015, type: 3}
+    - target: {fileID: 5390944861630036068, guid: d2bb44036bf78a348bf91e8ed23263a3, type: 3}
+      propertyPath: m_SpriteState.m_PressedSprite
+      value: 
+      objectReference: {fileID: 21300000, guid: e1b93b5e651131b42a17d380c597c015, type: 3}
+    - target: {fileID: 5390944861630036068, guid: d2bb44036bf78a348bf91e8ed23263a3, type: 3}
+      propertyPath: m_SpriteState.m_HighlightedSprite
+      value: 
+      objectReference: {fileID: 21300000, guid: bcc9e89109f90d24b8519f2a0b35e869, type: 3}
     - target: {fileID: 8804129004765670197, guid: d2bb44036bf78a348bf91e8ed23263a3, type: 3}
       propertyPath: m_Name
       value: ItemCardContanier_pf (1)
