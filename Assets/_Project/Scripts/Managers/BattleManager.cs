@@ -75,6 +75,10 @@ public class BattleManager : MonoBehaviour
     private readonly List<GameObject> _mirrorTiles = new();
     private Coroutine _battleCoroutine;
 
+    /// <summary>파트너 관전 미러 전투 코루틴(실전투 _battleCoroutine과 완전히 별도 필드).
+    /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
+    private Coroutine _mirrorBattleCoroutine;
+
     /// <summary>파트너 이탈 대기 중 전투 일시정지. Time.timeScale을 쓰지 않고 틱 루프 진입 자체를 막는다.</summary>
     private bool _isPaused;
 
@@ -434,13 +438,19 @@ public class BattleManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>치어리더: 선택(공속 +15% 또는 마나충전 +30%)을 아군 전체에.</summary>
-    private void ApplyCheerleaderChoice()
+    /// <summary>
+    /// 치어리더: 선택(공속 +15% 또는 마나충전 +30%)을 아군 전체에.
+    /// overrideChoice가 있으면 그 값을 쓰고(미러 전투 — CheerleaderChoice.Current를 직접 읽지 않음),
+    /// 없으면 기존과 동일하게 CheerleaderChoice.Current(client-local static)를 읽는다(실전투 경로 그대로).
+    /// </summary>
+    private void ApplyCheerleaderChoice(CheerleaderChoice.Option? overrideChoice = null)
     {
+        CheerleaderChoice.Option choice = overrideChoice ?? CheerleaderChoice.Current;
+
         foreach (var bu in _units)
         {
             if (bu.team != BattleTeam.Ally) continue;
-            if (CheerleaderChoice.Current == CheerleaderChoice.Option.AttackSpeed)
+            if (choice == CheerleaderChoice.Option.AttackSpeed)
                 bu.attackSpeed *= 1f + SynergyConstants.CheerleaderAtkSpeedPct;
             else
                 bu.manaGainMultiplier += SynergyConstants.CheerleaderManaRegenPct;
@@ -1519,5 +1529,484 @@ public class BattleManager : MonoBehaviour
             Destroy(tile);
 
         _mirrorTiles.Clear();
+    }
+
+    // ─────────────────────────────────────────
+    // 파트너 관전 — 미러 전투
+    //
+    // 파트너의 BattleSnapshot을 입력으로 실제 전투와 완전히 분리된 전투를 실행한다.
+    // 이 메서드들은 전부 "이 BattleManager 인스턴스"의 _units를 쓴다 — 실전투와 동시에
+    // 격리 실행하려면 반드시 별도 GameObject의 별도 BattleManager 컴포넌트에서 호출해야 한다
+    // (PartnerBattleMirrorController가 그 인스턴스 생성·생명주기를 담당).
+    //
+    // visual/BattleVfxPlayer는 전혀 쓰지 않는다 — SimulateTick/UpdateVisualPosition/
+    // BattleVfxPlayer.Play*가 전부 visual==null에 안전(조용히 no-op)함을 확인했으므로,
+    // 미러 전투는 판정만 하고 화면에는 아무것도 그리지 않는다(이번 단계 범위 밖).
+    //
+    // GameEvents.BattleStart/BattleEnd는 발행하지 않는다 — onComplete/onFailed 콜백으로만
+    // 결과를 알린다. PlayerHealthManager/RoundPhaseManager/AugmentManager 등 이 두 이벤트를
+    // 구독하는 모든 시스템이 자동으로 격리된다(발행 자체를 안 하므로).
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// 이 인스턴스가 지금 미러 전투를 실행 중인지. _mirrorBattleCoroutine의 null 여부가 아니라
+    /// 별도 플래그로 판단한다 — Unity 코루틴은 StartCoroutine 호출 시 첫 yield 전까지 동기 실행되므로
+    /// (예: 셋업 실패, 또는 전투가 tick 0에 바로 끝나는 경우) 코루틴 내부에서 핸들 변수를 null로
+    /// 지워도 그 직후 바깥의 "_mirrorBattleCoroutine = StartCoroutine(...)" 대입이 그 값을
+    /// 되돌려 덮어써버리는 순서 문제가 있다. 플래그는 StartCoroutine 호출 "전"에 세우므로 이 문제가 없다.
+    /// </summary>
+    public bool IsMirrorBattleRunning => _isMirrorBattleRunning;
+    private bool _isMirrorBattleRunning;
+
+    /// <summary>
+    /// 파트너 BattleSnapshot으로 미러 전투를 시작한다. 이미 실행 중이거나 snapshot이 없거나
+    /// 유닛/스테이지 셋업에 실패하면 onFailed만 호출하고 아무것도 진행하지 않는다.
+    /// 셋업(유닛 복원·시너지 적용)은 여기서 동기적으로 끝내고, 실제 틱 루프만 코루틴으로 돌린다.
+    /// </summary>
+    public void RunMirrorBattle(
+        BattleSnapshot snapshot,
+        System.Action<MirrorBattleResult> onComplete,
+        System.Action<string> onFailed)
+    {
+        if (_isMirrorBattleRunning)
+        {
+            onFailed?.Invoke("이미 미러 전투가 실행 중입니다");
+            return;
+        }
+        if (snapshot == null)
+        {
+            onFailed?.Invoke("BattleSnapshot이 null입니다");
+            return;
+        }
+
+        if (!SetupMirrorUnits(snapshot, out string failReason))
+        {
+            _units.Clear();
+            onFailed?.Invoke(failReason);
+            return;
+        }
+
+        ApplySnapshotSynergyBuffs(snapshot.activeSynergies);
+        ApplySnapshotSynergySpecials(snapshot);
+
+        _isMirrorBattleRunning = true;
+        _mirrorBattleCoroutine = StartCoroutine(RunMirrorBattleTickLoop(onComplete));
+    }
+
+    /// <summary>실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 파트너 이탈 등에서 호출.</summary>
+    public void AbortMirrorBattle()
+    {
+        if (!_isMirrorBattleRunning) return;
+
+        if (_mirrorBattleCoroutine != null) StopCoroutine(_mirrorBattleCoroutine);
+        _mirrorBattleCoroutine = null;
+        _isMirrorBattleRunning = false;
+        _units.Clear();
+    }
+
+    /// <summary>
+    /// 실전투 SimulateBattleLoop/RunOvertime(GameEvents.OvertimeStarted 발행 등)은 재사용하지 않고,
+    /// SimulateTick/HasAliveUnit(둘 다 기존 private 메서드 그대로)만 써서 자체 루프를 돈다 —
+    /// 미러는 화면에 안 보이므로 오버타임의 "실시간 유지" 연출이 필요 없다(고정 틱까지 즉시 판정).
+    /// 유닛/시너지 셋업은 RunMirrorBattle에서 이미 동기적으로 끝낸 상태로 진입한다.
+    /// </summary>
+    private IEnumerator RunMirrorBattleTickLoop(System.Action<MirrorBattleResult> onComplete)
+    {
+        int tick = 0;
+        while (tick < MAX_TICKS)
+        {
+            SimulateTick();
+
+            bool allyAlive = HasAliveUnit(BattleTeam.Ally);
+            bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
+
+            if (!allyAlive || !enemyAlive)
+            {
+                FinishMirrorBattle(allyAlive ? BattleEndReason.Victory : BattleEndReason.Defeat, tick, onComplete);
+                yield break;
+            }
+
+            tick++;
+            yield return new WaitForSeconds(TICK_INTERVAL);
+        }
+
+        // 타임아웃 — 실전투 오버타임의 최종 판정 규칙과 동일(적 하나라도 살아있으면 패배)만 적용,
+        // 실시간 대기 구간(RunOvertime)은 생략한다.
+        bool decisionWin = !HasAliveUnit(BattleTeam.Enemy);
+        FinishMirrorBattle(decisionWin ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat, tick, onComplete);
+    }
+
+    /// <summary>
+    /// 미러 전투 결과 집계(아군 생존 수/잔여 HP 합 — 스냅샷 원본이 파트너 진영이므로 "아군"이 곧 파트너 팀).
+    /// visual/_mirrorTiles를 만들지 않았으므로 Cleanup() 대신 _units만 비운다.
+    /// </summary>
+    private void FinishMirrorBattle(BattleEndReason outcome, int ticks, System.Action<MirrorBattleResult> onComplete)
+    {
+        int survivors = 0;
+        float hpSum = 0f;
+        foreach (var bu in _units)
+        {
+            if (bu.team != BattleTeam.Ally || !bu.IsAlive) continue;
+            survivors++;
+            hpSum += Mathf.Max(0f, bu.currentHp);
+        }
+
+        _units.Clear();
+        _mirrorBattleCoroutine = null;
+        _isMirrorBattleRunning = false;
+
+        onComplete?.Invoke(new MirrorBattleResult(outcome, ticks, survivors, hpSum));
+    }
+
+    /// <summary>
+    /// 스냅샷 아군 유닛 + 파트너 스테이지 적을 _units에 채운다. 실패하면 _units를 건드린 채로
+    /// false를 반환하고(호출측이 Clear), 원인을 failReason에 남긴다 — 추측/기본값 진행 없음.
+    /// </summary>
+    private bool SetupMirrorUnits(BattleSnapshot snapshot, out string failReason)
+    {
+        failReason = null;
+        _units.Clear();
+
+        foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
+        {
+            BattleUnit bu = CreateMirrorBattleUnit(entry, out string unitFail);
+            if (bu == null)
+            {
+                failReason = unitFail;
+                return false;
+            }
+            _units.Add(bu);
+        }
+
+        StageData stage = FindStageById(snapshot.stageId);
+        if (stage == null)
+        {
+            failReason = $"StageData 조회 실패: {snapshot.stageId}";
+            return false;
+        }
+
+        var board = GameManager.Instance.Board;
+        if (board == null)
+        {
+            failReason = "BoardManager 연결 안 됨(좌표 변환 불가)";
+            return false;
+        }
+
+        // SpawnMirrorEnemies(폴백)가 아니라 SpawnEnemiesFromStage(정상 경로)를 그대로 재사용한다 —
+        // GetEnemyBattleCoords는 순수 좌표 변환(보드 모양)이라 로컬 보드를 넘겨도 결과가 같다.
+        int enemyCount = SpawnEnemiesFromStage(stage, board);
+        if (enemyCount == 0)
+        {
+            failReason = $"'{stage.stageId}' 적 구성 생성 실패(DUMMY/풀 누락)";
+            return false;
+        }
+
+        ApplyOnCombatStartEffects();
+        return true;
+    }
+
+    /// <summary>
+    /// BattleSnapshot.UnitEntry 하나를 미러 BattleUnit으로 복원한다. ID 조회가 하나라도 실패하면
+    /// null + failReason을 반환한다(추측/기본값 금지). 스탯 계산(MaxHp/Attack/...)은 실제 전투
+    /// 계산식(PokemonUnit.MaxHp 등)을 복제하지 않기 위해, 씬/보드에 등록되지 않는 임시(비활성)
+    /// PokemonUnit 하나를 만들어 프로퍼티를 읽고 즉시 파괴한다 — 이 인스턴스는 _units/Cleanup()
+    /// 어디에도 남지 않는다(source는 계속 null).
+    /// </summary>
+    private BattleUnit CreateMirrorBattleUnit(BattleSnapshot.UnitEntry entry, out string failReason)
+    {
+        failReason = null;
+
+        PokemonDatabase pokemonDb = PokemonDatabase.Instance;
+        PokemonData species = pokemonDb != null ? pokemonDb.GetById(entry.speciesId) : null;
+        if (species == null)
+        {
+            failReason = $"speciesId {entry.speciesId} 조회 실패(PokemonDatabase)";
+            return null;
+        }
+
+        EvolutionStoneData stone = null;
+        if (entry.equippedStoneId != 0)
+        {
+            EvolutionStoneDatabase stoneDb = EvolutionStoneDatabase.Instance;
+            stone = stoneDb != null ? stoneDb.GetById(entry.equippedStoneId) : null;
+            if (stone == null)
+            {
+                failReason = $"equippedStoneId {entry.equippedStoneId} 조회 실패(EvolutionStoneDatabase)";
+                return null;
+            }
+        }
+
+        // previousSpeciesId는 전투 계산에 쓰이지 않지만(현재 data가 이미 진화 반영값), 스냅샷 필드
+        // 전부를 조회 가능해야 한다는 원칙에 따라 유효성만 확인한다.
+        if (entry.previousSpeciesId != 0 &&
+            (pokemonDb == null || pokemonDb.GetById(entry.previousSpeciesId) == null))
+        {
+            failReason = $"previousSpeciesId {entry.previousSpeciesId} 조회 실패(PokemonDatabase)";
+            return null;
+        }
+
+        ItemData item0 = null, item1 = null;
+        ItemDatabase itemDb = ItemDatabase.Instance;
+        if (entry.itemId0 != 0)
+        {
+            item0 = itemDb != null ? itemDb.GetById(entry.itemId0) : null;
+            if (item0 == null) { failReason = $"itemId0 {entry.itemId0} 조회 실패(ItemDatabase)"; return null; }
+        }
+        if (entry.itemId1 != 0)
+        {
+            item1 = itemDb != null ? itemDb.GetById(entry.itemId1) : null;
+            if (item1 == null) { failReason = $"itemId1 {entry.itemId1} 조회 실패(ItemDatabase)"; return null; }
+        }
+
+        // 스킬 해석: 종 기본 스킬과 skillId가 일치하면 그대로 사용. 다르면 "알려진 주입 스킬"인지만
+        // 확인한다(현재 코드에서 실제로 동적 생성되는 주입 스킬은 파치리스 날따름 하나뿐 —
+        // HeroPachirisuAugment.CreateTauntSkill(), skillId="PACHIRISU_TAUNT" 고정). 그 외는 추측하지
+        // 않고 실패 처리한다.
+        PokemonSkillData skill = null;
+        if (!string.IsNullOrEmpty(entry.skillId))
+        {
+            if (species.skill != null && species.skill.HasSkill && species.skill.skillId == entry.skillId)
+                skill = species.skill;
+            else if (entry.skillId == "PACHIRISU_TAUNT")
+                skill = HeroPachirisuAugment.CreateTauntSkill();
+            else
+            {
+                failReason = $"skillId '{entry.skillId}'을(를) 종 기본 스킬/알려진 주입 스킬로 해석하지 못함";
+                return null;
+            }
+        }
+
+        var phantomGO = new GameObject("MirrorStatPhantom");
+        var phantom = phantomGO.AddComponent<PokemonUnit>();
+        phantom.data = species;
+        phantom.starLevel = Mathf.Clamp(entry.starLevel, 1, 3);
+        phantom.heroStatMultiplier = entry.heroStatMultiplier;
+        phantom.isTradeEvolved = entry.isTradeEvolved;
+        phantom.equippedStone = stone;
+        phantom.roleOverride = entry.roleOverride;
+
+        float maxHp = phantom.MaxHp;
+        float attack = phantom.Attack;
+        float spellPower = phantom.SpellPower;
+        float defense = phantom.Defense;
+        float attackSpeed = phantom.AttackSpeed;
+        int range = phantom.Range;
+        string role = phantom.Role;
+
+        Destroy(phantomGO);
+
+        var bu = new BattleUnit
+        {
+            source = null,
+            data = species,
+            team = BattleTeam.Ally,
+            coords = new HexCoords(entry.q, entry.r),
+            maxHp = maxHp,
+            currentHp = maxHp,
+            attack = attack,
+            defense = defense,
+            spellPower = spellPower,
+            attackSpeed = attackSpeed,
+            range = Mathf.Max(1, range),
+            attackCooldown = 0f,
+            role = role,
+            starLevel = Mathf.Clamp(entry.starLevel, 1, 3),
+            hasSitrusBerry = entry.hasHeroBerry
+        };
+
+        ApplySkill(bu, skill, entry.skillManaCost);
+        bu.attackVfxId = !string.IsNullOrEmpty(entry.attackVfxIdOverride) ? entry.attackVfxIdOverride : species.attackVfxId;
+
+        if (item0 != null) AttachMirrorItemEffects(bu, item0);
+        if (item1 != null) AttachMirrorItemEffects(bu, item1);
+
+        bu.displayStone = stone;
+
+        return bu;
+    }
+
+    /// <summary>CreateBattleUnit의 아이템 훅 부착부와 같은 내용(둘 다 4줄 수준이라 공용 private
+    /// 메서드로만 뽑고, CreateBattleUnit 본문은 회귀 위험 때문에 건드리지 않는다).</summary>
+    private void AttachMirrorItemEffects(BattleUnit bu, ItemData item)
+    {
+        bu.effects.Add(new ItemStatEffect(item));
+        bu.effects.Add(new ItemConditionalEffect(item, this));
+        bu.displayItems.Add(item);
+        if (item.ccImmune) bu.HasCcImmuneItem = true;
+    }
+
+    /// <summary>
+    /// ApplySynergyBuffs의 스냅샷 버전. bu.source.data.synergies 대신 bu.data.synergies를 쓴다
+    /// (source 없는 미러 유닛도 data는 항상 채워져 있음). 수치 적용은 기존 ApplySynergyBuff를 그대로 재사용.
+    /// </summary>
+    private void ApplySnapshotSynergyBuffs(List<BattleSnapshot.SynergyEntry> activeSynergies)
+    {
+        if (activeSynergies == null) return;
+
+        int appliedCount = 0;
+        foreach (BattleSnapshot.SynergyEntry entry in activeSynergies)
+        {
+            SynergyData data = FindSynergyById(entry.synergyId);
+            if (data == null) continue;
+
+            string synergyId = data.synergyNameEn;
+            int tier = entry.tier + 1; // 1-base(ApplySynergyBuffs와 동일 규칙)
+
+            foreach (var bu in _units)
+            {
+                if (bu.team != BattleTeam.Ally || bu.data == null || bu.data.synergies == null) continue;
+                if (!bu.data.synergies.Contains(data.synergyName) && !bu.data.synergies.Contains(data.synergyNameEn)) continue;
+
+                if (ApplySynergyBuff(bu, synergyId, tier)) appliedCount++;
+            }
+        }
+
+        if (appliedCount > 0)
+            Debug.Log($"[MirrorBattle] 시너지 버프 {appliedCount}건 적용");
+    }
+
+    /// <summary>ApplySynergySpecials의 스냅샷 버전 — GameManager.Instance.Synergy/CheerleaderChoice.Current를 읽지 않는다.</summary>
+    private void ApplySnapshotSynergySpecials(BattleSnapshot snapshot)
+    {
+        if (SnapshotActiveTier(snapshot, "Ice").HasValue)
+            foreach (var bu in _units)
+                if (bu.team == BattleTeam.Enemy)
+                    bu.attackSpeed *= 1f - SynergyConstants.IceEnemyAtkSpeedReduction;
+
+        if (SnapshotActiveTier(snapshot, "Cheerleader").HasValue)
+            ApplyCheerleaderChoice(snapshot.cheerleaderChoice);
+
+        if (SnapshotHasHeroEeveeThreeStar(snapshot))
+        {
+            SpawnMirrorMutantBots(MutantBots.Length);
+        }
+        else
+        {
+            int? mutantTier = SnapshotActiveTier(snapshot, "Mutant");
+            if (mutantTier.HasValue)
+                SpawnMirrorMutantBots(mutantTier.Value + 1);
+        }
+
+        SynergyData dark = SnapshotActiveTier(snapshot, "Dark").HasValue ? FindSynergyByNameEn("Dark") : null;
+        if (dark != null)
+            MarkMirrorDarkFirstSkillStun(dark);
+    }
+
+    /// <summary>MarkDarkFirstSkillStun의 스냅샷 버전 — bu.data.synergies 기준(HasHeroEeveeThreeStar와 같은 이유).</summary>
+    private void MarkMirrorDarkFirstSkillStun(SynergyData dark)
+    {
+        foreach (var bu in _units)
+        {
+            if (bu.team != BattleTeam.Ally || bu.data == null || bu.data.synergies == null) continue;
+            if (!bu.data.synergies.Contains(dark.synergyName) && !bu.data.synergies.Contains(dark.synergyNameEn)) continue;
+            bu.darkFirstSkillPending = true;
+        }
+    }
+
+    /// <summary>HasHeroEeveeThreeStar의 스냅샷 버전 — snapshot.units(evolutionLocked)를 직접 본다.</summary>
+    private static bool SnapshotHasHeroEeveeThreeStar(BattleSnapshot snapshot)
+    {
+        PokemonDatabase db = PokemonDatabase.Instance;
+        if (db == null) return false;
+
+        foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
+        {
+            if (!entry.evolutionLocked || entry.starLevel < 3) continue;
+
+            PokemonData species = db.GetById(entry.speciesId);
+            if (species != null &&
+                string.Equals(species.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// SpawnMutantBots의 스냅샷 버전. 빈 타일은 "로컬 보드의 전체 좌표(모양은 어느 클라이언트나 동일)
+    /// − 스냅샷 점유 좌표"로 구한다(파트너의 실제 보드 객체는 이 클라이언트에 없음). CreateBotUnit은
+    /// 기존 private 메서드를 그대로 재사용한다.
+    /// </summary>
+    private void SpawnMirrorMutantBots(int tier)
+    {
+        PokemonDatabase db = PokemonDatabase.Instance;
+        BoardManager board = GameManager.Instance.Board;
+        if (db == null || board == null) return;
+
+        var occupied = new HashSet<HexCoords>();
+        foreach (var bu in _units)
+            if (bu.team == BattleTeam.Ally)
+                occupied.Add(bu.coords);
+
+        var empty = new List<HexCoords>();
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+            if (!occupied.Contains(coords)) empty.Add(coords);
+        empty.Sort(CompareCoords);
+
+        int count = Mathf.Min(tier, MutantBots.Length);
+        int placed = 0;
+        for (int i = 0; i < count; i++)
+        {
+            if (placed >= empty.Count)
+            {
+                Debug.LogWarning("[MirrorBattle] 돌연변이 봇 배치할 빈 타일 부족 — 일부 미소환");
+                break;
+            }
+
+            PokemonData data = db.GetByNameEn(MutantBots[i]);
+            if (data == null)
+            {
+                Debug.LogWarning($"[MirrorBattle] 돌연변이 봇 '{MutantBots[i]}' DB에 없음 — 스킵");
+                continue;
+            }
+
+            _units.Add(CreateBotUnit(data, empty[placed++]));
+        }
+    }
+
+    /// <summary>synergyNameEn으로 스냅샷 activeSynergies에서 활성 티어(0-base)를 찾는다. 없으면 null.</summary>
+    private static int? SnapshotActiveTier(BattleSnapshot snapshot, string synergyNameEn)
+    {
+        SynergyData target = FindSynergyByNameEn(synergyNameEn);
+        if (target == null) return null;
+
+        foreach (BattleSnapshot.SynergyEntry entry in snapshot.activeSynergies)
+            if (entry.synergyId == target.id)
+                return entry.tier;
+        return null;
+    }
+
+    /// <summary>SynergyDatabase에 GetById가 없어 여기서 직접 선형 탐색한다(DB 규모가 작아 문제 없음).</summary>
+    private static SynergyData FindSynergyById(int synergyId)
+    {
+        SynergyDatabase db = SynergyDatabase.Instance;
+        if (db == null || db.all == null) return null;
+
+        foreach (SynergyData s in db.all)
+            if (s != null && s.id == synergyId) return s;
+        return null;
+    }
+
+    private static SynergyData FindSynergyByNameEn(string synergyNameEn)
+    {
+        SynergyDatabase db = SynergyDatabase.Instance;
+        if (db == null || db.all == null) return null;
+
+        foreach (SynergyData s in db.all)
+            if (s != null && string.Equals(s.synergyNameEn, synergyNameEn, System.StringComparison.OrdinalIgnoreCase))
+                return s;
+        return null;
+    }
+
+    /// <summary>StageDatabase에 stageId 조회 API가 없어 여기서 직접 선형 탐색한다.</summary>
+    private static StageData FindStageById(string stageId)
+    {
+        if (string.IsNullOrEmpty(stageId)) return null;
+
+        StageDatabase db = StageDatabase.Instance;
+        if (db == null || db.stages == null) return null;
+
+        foreach (StageData s in db.stages)
+            if (s != null && s.stageId == stageId) return s;
+        return null;
     }
 }

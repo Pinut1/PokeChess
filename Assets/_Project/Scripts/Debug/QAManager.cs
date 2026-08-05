@@ -2201,7 +2201,57 @@ public class QAManager : MonoBehaviour
         DrawPartnerBattleSnapshotStatus(net);
 
         GUILayout.Space(6f);
+        DrawPartnerMirrorBattleButton(net);
+
+        GUILayout.Space(6f);
         GUILayout.Label("네트워크 조작(강제 연결/해제, RPC 실행, 파트너 데이터 변경 등)은 지원하지 않습니다.");
+    }
+
+    /// <summary>
+    /// 파트너 미러 전투 테스트 버튼. HasPartnerBattleSnapshot이 false이거나 이미 미러 전투가
+    /// 실행 중이면 비활성화된다(GUI.enabled로 클릭 자체를 막음 — 예외로 막지 않음).
+    /// </summary>
+    private void DrawPartnerMirrorBattleButton(NetworkManager net)
+    {
+        PartnerBattleMirrorController controller = PartnerBattleMirrorController.GetOrCreate();
+        bool canRun = net.HasPartnerBattleSnapshot && !controller.IsRunning;
+
+        bool prevEnabled = GUI.enabled;
+        GUI.enabled = canRun;
+        if (GUILayout.Button("파트너 미러 전투 테스트", GUILayout.Width(220f)))
+            HandlePartnerMirrorBattleTest(net, controller);
+        GUI.enabled = prevEnabled;
+    }
+
+    /// <summary>
+    /// 저장된 파트너 BattleSnapshot으로 미러 전투를 시작한다. 실제 전투 흐름·GameEvents.BattleStart/
+    /// BattleEnd와는 무관하다 — 시작/종료 결과를 전부 QA 로그로만 남긴다(화면 표시 없음, 이번 단계 범위 밖).
+    /// </summary>
+    private void HandlePartnerMirrorBattleTest(NetworkManager net, PartnerBattleMirrorController controller)
+    {
+        const string action = "파트너 미러 전투 테스트";
+
+        BattleSnapshot snapshot = net.PartnerBattleSnapshot;
+        if (snapshot == null)
+        {
+            LogFailure(action, "파트너 BattleSnapshot 없음");
+            return;
+        }
+
+        string stageLabel = string.IsNullOrEmpty(snapshot.stageId) ? "-" : snapshot.stageId;
+
+        controller.StartMirrorBattle(
+            snapshot,
+            result => LogSuccess(action,
+                $"종료 | Outcome={result.outcome} | Ticks={result.elapsedTicks} | " +
+                $"Survivors={result.survivorCount} | RemainingHp={result.remainingHpSum:0}"),
+            error => LogFailure(action, error)
+        );
+
+        // StartMirrorBattle이 "이미 실행 중" 등으로 즉시 실패했을 수도 있어, 시작 로그는
+        // 실행 중 여부를 다시 확인한 뒤에만 남긴다(실패인데 시작 로그가 먼저 찍히는 것 방지).
+        if (controller.IsRunning)
+            LogSuccess(action, $"시작 | Actor={snapshot.playerActorNumber} | Units={snapshot.units.Count} | Stage={stageLabel}");
     }
 
     /// <summary>
