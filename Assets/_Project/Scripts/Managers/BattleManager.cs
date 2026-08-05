@@ -454,10 +454,12 @@ public class BattleManager : MonoBehaviour
         var board = GameManager.Instance.Board;
         if (db == null || board == null) return;
 
-        // 빈 아군 좌표(스냅샷의 value==null) 수집.
+        // 빈 아군 좌표(스냅샷의 value==null) 수집. Dictionary 순회 순서는 삽입 이력에 우연히
+        // 의존하므로(공용 API는 그대로 두고) 여기서 q,r로 명시 정렬해 클라이언트 간 배치 순서를 고정한다.
         var empty = new List<HexCoords>();
         foreach (var kv in board.GetBoardSnapshot())
             if (kv.Value == null) empty.Add(kv.Key);
+        empty.Sort(CompareCoords);
 
         int count = Mathf.Min(tier, MutantBots.Length);
         int placed = 0;
@@ -514,10 +516,26 @@ public class BattleManager : MonoBehaviour
         SetupVisuals(board);
     }
 
-    /// <summary>아군: 내 보드 스냅샷 그대로 BattleUnit으로 추가.</summary>
+    /// <summary>
+    /// 전투 결정론 정렬 기준 — q 오름차순, 같으면 r 오름차순. 전투 셋업 시점(SetupUnits 안)에만
+    /// 1회 쓰인다. BoardManager.GetBoardSnapshot()이 반환하는 Dictionary는 순회 순서를 공식
+    /// 보장하지 않아(현재는 삽입 이력에 우연히 의존), 두 클라이언트가 항상 같은 순서로
+    /// BattleUnit을 만들도록 소비 지점(BattleManager)에서만 명시 정렬한다 — 공용 API인
+    /// BoardManager.GetBoardSnapshot() 자체의 반환 순서는 바꾸지 않는다(다른 소비처 영향 회피).
+    /// </summary>
+    private static int CompareCoords(HexCoords a, HexCoords b)
+    {
+        int qCompare = a.q.CompareTo(b.q);
+        return qCompare != 0 ? qCompare : a.r.CompareTo(b.r);
+    }
+
+    /// <summary>아군: 내 보드 스냅샷을 q,r 순으로 정렬해 BattleUnit으로 추가.</summary>
     private void SetupAllyUnits(BoardManager board)
     {
-        foreach (var kv in board.GetBoardSnapshot())
+        var entries = new List<KeyValuePair<HexCoords, PokemonUnit>>(board.GetBoardSnapshot());
+        entries.Sort((a, b) => CompareCoords(a.Key, b.Key));
+
+        foreach (var kv in entries)
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
@@ -691,10 +709,16 @@ public class BattleManager : MonoBehaviour
         return data;
     }
 
-    /// <summary>"내 보드 미러" 폴백 적 생성(기존 동작). StageData 도입 전/디버그용.</summary>
+    /// <summary>
+    /// "내 보드 미러" 폴백 적 생성(기존 동작). StageData 도입 전/디버그용.
+    /// 이 경로도 GetBoardSnapshot() Dictionary를 순회하므로 아군과 같은 기준(q,r)으로 정렬한다.
+    /// </summary>
     private void SpawnMirrorEnemies(BoardManager board)
     {
-        foreach (var kv in board.GetBoardSnapshot())
+        var entries = new List<KeyValuePair<HexCoords, PokemonUnit>>(board.GetBoardSnapshot());
+        entries.Sort((a, b) => CompareCoords(a.Key, b.Key));
+
+        foreach (var kv in entries)
         {
             PokemonUnit unit = kv.Value;
             if (unit == null || unit.data == null) continue;
