@@ -18,7 +18,9 @@ MonoBehaviour:
   countPerSpecies: 0
   tiers:
   - count: 1
-    effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
+    effectDescription: +20%
   - count: 2
-    effectDescription: "spellPower \uBE44\uC728 \uC99D\uAC00"
+    effectDescription: +40%
+  description: "\uB4DC\uB798\uACE4 \uD0C0\uC785 \uD3EC\uCF13\uBAAC\uC774 \uB298\uC5B4\uB0A0\uC218\uB85D
+    \uC2A4\uD0AC \uD53C\uD574\uB7C9 \uC218\uCE58\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4."
   icon: {fileID: 995343878, guid: 3b5e3dbf6b04b4b4c9f29031e55e931b, type: 3}
