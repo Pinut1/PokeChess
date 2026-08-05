@@ -17,7 +17,7 @@ MonoBehaviour:
   stoneNameEn: WaterStone
   stoneType: water
   description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
-    \uC774\uC0C1\uD55C \uB3CC. \uD22C\uBA85\uD55C \uD478\uB978\uC0C9\uC744 \uB760\uACE0
+    \uC774\uC0C1\uD55C \uB3CC. \n\uD22C\uBA85\uD55C \uD478\uB978\uC0C9\uC744 \uB760\uACE0
     \uC788\uB2E4."
   mappings:
   - targetPokemon: Eevee

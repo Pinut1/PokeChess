@@ -73,6 +73,11 @@ public class BattleManager : MonoBehaviour
 
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
+
+    // 적 진영 바닥 타일(좌표 → 타일). 적이 서 있는 칸만 짙게 칠하려고 좌표로 되찾을 수 있게 들고 있는다.
+    // 준비 단계 프리뷰와 전투 중 미러 보드가 번갈아 쓰며, 각자 걷어낼 때(ClearEnemyPreview/Cleanup) 같이 비운다.
+    // 원기둥 폴백 타일은 HexTile이 아니라 여기 담기지 않는다 — 색 구분도 되지 않는다.
+    private readonly Dictionary<HexCoords, HexTile> _enemyTiles = new();
     private Coroutine _battleCoroutine;
 
     /// <summary>파트너 이탈 대기 중 전투 일시정지. Time.timeScale을 쓰지 않고 틱 루프 진입 자체를 막는다.</summary>
@@ -592,9 +597,7 @@ public class BattleManager : MonoBehaviour
         {
             HexCoords enemyCoords = board.GetEnemyBattleCoords(coords);
 
-            GameObject tile = _enemyTilePrefab != null
-                ? CreateEnemyTileFromPrefab()
-                : CreateFallbackEnemyTile();
+            GameObject tile = CreateEnemyTile(enemyCoords);
 
             tile.name = $"EnemyPreviewTile_{enemyCoords}";
             tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
@@ -633,6 +636,9 @@ public class BattleManager : MonoBehaviour
 
             _previewObjects.Add(visual);
 
+            // 바닥은 SpawnPreviewTiles에서 이미 다 깔렸다 — 그중 이 칸만 점유 색으로 바꾼다.
+            MarkEnemyTileOccupied(coords);
+
             // 전투 때와 같은 계산(별 배수·스테이지 배수·보유 아이템)으로 스탯 사본을 만들어 둔다.
             // _units에 넣지 않으므로 시뮬레이션에는 영향이 없고, 스탯창이 준비 단계에도 적을 보여줄 수 있다.
             BattleUnit preview = CreateEnemyUnit(data, e, coords);
@@ -656,6 +662,7 @@ public class BattleManager : MonoBehaviour
 
         _previewObjects.Clear();
         _previewEnemies.Clear();
+        _enemyTiles.Clear();
     }
 
     /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
@@ -713,31 +720,47 @@ public class BattleManager : MonoBehaviour
         {
             HexCoords enemyCoords = board.GetEnemyBattleCoords(coords);
 
-            GameObject tile = _enemyTilePrefab != null
-                ? CreateEnemyTileFromPrefab()
-                : CreateFallbackEnemyTile();
+            GameObject tile = CreateEnemyTile(enemyCoords);
 
             tile.name = $"EnemyBoardTile_{enemyCoords}";
             tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
 
             _mirrorTiles.Add(tile);
         }
+
+        // 점유 색을 칠하지 않는다 — 미러 보드는 전투 중에만 존재하고, 전투 중에는 아군 보드도
+        // Default Color로 고정하기 때문이다(BoardManager.HandlePhaseChanged와 같은 규칙).
+        // 적 배치를 색으로 읽는 건 준비 단계 프리뷰(SpawnPreviewEnemies)의 몫이다.
     }
 
     /// <summary>
-    /// 아트 타일 생성. 적 진영은 장식 전용이라 드롭 처리와 콜라이더를 끈다.
+    /// 적 진영 바닥 한 칸 생성. 프리팹이 없으면 원기둥 폴백.
+    /// 적 진영은 장식 전용이라 드롭 처리와 콜라이더를 끈다.
     /// HexTile은 IDropTarget이라 그대로 두면 적 진영에 유닛이 놓이고,
     /// 콜라이더가 살아 있으면 아이템 드래그 등 다른 레이캐스트도 가로챈다.
+    ///
+    /// <b>컴포넌트를 꺼도 색은 바뀐다</b> — Awake는 Instantiate 시점에 이미 돌았고,
+    /// SetOccupied는 enabled와 무관한 일반 메서드다.
     /// </summary>
-    private GameObject CreateEnemyTileFromPrefab()
+    private GameObject CreateEnemyTile(HexCoords coords)
     {
+        if (_enemyTilePrefab == null) return CreateFallbackEnemyTile();
+
         HexTile hex = Instantiate(_enemyTilePrefab);
         hex.enabled = false;
 
         foreach (var col in hex.GetComponentsInChildren<Collider>(true))
             col.enabled = false;
 
+        _enemyTiles[coords] = hex;
         return hex.gameObject;
+    }
+
+    /// <summary>그 칸에 적이 서 있다고 표시한다. 색은 HexTile_Enemy 프리팹의 Occupied Color가 정한다.</summary>
+    private void MarkEnemyTileOccupied(HexCoords coords)
+    {
+        if (_enemyTiles.TryGetValue(coords, out HexTile tile) && tile != null)
+            tile.SetOccupied(true);
     }
 
     /// <summary>프리팹 미연결 시 쓰는 임시 평면(연빨강 원기둥).</summary>
@@ -1495,5 +1518,6 @@ public class BattleManager : MonoBehaviour
             Destroy(tile);
 
         _mirrorTiles.Clear();
+        _enemyTiles.Clear();
     }
 }

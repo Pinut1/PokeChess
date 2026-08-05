@@ -32,9 +32,26 @@ public class AugmentOfferPanel : MonoBehaviour
     [SerializeField] private Button AugmentHold_Button;
     [Tooltip("내려두면 180° 뒤집히는 화살표. Pivot이 중앙이라 회전만으로 제자리에서 뒤집힌다.")]
     [SerializeField] private RectTransform HoldIcon_Image;
+
+    [Tooltip("위로 띄울 대상. 비워두면 버튼과 아이콘 중 <b>바깥쪽(부모)</b>을 자동으로 고른다 — " +
+             "둘의 부모자식 관계를 뒤집어도 그대로 동작한다.\n" +
+             "안쪽(자식)만 띄우면 부모에 붙은 그림은 제자리에 있고 클릭 영역만 어긋난다.")]
+    [SerializeField] private RectTransform Hold_RiseTarget;
+
     [Tooltip("내려둔 상태에서 버튼을 띄울 높이(px). 하단 패널과 겹치지 않도록 조절.")]
     [SerializeField] private float _minimizedButtonRiseY;
     [SerializeField] private float _minimizedIconRotationZ = 180f;
+
+    [Header("내려두기 — 아이콘 색")]
+    [Tooltip("색을 바꿀 아이콘 이미지. 비워두면 Hold Icon Image에 붙은 Image를 쓰고, " +
+             "거기 없으면 그 자식에서 찾는다.")]
+    [SerializeField] private Image HoldIcon_Graphic;
+
+    [Tooltip("내려둔(180° 뒤집힌) 상태의 아이콘 색. 평상시 색은 씬/프리팹에 잡아둔 Image 색을 그대로 쓴다.")]
+    [SerializeField] private Color _minimizedIconColor = new(1f, 0.82f, 0.35f, 1f);
+
+    [Tooltip("끄면 색은 그대로 두고 회전·위치만 바뀐다.")]
+    [SerializeField] private bool _tintIconWhenMinimized = true;
 
     [Header("텍스트(선택)")]
     [Tooltip("남은 시간. 안내 문구는 씬에 고정 텍스트로 넣어두므로 스크립트가 건드리지 않는다.")]
@@ -44,8 +61,11 @@ public class AugmentOfferPanel : MonoBehaviour
 
     private bool _isMinimized;
     private Quaternion _iconBaseRotation;
-    private RectTransform _holdButtonRect;
-    private Vector2 _holdButtonBasePos;
+    private Color _iconBaseColor = Color.white;
+
+    // 실제로 띄우는 대상과 그 원래 자리. 버튼이 아니라 "바깥쪽 오브젝트"일 수 있다.
+    private RectTransform _riseRect;
+    private Vector2 _riseBasePos;
     private int _shownSeconds = -1; // 타이머 텍스트 중복 대입 방지(TMP는 같은 값이어도 재빌드한다)
 
     private void Awake()
@@ -58,17 +78,24 @@ public class AugmentOfferPanel : MonoBehaviour
             Debug.LogWarning($"[AugmentOfferPanel] 카드 {_cards.Count}장 — {AugmentManager.OFFER_COUNT}장이어야 함");
 
         if (HoldIcon_Image != null)
+        {
             _iconBaseRotation = HoldIcon_Image.localRotation;
 
-        if (AugmentHold_Button != null)
-        {
-            // 버튼의 RectTransform은 Button에서 바로 얻는다 — 인스펙터 필드를 늘리지 않기 위해.
-            _holdButtonRect = AugmentHold_Button.transform as RectTransform;
-            if (_holdButtonRect != null)
-                _holdButtonBasePos = _holdButtonRect.anchoredPosition;
-
-            AugmentHold_Button.onClick.AddListener(ToggleMinimized);
+            // GetComponentInChildren은 자기 자신부터 본다 — 아이콘에 Image가 붙어 있으면 그게 잡힌다.
+            if (HoldIcon_Graphic == null)
+                HoldIcon_Graphic = HoldIcon_Image.GetComponentInChildren<Image>(true);
         }
+
+        // 평상시 색은 씬에 잡아둔 값을 그대로 쓴다(회전 기준값·버튼 원위치와 같은 방식).
+        if (HoldIcon_Graphic != null)
+            _iconBaseColor = HoldIcon_Graphic.color;
+
+        _riseRect = ResolveRiseTarget();
+        if (_riseRect != null)
+            _riseBasePos = _riseRect.anchoredPosition;
+
+        if (AugmentHold_Button != null)
+            AugmentHold_Button.onClick.AddListener(ToggleMinimized);
 
         // 오퍼가 오기 전까지는 닫아둔다(씬에 켜둔 채 저장했더라도 정리).
         if (Center_PanelGroup != null)
@@ -175,12 +202,55 @@ public class AugmentOfferPanel : MonoBehaviour
                 ? _iconBaseRotation * Quaternion.Euler(0f, 0f, _minimizedIconRotationZ)
                 : _iconBaseRotation;
 
-        // 내려둔 동안엔 버튼 자체를 띄운다(하단 패널과 겹치지 않게).
-        if (_holdButtonRect != null)
+        // 뒤집힌 상태를 색으로도 구분한다. 스프라이트는 그대로 두고 틴트만 바꾼다.
+        if (_tintIconWhenMinimized && HoldIcon_Graphic != null)
+            HoldIcon_Graphic.color = _isMinimized ? _minimizedIconColor : _iconBaseColor;
+
+        // 내려둔 동안엔 버튼을 띄운다(하단 패널과 겹치지 않게).
+        if (_riseRect != null)
         {
-            Vector2 pos = _holdButtonBasePos;
+            Vector2 pos = _riseBasePos;
             if (_isMinimized) pos.y += _minimizedButtonRiseY;
-            _holdButtonRect.anchoredPosition = pos;
+            _riseRect.anchoredPosition = pos;
         }
+    }
+
+    /// <summary>
+    /// 띄울 대상을 정한다. 인스펙터에 지정했으면 그것, 아니면
+    /// <b>Center_PanelGroup의 직속 자식 중 버튼을 품고 있는 것</b>.
+    ///
+    /// 버튼이나 아이콘을 곧바로 쓰지 않는 이유: 둘 중 <b>안쪽</b>을 띄우면 바깥 오브젝트에 붙은
+    /// 그림은 제자리에 남고 클릭 판정만 위로 뜬다. 어느 쪽이 부모인지, 사이에 래퍼 오브젝트를
+    /// 하나 더 끼웠는지에 따라 답이 달라지므로, 계층을 어떻게 짜든 변하지 않는 기준
+    /// (= 오퍼 패널 그룹 바로 아래 한 덩어리)으로 잡는다.
+    ///
+    /// 이 규칙이 성립하려면 내려두기 버튼 덩어리가 Augment_Panel <b>밖</b>,
+    /// Center_PanelGroup 바로 아래에 있어야 한다(클래스 주석의 표시 구조 그대로).
+    /// </summary>
+    private RectTransform ResolveRiseTarget()
+    {
+        if (Hold_RiseTarget != null) return Hold_RiseTarget;
+
+        RectTransform button = AugmentHold_Button != null
+            ? AugmentHold_Button.transform as RectTransform
+            : null;
+
+        RectTransform fallback = button != null ? button : HoldIcon_Image;
+        if (fallback == null) return null;
+
+        Transform group = Center_PanelGroup != null ? Center_PanelGroup.transform : null;
+        if (group == null) return fallback;
+
+        // 버튼에서 위로 올라가며 부모가 패널 그룹인 지점을 찾는다.
+        for (Transform t = fallback; t != null; t = t.parent)
+            if (t.parent == group)
+                return t as RectTransform ?? fallback;
+
+        // 패널 그룹 아래가 아니면(구조 변경) 원래 방식대로 버튼을 띄운다.
+        Debug.LogWarning(
+            $"[AugmentOfferPanel] '{fallback.name}'이(가) Center_PanelGroup 아래에 없습니다 — " +
+            "띄울 대상을 Hold Rise Target에 직접 지정하세요.", this);
+
+        return fallback;
     }
 }

@@ -32,6 +32,15 @@ public class BoardCapacityLabel : MonoBehaviour
     private int _shownCap   = -1;
     private bool _visible = true; // 전투 중에는 false — 문자열만 비운다
 
+    // OnUnitCapChanged가 실어 보낸 최신 상한. -1 = 아직 한 번도 못 받음(첫 그리기는 BoardManager 캐시로 폴백).
+    //
+    // ⚠️ BoardManager의 UnitCap을 다시 읽으면 안 되는 이유:
+    // BoardManager도 같은 이벤트를 구독해 자기 _unitCap을 갱신하는데, 멀티캐스트 델리게이트는
+    // 구독한 순서대로 호출된다. 이 라벨이 먼저 구독돼 있으면 BoardManager가 아직 갱신되기 전에
+    // 읽어서 옛 상한이 나온다 — 레벨을 올려도 숫자가 그대로 있다가, 유닛을 사고 놓아
+    // OnUnitPlaced로 다시 그려질 때에야 뒤늦게 바뀌던 원인이다.
+    private int _capFromEvent = -1;
+
     // 글자색 대신 머티리얼 발광색을 바꾼다. 공유본을 건드리면 같은 프리셋을 쓰는
     // 다른 텍스트까지 물들므로 인스턴스(fontMaterial)를 잡는다.
     private Material _material;
@@ -68,7 +77,13 @@ public class BoardCapacityLabel : MonoBehaviour
     private void Start() => Refresh(); // 매니저 초기화가 OnEnable보다 늦을 수 있어 한 번 더.
 
     private void HandleRosterChanged(PokemonUnit _) => Refresh();
-    private void HandleCapChanged(int _)           => Refresh();
+
+    /// <summary>상한 변경. 이벤트가 들고 온 값을 그대로 믿는다(_capFromEvent 주석 참고).</summary>
+    private void HandleCapChanged(int cap)
+    {
+        _capFromEvent = cap;
+        Refresh();
+    }
 
     /// <summary>
     /// 배치를 바꿀 수 있는 쇼핑 단계에서만 표시한다.
@@ -99,7 +114,10 @@ public class BoardCapacityLabel : MonoBehaviour
         if (!GameManager.TryGet(out var gm) || gm.Board == null) return;
 
         int count = gm.Board.BoardUnitCount;
-        int cap   = gm.Board.UnitCap;
+
+        // 이벤트를 한 번이라도 받았으면 그 값이 최신이다. 첫 그리기(OnEnable/Start)에서만
+        // BoardManager 캐시로 폴백한다 — 그땐 아직 아무도 이벤트를 쏘지 않았을 수 있다.
+        int cap = _capFromEvent >= 0 ? _capFromEvent : gm.Board.UnitCap;
 
         // 값이 그대로면 건드리지 않는다 — TMP는 같은 문자열을 넣어도 메시를 다시 만든다.
         if (count == _shownCount && cap == _shownCap) return;

@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d756f01a667b30c4da1760faf569c3e5
+guid: f20225ade7d908149b72ee0f5cdf920c
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -110,35 +110,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: 041zubat_card_0
+      name: Green_02_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 600
-        height: 350
-      alignment: 9
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: d1be9c2ba0f625d46a25b394d12269c6
-      internalID: -4103659049743401807
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: 041zubat_card_1
-      rect:
-        serializedVersion: 2
-        x: 170
-        y: 0
-        width: 250
-        height: 250
+        x: 50
+        y: 191
+        width: 320
+        height: 320
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -147,8 +125,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 41d79572e18239c47a65ae9aa7c02bae
-      internalID: 1276257320061850391
+      spriteID: 754890b138b886f4bbb3228c6fe55960
+      internalID: -353335519
       vertices: []
       indices: 
       edges: []
@@ -157,7 +135,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: ac1f2bd207e3cba45bd67ac6cb9ec73d
     internalID: 0
     vertices: []
     indices: 
@@ -165,10 +143,11 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     spriteCustomMetadata:
-      entries: []
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":64.0,"y":64.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":0,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
-      041zubat_card_0: -4103659049743401807
-      041zubat_card_1: 1276257320061850391
+      Green_02_0: -353335519
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

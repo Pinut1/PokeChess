@@ -17,7 +17,7 @@ MonoBehaviour:
   stoneNameEn: MoonStone
   stoneType: moon
   description: "\uC5B4\uB290 \uD2B9\uC815 \uD3EC\uCF13\uBAAC\uC744 \uC9C4\uD654\uC2DC\uD0A4\uB294
-    \uC774\uC0C1\uD55C \uB3CC. \uBC24\uD558\uB298\uCC98\uB7FC \uAE4C\uB9E3\uB2E4."
+    \uC774\uC0C1\uD55C \uB3CC. \n\uBC24\uD558\uB298\uCC98\uB7FC \uAE4C\uB9E3\uB2E4."
   mappings:
   - targetPokemon: Jigglypuff
     evolvedPokemon: Wigglytuff
