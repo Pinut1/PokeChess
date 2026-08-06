@@ -626,13 +626,33 @@ public class BattleManager : MonoBehaviour
     // 시각 전용이므로 스탯/효과 스냅샷은 기존대로 전투 시작 시점에만 만들어진다.
     // ─────────────────────────────────────────
 
+    /// <summary>
+    /// 파트너 관전(쇼핑 중 적 프리뷰) 전용 진입점. 아래 private ShowEnemyPreview를 그대로 호출한다 —
+    /// 로직을 복제하지 않는다. 실전투 인스턴스(_visualOffset=0/_visualParent=null)에서는 절대 호출하지
+    /// 않는다(호출측 책임) — 미러 인스턴스에서 호출해야 ConfigureMirrorVisuals로 설정된 오프셋 덕분에
+    /// 파트너 보드 위치에 그려진다.
+    /// </summary>
+    public void ShowMirrorEnemyPreview(StageData stage) => ShowEnemyPreview(stage);
+
+    /// <summary>파트너 관전 종료 시 적 프리뷰 정리. 아래 private ClearEnemyPreview를 그대로 호출한다.</summary>
+    public void ClearMirrorEnemyPreview() => ClearEnemyPreview();
+
+    /// <summary>
+    /// 미러 전투 시작 시 호출. 쇼핑 중 보여주던 적 프리뷰 "유닛"만 제거하고 빨간 육각 타일은 그대로
+    /// 둔다 — ClearMirrorEnemyPreview()(전체 정리)를 쓰면 타일까지 같이 사라진다. 아래 private
+    /// ClearEnemyPreviewUnitsOnly를 그대로 호출한다.
+    /// </summary>
+    public void ClearMirrorEnemyPreviewUnitsOnly() => ClearEnemyPreviewUnitsOnly();
+
     /// <summary>이번 라운드 적 진영(바닥 + 적 모델)을 미리 표시. 기존 프리뷰는 먼저 제거한다.</summary>
     private void ShowEnemyPreview(StageData stage)
     {
-        ClearEnemyPreview();
-
-        // 전투 중에 라운드가 바뀌는 경우는 없지만, 있더라도 실제 전투 시각화를 덮지 않도록 막는다.
+        // 전투 진행 중이면 프리뷰 상태를 아무것도 건드리지 않고 즉시 반환한다 — 미러 인스턴스에서는
+        // 지금 남아있는 빨간 타일이 실제 미러 전투 적의 바닥으로 쓰이고 있으므로, ClearEnemyPreview를
+        // 먼저 호출해 지웠다가 이 가드에 막혀 다시 못 만드는 일이 없어야 한다.
         if (_units.Count > 0) return;
+
+        ClearEnemyPreview();
 
         var board = GameManager.TryGet(out var gm) ? gm.Board : null;
         if (board == null || stage == null) return;
@@ -650,7 +670,10 @@ public class BattleManager : MonoBehaviour
             GameObject tile = CreateEnemyTile(enemyCoords);
 
             tile.name = $"EnemyPreviewTile_{enemyCoords}";
-            tile.transform.position = board.CoordsToWorldPosition(enemyCoords);
+            // _visualOffset은 실전투 인스턴스에서 항상 Vector3.zero라 이 한 줄은 실전투 결과에 영향 없다 —
+            // 미러 인스턴스만 파트너 보드 위치로 밀려서 그려진다(SpawnVisual/UpdateVisualPosition과 동일 원칙).
+            tile.transform.position = board.CoordsToWorldPosition(enemyCoords) + _visualOffset;
+            if (_visualParent != null) tile.transform.SetParent(_visualParent, true);
 
             _previewObjects.Add(tile);
         }
@@ -677,7 +700,11 @@ public class BattleManager : MonoBehaviour
             visual.name = $"EnemyPreview_{data.pokemonNameEn}_{coords}";
             // 적은 아군 진영을 바라본다. 전투 시각화(SpawnVisual)와 같은 규칙.
             visual.transform.Rotate(0f, 180f, 0f, Space.World);
-            visual.transform.position = board.CoordsToWorldPosition(coords) + Vector3.up * 0.5f;
+            // _visualOffset은 실전투 인스턴스에서 항상 Vector3.zero라 이 한 줄은 실전투 결과에 영향 없다 —
+            // 미러 인스턴스만 파트너 보드 위치로 밀려서 그려진다(SpawnVisual/UpdateVisualPosition과 동일 원칙).
+            visual.transform.position = board.CoordsToWorldPosition(coords) + Vector3.up * 0.5f + _visualOffset;
+            if (_visualParent != null) visual.transform.SetParent(_visualParent, true);
+            ApplyVisualLayer(visual);
 
             // 준비 단계에는 유닛 드래그/아이템 장착 레이캐스트가 살아 있다.
             // 프리뷰는 장식이므로 콜라이더를 꺼서 그 판정에 끼어들지 않게 한다(적 진영 타일과 동일).
@@ -713,6 +740,35 @@ public class BattleManager : MonoBehaviour
         _previewObjects.Clear();
         _previewEnemies.Clear();
         _enemyTiles.Clear();
+    }
+
+    /// <summary>
+    /// _previewObjects/_previewEnemies에는 적 프리뷰 "타일"(SpawnPreviewTiles)과 "유닛 모델"
+    /// (SpawnPreviewEnemies)이 함께 섞여 있다 — 별도 컬렉션으로 나뉘어 있지 않다. 이 메서드는
+    /// _previewEnemies(프리뷰 유닛의 BattleUnit 스냅샷 목록, 각 항목의 .visual이 곧 유닛 모델
+    /// GameObject)만 순회해 그 유닛 모델만 Destroy하고 _previewObjects에서도 정확히 그 참조만
+    /// 제거한다 — 같은 오브젝트를 두 번 Destroy하지 않는다. 타일 GameObject(_previewObjects에 남는
+    /// 나머지)와 _enemyTiles(좌표→타일 조회용 딕셔너리)는 건드리지 않아 화면에 그대로 남는다.
+    ///
+    /// 유닛을 지우기 전, 그 유닛이 서 있던 칸의 점유색(SetOccupied(true))도 함께 원복한다 —
+    /// 안 그러면 타일 자체는 살아있으니 점유색만 미러 전투 내내 남아 몇 칸만 진한 색으로 보인다.
+    /// 이 복원은 preview.visual 유효성과 무관하게 항상 실행해야 하므로 visual null 검사보다 먼저 한다.
+    /// </summary>
+    private void ClearEnemyPreviewUnitsOnly()
+    {
+        foreach (BattleUnit preview in _previewEnemies)
+        {
+            if (preview == null) continue;
+
+            if (_enemyTiles.TryGetValue(preview.coords, out HexTile tile) && tile != null)
+                tile.SetOccupied(false);
+
+            if (preview.visual == null) continue;
+            _previewObjects.Remove(preview.visual);
+            Destroy(preview.visual);
+        }
+
+        _previewEnemies.Clear();
     }
 
     /// <summary>StageData의 적 배치(적 진영 로컬좌표)를 미러 좌표에 BattleUnit으로 생성. 생성 수 반환.</summary>
@@ -800,16 +856,50 @@ public class BattleManager : MonoBehaviour
     /// </summary>
     private GameObject CreateEnemyTile(HexCoords coords)
     {
-        if (_enemyTilePrefab == null) return CreateFallbackEnemyTile();
+        GameObject tileGO;
 
-        HexTile hex = Instantiate(_enemyTilePrefab);
-        hex.enabled = false;
+        if (_enemyTilePrefab == null)
+        {
+            tileGO = CreateFallbackEnemyTile();
+        }
+        else
+        {
+            HexTile hex = Instantiate(_enemyTilePrefab);
+            hex.enabled = false;
 
-        foreach (var col in hex.GetComponentsInChildren<Collider>(true))
-            col.enabled = false;
+            foreach (var col in hex.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
 
-        _enemyTiles[coords] = hex;
-        return hex.gameObject;
+            _enemyTiles[coords] = hex;
+            tileGO = hex.gameObject;
+        }
+
+        ApplyVisualLayer(tileGO);
+        return tileGO;
+    }
+
+    /// <summary>
+    /// 실전투/미러 인스턴스를 기존 _visualParent==null 여부로 구분해 LocalGameplayVisual/
+    /// PartnerSpectateVisual Layer를 재귀 태깅한다(새 bool 상태를 추가하지 않고 기존 구분 재사용).
+    /// Default(0)였던 자식만 바꾸고 UI/Ignore Raycast/Outline 등 특수 Layer 자식은 보존한다.
+    /// 두 Layer 중 하나라도 Unity Editor에 없으면 아무 것도 하지 않는다(부분 적용 금지 —
+    /// PartnerSpectateView/OpponentBoardView의 Layer 판정과 동일 조건). Instantiate 직후 1회만 호출.
+    /// </summary>
+    private void ApplyVisualLayer(GameObject root)
+    {
+        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        int partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
+        if (localLayer < 0 || partnerLayer < 0 || root == null) return;
+
+        int targetLayer = _visualParent == null ? localLayer : partnerLayer;
+        SetDefaultLayerRecursive(root.transform, targetLayer);
+    }
+
+    private static void SetDefaultLayerRecursive(Transform node, int targetLayer)
+    {
+        if (node.gameObject.layer == 0) node.gameObject.layer = targetLayer;
+        for (int i = 0; i < node.childCount; i++)
+            SetDefaultLayerRecursive(node.GetChild(i), targetLayer);
     }
 
     /// <summary>그 칸에 적이 서 있다고 표시한다. 색은 HexTile_Enemy 프리팹의 Occupied Color가 정한다.</summary>
@@ -974,6 +1064,7 @@ public class BattleManager : MonoBehaviour
         }
 
         visual.name = $"BattleVisual_{bu.team}_{bu.coords}";
+        ApplyVisualLayer(visual);
 
         // 전투 시작 시엔 서로 마주 보게 세워두고, 이후 매 틱 실제 노리는 대상을 향해 돌린다.
         // 프리팹의 기본 자세는 UnitFacing이 보관해 요(yaw)만 덧씌우므로 기울기가 유지된다.
@@ -1651,6 +1742,26 @@ public class BattleManager : MonoBehaviour
         _playBattleVfx = false;
     }
 
+    /// <summary>이 인스턴스의 Inspector 연결 적 진영 바닥 프리팹. 미러 인스턴스가 실제 로컬 인스턴스
+    /// (GameManager.Battle)에서 이 값을 읽어 ConfigureMirrorEnemyTilePrefab으로 자기 자신에 주입할
+    /// 때 쓰는 읽기 전용 노출 — 필드를 그대로 public으로 열지 않는다.</summary>
+    public HexTile EnemyTilePrefab => _enemyTilePrefab;
+
+    /// <summary>
+    /// 미러 인스턴스 전용 — 실제 로컬 BattleManager의 _enemyTilePrefab을 그대로 물려받는다.
+    /// 런타임 AddComponent로 생성되는 미러 인스턴스는 어떤 인스턴스의 Inspector 값도 물려받지 않아
+    /// _enemyTilePrefab이 항상 null로 시작하는데, null 상태로 CreateEnemyTile()을 호출하면
+    /// CreateFallbackEnemyTile()(연빨강 원기둥 폴백)로 빠져 실제 로컬 적 진영 바닥(HexTile_Enemy)과
+    /// 다르게 보인다(관전 화면에서 확인된 문제). null을 넘기면 아무 것도 하지 않는다 — 호출측이
+    /// 아직 실제 인스턴스를 못 구했을 때 이미 주입된 값을 실수로 지우지 않기 위함.
+    /// 실전투 인스턴스는 절대 호출하지 않는다(ConfigureMirrorVisuals와 같은 원칙).
+    /// </summary>
+    public void ConfigureMirrorEnemyTilePrefab(HexTile enemyTilePrefab)
+    {
+        if (enemyTilePrefab == null) return;
+        _enemyTilePrefab = enemyTilePrefab;
+    }
+
     /// <summary>
     /// 파트너 BattleSnapshot으로 미러 전투를 시작한다. 이미 실행 중이거나 snapshot이 없거나
     /// 유닛/스테이지 셋업에 실패하면 onFailed만 호출하고 아무것도 진행하지 않는다.
@@ -1683,10 +1794,14 @@ public class BattleManager : MonoBehaviour
         ApplySnapshotSynergySpecials(snapshot);
 
         _isMirrorBattleRunning = true;
-        _mirrorBattleCoroutine = StartCoroutine(RunMirrorBattleTickLoop(onComplete));
+        _mirrorBattleCoroutine = StartCoroutine(RunMirrorBattleTickLoop(onComplete, onFailed));
     }
 
-    /// <summary>실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 파트너 이탈 등에서 호출.
+    /// <summary>실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 파트너 이탈 등 "외부"에서 호출하는
+    /// 전용 경로 — 코루틴이 아직 살아있다는 전제로 StopCoroutine을 쏜다. 코루틴 "자기 자신"의 내부
+    /// (RunMirrorBattleTickLoop의 예외 처리 등)에서는 재사용하지 말 것: 실행 중인 코루틴이 자기 자신에
+    /// StopCoroutine을 거는 건 불필요하고, 이후 yield break로 어차피 빠져나가므로 그쪽은
+    /// HandleMirrorBattleException이 상태 정리를 직접 담당한다.
     /// Cleanup()이 남아있는 미러 visual을 전부 파괴한다(bu.source는 전부 null이라 실제 PokemonUnit엔 영향 없음).</summary>
     public void AbortMirrorBattle()
     {
@@ -1703,13 +1818,37 @@ public class BattleManager : MonoBehaviour
     /// SimulateTick/HasAliveUnit(둘 다 기존 private 메서드 그대로)만 써서 자체 루프를 돈다 —
     /// 미러는 화면에 안 보이므로 오버타임의 "실시간 유지" 연출이 필요 없다(고정 틱까지 즉시 판정).
     /// 유닛/시너지 셋업은 RunMirrorBattle에서 이미 동기적으로 끝낸 상태로 진입한다.
+    ///
+    /// WaitForSecondsRealtime을 쓴다 — 실전투(RunBattle/SimulateBattleLoop/RunOvertime)의 WaitForSeconds는
+    /// 그대로 두고, 미러 루프만 향후 게임 내부 Time.timeScale 변화로부터 독립시키기 위함(현재 원인으로
+    /// 단정된 것은 아님 — 격리 목적의 선제 조치).
     /// </summary>
-    private IEnumerator RunMirrorBattleTickLoop(System.Action<MirrorBattleResult> onComplete)
+    private IEnumerator RunMirrorBattleTickLoop(
+        System.Action<MirrorBattleResult> onComplete,
+        System.Action<string> onFailed)
     {
         int tick = 0;
         while (tick < MAX_TICKS)
         {
-            SimulateTick();
+            // SimulateTick()에서 처리되지 않은 예외가 나면 코루틴이 조용히 죽어 IsRunning이 true로
+            // 고착되고 visual도 고아 상태로 남는다(FinishMirrorBattle/AbortMirrorBattle 어느 쪽도 못 탐) —
+            // yield break는 catch 안에서 쓸 수 없으므로(C# 제약) 예외만 잡아두고 실제 종료 처리·yield break는
+            // try/catch 바깥에서 한다.
+            System.Exception tickException = null;
+            try
+            {
+                SimulateTick();
+            }
+            catch (System.Exception ex)
+            {
+                tickException = ex;
+            }
+
+            if (tickException != null)
+            {
+                HandleMirrorBattleException(tickException, tick, onFailed);
+                yield break;
+            }
 
             bool allyAlive = HasAliveUnit(BattleTeam.Ally);
             bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
@@ -1721,13 +1860,46 @@ public class BattleManager : MonoBehaviour
             }
 
             tick++;
-            yield return new WaitForSeconds(TICK_INTERVAL);
+            yield return new WaitForSecondsRealtime(TICK_INTERVAL);
         }
 
         // 타임아웃 — 실전투 오버타임의 최종 판정 규칙과 동일(적 하나라도 살아있으면 패배)만 적용,
         // 실시간 대기 구간(RunOvertime)은 생략한다.
         bool decisionWin = !HasAliveUnit(BattleTeam.Enemy);
         FinishMirrorBattle(decisionWin ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat, tick, onComplete);
+    }
+
+    /// <summary>
+    /// RunMirrorBattleTickLoop의 SimulateTick()에서 처리되지 않은 예외가 발생했을 때만 호출된다.
+    /// Victory/Defeat 등 정상 판정으로 위장하지 않고(onComplete 절대 호출 안 함) onFailed로만 알린다.
+    /// 진단에 필요한 상태(틱/생존 수/GamePhase/Time.timeScale/예외 전체)를 로그로 남기고, 정상 종료
+    /// (FinishMirrorBattle)·파트너 이탈 중단(AbortMirrorBattle)과 동일하게 _mirrorBattleCoroutine=null,
+    /// _isMirrorBattleRunning=false, Cleanup()을 빠짐없이 실행한다.
+    /// </summary>
+    private void HandleMirrorBattleException(System.Exception ex, int tick, System.Action<string> onFailed)
+    {
+        int allySurvivors = 0, enemySurvivors = 0;
+        foreach (var bu in _units)
+        {
+            if (!bu.IsAlive) continue;
+            if (bu.team == BattleTeam.Ally) allySurvivors++;
+            else enemySurvivors++;
+        }
+
+        string phaseLabel = GameManager.TryGet(out var gm) && gm.Phase != null
+            ? gm.Phase.CurrentPhase.ToString()
+            : "알 수 없음(GameManager/Phase 없음)";
+
+        Debug.LogError(
+            $"[MirrorBattle] SimulateTick 예외로 중단 | Tick={tick} | AllySurvivors={allySurvivors} | " +
+            $"EnemySurvivors={enemySurvivors} | GamePhase={phaseLabel} | Time.timeScale={Time.timeScale} | " +
+            $"예외: {ex}");
+
+        _mirrorBattleCoroutine = null;
+        _isMirrorBattleRunning = false;
+        Cleanup();
+
+        onFailed?.Invoke($"미러 전투 내부 오류(tick {tick}): {ex.GetType().Name}: {ex.Message}");
     }
 
     /// <summary>

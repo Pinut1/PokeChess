@@ -25041,6 +25041,7 @@ MonoBehaviour:
   _heightOffset: 2
   _includeBench: 1
   _itemLiftPixels: 20
+  _partnerSpectateView: {fileID: 1915979506}
 --- !u!114 &1966575254
 MonoBehaviour:
   m_ObjectHideFlags: 0

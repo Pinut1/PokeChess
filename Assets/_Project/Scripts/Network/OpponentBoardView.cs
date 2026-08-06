@@ -42,8 +42,42 @@ public class OpponentBoardView : MonoBehaviour
     /// <summary>해석 실패를 이미 경고한 speciesId — 스냅샷마다 반복 경고(스팸) 방지.</summary>
     private readonly HashSet<int> _warnedSpecies = new();
 
-    /// <summary>파트너 미러 전투 QA 테스트 등 다른 곳에서 같은 오프셋 위치에 그릴 때 재사용할 수 있게 공개.</summary>
-    public Vector3 BoardOffset => _boardOffset;
+    /// <summary>파트너 미러 전투 QA 테스트 등 다른 곳에서 같은 위치 기준을 쓰도록 공개. 두 관전 Layer
+    /// (LocalGameplayVisual/PartnerSpectateVisual)가 모두 준비되면 Layer/CullingMask로 화면을 분리하므로
+    /// 더 이상 좌표를 밀 필요가 없어 0을 반환하고, 하나라도 없으면 기존 오프셋을 그대로 반환한다
+    /// (겹침 방지 폴백). PartnerSpectateView의 카메라 위치, BattleManager 미러 인스턴스의
+    /// _visualOffset(PartnerBattleMirrorController.BoardOffset → FindBoardOffset 경유)이 전부 이
+    /// 값 하나로 연동되므로, 오프셋을 각 호출부에서 따로 지우지 않고 이 한 곳에서만 0/실값을 가른다.</summary>
+    public Vector3 BoardOffset => ArePartnerLayersReady(out _, out _) ? Vector3.zero : _boardOffset;
+
+    private const string LOCAL_LAYER_NAME = "LocalGameplayVisual";
+    private const string PARTNER_LAYER_NAME = "PartnerSpectateVisual";
+
+    /// <summary>Layer 누락 경고를 최초 1회만 남기기 위한 플래그(스냅샷마다 반복 로그 방지).</summary>
+    private bool _layerWarningLogged;
+
+    /// <summary>
+    /// 두 관전 전용 Layer가 Unity Editor에 모두 추가돼 있는지 확인한다. PartnerBattleMirrorController가
+    /// 이 판정을 그대로 가져다 써서(카메라 CullingMask 조정 등) 판정 기준을 한 곳에서만 계산한다.
+    /// 하나라도 없으면 Layer/CullingMask 분리와 오프셋 제거를 전혀 적용하지 않고 기존 BoardOffset
+    /// 방식으로 안전하게 계속 동작한다(부분 적용으로 인한 로컬/파트너 비주얼 겹침 방지).
+    /// </summary>
+    public bool ArePartnerLayersReady(out int localLayer, out int partnerLayer)
+    {
+        localLayer = LayerMask.NameToLayer(LOCAL_LAYER_NAME);
+        partnerLayer = LayerMask.NameToLayer(PARTNER_LAYER_NAME);
+        bool ready = localLayer >= 0 && partnerLayer >= 0;
+
+        if (!ready && !_layerWarningLogged)
+        {
+            Debug.LogError($"[OpponentBoardView] Layer 누락 — '{LOCAL_LAYER_NAME}'({localLayer}), " +
+                            $"'{PARTNER_LAYER_NAME}'({partnerLayer}). Unity Editor에 두 Layer를 추가할 " +
+                            "때까지 기존 BoardOffset 오프셋 방식으로 동작합니다(Layer/CullingMask 분리 미적용).");
+            _layerWarningLogged = true;
+        }
+
+        return ready;
+    }
 
     /// <summary>true면 Render를 호출해도 아무것도 그리지 않는다(파트너 미러 전투와 동시 표시되는 것 방지용).</summary>
     private bool _suppressed;
@@ -51,8 +85,119 @@ public class OpponentBoardView : MonoBehaviour
     /// <summary>Render가 마지막으로 받은 스냅샷. 억제 해제 시 다시 그리기 위해 보관.</summary>
     private BoardSnapshot _lastSnapshot;
 
-    private void OnEnable()  => GameEvents.OnOpponentBoardChanged += Render;
+    /// <summary>파트너 프리뷰 시각 오브젝트 전용 루트(런타임 생성). 이 컴포넌트가 붙은 GameObject(씬에서는
+    /// NetworkManager와 같은 오브젝트)를 그대로 부모로 쓰면 그 오브젝트에 달린 다른 컴포넌트/자식과 섞일 수
+    /// 있어, 풀링된 비주얼만 담는 전용 자식 하나를 따로 둔다.</summary>
+    private Transform _visualRoot;
+
+    /// <summary>파트너 관전용 아군 헥스 타일 + 벤치 받침 전용 루트(런타임 생성). 유닛 풀링 루트
+    /// (_visualRoot/_active)와 완전히 분리해, SetSuppressed(파트너 "유닛"만 숨김)나 스냅샷 재배치가
+    /// 이 정적인 보드 배경에 영향을 주지 않게 한다. transform의 자식이라 컴포넌트 파괴 시(Destroy)
+    /// Unity가 자동으로 함께 정리한다(_visualRoot와 동일 원칙 — 별도 OnDestroy 불필요).</summary>
+    private Transform _boardVisualRoot;
+
+    /// <summary>파트너 아군 타일/벤치 받침을 이미 만들었는지. OnEnable이 여러 번 호출되거나
+    /// Render가 스냅샷마다 반복 호출돼도 중복 생성되지 않도록 막는다.</summary>
+    private bool _boardVisualsBuilt;
+
+    /// <summary>스냅샷을 한 번이라도 수신했는지. entries.Count(빈 스냅샷 여부)와는 다른 축이다 —
+    /// PartnerSpectateView가 "아직 수신 전(준비 중)"과 "빈 필드 정상 수신"을 구분하는 데 쓴다.</summary>
+    public bool HasSnapshot => _lastSnapshot != null;
+
+    private Transform EnsureVisualRoot()
+    {
+        if (_visualRoot == null)
+        {
+            var go = new GameObject("OpponentBoardVisualRoot");
+            go.transform.SetParent(transform, false);
+            _visualRoot = go.transform;
+        }
+        return _visualRoot;
+    }
+
+    private void OnEnable()
+    {
+        GameEvents.OnOpponentBoardChanged += Render;
+        EnsurePartnerBoardVisuals();
+    }
+
     private void OnDisable() => GameEvents.OnOpponentBoardChanged -= Render;
+
+    /// <summary>
+    /// 파트너 관전용 아군 헥스 타일 + 벤치 받침을 최초 1회만 생성한다(보드 모양은 정적이라 스냅샷마다
+    /// 다시 만들 필요 없음). 실제 BoardManager 좌표 API(GetBoardSnapshot/GetBenchSnapshot/
+    /// CoordsToWorldPosition/BenchSlotWorldPosition)와 실제 프리팹(TilePrefab/BenchTilePrefab)을
+    /// 그대로 재사용하며 좌표·색상·스케일을 새로 하드코딩하지 않는다. 두 관전 Layer가 준비되지
+    /// 않았으면(ArePartnerLayersReady==false) 아무 것도 만들지 않는다 — Layer 없이 만들면 카메라
+    /// CullingMask 분리도 안 된 상태라 로컬 타일과 겹쳐 보이기만 하고 아무 이점이 없기 때문이다.
+    ///
+    /// OnEnable은 Unity 실행 순서상 씬의 모든 오브젝트에 대해 항상 Start()보다 먼저 끝난다 —
+    /// 그래서 이 메서드의 최초 호출(OnEnable 경유)은 거의 항상 BoardManager.Start()
+    /// (GenerateBoard/GenerateBench)가 실행되기 전에 들어온다. 그 시점엔 _battleField가 비어 있어
+    /// GetBoardSnapshot().Keys.Count == 0이므로, 이를 "아직 준비 안 됨" 신호로 보고 아무 것도
+    /// 만들지 않은 채 _boardVisualsBuilt도 세우지 않고 반환한다. Render()가 스냅샷을 받을 때마다
+    /// 이 메서드를 다시 호출하므로(파트너 첫 스냅샷은 네트워크 왕복이 걸려 BoardManager.Start()보다
+    /// 항상 늦게 도착), 보드 좌표가 채워진 뒤 자연히 재시도된다. GenerateBoard/GenerateBench는
+    /// 같은 Start() 안에서 연달아 호출되므로 보드 좌표가 찼다는 것은 벤치 좌표도 이미 찼다는 뜻과
+    /// 같다 — 벤치 준비 여부를 별도로 확인하지 않는다.
+    /// </summary>
+    private void EnsurePartnerBoardVisuals()
+    {
+        if (_boardVisualsBuilt) return;
+        if (!ArePartnerLayersReady(out _, out int partnerLayer)) return;
+
+        var board = GameManager.TryGet(out var gm) ? gm.Board : null;
+        if (board == null || board.TilePrefab == null || board.BenchTilePrefab == null) return;
+
+        // BoardManager.Start()가 아직 안 돌았으면(보드 좌표 0개) 보류 — _boardVisualsBuilt를 세우지
+        // 않아 다음 Render() 호출에서 재시도된다. IReadOnlyDictionary.Keys는 IEnumerable이라
+        // Count가 없어 Dictionary 자체의 Count(IReadOnlyCollection)를 쓴다.
+        if (board.GetBoardSnapshot().Count == 0) return;
+
+        var rootGO = new GameObject("PartnerBoardVisualRoot");
+        rootGO.transform.SetParent(transform, false);
+        _boardVisualRoot = rootGO.transform;
+
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+        {
+            HexTile tile = Instantiate(board.TilePrefab, _boardVisualRoot);
+            tile.transform.position = board.CoordsToWorldPosition(coords);
+            tile.enabled = false; // HexTile 컴포넌트(드롭/호버) 비활성화 — 표시 전용
+            foreach (var col in tile.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
+            SetDefaultLayerRecursive(tile.transform, partnerLayer);
+        }
+
+        for (int i = 0; i < board.GetBenchSnapshot().Count; i++)
+        {
+            BenchTile bench = Instantiate(board.BenchTilePrefab, _boardVisualRoot);
+
+            // GenerateBench()는 각 BenchTile의 로컬 회전/스케일을 건드리지 않고 위치만 대입한다 —
+            // 그래서 실제 로컬 벤치 타일의 월드 회전/스케일은 "_benchAnchor(월드) × 프리팹 자체의
+            // 로컬 값"의 곱이다. Instantiate 직후 지금 시점의 localRotation/localScale은 아직
+            // 프리팹 원본 그대로이므로, 그 값에 _benchAnchor의 월드 회전/스케일을 곱해 실제 로컬
+            // 벤치와 동일한 최종 월드 회전/스케일을 재현한다(임의 숫자 보정 없음 — 전부 BoardManager
+            // 실제 값 기반 계산).
+            Quaternion prefabLocalRotation = bench.transform.localRotation;
+            Vector3 prefabLocalScale = bench.transform.localScale;
+            bench.transform.SetPositionAndRotation(
+                board.BenchSlotWorldPosition(i),
+                board.BenchAnchorRotation * prefabLocalRotation);
+            bench.transform.localScale = Vector3.Scale(prefabLocalScale, board.BenchAnchorScale);
+
+            bench.enabled = false; // BenchTile 상호작용(드롭) 비활성화 — 표시 전용
+            foreach (var col in bench.GetComponentsInChildren<Collider>(true))
+                col.enabled = false;
+            SetDefaultLayerRecursive(bench.transform, partnerLayer);
+        }
+
+        // 아군 타일 + 벤치 받침을 모두 성공적으로 만든 뒤에만 세운다. 이 메서드에는 외부 I/O·비동기·
+        // 코루틴이 없고, 루프 안에서 쓰는 좌표 API(CoordsToWorldPosition/BenchSlotWorldPosition)는
+        // 범위를 벗어나도 예외 대신 안전한 기본값을 반환하도록 이미 만들어져 있어(BoardManager.cs),
+        // 루프 도중 예외로 중단돼 일부만 생성된 채 멈추는 경로가 구조적으로 없다 — 그래서 별도
+        // 정리/재시도 로직 없이 마지막에 플래그만 세운다.
+        _boardVisualsBuilt = true;
+    }
 
     /// <summary>
     /// 표시를 일시적으로 끄거나 켠다. 끄면 현재 활성 비주얼을 전부 풀로 반환하고,
@@ -70,7 +215,9 @@ public class OpponentBoardView : MonoBehaviour
     {
         _lastSnapshot = snap;
 
-        var board = GameManager.Instance != null ? GameManager.Instance.Board : null;
+        EnsurePartnerBoardVisuals();
+
+        var board = GameManager.TryGet(out var gm) ? gm.Board : null;
 
         // 활성분 전부 풀로 반환 후 스냅샷 기준으로 다시 배치.
         ReleaseActive();
@@ -87,17 +234,24 @@ public class OpponentBoardView : MonoBehaviour
 
             GameObject go = RentVisual(poolKey, data);
             go.SetActive(true);
-            go.transform.position = basePos + _boardOffset + Vector3.up * _unitHeight;
+            go.transform.position = basePos + BoardOffset + Vector3.up * _unitHeight;
 
-            float scale = 0.6f + (e.starLevel - 1) * 0.15f; // 성급 높을수록 약간 크게
-            go.transform.localScale = Vector3.one * scale;
+            // 실제 로컬 유닛(PokemonUnit.RefreshVisual/StarVisualScale)과 같은 기준으로 크기를 맞춘다 —
+            // 종마다 프리팹 원본 스케일이 다르므로 Vector3.one 같은 고정값을 강제하지 않고, 그 원본에
+            // 성급 배율만 곱한다. 성급 배율 계산 자체는 PokemonUnit.ComputeStarVisualScale로 위임해
+            // 실제 로컬 유닛과 동일한 계산을 재사용한다(값을 이 파일에 별도로 다시 적지 않음).
+            float starFactor = PokemonUnit.ComputeStarVisualScale(e.starLevel);
 
             if (poolKey == FALLBACK_POOL_KEY)
             {
-                // 캡슐 폴백만 성급 색상 표시(모델 머티리얼은 건드리지 않음).
-                go.transform.localScale = new Vector3(scale, 0.5f, scale);
+                // 캡슐 폴백은 참조할 프리팹이 없어 기존 그대로 성급 배율만으로 크기를 정한다.
+                go.transform.localScale = new Vector3(starFactor, 0.5f, starFactor);
                 var rend = go.GetComponent<Renderer>();
                 if (rend != null) rend.material.color = StarColor(e.starLevel);
+            }
+            else
+            {
+                go.transform.localScale = data.modelPrefab.transform.localScale * starFactor;
             }
 
             string speciesName = data != null ? data.pokemonNameEn : e.speciesId.ToString();
@@ -128,19 +282,32 @@ public class OpponentBoardView : MonoBehaviour
         GameObject go;
         if (poolKey != FALLBACK_POOL_KEY)
         {
-            go = Instantiate(data.modelPrefab, transform);
+            go = Instantiate(data.modelPrefab, EnsureVisualRoot());
         }
         else
         {
             go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.transform.SetParent(transform);
+            go.transform.SetParent(EnsureVisualRoot());
         }
 
         // 미러는 표시 전용 — 드래그 레이캐스트에 안 걸리도록 콜라이더 제거.
         foreach (var col in go.GetComponentsInChildren<Collider>(true))
             Destroy(col);
 
+        // 최초 생성 시 1회만 태깅 — 이후 풀에서 꺼내 재사용해도 GameObject.layer는 그대로 유지된다.
+        if (ArePartnerLayersReady(out _, out int partnerLayer))
+            SetDefaultLayerRecursive(go.transform, partnerLayer);
+
         return go;
+    }
+
+    /// <summary>Default(0)였던 자식만 targetLayer로 바꾸고 UI/Ignore Raycast/Outline 등 이미 특수
+    /// Layer가 지정된 자식은 보존한다. BoardManager/PokemonUnit/BattleManager와 동일한 규칙.</summary>
+    private static void SetDefaultLayerRecursive(Transform node, int targetLayer)
+    {
+        if (node.gameObject.layer == 0) node.gameObject.layer = targetLayer;
+        for (int i = 0; i < node.childCount; i++)
+            SetDefaultLayerRecursive(node.GetChild(i), targetLayer);
     }
 
     /// <summary>활성 비주얼을 전부 비활성화하고 각자의 종별 풀로 반환.</summary>

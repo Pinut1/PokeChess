@@ -23,6 +23,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnXpChanged       += HandleXpChanged;
         GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
         GameEvents.OnItemShopRerolled += HandleItemShopRerolled;
+        GameEvents.OnBattleStart      += HandleBattleStart;
     }
 
     private void OnDisable()
@@ -37,6 +38,23 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnXpChanged       -= HandleXpChanged;
         GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemShopRerolled -= HandleItemShopRerolled;
+        GameEvents.OnBattleStart      -= HandleBattleStart;
+    }
+
+    /// <summary>
+    /// 전투 시작 시 로컬 BattleSnapshot을 1회 만들어 파트너에게 전송한다(파트너 관전용 자동 전송).
+    /// GameEvents.OnBattleStart는 BattleManager.HandleBattleStart(실제 전투 코루틴 시작)와 같은
+    /// 프레임에 함께 발화하지만, 이 핸들러는 결과를 기다리지 않는 동기 조립+RPC 호출 한 번뿐이라
+    /// 실제 전투 시뮬레이션 시작을 지연시키지 않는다. 관전 기능 자체가 없거나 실패해도
+    /// (BroadcastBattleSnapshot이 false를 반환해도) 이 메서드는 그 결과를 무시하고 넘어간다 —
+    /// 전투 시작 흐름에 관전 실패가 영향을 주면 안 되기 때문이다.
+    /// </summary>
+    private void HandleBattleStart()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Board == null || gm.Network == null) return;
+
+        BattleSnapshot snapshot = BattleSnapshotCodec.CreateFromCurrentState(gm);
+        gm.Network.BroadcastBattleSnapshot(snapshot);
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
