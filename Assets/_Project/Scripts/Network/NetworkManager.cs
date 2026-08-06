@@ -291,10 +291,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
     private string _soloMatchGuid = "";
 
-    /// <summary>매치 진행 여부 판별 키(public — 로비 방 목록 표시(진행 중 태그)에서 NetworkConnectionTest가 읽음).</summary>
+    /// <summary>매치 진행 여부 판별 키(public — 로비 방 목록 표시(진행 중 태그)에서 RoomListUI가 읽음).</summary>
     public const string MATCH_GUID_ROOM_KEY = "MatchGuid";
 
-    /// <summary>방장 표시 닉네임 Room 속성 키(public — 로비 방 목록 표시에서 NetworkConnectionTest가 읽음).
+    /// <summary>방장 표시 닉네임 Room 속성 키(public — 로비 방 목록 표시에서 RoomListUI가 읽음).
     /// 값 자체는 NetworkManager만 쓴다(생성 시/마스터 교체 시) — 다른 곳은 읽기 전용.</summary>
     public const string HOST_NICKNAME_PROP_KEY = "HostNickname";
     public string PartnerNickname
@@ -324,7 +324,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void Awake()
     {
         // 자동 씬 동기화는 "연결 전에" 켜져 있어야 팔로워(비마스터)가 마스터의 LoadLevel을 따라온다.
-        // 같은 GameObject의 다른 컴포넌트(NetworkConnectionTest)가 Start에서 Connect()를 부를 수 있어
+        // 다른 컴포넌트(타이틀 화면의 TitleScreenUI)가 Start에서 Connect()를 부를 수 있어
         // Start 순서 경합을 피하려고 모든 Start보다 먼저인 Awake에서 켠다.
         if (!_soloMode) PhotonNetwork.AutomaticallySyncScene = true;
 
