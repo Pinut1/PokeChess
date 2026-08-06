@@ -2299,28 +2299,6 @@ public class QAManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 로컬 상태(필드 유닛/스테이지/라운드/치어리더 선택/활성 시너지)로 BattleSnapshot을 만든다.
-    /// 왕복 테스트·전송 테스트 두 QA 진입점이 공용으로 쓰는 조립 로직 — 중복 작성하지 않기 위해 분리했다.
-    /// </summary>
-    private static BattleSnapshot BuildLocalBattleSnapshot(GameManager gm)
-    {
-        StageData stage = gm.Phase != null ? gm.Phase.CurrentStage : null;
-        int roundIndex = gm.Phase != null ? gm.Phase.CurrentRound : 0;
-        IReadOnlyList<SynergyStatus> activeSynergies = gm.Synergy != null ? gm.Synergy.GetActiveSynergies() : null;
-
-        // 미러 desync 위험이 확인된 CheerleaderChoice.Current(static)는 BattleSnapshotCodec.Create가
-        // 직접 읽지 않으므로, 여기(호출측)에서 읽어 인자로 넘긴다.
-        int playerActorNumber = -1;
-#if PHOTON_UNITY_NETWORKING
-        if (PhotonNetwork.LocalPlayer != null)
-            playerActorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
-#endif
-
-        return BattleSnapshotCodec.Create(
-            gm.Board, stage, roundIndex, playerActorNumber, CheerleaderChoice.Current, activeSynergies);
-    }
-
-    /// <summary>
     /// BattleSnapshot Create→Encode→TryDecode→EquivalentTo 왕복 검증(QA 전용 진입점).
     /// 실제 전투 시작 흐름·네트워크 RPC와는 무관하다 — 현재 로컬 상태를 스냅샷화해서
     /// 직렬화 왕복이 값 손실 없이 되는지만 로컬에서 확인한다(BattleSnapshotCodec.cs 참고).
@@ -2335,7 +2313,7 @@ public class QAManager : MonoBehaviour
             return;
         }
 
-        BattleSnapshot snapshot = BuildLocalBattleSnapshot(gm);
+        BattleSnapshot snapshot = BattleSnapshotCodec.CreateFromCurrentState(gm);
 
         if (!BattleSnapshotCodec.VerifyRoundTrip(snapshot, out string error))
         {
@@ -2363,7 +2341,7 @@ public class QAManager : MonoBehaviour
             return;
         }
 
-        BattleSnapshot snapshot = BuildLocalBattleSnapshot(gm);
+        BattleSnapshot snapshot = BattleSnapshotCodec.CreateFromCurrentState(gm);
 
         if (!BattleSnapshotCodec.VerifyRoundTrip(snapshot, out string error))
         {

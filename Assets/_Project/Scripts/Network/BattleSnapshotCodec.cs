@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+#if PHOTON_UNITY_NETWORKING
+using Photon.Pun;
+#endif
 
 /// <summary>
 /// BattleSnapshot 생성(Create) + 직렬화(Encode/TryDecode) 전담.
@@ -34,7 +37,8 @@ public static class BattleSnapshotCodec
 
     /// <summary>
     /// 현재 로컬 상태에서 BattleSnapshot을 만든다. GameManager.Instance를 직접 호출하지 않고
-    /// 필요한 원본을 매개변수로 받는 factory다 — 호출부는 아직 없다(이번 단계는 정의만).
+    /// 필요한 원본을 매개변수로 받는 factory다. 호출부: BoardSyncBroadcaster(OnBattleStart 자동 전송),
+    /// QAManager(왕복/전송 테스트) — 둘 다 CreateFromCurrentState를 통해 이 메서드를 간접 호출한다.
     /// </summary>
     /// <param name="board">필드 유닛 조회 대상(널이면 유닛 없이 생성).</param>
     /// <param name="stage">현재 스테이지(널이면 stageId="").</param>
@@ -96,6 +100,30 @@ public static class BattleSnapshotCodec
         }
 
         return snap;
+    }
+
+    /// <summary>
+    /// 현재 로컬 상태(필드 유닛/스테이지/라운드/치어리더 선택/활성 시너지)로 BattleSnapshot을 만드는
+    /// 공용 진입점. 원래 QAManager.BuildLocalBattleSnapshot에 있던 조립 로직을 그대로 옮긴 것이라
+    /// 계산 결과는 이전과 동일하다 — GameEvents.OnBattleStart 자동 전송(BoardSyncBroadcaster)과
+    /// QA 왕복/전송 테스트(QAManager) 양쪽이 중복 작성 없이 이 메서드 하나를 공유한다.
+    /// GameManager는 이미 갖고 있는 참조를 그대로 받는다(TryGet 여부는 호출측 책임).
+    /// </summary>
+    public static BattleSnapshot CreateFromCurrentState(GameManager gm)
+    {
+        StageData stage = gm.Phase != null ? gm.Phase.CurrentStage : null;
+        int roundIndex = gm.Phase != null ? gm.Phase.CurrentRound : 0;
+        IReadOnlyList<SynergyStatus> activeSynergies = gm.Synergy != null ? gm.Synergy.GetActiveSynergies() : null;
+
+        // 미러 desync 위험이 확인된 CheerleaderChoice.Current(static)는 Create가 직접 읽지 않으므로,
+        // 여기(대표 호출부)에서 읽어 인자로 넘긴다.
+        int playerActorNumber = -1;
+#if PHOTON_UNITY_NETWORKING
+        if (PhotonNetwork.LocalPlayer != null)
+            playerActorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+#endif
+
+        return Create(gm.Board, stage, roundIndex, playerActorNumber, CheerleaderChoice.Current, activeSynergies);
     }
 
     private static BattleSnapshot.UnitEntry BuildUnitEntry(PokemonUnit unit, HexCoords coords, int index)

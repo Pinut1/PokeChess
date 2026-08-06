@@ -33,6 +33,11 @@ public class UnitStatusBarHud : MonoBehaviour
              "슬롯이 가로 배치라 아이템 1개든 2개든 이동량은 같다.")]
     [SerializeField] private float _itemLiftPixels = 20f;
 
+    [Tooltip("파트너 관전 전체화면이 떠 있는 동안 이 HUD를 숨기기 위한 참조. 비워두면(기본) 기존과 " +
+             "동일하게 항상 표시된다 — 관전 기능이 없는 씬에서도 이 HUD가 정상 동작해야 하므로 " +
+             "연결을 강제하지 않는다. PIP(축소) 상태는 여기 포함하지 않는다 — 전체화면일 때만 숨긴다.")]
+    [SerializeField] private PartnerSpectateView _partnerSpectateView;
+
     private readonly List<UnitStatusBarUI> _pool = new();
 
     private void Awake()
@@ -43,6 +48,11 @@ public class UnitStatusBarHud : MonoBehaviour
     private void LateUpdate()
     {
         if (_barPrefab == null || _barRoot == null || _camera == null) return;
+
+        // 파트너 전체화면 관전 중에는 내 로컬 유닛 상태바를 그리지 않는다 — 관전 카메라와 무관하게
+        // Camera.main 기준으로 그려지므로, 그대로 두면 파트너 화면 위에 내 유닛 바가 겹쳐 보인다.
+        if (_partnerSpectateView != null && _partnerSpectateView.IsExpanded) { HideFrom(0); return; }
+
         if (!GameManager.TryGet(out var gm)) { HideFrom(0); return; }
 
         int used = gm.Phase != null && gm.Phase.CurrentPhase == GamePhase.Battle

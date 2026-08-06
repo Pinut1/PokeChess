@@ -79,6 +79,24 @@ public class BoardManager : MonoBehaviour
     /// <summary>현재 레벨 기준 보드 배치 상한. 표시용(BoardCapacityLabel 등) 읽기 전용 노출.</summary>
     public int UnitCap => _unitCap;
 
+    /// <summary>아군 헥스 타일 프리팹(읽기 전용 노출). 파트너 관전용 타일 복제(OpponentBoardView)가
+    /// 실제 좌표 API(CoordsToWorldPosition)와 함께 재사용한다. 필드 자체는 계속 private [SerializeField]로 유지.</summary>
+    public HexTile TilePrefab => _tilePrefab;
+
+    /// <summary>벤치 받침 프리팹(읽기 전용 노출). 용도는 TilePrefab과 동일.</summary>
+    public BenchTile BenchTilePrefab => _benchTilePrefab;
+
+    /// <summary>벤치 받침 앵커(_benchAnchor)의 월드 회전. GenerateBench()는 각 BenchTile의 로컬 회전을
+    /// 건드리지 않으므로(위치만 대입), 실제 벤치 타일의 월드 회전은 이 값과 프리팹 자체의 로컬 회전을
+    /// 곱한 값이다. 파트너 관전용 벤치 복제(OpponentBoardView)가 BenchSlotWorldPosition(위치)과 함께
+    /// 실제 로컬 벤치와 동일한 회전을 재현하는 데 쓴다.</summary>
+    public Quaternion BenchAnchorRotation => _benchAnchor != null ? _benchAnchor.rotation : Quaternion.identity;
+
+    /// <summary>벤치 받침 앵커(_benchAnchor)의 월드 스케일(_benchScale 인스펙터 값 반영). GenerateBench()가
+    /// 각 BenchTile의 로컬 스케일을 건드리지 않으므로, 실제 벤치 타일의 월드 스케일은 이 값과 프리팹
+    /// 자체의 로컬 스케일을 곱한 값이다. 용도는 BenchAnchorRotation과 동일.</summary>
+    public Vector3 BenchAnchorScale => _benchAnchor != null ? _benchAnchor.lossyScale : Vector3.one;
+
     /// <summary>지금 보드 위에 올라간 유닛 수. 표시용 읽기 전용 노출.</summary>
     public int BoardUnitCount => CountUnitsOnBoard();
 
@@ -317,6 +335,7 @@ public class BoardManager : MonoBehaviour
                 // 타일에게 콜백 무전기 주입! (이름도 예쁘게 세팅)
                 // TryPlaceUnit은 bool을 반환하므로 Action으로 받기 위해 람다로 감싼다(반환값 무시).
                 newTile.Initialize(coords, (unit, c) => TryPlaceUnit(unit, c), $"Tile_{row}_{col}");
+                ApplyLocalVisualLayer(newTile.gameObject);
 
                 // 금고에 빈 타일 등록
                 _battleField.Add(coords, null);
@@ -388,6 +407,7 @@ public class BoardManager : MonoBehaviour
             // 드롭 콜백은 그대로 걸어두고 TryDropOnBench가 거부한다 — 판정을 한 곳에 모으기 위함.
             string tileName = IsUsableBenchSlot(slot) ? $"BenchTile_{slot}" : $"BenchTile_{slot}_Reserved";
             tile.Initialize(slot, (unit, s) => TryDropOnBench(unit, s), tileName);
+            ApplyLocalVisualLayer(tile.gameObject);
             _benchTiles[i] = tile;
 
             if (!warnedMissingCollider && tile.GetComponentInChildren<Collider>() == null)
@@ -396,6 +416,29 @@ public class BoardManager : MonoBehaviour
                 warnedMissingCollider = true;
             }
         }
+    }
+
+    /// <summary>
+    /// 로컬(내) 보드 시각 오브젝트(아군 타일/벤치 받침) 전용 Layer 태깅. Default(0)였던 자식만
+    /// LocalGameplayVisual로 바꾸고, 이미 UI/Ignore Raycast/Outline 등 다른 특수 Layer가 지정된
+    /// 자식은 보존한다. LocalGameplayVisual/PartnerSpectateVisual 둘 중 하나라도 Unity Editor에
+    /// 아직 추가되지 않았으면 아무 것도 바꾸지 않는다 — 부분 적용(카메라 CullingMask는 그대로인데
+    /// Layer만 바뀌어 오히려 안 보이게 되는 상태)을 막기 위함. Instantiate 직후 1회만 호출한다.
+    /// </summary>
+    private static void ApplyLocalVisualLayer(GameObject root)
+    {
+        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        int partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
+        if (localLayer < 0 || partnerLayer < 0 || root == null) return;
+
+        SetDefaultLayerRecursive(root.transform, localLayer);
+    }
+
+    private static void SetDefaultLayerRecursive(Transform node, int targetLayer)
+    {
+        if (node.gameObject.layer == 0) node.gameObject.layer = targetLayer;
+        for (int i = 0; i < node.childCount; i++)
+            SetDefaultLayerRecursive(node.GetChild(i), targetLayer);
     }
 
     /// <summary>

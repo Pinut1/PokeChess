@@ -259,10 +259,17 @@ public class PokemonUnit : MonoBehaviour
     // 새 모델만 덧붙여 두 모델이 겹친다. 직렬화하면 Unity가 복제된 자식으로 참조를 remap한다.
     [SerializeField] private GameObject _visual;
 
+    /// <summary>_starVisualScale 기본값이자, PokemonUnit 인스턴스 없이 같은 배율이 필요한 곳
+    /// (OpponentBoardView의 파트너 프리뷰 등)이 공유하는 단일 출처. 값을 두 곳에 따로 적지 않기
+    /// 위해 아래 인스턴스 필드도 이 배열을 기본값으로 그대로 참조한다.
+    /// private로 막아 배열 원소를 외부에서 직접 바꿀 수 없게 한다 — 외부에는 ComputeStarVisualScale
+    /// 계산 결과만 public static으로 노출한다(가변 배열 참조 자체는 절대 밖으로 내보내지 않음).</summary>
+    private static readonly float[] DefaultStarVisualScale = { 1f, 1.15f, 1.3f };
+
     // 성급별 모델 확대 배율. 인덱스 = starLevel - 1.
     // 진화로 프리팹이 바뀌지 않는 성급업(피카츄 2성→3성, 라프라스 1→2→3성)은 크기 말고는
     // 구분할 단서가 없어서 눈으로 성급을 읽을 수 있게 키운다.
-    [SerializeField] private float[] _starVisualScale = { 1f, 1.15f, 1.3f };
+    [SerializeField] private float[] _starVisualScale = DefaultStarVisualScale;
 
     /// <summary>현재 data의 modelPrefab으로 시각 요소를 (재)생성. 없으면 placeholder 캡슐.</summary>
     public void RefreshVisual()
@@ -311,15 +318,50 @@ public class PokemonUnit : MonoBehaviour
         // 드래그 레이캐스트 픽업용 콜라이더 보장 (모델 프리팹에 없을 수도 있음)
         if (GetComponentInChildren<Collider>() == null)
             gameObject.AddComponent<CapsuleCollider>();
+
+        // 이 컴포넌트는 항상 로컬(내) 보드/벤치 유닛이다(파트너 관전 표시는 OpponentBoardView가
+        // PokemonUnit 없이 별도로 만든다) — 스케일과 무관한 Layer 속성만 추가로 태깅한다.
+        ApplyLocalVisualLayer(_visual);
     }
 
-    /// <summary>현재 성급의 모델 확대 배율. 배열이 비었거나 범위를 벗어나면 1배(무확대).</summary>
-    private float StarVisualScale()
+    /// <summary>Default(0)였던 자식만 LocalGameplayVisual로 바꾸고 UI/Outline 등 특수 Layer 자식은
+    /// 보존한다. 두 관전 Layer 중 하나라도 Editor에 없으면 아무 것도 하지 않는다(부분 적용 금지 —
+    /// BoardManager/BattleManager/OpponentBoardView와 동일 조건).</summary>
+    private static void ApplyLocalVisualLayer(GameObject root)
     {
-        if (_starVisualScale == null || _starVisualScale.Length == 0) return 1f;
+        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        int partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
+        if (localLayer < 0 || partnerLayer < 0 || root == null) return;
 
-        int idx = Mathf.Clamp(starLevel - 1, 0, _starVisualScale.Length - 1);
-        float scale = _starVisualScale[idx];
+        SetDefaultLayerRecursive(root.transform, localLayer);
+    }
+
+    private static void SetDefaultLayerRecursive(Transform node, int targetLayer)
+    {
+        if (node.gameObject.layer == 0) node.gameObject.layer = targetLayer;
+        for (int i = 0; i < node.childCount; i++)
+            SetDefaultLayerRecursive(node.GetChild(i), targetLayer);
+    }
+
+    /// <summary>현재 성급의 모델 확대 배율. 배열이 비었거나 범위를 벗어나면 1배(무확대).
+    /// 계산 자체는 ComputeStarVisualScale(정적, 공용)에 그대로 위임한다 — 동작은 기존과 동일하다.</summary>
+    private float StarVisualScale() => ComputeStarVisualScale(_starVisualScale, starLevel);
+
+    /// <summary>
+    /// PokemonUnit 인스턴스 없이 같은 성급 배율을 계산해야 하는 곳(OpponentBoardView의 파트너 프리뷰 등)을
+    /// 위한 공용 진입점. 인스턴스별로 Inspector에서 _starVisualScale을 따로 조정했다면 그 값은 반영되지
+    /// 않고 DefaultStarVisualScale 기준으로 계산된다 — 인스턴스가 없는 호출측은 애초에 어떤 유닛의
+    /// Inspector 값인지 알 수 없으므로 기본값이 유일하게 답할 수 있는 값이다.
+    /// </summary>
+    public static float ComputeStarVisualScale(int starLevel) =>
+        ComputeStarVisualScale(DefaultStarVisualScale, starLevel);
+
+    private static float ComputeStarVisualScale(float[] table, int starLevel)
+    {
+        if (table == null || table.Length == 0) return 1f;
+
+        int idx = Mathf.Clamp(starLevel - 1, 0, table.Length - 1);
+        float scale = table[idx];
         return scale > 0f ? scale : 1f;
     }
 

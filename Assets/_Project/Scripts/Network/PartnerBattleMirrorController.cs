@@ -34,6 +34,31 @@ public class PartnerBattleMirrorController : MonoBehaviour
     /// <summary>파트너 관전 카메라 등 외부에서도 같은 파트너 보드 오프셋을 쓰도록 공개.</summary>
     public Vector3 BoardOffset => FindBoardOffset();
 
+    /// <summary>두 관전 전용 Layer(LocalGameplayVisual/PartnerSpectateVisual)가 Unity Editor에 모두
+    /// 추가돼 있는지. OpponentBoardView의 판정을 그대로 전달한다(판정 기준을 한 곳에서만 계산) —
+    /// PartnerSpectateView가 Main/Spectator Camera의 CullingMask를 조정할지 결정할 때 쓴다.</summary>
+    public bool ArePartnerLayersReady(out int localLayer, out int partnerLayer)
+    {
+        EnsureOpponentBoardView();
+        if (_opponentBoardView != null)
+            return _opponentBoardView.ArePartnerLayersReady(out localLayer, out partnerLayer);
+
+        localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
+        return localLayer >= 0 && partnerLayer >= 0;
+    }
+
+    /// <summary>파트너 BoardSnapshot을 한 번이라도 수신했는지. OpponentBoardView.HasSnapshot을 그대로 전달 —
+    /// PartnerSpectateView가 "아직 수신 전(준비 중)"과 "빈 필드 정상 수신"을 구분하는 데 쓴다.</summary>
+    public bool HasPartnerBoardSnapshot
+    {
+        get
+        {
+            EnsureOpponentBoardView();
+            return _opponentBoardView != null && _opponentBoardView.HasSnapshot;
+        }
+    }
+
     /// <summary>
     /// 미러 유닛 visual들이 실제로 자식으로 매달리는 루트(=미러 BattleManager 자신의 Transform).
     /// 관전 카메라가 "현재 미러 전장에 실제로 그려진 visual들의 월드 바운즈"를 계산할 때 쓴다.
@@ -56,17 +81,40 @@ public class PartnerBattleMirrorController : MonoBehaviour
     /// 미러 전용 BattleManager를 최초 1회 생성한다. 생성 직후 enabled=false로 전환해
     /// OnEnable에서 걸린 GameEvents 구독을 즉시 해제하고(실제 게임 이벤트 격리),
     /// OpponentBoardView가 쓰는 것과 같은 파트너 보드 오프셋으로 시각 표시를 설정한다.
+    /// 이미 생성돼 있으면(재사용) 새로 만들지 않지만, 아래 InjectEnemyTilePrefabIfAvailable는
+    /// 이 메서드가 호출될 때마다(최초 생성이든 재사용이든) 항상 다시 시도한다.
     /// </summary>
     private void EnsureMirrorBattleManager()
     {
-        if (_mirrorBattleManager != null) return;
+        if (_mirrorBattleManager == null)
+        {
+            var mirrorGO = new GameObject("MirrorBattleManager");
+            mirrorGO.transform.SetParent(transform);
 
-        var mirrorGO = new GameObject("MirrorBattleManager");
-        mirrorGO.transform.SetParent(transform);
+            _mirrorBattleManager = mirrorGO.AddComponent<BattleManager>();
+            _mirrorBattleManager.enabled = false;
+            _mirrorBattleManager.ConfigureMirrorVisuals(FindBoardOffset(), mirrorGO.transform);
+        }
 
-        _mirrorBattleManager = mirrorGO.AddComponent<BattleManager>();
-        _mirrorBattleManager.enabled = false;
-        _mirrorBattleManager.ConfigureMirrorVisuals(FindBoardOffset(), mirrorGO.transform);
+        InjectEnemyTilePrefabIfAvailable();
+    }
+
+    /// <summary>
+    /// 실제 로컬 BattleManager(GameManager.Battle)의 _enemyTilePrefab을 미러 인스턴스에 주입한다.
+    /// 런타임 AddComponent로 생성되는 미러 인스턴스는 어떤 Inspector 값도 물려받지 않으므로,
+    /// 그대로 두면 CreateEnemyTile()이 항상 폴백(연빨강 원기둥)으로 빠진다.
+    /// EnsureMirrorBattleManager가 호출될 때마다(최초 생성/기존 인스턴스 재사용 모두) 매번 다시
+    /// 시도한다 — 씬/초기화 순서상 최초 호출 시점엔 GameManager.Battle이 아직 준비되지 않았을 수
+    /// 있는데, 나중 호출에서 준비되면 그때 채워지도록 하기 위함. BattleManager.ConfigureMirrorEnemyTilePrefab
+    /// 자체가 null 인자를 무시하므로 이미 주입된 값을 실수로 지우는 일은 없다.
+    /// </summary>
+    private void InjectEnemyTilePrefabIfAvailable()
+    {
+        if (_mirrorBattleManager == null) return;
+        if (!GameManager.TryGet(out var gm) || gm.Battle == null) return;
+        if (gm.Battle.EnemyTilePrefab == null) return;
+
+        _mirrorBattleManager.ConfigureMirrorEnemyTilePrefab(gm.Battle.EnemyTilePrefab);
     }
 
     /// <summary>
@@ -114,15 +162,53 @@ public class PartnerBattleMirrorController : MonoBehaviour
         GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
     }
 
+    /// <summary>파트너 이탈 시 실행 중인 미러 전투를 조용히 중단한다 — 별도 결과 보고 없음.
+    /// 기존 파트너 대기 팝업/게임 일시정지 흐름은 건드리지 않는다(그건 기존 시스템 몫).</summary>
+    private void HandleOpponentDisconnected(float graceSeconds) => StopMirrorBattle();
+
     /// <summary>
-    /// 파트너 이탈 시 실행 중인 미러 전투를 조용히 중단한다 — 별도 결과 보고 없음.
-    /// 기존 파트너 대기 팝업/게임 일시정지 흐름은 건드리지 않는다(그건 기존 시스템 몫).
+    /// 실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 외부(관전 시스템이 새 BattleSnapshot으로
+    /// 갈아탈 때 등)에서 "지금 도는 미러 전투를 멈추고 싶다"는 의도를 이름으로 드러내는 공개 진입점 —
+    /// 내부적으로 BattleManager.AbortMirrorBattle() 하나만 그대로 재사용하고 새 정리 로직을 만들지
+    /// 않는다. 실행 중이 아니면 아무 일도 하지 않는다(중복 호출 안전).
     /// </summary>
-    private void HandleOpponentDisconnected(float graceSeconds)
+    public void StopMirrorBattle()
     {
         if (!IsRunning) return;
         _mirrorBattleManager.AbortMirrorBattle();
         SetOpponentBoardSuppressed(false);
+    }
+
+    /// <summary>
+    /// 쇼핑 중 파트너 관전용 적 프리뷰를 표시한다(BattleSnapshot 미러 전투와는 완전히 별개 경로).
+    /// 미러 BattleManager.ShowMirrorEnemyPreview를 그대로 전달 — ConfigureMirrorVisuals로 설정된
+    /// 오프셋 덕분에 파트너 보드 위치에 그려진다. 미러 전투가 실행 중(_units 채워짐)이면
+    /// BattleManager.ShowEnemyPreview 자체의 가드(_units.Count > 0 → return)로 무시된다.
+    /// </summary>
+    public void ShowPartnerEnemyPreview(StageData stage)
+    {
+        EnsureMirrorBattleManager();
+        _mirrorBattleManager.ShowMirrorEnemyPreview(stage);
+    }
+
+    /// <summary>
+    /// 파트너 관전용 적 프리뷰만 정리한다. 이 컨트롤러가 소유한 미러 BattleManager 인스턴스
+    /// (_mirrorBattleManager)의 프리뷰만 지운다 — 로컬 실제 BattleManager(GameManager.Instance.Battle)의
+    /// 적 프리뷰와는 완전히 별도 인스턴스라 영향이 없다.
+    /// </summary>
+    public void ClearPartnerEnemyPreview()
+    {
+        if (_mirrorBattleManager != null) _mirrorBattleManager.ClearMirrorEnemyPreview();
+    }
+
+    /// <summary>
+    /// 미러 전투 시작 시 호출. 쇼핑 중 보여주던 적 프리뷰 "유닛"만 제거하고 빨간 육각 타일은 유지한다
+    /// (ClearPartnerEnemyPreview는 타일까지 함께 지운다) — 타일 위에서 실제 미러 전투 적이 싸우는
+    /// 모습을 그대로 보여주기 위함.
+    /// </summary>
+    public void ClearPartnerEnemyPreviewUnitsOnly()
+    {
+        if (_mirrorBattleManager != null) _mirrorBattleManager.ClearMirrorEnemyPreviewUnitsOnly();
     }
 
     /// <summary>
