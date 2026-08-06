@@ -18,7 +18,7 @@ using UnityEngine.UI;
 /// </summary>
 public class TitleScreenUI : MonoBehaviour
 {
-    /// <summary>이전 세션 관련 화면 상태. NetworkManager 폴링 + 로컬 UI 플래그로 판정한다.</summary>
+    /// <summary>모달로 덮어야 할 화면 상태. NetworkManager 폴링 + 로컬 UI 플래그로 판정한다.</summary>
     private enum TitleUiState
     {
         NormalLogin,
@@ -26,7 +26,8 @@ public class TitleScreenUI : MonoBehaviour
         Rejoining,
         RejoinFailed,
         ConfirmStartNew,
-        AbandoningPreviousSession
+        AbandoningPreviousSession,
+        WaitingForPartner
     }
 
     [Header("단계 1 — Press any Button")]
@@ -166,12 +167,19 @@ public class TitleScreenUI : MonoBehaviour
         SetMessage(null);
     }
 
-    /// <summary>접속 전이거나 재접속 처리 중이면 입장 버튼을 잠근다.</summary>
+    /// <summary>
+    /// 접속 전이거나 재접속 처리 중이면 입장 버튼을 잠근다.
+    /// <para>
+    /// <b>이미 방에 들어가 있을 때도 잠근다.</b> 방을 만든 뒤 파트너를 기다리는 동안에도 타이틀 화면은
+    /// 그대로 떠 있는데(씬 전환은 두 번째 플레이어가 들어와야 일어난다), 이때 버튼이 살아 있으면
+    /// 방에 있는 채로 JoinOrCreateRoom을 다시 불러 Photon이 오류를 뱉는다.
+    /// </para>
+    /// </summary>
     private void RefreshLoginInteractable()
     {
         if (_network == null) return;
 
-        bool ready = _network.IsConnected && !_network.IsRejoining;
+        bool ready = _network.IsConnected && !_network.IsRejoining && !_network.IsInRoom;
 
         if (_createRoomButton != null) _createRoomButton.interactable = ready;
         if (_joinRandomButton != null) _joinRandomButton.interactable = ready;
@@ -261,6 +269,10 @@ public class TitleScreenUI : MonoBehaviour
         if (_network.RejoinFailed) return TitleUiState.RejoinFailed;
         if (_network.HasSavedSession) return TitleUiState.PreviousSessionAvailable;
 
+        // 방에 들어갔지만 아직 씬은 그대로 = 파트너 대기 중. HasSavedSession보다 뒤에 두어도 되는 이유는
+        // NetworkManager가 OnJoinedRoom에서 저장된 세션을 지우기 때문이다(둘이 동시에 참이 되지 않는다).
+        if (_network.IsInRoom) return TitleUiState.WaitingForPartner;
+
         return TitleUiState.NormalLogin;
     }
 
@@ -295,6 +307,14 @@ public class TitleScreenUI : MonoBehaviour
 
             case TitleUiState.AbandoningPreviousSession:
                 _modalDialog.ShowWaiting("재접속을 포기하는 중입니다...");
+                break;
+
+            // 버튼 없는 대기 화면으로 두면 파트너가 영영 안 올 때 빠져나갈 길이 없다 — 나가기를 준다.
+            // 아직 혼자 있는 방이라 나가도 남는 사람이 없다.
+            case TitleUiState.WaitingForPartner:
+                _modalDialog.ShowNotice(
+                    "파트너를 기다리는 중입니다...", "나가기",
+                    () => _network.LeaveRoom());
                 break;
 
             case TitleUiState.RejoinFailed:
