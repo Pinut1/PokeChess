@@ -271,11 +271,15 @@ public class ShopManager : MonoBehaviour
         // 마스터의 TryAuthorityRollSharedShop()은 기존 예약을 무조건 반환하고 새로 만든다.
         // 무조건 Roll()을 부르면 RequestSharedShopRestore()가 복원하려는 기존 예약을 먼저 지워버릴
         // 수 있다(2026-08 확인). 재접속이면 상점 채우기는 RequestSharedShopRestore 응답에 맡긴다.
-        // 아이템 상점(RollItemShop)은 공유 풀 권위와 무관한 순수 로컬 추첨이라 그대로 둔다.
+        // 아이템 상점(RollItemShop)도 재접속 시 함께 스킵한다 — 개인 로컬 상태라 공유 풀 권위와는
+        // 무관하지만, 저장된 스냅샷이 있으면 RestoreLocalPlayerStateAfterReconnect()가
+        // RestoreItemShopState()로 복원하고, 없으면(구버전 세션) 그쪽에서 한 번만 폴백으로 새로
+        // 굴린다(2026-08). 여기서 무조건 굴리면 복원할 상점 내용을 먼저 지워버린다.
         if (!isResumingRejoinedMatch)
+        {
             Roll();         // 초기 유닛 상점 공개
-
-        RollItemShop(); // 초기 아이템 상점 공개
+            RollItemShop(); // 초기 아이템 상점 공개
+        }
     }
 
     /// <summary>
@@ -479,6 +483,26 @@ public class ShopManager : MonoBehaviour
 
         Debug.Log($"[LevelXP] XP 구매 완료 (-{_buyXpCostGold}G, +{_buyXpAmount}XP)");
         return true;
+    }
+
+    /// <summary>
+    /// 재접속 복원 전용 — 저장된 레벨/XP를 부작용 없이 직접 반영한다. AddXp()/TryLevelUp()과 달리
+    /// 레벨업 판정·골드 차감을 거치지 않는다 — 재접속 때마다 정상 레벨업 이벤트가 반복 실행되면
+    /// 이후 추가될 수 있는 레벨업 보상 로직이 중복 실행될 위험이 있어 분리했다.
+    /// 최대 레벨에서의 XP 처리(0으로 고정)는 TryLevelUp()과 동일한 정책을 따른다.
+    /// </summary>
+    public void RestoreProgressionState(int level, int currentXp)
+    {
+        _currentLevel = Mathf.Clamp(level, 1, _maxLevel);
+
+        int restoredXp = Mathf.Max(0, currentXp);
+        CurrentXp = _currentLevel >= _maxLevel ? 0 : restoredXp;
+
+        Debug.Log($"[LevelXP] 재접속 복원: Lv.{_currentLevel}, XP {CurrentXp}/{RequiredXp}");
+
+        // LevelChanged는 ShopManager 자신의 HandleLevelChanged를 거쳐 UnitCapChanged까지 발행한다.
+        GameEvents.LevelChanged(_currentLevel);
+        GameEvents.XpChanged(CurrentXp, RequiredXp);
     }
 
     /// <summary>
@@ -1057,6 +1081,17 @@ public class ShopManager : MonoBehaviour
         RerollCount += amount;
         GameEvents.RerollCountChanged(RerollCount);
         Debug.Log($"[Shop] 무료 리롤 +{amount} => {RerollCount}");
+    }
+
+    /// <summary>
+    /// 재접속 복원 전용 — 저장된 무료 리롤 잔여 횟수를 부작용 없이 직접 반영한다. AddReroll()과 달리
+    /// 보상/증강 지급 경로가 아니므로, 재접속 때마다 지급 로직이 중복 실행될 위험이 없다.
+    /// </summary>
+    public void RestoreRerollCount(int rerollCount)
+    {
+        RerollCount = Mathf.Max(0, rerollCount);
+        Debug.Log($"[Shop] 재접속 복원: 무료 리롤 {RerollCount}");
+        GameEvents.RerollCountChanged(RerollCount);
     }
 
     /// <summary>슬롯의 포켓몬을 구매해 벤치에 배치. 성공 시 true.</summary>
@@ -2770,6 +2805,157 @@ public class ShopManager : MonoBehaviour
             EvolutionStoneData stone => stone.stoneName,
             _ => product != null ? product.name : "(null)"
         };
+    }
+
+    /// <summary>슬롯이 비어있음(구매됨/추첨 실패).</summary>
+    private const int ITEM_SHOP_SLOT_EMPTY = 0;
+    /// <summary>슬롯에 일반 아이템(ItemData)이 진열됨.</summary>
+    private const int ITEM_SHOP_SLOT_ITEM = 1;
+    /// <summary>슬롯에 진화의 돌(EvolutionStoneData)이 진열됨.</summary>
+    private const int ITEM_SHOP_SLOT_STONE = 2;
+
+    /// <summary>아이템 상점 슬롯 1칸의 재접속 스냅샷. dataId는 kind==ITEM이면 ItemData.id,
+    /// kind==STONE이면 EvolutionStoneData.id. kind==EMPTY면 dataId는 의미 없음(0).</summary>
+    [System.Serializable]
+    private class ItemShopSlotSnapshot
+    {
+        public int kind;
+        public int dataId;
+    }
+
+    /// <summary>아이템 상점 전체 재접속 스냅샷. JsonUtility로 직렬화해 Player CustomProperties에 저장한다.</summary>
+    [System.Serializable]
+    private class ItemShopReconnectSnapshot
+    {
+        public ItemShopSlotSnapshot[] slots;
+        public bool[] rerollUsed;
+        /// <summary>_lastDisplayedStone.id. 표시된 돌이 없으면 0.</summary>
+        public int lastDisplayedStoneId;
+    }
+
+    /// <summary>
+    /// 현재 아이템 상점 상태(진열 카드/슬롯별 리롤 사용 여부/마지막 표시 돌)를 재접속 복원용
+    /// JSON으로 직렬화한다. NetworkManager는 이 문자열을 그대로 Player CustomProperties에 저장할
+    /// 뿐, 내부 구조를 알 필요가 없다.
+    /// </summary>
+    public string CreateItemShopReconnectSnapshotJson()
+    {
+        if (_itemSlots == null) return null;
+
+        var slots = new ItemShopSlotSnapshot[_itemSlots.Length];
+        for (int i = 0; i < _itemSlots.Length; i++)
+        {
+            slots[i] = _itemSlots[i] switch
+            {
+                ItemData item => new ItemShopSlotSnapshot { kind = ITEM_SHOP_SLOT_ITEM, dataId = item.id },
+                EvolutionStoneData stone => new ItemShopSlotSnapshot { kind = ITEM_SHOP_SLOT_STONE, dataId = stone.id },
+                _ => new ItemShopSlotSnapshot { kind = ITEM_SHOP_SLOT_EMPTY, dataId = 0 }
+            };
+        }
+
+        var rerollUsed = new bool[_itemShopSize];
+        if (_itemSlotRerollUsed != null)
+        {
+            int copyLength = Mathf.Min(rerollUsed.Length, _itemSlotRerollUsed.Length);
+            System.Array.Copy(_itemSlotRerollUsed, rerollUsed, copyLength);
+        }
+
+        var snapshot = new ItemShopReconnectSnapshot
+        {
+            slots = slots,
+            rerollUsed = rerollUsed,
+            lastDisplayedStoneId = _lastDisplayedStone != null ? _lastDisplayedStone.id : 0
+        };
+
+        return JsonUtility.ToJson(snapshot);
+    }
+
+    /// <summary>
+    /// 재접속 복원 전용 — 저장된 JSON 스냅샷으로 아이템 상점을 부작용 없이 복원한다.
+    /// RollItemShop()/RerollItemSlot()을 호출하지 않고, 저장된 id를 ItemDatabase/
+    /// EvolutionStoneDatabase에서 조회해 ScriptableObject 참조를 직접 되찾는다.
+    /// 슬롯 수가 현재 _itemShopSize와 다르거나 id 하나라도 조회에 실패하면 전체를 적용하지 않고
+    /// false를 반환한다(불완전한 상태로 일부만 반영하지 않음) — 호출부가 새 추첨으로 폴백해야 한다.
+    /// 성공 시에만 _itemSlots/_itemSlotRerollUsed/_lastDisplayedStone을 갱신하고
+    /// GameEvents.ItemShopRerolled를 1회 발행한다.
+    /// </summary>
+    public bool RestoreItemShopState(string snapshotJson)
+    {
+        if (string.IsNullOrEmpty(snapshotJson)) return false;
+
+        ItemShopReconnectSnapshot snapshot;
+        try { snapshot = JsonUtility.FromJson<ItemShopReconnectSnapshot>(snapshotJson); }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[ItemShop][Rejoin] 스냅샷 파싱 실패: {e.Message}");
+            return false;
+        }
+
+        if (snapshot?.slots == null || snapshot.rerollUsed == null ||
+            snapshot.slots.Length != _itemShopSize || snapshot.rerollUsed.Length != _itemShopSize)
+        {
+            Debug.LogWarning("[ItemShop][Rejoin] 스냅샷 슬롯 수 불일치 — 복원 실패");
+            return false;
+        }
+
+        var itemDb = ItemDatabase.Instance;
+        var stoneDb = EvolutionStoneDatabase.Instance;
+        var resolvedSlots = new ScriptableObject[snapshot.slots.Length];
+
+        for (int i = 0; i < snapshot.slots.Length; i++)
+        {
+            var slotSnapshot = snapshot.slots[i];
+            switch (slotSnapshot.kind)
+            {
+                case ITEM_SHOP_SLOT_EMPTY:
+                    resolvedSlots[i] = null;
+                    break;
+
+                case ITEM_SHOP_SLOT_ITEM:
+                    ItemData item = itemDb != null ? itemDb.GetById(slotSnapshot.dataId) : null;
+                    if (item == null)
+                    {
+                        Debug.LogWarning($"[ItemShop][Rejoin] {i}번 슬롯 아이템 id={slotSnapshot.dataId} 조회 실패 — 복원 실패");
+                        return false;
+                    }
+                    resolvedSlots[i] = item;
+                    break;
+
+                case ITEM_SHOP_SLOT_STONE:
+                    EvolutionStoneData stone = stoneDb != null ? stoneDb.GetById(slotSnapshot.dataId) : null;
+                    if (stone == null)
+                    {
+                        Debug.LogWarning($"[ItemShop][Rejoin] {i}번 슬롯 진화의 돌 id={slotSnapshot.dataId} 조회 실패 — 복원 실패");
+                        return false;
+                    }
+                    resolvedSlots[i] = stone;
+                    break;
+
+                default:
+                    Debug.LogWarning($"[ItemShop][Rejoin] {i}번 슬롯 알 수 없는 kind={slotSnapshot.kind} — 복원 실패");
+                    return false;
+            }
+        }
+
+        EvolutionStoneData resolvedLastStone = null;
+        if (snapshot.lastDisplayedStoneId > 0)
+        {
+            resolvedLastStone = stoneDb != null ? stoneDb.GetById(snapshot.lastDisplayedStoneId) : null;
+            if (resolvedLastStone == null)
+            {
+                Debug.LogWarning($"[ItemShop][Rejoin] lastDisplayedStone id={snapshot.lastDisplayedStoneId} 조회 실패 — 복원 실패");
+                return false;
+            }
+        }
+
+        // 여기까지 왔으면 전부 유효 — 이제서야 실제 상태에 반영한다(부분 적용 금지).
+        _itemSlots = resolvedSlots;
+        _itemSlotRerollUsed = (bool[])snapshot.rerollUsed.Clone();
+        _lastDisplayedStone = resolvedLastStone;
+
+        Debug.Log("[ItemShop][Rejoin] 아이템 상점 상태 복원 완료");
+        GameEvents.ItemShopRerolled();
+        return true;
     }
 
     // ──────────────────────────────────────────

@@ -226,7 +226,15 @@ public class AugmentManager : MonoBehaviour
     // ─────────────────────────────────────────
 
     private void HandleRoundChanged(int round)
-        => _activeAugments.ForEach(a => a.OnRoundChanged(round));
+    {
+        // 재접속 라운드 캐치업 중이면 라운드 진입 효과(예: GambleStoneAugment의 매 라운드 돌 지급)를
+        // 다시 실행하지 않는다 — ShopManager/RewardManager와 동일 패턴(2026-08). 증강 자체의 재접속
+        // 복원(RestoreAugmentByNameEn → Augment.Restore())은 이 이벤트 경로를 타지 않으므로 영향 없다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+            return;
+
+        _activeAugments.ForEach(a => a.OnRoundChanged(round));
+    }
 
     private void HandleBattleStart()
         => _activeAugments.ForEach(a => a.OnBattleStart());

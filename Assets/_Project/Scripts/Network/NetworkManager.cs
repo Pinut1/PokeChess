@@ -75,6 +75,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC와 달리 유예(비활성) 중에도 서버에 보존돼 재접속·마스터 교체에 안전하다.</summary>
     private const string AUGMENTS_PROP_KEY = "Augments";
 
+    /// <summary>플레이어 레벨을 Player CustomProperties에 저장할 때 쓰는 키(재접속 복원용).</summary>
+    private const string LEVEL_PROP_KEY = "Level";
+
+    /// <summary>플레이어 현재 XP(레벨 내 진행도)를 Player CustomProperties에 저장할 때 쓰는 키(재접속 복원용).</summary>
+    private const string XP_PROP_KEY = "CurrentXp";
+
+    /// <summary>플레이어의 무료 리롤 잔여 횟수를 Player CustomProperties에 저장할 때 쓰는 키(재접속 복원용).</summary>
+    private const string REROLL_COUNT_PROP_KEY = "RerollCount";
+
+    /// <summary>아이템 상점 재접속 스냅샷(JSON 직렬화된 ShopManager.ItemShopReconnectSnapshot)을
+    /// Player CustomProperties에 저장할 때 쓰는 키. 개인 로컬 상태라 Room이 아닌 Player 속성에 둔다.</summary>
+    private const string ITEM_SHOP_STATE_PROP_KEY = "ItemShopState";
+
     /// <summary>내 보드+벤치 유닛 스냅샷(JSON 직렬화된 BoardManager.UnitSaveData[])을 Player
     /// CustomProperties에 저장할 때 쓰는 키(1차 구현 — 저장/복원 기반만).</summary>
     private const string UNITS_PROP_KEY = "Units";
@@ -361,6 +374,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // 돌아온 경우(Photon 연결 자체는 끊기지 않음) 이 값들이 새 씬의 새 인스턴스에서 전혀
             // 채워지지 않던 문제(2026-08 확인) 수정 — 이 분기 자체를 타는 것과는 무관하게 필요하다.
             ReloadSavedRejoinSessionDisplayState();
+
+            // 이 인스턴스가 이미 라운드가 진행 중인 방에서 생성됐다면(s_resyncAfterRejoinPending이 세팅된
+            // 정상 재접속 경로가 아니더라도 — 예: PUN AutomaticallySyncScene을 타고 수동적으로 씬이
+            // 재생성된 경우) 신규 매치 시작으로 오판하지 않도록 _gameStarted를 미리 true로 간주한다.
+            // 정말 신규 매치라면 Room에 ROUND_PROP_KEY가 아직 없으므로 이 체크는 아무 영향이 없다.
+            // (OnPlayerPropertiesUpdate의 HasActiveRoundInRoom 방어와는 책임이 다르다 — 여기는 이 인스턴스의
+            // _gameStarted 자체를 최대한 이른 시점에 정확히 복원하는 초기화, 그쪽은 그 복원이 어떤 이유로든
+            // 누락됐을 때의 최종 방어선이다.)
+            if (!_gameStarted && HasActiveRoundInRoom())
+                _gameStarted = true;
 
             // 재입장 성공 후 게임 씬으로 명시적으로 복귀한 경우 — 이 씬의 다른 매니저들이 Awake/OnEnable로
             // GameEvents 구독을 마친 뒤(Start 시점엔 항상 보장됨) 예약된 재동기화를 실행한다.
@@ -2492,6 +2515,33 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    /// <summary>내 레벨/현재 XP를 Player CustomProperties에 기록(재접속 복원용). 두 값은 서로 연관돼
+    /// 있으므로 한 번의 SetCustomProperties 호출로 함께 저장한다.</summary>
+    public void SyncLocalProgression(int level, int currentXp)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        var props = new Hashtable { { LEVEL_PROP_KEY, level }, { XP_PROP_KEY, currentXp } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>내 무료 리롤 잔여 횟수를 Player CustomProperties에 기록(재접속 복원용).</summary>
+    public void SyncLocalRerollCount(int rerollCount)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        var props = new Hashtable { { REROLL_COUNT_PROP_KEY, rerollCount } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>내 아이템 상점 스냅샷(JSON)을 Player CustomProperties에 기록(재접속 복원용).
+    /// 아이템 상점은 공유 풀 권위와 무관한 개인 로컬 상태라 Room이 아닌 Player 속성에 저장한다.</summary>
+    public void SyncLocalItemShopState(string snapshotJson)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        if (string.IsNullOrEmpty(snapshotJson)) return;
+        var props = new Hashtable { { ITEM_SHOP_STATE_PROP_KEY, snapshotJson } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
     /// <summary>팀 공통 HP 초기화(MasterClient만, 아직 미설정일 때). PlayerHealthManager가 게임 시작 시 호출.</summary>
     public void InitTeamHealth(int hp)
     {
@@ -2987,6 +3037,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// Room CustomProperties의 ROUND_PROP_KEY가 유효한 진행 라운드(1 이상)를 갖고 있는지.
+    /// 씬 로드 핸드셰이크가 재접속으로 인한 SceneReady 재갱신을 신규 매치 시작과 구분하는 서버 권위
+    /// 기준(2026-08) — 클라이언트별 휘발성 필드(_gameStarted)보다 우선한다. Room이 아직 없거나
+    /// 라운드 값이 예상 타입이 아니면 방어적으로 false.
+    /// </summary>
+    private bool HasActiveRoundInRoom()
+    {
+        if (PhotonNetwork.CurrentRoom == null) return false;
+        if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue)) return false;
+
+        try { return System.Convert.ToInt32(roundValue) >= 1; }
+        catch (System.Exception) { return false; }
+    }
+
+    /// <summary>
     /// 플레이어의 CustomProperties(준비 상태)가 바뀔 때마다 호출됨.
     /// MasterClient만 검사 — 모든 플레이어가 준비 완료면 전체에 알림.
     /// _readyCount(로컬 변수) 대신 Player CustomProperties를 직접 조회하므로
@@ -3013,7 +3078,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!IsMasterClient) return;
 
         // 게임 씬 로드 핸드셰이크: 두 클라가 모두 SceneReady면 라운드 1 시작(1회만).
-        if (!_gameStarted && changedProps.ContainsKey(SCENE_READY_PROP_KEY) && AllPlayersHaveFlag(SCENE_READY_PROP_KEY))
+        // _gameStarted는 이 인스턴스의 휘발성 필드라, 신뢰할 수 없는 경로로 씬이 재생성되면(예: 재접속
+        // 클라이언트의 SceneReady 재갱신이 AutomaticallySyncScene을 타고 넘어와 마스터 자신의 씬까지
+        // 재생성되는 경우) false로 남을 수 있다. Room에 이미 진행 중인 라운드가 기록돼 있으면 신규 매치
+        // 시작으로 오판하지 않도록 서버 권위(HasActiveRoundInRoom)로 한 번 더 방어한다
+        // (2026-08 재접속 중 라운드1 중복 방송 확인 — RestoreLocalPlayerStateAfterReconnect 완료 후
+        // 골드/무료 리롤/시작 유닛/유닛 상점이 RW001 보상으로 재지급되는 회귀).
+        if (!_gameStarted && !HasActiveRoundInRoom() &&
+            changedProps.ContainsKey(SCENE_READY_PROP_KEY) && AllPlayersHaveFlag(SCENE_READY_PROP_KEY))
         {
             _gameStarted = true;
             BroadcastRoundStart(1);
@@ -3172,8 +3244,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 GameEvents.PartnerAugmentsChanged(augmentNames);
         }
 
-        // 2) 내 정보 복원(2단계 신규) — 서버(Player CustomProperties)에 남아있는 내 Gold/Augments를
-        // 기존 시스템에 반영한다. 유닛/보드/아이템/레벨·XP는 저장 위치 자체가 없어 이번 단계 범위 밖.
+        // 2) 내 정보 복원(2단계 신규) — 서버(Player CustomProperties)에 남아있는 내 Gold/Augments/
+        // 레벨·XP/무료 리롤/아이템 상점을 기존 시스템에 반영한다. 유닛 인벤토리는 저장 위치 자체가
+        // 없어 이번 단계 범위 밖.
         RestoreLocalPlayerStateAfterReconnect();
 
         int teamHp = TeamHealth;
@@ -3198,9 +3271,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments Player CustomProperties를 읽어 기존
-    /// 시스템에 반영한다. 새 저장 구조는 만들지 않고 기존 GOLD_PROP_KEY/AUGMENTS_PROP_KEY만 읽는다.
-    /// 유닛/보드/아이템/레벨·XP는 애초에 저장 위치가 없어 이번 단계에서 다루지 않는다.
+    /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments/레벨·XP/무료 리롤/아이템 상점 Player
+    /// CustomProperties를 읽어 기존 시스템에 반영한다. GOLD_PROP_KEY/AUGMENTS_PROP_KEY/UNITS_PROP_KEY/
+    /// LEVEL_PROP_KEY/XP_PROP_KEY에 이어 REROLL_COUNT_PROP_KEY/ITEM_SHOP_STATE_PROP_KEY를 추가로 읽는다.
+    /// 유닛 인벤토리는 애초에 저장 위치가 없어 다루지 않는다.
     /// </summary>
     private void RestoreLocalPlayerStateAfterReconnect()
     {
@@ -3221,6 +3295,47 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             {
                 gm.Shop.AddGold(delta);
                 Debug.Log($"[Network][Rejoin] 내 골드 복원: {gm.Shop.Gold}G (서버 저장값 {savedGold}G)");
+            }
+        }
+
+        // Level/XP: ShopManager.CurrentLevel/CurrentXp는 private set이라 직접 대입할 수 없다. AddXp()는
+        // 정상 XP 획득 경로라 레벨업 판정·이벤트를 동반하므로 재접속 복원에는 쓰지 않고, 부작용 없는
+        // 전용 진입점(RestoreProgressionState)만 사용한다. 두 키가 모두 있을 때만 복원한다 — 구버전
+        // 세션이나 값이 아직 한 번도 저장되지 않은 신규 게임에서는 조용히 건너뛴다(예외 없음).
+        if (gm.Shop != null &&
+            myProps.TryGetValue(LEVEL_PROP_KEY, out object myLevel) &&
+            myProps.TryGetValue(XP_PROP_KEY, out object myXp))
+        {
+            gm.Shop.RestoreProgressionState((int)myLevel, (int)myXp);
+            Debug.Log($"[Network][Rejoin] 내 레벨/XP 복원: Lv.{gm.Shop.CurrentLevel}, {gm.Shop.CurrentXp}/{gm.Shop.RequiredXp} (서버 저장값 Lv.{myLevel}, XP {myXp})");
+        }
+
+        // 무료 리롤 잔여 횟수: ShopManager.RerollCount는 private set이라 직접 대입할 수 없다. AddReroll()은
+        // 보상/증강 지급 경로라 재접속마다 재실행되면 안 되므로 부작용 없는 전용 진입점(RestoreRerollCount)만
+        // 사용한다. 키가 없으면(구버전 세션) 조용히 건너뛴다 — 새 ShopManager 기본값(0) 유지.
+        if (gm.Shop != null && myProps.TryGetValue(REROLL_COUNT_PROP_KEY, out object myRerollCount))
+        {
+            gm.Shop.RestoreRerollCount((int)myRerollCount);
+            Debug.Log($"[Network][Rejoin] 내 무료 리롤 복원: {gm.Shop.RerollCount}");
+        }
+
+        // 아이템 상점(개인 로컬 상태, 공유 풀 권위와 무관): 저장된 스냅샷이 있으면 그대로 복원한다.
+        // ShopManager.Start()는 재접속 시 RollItemShop()을 스킵하므로, 스냅샷이 없거나(구버전 세션)
+        // 구조가 손상돼 RestoreItemShopState()가 false를 반환하면 아이템 상점이 빈 채로 남는다 —
+        // 여기서 폴백으로 한 번만 새로 굴려 안전망을 둔다(신규 매치의 초기화 흐름과는 분리된 경로).
+        if (gm.Shop != null)
+        {
+            bool itemShopRestored = false;
+            if (myProps.TryGetValue(ITEM_SHOP_STATE_PROP_KEY, out object myItemShopState) &&
+                myItemShopState is string itemShopJson && !string.IsNullOrEmpty(itemShopJson))
+            {
+                itemShopRestored = gm.Shop.RestoreItemShopState(itemShopJson);
+            }
+
+            if (!itemShopRestored)
+            {
+                Debug.Log("[Network][Rejoin] 아이템 상점 스냅샷 없음/복원 실패 — 폴백으로 새로 갱신");
+                gm.Shop.RollItemShop();
             }
         }
 
@@ -3533,6 +3648,9 @@ public class NetworkManager : MonoBehaviour
     public bool BroadcastBattleSnapshot(BattleSnapshot _) => false;
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
+    public void SyncLocalProgression(int _, int __) { }
+    public void SyncLocalRerollCount(int _) { }
+    public void SyncLocalItemShopState(string _) { }
     public bool RequestSharedShopRoll(int level, bool forceCostFour, bool onlyCostFour, int[] excludedBaseIds) => false;
     public bool RequestSharedShopRestore() => false;
     public bool RequestSharedShopPurchase(int revision, int slot) => false;

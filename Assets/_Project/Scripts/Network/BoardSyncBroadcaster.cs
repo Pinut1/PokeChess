@@ -20,6 +20,9 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnGoldChanged     += HandleGoldChanged;
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested += MarkBoardDirtyForResync;
+        GameEvents.OnXpChanged       += HandleXpChanged;
+        GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
+        GameEvents.OnItemShopRerolled += HandleItemShopRerolled;
     }
 
     private void OnDisable()
@@ -31,6 +34,9 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnGoldChanged     -= HandleGoldChanged;
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested -= MarkBoardDirtyForResync;
+        GameEvents.OnXpChanged       -= HandleXpChanged;
+        GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
+        GameEvents.OnItemShopRerolled -= HandleItemShopRerolled;
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
@@ -60,6 +66,36 @@ public class BoardSyncBroadcaster : MonoBehaviour
             if (!string.IsNullOrEmpty(name)) names.Add(name);
         }
         gm.Network.SyncLocalAugments(names.ToArray());
+    }
+
+    /// <summary>
+    /// 레벨/XP 저장 트리거. ShopManager.AddXp()는 레벨업이 발생하면 OnLevelChanged를 (레벨업 횟수만큼)
+    /// 먼저 쏘고 OnXpChanged를 마지막에 한 번만 쏜다 — 그래서 OnLevelChanged는 구독하지 않고
+    /// OnXpChanged만 구독해 최종 확정된 레벨/XP를 한 번만 저장한다(중복 저장 방지).
+    /// </summary>
+    private void HandleXpChanged(int currentXp, int _)
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Shop == null || gm.Network == null) return;
+        gm.Network.SyncLocalProgression(gm.Shop.CurrentLevel, currentXp);
+    }
+
+    /// <summary>무료 리롤 잔여 횟수 저장 트리거.</summary>
+    private void HandleRerollCountChanged(int rerollCount)
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Network == null) return;
+        gm.Network.SyncLocalRerollCount(rerollCount);
+    }
+
+    /// <summary>
+    /// 아이템 상점 저장 트리거. RollItemShop()(라운드 시작)과 RerollItemSlot()(슬롯 개별 리롤) 모두
+    /// 이 이벤트를 발행하므로 두 경로 모두 여기서 한 번에 커버된다. 이벤트 인자가 없어 ShopManager가
+    /// 직접 현재 상태를 직렬화한 JSON을 만들어 넘겨준다.
+    /// </summary>
+    private void HandleItemShopRerolled()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Shop == null || gm.Network == null) return;
+        string snapshotJson = gm.Shop.CreateItemShopReconnectSnapshotJson();
+        gm.Network.SyncLocalItemShopState(snapshotJson);
     }
 
     private void LateUpdate()
