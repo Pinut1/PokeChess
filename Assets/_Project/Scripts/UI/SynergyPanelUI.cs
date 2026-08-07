@@ -36,6 +36,12 @@ public class SynergyPanelUI : MonoBehaviour
     private readonly List<SynergyStatus> _sorted = new List<SynergyStatus>();
     private int _page;
 
+    /// <summary>지금 이 패널이 내 시너지가 아니라 파트너 시너지를 보여주는 중인지.</summary>
+    private bool _showingPartnerSynergy;
+
+    // OpponentBoardView.LastSnapshot을 읽기 위한 캐시(지연 탐색) — ItemInventoryUI와 동일 패턴.
+    private OpponentBoardView _partnerBoardView;
+
     private int RowsPerPage => _rows != null ? _rows.Length : 0;
 
     private void Awake()
@@ -49,30 +55,115 @@ public class SynergyPanelUI : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnSynergyUpdated += Refresh;
+        GameEvents.OnSynergyUpdated += HandleLocalSynergyUpdated;
+        GameEvents.OnOpponentBoardChanged += HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
         Refresh();
     }
 
     private void OnDisable()
     {
-        GameEvents.OnSynergyUpdated -= Refresh;
+        GameEvents.OnSynergyUpdated -= HandleLocalSynergyUpdated;
+        GameEvents.OnOpponentBoardChanged -= HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
+
+        // 파트너 시너지를 보여주던 도중 꺼지더라도 다음 활성화 때 그 상태로 남지 않게 한다
+        // (정상 경로는 HandlePartnerSpectateExpandedChanged(false)가 되돌리지만, 이 컴포넌트 자신이
+        // 먼저 비활성화되는 경우를 대비한 방어 처리 — ItemInventoryUI와 동일 원칙).
+        _showingPartnerSynergy = false;
 
         // 패널이 꺼지면 설명창도 같이 닫는다 — 안 그러면 Exit 이벤트를 못 받고 떠 있게 된다.
         if (_tooltip != null) _tooltip.HideAll();
     }
 
+    /// <summary>
+    /// 파트너 전체화면 관전 진입/종료(GameEvents.OnPartnerSpectateExpandedChanged, PIP는 포함 안 함).
+    /// 진입 시 파트너의 마지막 보드 스냅샷으로 즉시 1회 계산해 표시하고(다음 파트너 보드 변경까지
+    /// 기다리지 않음), 종료 시 내 시너지(Refresh)로 정확히 되돌린다. 실제 SynergyManager 상태
+    /// (_statuses/GetActiveSynergies)는 전혀 건드리지 않는다 — 이 패널이 무엇을 보여줄지만 바꾼다.
+    /// </summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded)
+    {
+        _showingPartnerSynergy = expanded;
+
+        if (_tooltip != null) _tooltip.HideAll(); // 전환 중 낡은 설명창이 남지 않게
+
+        if (expanded)
+            RefreshFromPartner(EnsurePartnerBoardView()?.LastSnapshot);
+        else
+            Refresh();
+    }
+
+    private OpponentBoardView EnsurePartnerBoardView()
+    {
+        if (_partnerBoardView == null) _partnerBoardView = FindFirstObjectByType<OpponentBoardView>();
+        return _partnerBoardView;
+    }
+
+    /// <summary>내 시너지 갱신(GameEvents.OnSynergyUpdated). 파트너 시너지를 보여주는 중에는 보류한다 —
+    /// 관전을 마치고 Refresh()로 돌아갈 때 SynergyManager를 다시 pull하므로 놓치는 변경은 없다.</summary>
+    private void HandleLocalSynergyUpdated()
+    {
+        if (_showingPartnerSynergy) return;
+        Refresh();
+    }
+
+    /// <summary>파트너 보드 갱신(GameEvents.OnOpponentBoardChanged). 파트너 시너지를 보여주는 중일 때만
+    /// 반영한다 — 평소(내 시너지 표시 중)에는 이 이벤트를 무시한다.</summary>
+    private void HandlePartnerBoardChanged(BoardSnapshot snap)
+    {
+        if (!_showingPartnerSynergy) return;
+        RefreshFromPartner(snap);
+    }
+
     private void TogglePage()
     {
         _page = _page == 0 ? 1 : 0;
-        Refresh();
+        if (_showingPartnerSynergy) RefreshFromPartner(EnsurePartnerBoardView()?.LastSnapshot);
+        else Refresh();
     }
 
     private void Refresh()
     {
-        if (RowsPerPage == 0) return;
-
         var synergy = GameManager.TryGet(out var gm) ? gm.Synergy : null;
-        var all = synergy != null ? synergy.GetAllSynergyStatuses() : null;
+        BindStatuses(synergy != null ? synergy.GetAllSynergyStatuses() : null);
+    }
+
+    /// <summary>
+    /// 파트너 BoardSnapshot의 보드(벤치 제외) 유닛만 골라 SynergyManager.ComputeSynergyStatuses로
+    /// 계산한 뒤 같은 방식으로 바인딩한다. SynergyManager._statuses(실제 게임에 적용되는 상태)는
+    /// 전혀 건드리지 않는다 — 이 결과는 계산만 하고 화면에 그리는 용도로만 쓴다.
+    /// </summary>
+    private void RefreshFromPartner(BoardSnapshot snap)
+    {
+        var synergy = GameManager.TryGet(out var gm) ? gm.Synergy : null;
+        if (synergy == null) { BindStatuses(null); return; }
+
+        BindStatuses(synergy.ComputeSynergyStatuses(ResolveBoardSpecies(snap)).Values);
+    }
+
+    /// <summary>BoardSnapshot에서 보드 위(벤치 제외) 유닛의 종만 추린다 — 로컬 계산(board.GetUnitsOnBoard())과
+    /// 동일 규칙. speciesId만으로 충분한 이유는 SynergyManager.ComputeSynergyStatuses의 doc 참고.</summary>
+    private static List<PokemonData> ResolveBoardSpecies(BoardSnapshot snap)
+    {
+        var list = new List<PokemonData>();
+        if (snap == null) return list;
+
+        PokemonDatabase db = PokemonDatabase.Instance;
+        if (db == null) return list;
+
+        foreach (var e in snap.entries)
+        {
+            if (!e.onBoard) continue; // 벤치는 시너지에 포함되지 않음
+            PokemonData data = db.GetById(e.speciesId);
+            if (data != null) list.Add(data);
+        }
+        return list;
+    }
+
+    private void BindStatuses(IEnumerable<SynergyStatus> all)
+    {
+        if (RowsPerPage == 0) return;
 
         _sorted.Clear();
         if (all != null)

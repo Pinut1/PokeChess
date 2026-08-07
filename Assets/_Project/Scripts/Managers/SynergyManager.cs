@@ -89,20 +89,43 @@ public class SynergyManager : MonoBehaviour
         var board = GameManager.Instance.Board;
         if (board == null) return;
 
+        var boardSpecies = new List<PokemonData>();
+        foreach (var unit in board.GetUnitsOnBoard())
+            if (unit != null && unit.data != null) boardSpecies.Add(unit.data);
+
+        _statuses.Clear();
+        foreach (var kv in ComputeSynergyStatuses(boardSpecies))
+            _statuses[kv.Key] = kv.Value;
+
+        GameEvents.SynergyUpdated();
+    }
+
+    /// <summary>
+    /// 순수 계산 — 보드 위 종(PokemonData) 목록만으로 시너지 상태를 계산한다. RecalculateSynergies가
+    /// board.GetUnitsOnBoard()에서 뽑아 쓰는 것과 완전히 같은 로직이며(이 메서드로 추출), PokemonUnit
+    /// 인스턴스나 실제 보드 상태를 전혀 요구하지 않는다 — 성급/장착 아이템은 시너지 카운트에 영향이
+    /// 없고, unit.data 자체가 이미 진화/돌 진화/통신진화 반영 후의 최종 종이라 speciesId 하나만
+    /// 있으면 충분하다. 그래서 파트너 관전(BoardSnapshot.Entry.speciesId, PokemonUnit이 없는 곳)에서도
+    /// 그대로 재사용할 수 있다 — 이 인스턴스가 이미 들고 있는 _all/_synergyLookup(SynergyDatabase
+    /// 로드 결과)을 그대로 쓰고, 새 DB 접근이나 계산 경로를 만들지 않는다.
+    /// 인자로 받은 목록은 호출측이 "보드 위(벤치 제외)"만 추리는 책임을 진다 — 이 메서드는 필터링하지 않는다.
+    /// </summary>
+    public Dictionary<int, SynergyStatus> ComputeSynergyStatuses(IEnumerable<PokemonData> boardSpecies)
+    {
         // 시너지 id → 고유 카운트 키 집합.
         // 키는 기본적으로 진화 계열 루트(EvolutionFamily), countPerSpecies 시너지만 종 id.
         var keysPerSynergy = new Dictionary<int, HashSet<int>>();
 
-        foreach (var unit in board.GetUnitsOnBoard())
+        foreach (var data in boardSpecies)
         {
-            if (unit == null || unit.data == null) continue;
+            if (data == null) continue;
 
-            foreach (var synergyKey in unit.data.synergies)
+            foreach (var synergyKey in data.synergies)
             {
                 if (!_synergyLookup.TryGetValue(synergyKey, out var synergyData))
                 {
                     if (_warnedUnknown.Add(synergyKey))
-                        Debug.LogWarning($"[Synergy] 미등록 시너지 문자열: \"{synergyKey}\" ({unit.data.pokemonName}) — 데이터 오타 확인");
+                        Debug.LogWarning($"[Synergy] 미등록 시너지 문자열: \"{synergyKey}\" ({data.pokemonName}) — 데이터 오타 확인");
                     continue;
                 }
 
@@ -114,12 +137,12 @@ public class SynergyManager : MonoBehaviour
                 // 돌연변이(countPerSpecies)만 종 단위 — 이브이 진화체 수집이 시너지 설계 자체라
                 // 계열로 묶으면 최대 1카운트가 되어 성립하지 않는다.
                 keys.Add(synergyData.countPerSpecies
-                    ? unit.data.id
-                    : EvolutionFamily.RootId(unit.data)); // 중복은 HashSet이 걸러줌
+                    ? data.id
+                    : EvolutionFamily.RootId(data)); // 중복은 HashSet이 걸러줌
             }
         }
 
-        _statuses.Clear();
+        var result = new Dictionary<int, SynergyStatus>();
         foreach (var data in _all)
         {
             if (data == null) continue;
@@ -127,7 +150,7 @@ public class SynergyManager : MonoBehaviour
             int count = keysPerSynergy.TryGetValue(data.id, out var keys) ? keys.Count : 0;
             if (count == 0) continue;
 
-            _statuses[data.id] = new SynergyStatus
+            result[data.id] = new SynergyStatus
             {
                 data = data,
                 uniqueCount = count,
@@ -135,7 +158,7 @@ public class SynergyManager : MonoBehaviour
             };
         }
 
-        GameEvents.SynergyUpdated();
+        return result;
     }
 
     /// <summary>충족하는 가장 높은 티어 인덱스. 없으면 -1. (tiers는 임포터가 count 오름차순으로 저장)</summary>

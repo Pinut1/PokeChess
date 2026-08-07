@@ -84,6 +84,12 @@ public class UIManager : MonoBehaviour
     private GamePhase _currentPhase = GamePhase.Lobby;
     private bool _readyRequestSubmitted;
 
+    // 파트너 전체화면 관전 중 상점 HUD 숨김/복원 상태(HandlePartnerSpectateExpandedChanged 전용).
+    private bool _shopPanelsHiddenForSpectate;
+    private bool _unitStorePanelActiveBeforeSpectate;
+    private bool _itemStorePanelActiveBeforeSpectate;
+    private bool _battleReadyButtonActiveBeforeSpectate;
+
     // ──────────────────────────────────────────
     // 전적 데이터 및 전적창 상태
     // ──────────────────────────────────────────
@@ -229,6 +235,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnUnitPlaced += HandleUnitPlacedForForm;
         GameEvents.OnUnitBenched += HandleUnitBenchedForForm;
         GameEvents.OnAllPlayersReady += HandleAllPlayersReadyForForm;
+
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
     }
 
     private void OnDisable()
@@ -251,6 +259,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnUnitPlaced -= HandleUnitPlacedForForm;
         GameEvents.OnUnitBenched -= HandleUnitBenchedForForm;
         GameEvents.OnAllPlayersReady -= HandleAllPlayersReadyForForm;
+
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
 
         _isGoldTransferPending = false;
 
@@ -576,6 +586,44 @@ public class UIManager : MonoBehaviour
 
         if (_itemStorePanel != null)
             _itemStorePanel.SetActive(!showUnitStore);
+    }
+
+    /// <summary>
+    /// 파트너 전체화면 관전 진입/종료(GameEvents.OnPartnerSpectateExpandedChanged, PIP는 포함 안 함).
+    /// 진입 시 상점 HUD 두 루트(_unitStorePanel/_itemStorePanel)와 전투 시작 버튼을 끈다 —
+    /// 새로고침·리롤·XP 구매 버튼(ShopButton_Panel)이 UnitStore_Panel의 자식이라 이 SetActive만으로
+    /// 함께 꺼진다(버튼을 개별로 SetActive하지 않는다). 진입 전 각 오브젝트의 실제 활성 상태를
+    /// 저장해뒀다가 종료 시 그대로 되돌린다 — SetActiveShopPanel(상호 배타 토글)을 쓰면 "둘 다
+    /// 꺼져 있던 상태"(예: 전투 중)를 강제로 아이템 상점 활성으로 되돌리는 오류가 생기고,
+    /// 전투 시작 버튼도 무조건 true로 복원하면 원래 꺼져 있던 상태(예: 이미 준비 완료로
+    /// UpdateBattleReadyButtonState가 비활성 처리한 경우 등)를 무시하고 잘못 되살리므로 두 경우
+    /// 모두 저장된 실제 값으로만 되돌린다. ShopManager/전투 준비 네트워크 로직은 건드리지 않는다 —
+    /// GameObject 표시 여부만 바꾼다(interactable은 UpdateBattleReadyButtonState가 별도로 관리).
+    /// </summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded)
+    {
+        if (expanded)
+        {
+            if (_shopPanelsHiddenForSpectate) return; // 중복 진입 방지
+            _shopPanelsHiddenForSpectate = true;
+
+            _unitStorePanelActiveBeforeSpectate = _unitStorePanel != null && _unitStorePanel.activeSelf;
+            _itemStorePanelActiveBeforeSpectate = _itemStorePanel != null && _itemStorePanel.activeSelf;
+            _battleReadyButtonActiveBeforeSpectate = _battleReadyButton != null && _battleReadyButton.gameObject.activeSelf;
+
+            if (_unitStorePanel != null) _unitStorePanel.SetActive(false);
+            if (_itemStorePanel != null) _itemStorePanel.SetActive(false);
+            if (_battleReadyButton != null) _battleReadyButton.gameObject.SetActive(false);
+        }
+        else
+        {
+            if (!_shopPanelsHiddenForSpectate) return;
+            _shopPanelsHiddenForSpectate = false;
+
+            if (_unitStorePanel != null) _unitStorePanel.SetActive(_unitStorePanelActiveBeforeSpectate);
+            if (_itemStorePanel != null) _itemStorePanel.SetActive(_itemStorePanelActiveBeforeSpectate);
+            if (_battleReadyButton != null) _battleReadyButton.gameObject.SetActive(_battleReadyButtonActiveBeforeSpectate);
+        }
     }
 
     private static Button FindSceneButton(string name, GameObject requiredParent = null)

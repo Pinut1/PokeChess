@@ -53,6 +53,21 @@ public class ItemInventoryUI : MonoBehaviour
     private Coroutine _reforgeHoldCoroutine;
     private bool _reforgeHoldComplete;
 
+    // ─────────────────────────────
+    // 파트너 전체화면 관전 — 읽기 전용 표시 전환
+    // ─────────────────────────────
+    // Raycast 자체를 막는 방식(CanvasGroup.blocksRaycasts=false)은 Hover(OnPointerEnter/Exit)까지
+    // 함께 막아 설명창 툴팁이 안 뜨는 문제가 있었다(실측 확인). 그래서 각 ItemSlotUI.ReadOnly만
+    // 켠다 — 드래그 시작(OnBeginDrag) 한 곳만 막고 Hover는 그대로 통과시키는, 상태를 바꾸는 입력
+    // 경로만 정밀 차단하는 방식이다(ItemSlotUI.ReadOnly 주석 참고).
+
+    /// <summary>지금 이 인벤토리가 내 것이 아니라 파트너 것을 보여주는 중인지.</summary>
+    private bool _showingPartnerInventory;
+
+    // OpponentBoardView.LastSnapshot을 읽기 위한 캐시(지연 탐색) — PartnerBattleMirrorController가
+    // EnsureOpponentBoardView에서 쓰는 것과 같은 lazy-init 패턴.
+    private OpponentBoardView _partnerBoardView;
+
     private void Awake()
     {
         if (_camera == null) _camera = Camera.main;
@@ -101,13 +116,23 @@ public class ItemInventoryUI : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnInventoryChanged += Refresh;
+        GameEvents.OnInventoryChanged += HandleLocalInventoryChanged;
+        GameEvents.OnOpponentBoardChanged += HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
         Refresh();
     }
 
     private void OnDisable()
     {
-        GameEvents.OnInventoryChanged -= Refresh;
+        GameEvents.OnInventoryChanged -= HandleLocalInventoryChanged;
+        GameEvents.OnOpponentBoardChanged -= HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
+
+        // 파트너 데이터를 보여주던 도중 꺼지더라도 다음 활성화 때 잠금이 풀린 채 남지 않게 한다
+        // (정상 경로는 이미 HandlePartnerSpectateExpandedChanged(false)가 되돌리지만, 이 컴포넌트
+        // 자신이 먼저 비활성화되는 경우를 대비한 방어 처리).
+        _showingPartnerInventory = false;
+        SetSlotsReadOnly(false);
 
         // UI가 꺼지는 동안 홀드 코루틴이 남아 있으면 안 된다(요구사항: UI 비활성화 시 즉시 초기화).
         _reforgeDragSource = null;
@@ -120,6 +145,60 @@ public class ItemInventoryUI : MonoBehaviour
 
         for (int i = 0; i < _slots.Length; i++)
             if (_slots[i] != null) _tooltip.Hide(_slots[i]);
+    }
+
+    /// <summary>
+    /// 파트너 전체화면 관전 진입/종료(GameEvents.OnPartnerSpectateExpandedChanged, PIP는 포함 안 함).
+    /// 진입 시 모든 슬롯을 읽기 전용으로 돌리고(SetSlotsReadOnly — 드래그만 막고 Hover는 그대로 통과)
+    /// 파트너의 마지막 보드 스냅샷으로 즉시 1회 표시한다(다음 파트너 보드 변경까지 기다리지 않음).
+    /// 종료 시 읽기 전용을 풀고 내 인벤토리로 정확히 되돌린다. 진행 중이던 재조합기 홀드/설명창처럼
+    /// 로컬 상호작용 상태는 전환 즉시 정리한다 — 파트너 데이터로 바뀐 슬롯을 대상으로 낡은 홀드가
+    /// 이어지면 안 되기 때문이다.
+    /// </summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded)
+    {
+        _showingPartnerInventory = expanded;
+        SetSlotsReadOnly(expanded);
+
+        _reforgeDragSource = null;
+        CancelReforgeHold();
+
+        if (_tooltip != null)
+            for (int i = 0; i < _slots.Length; i++)
+                if (_slots[i] != null) _tooltip.Hide(_slots[i]);
+
+        if (expanded)
+            RefreshFromPartner(EnsurePartnerBoardView()?.LastSnapshot);
+        else
+            Refresh();
+    }
+
+    private void SetSlotsReadOnly(bool readOnly)
+    {
+        for (int i = 0; i < _slots.Length; i++)
+            if (_slots[i] != null) _slots[i].ReadOnly = readOnly;
+    }
+
+    private OpponentBoardView EnsurePartnerBoardView()
+    {
+        if (_partnerBoardView == null) _partnerBoardView = FindFirstObjectByType<OpponentBoardView>();
+        return _partnerBoardView;
+    }
+
+    /// <summary>내 인벤토리 변경 반영. 파트너 데이터를 보여주는 중에는 보류한다 — 관전을 마치고
+    /// Refresh()로 돌아갈 때 어차피 최신 상태를 다시 읽으므로 놓치는 변경은 없다.</summary>
+    private void HandleLocalInventoryChanged()
+    {
+        if (_showingPartnerInventory) return;
+        Refresh();
+    }
+
+    /// <summary>파트너 보드 갱신(GameEvents.OnOpponentBoardChanged). 파트너 데이터를 보여주는 중일 때만
+    /// 반영한다 — 평소(내 인벤토리 표시 중)에는 이 이벤트를 무시한다.</summary>
+    private void HandlePartnerBoardChanged(BoardSnapshot snap)
+    {
+        if (!_showingPartnerInventory) return;
+        RefreshFromPartner(snap);
     }
 
     /// <summary>
@@ -163,11 +242,77 @@ public class ItemInventoryUI : MonoBehaviour
     }
 
     /// <summary>
+    /// 파트너 BoardSnapshot의 인벤토리 섹션(inventoryItemIds/inventoryStoneIds/hasRemover/
+    /// reforgerCount)으로 칸을 채운다. Refresh()와 같은 순서(아이템 → 진화의 돌 → 제거기 → 재조합기)를
+    /// 따르되, id를 ItemDatabase/EvolutionStoneDatabase로 되찾아 표시만 한다 — 내 ItemManager는
+    /// 전혀 건드리지 않고, 여기서 만든 참조를 어딘가에 다시 써넣지도 않는다(순수 표시).
+    /// 재조합/장착 등 실제 변경 메서드는 이 경로에서 전혀 호출하지 않는다(SetSlotsReadOnly가
+    /// ItemSlotUI.ReadOnly로 드래그 시작 자체를 막으므로 이 메서드가 호출될 상황에서는 드롭도
+    /// 애초에 발생하지 않는다).
+    /// </summary>
+    private void RefreshFromPartner(BoardSnapshot snap)
+    {
+        if (snap == null) { ClearAllSlots(); return; }
+
+        ItemDatabase itemDb = ItemDatabase.Instance;
+        EvolutionStoneDatabase stoneDb = EvolutionStoneDatabase.Instance;
+        int cursor = 0;
+
+        if (itemDb != null)
+        {
+            foreach (int id in snap.inventoryItemIds)
+            {
+                if (cursor >= _slots.Length) break;
+                ItemData item = itemDb.GetById(id);
+                if (item != null) _slots[cursor]?.Bind(item);
+                else _slots[cursor]?.Clear();
+                cursor++;
+            }
+        }
+
+        if (stoneDb != null)
+        {
+            foreach (int id in snap.inventoryStoneIds)
+            {
+                if (cursor >= _slots.Length) break;
+                EvolutionStoneData stone = stoneDb.GetById(id);
+                if (stone != null) _slots[cursor]?.Bind(stone);
+                else _slots[cursor]?.Clear();
+                cursor++;
+            }
+        }
+
+        if (snap.hasRemover && _removerData != null && cursor < _slots.Length)
+            _slots[cursor++]?.Bind(_removerData);
+
+        if (_reforgerData != null)
+            for (int i = 0; i < snap.reforgerCount && cursor < _slots.Length; i++, cursor++)
+                _slots[cursor]?.Bind(_reforgerData);
+
+        for (; cursor < _slots.Length; cursor++)
+            _slots[cursor]?.Clear();
+    }
+
+    private void ClearAllSlots()
+    {
+        for (int i = 0; i < _slots.Length; i++)
+            _slots[i]?.Clear();
+    }
+
+    /// <summary>
     /// 드롭 처리 진입점. 인벤토리 슬롯 대상 재조합기 사용을 3D 유닛 레이캐스트보다 먼저 판정한다 —
     /// 칸 뒤에 우연히 유닛이 겹쳐 보이더라도 슬롯 재조합이 우선해야 한다.
     /// </summary>
     private void HandleDropped(ItemSlotUI slot, PointerEventData eventData)
     {
+        // 방어선 — ItemSlotUI.ReadOnly(SetSlotsReadOnly)가 이 시점 이전에 이미 드래그 시작 자체를
+        // 막아 Dropped가 발행될 일이 없지만, 파트너 데이터를 보여주는 동안 실제 변경 메서드
+        // (ItemManager.EquipToUnit 등)가 절대 호출되지 않도록 한 번 더 확인한다. slot.CurrentData는
+        // 이 상태에서 파트너 아이템(같은 ScriptableObject 에셋을 내가도 보유할 수 있음)이라 id가
+        // 아니라 참조로 비교하는 기존 ItemManager 쪽 검사에만 기대면 우연히 통과할 여지가 있다 —
+        // 그래서 여기서 원천 차단한다.
+        if (_showingPartnerInventory) { _reforgeDragSource = null; CancelReforgeHold(); return; }
+
         if (slot == null || slot.IsEmpty) { _reforgeDragSource = null; CancelReforgeHold(); return; }
         if (!GameManager.TryGet(out var gm) || gm.Item == null) { _reforgeDragSource = null; CancelReforgeHold(); return; }
 

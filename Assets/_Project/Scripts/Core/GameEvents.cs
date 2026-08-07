@@ -149,6 +149,15 @@ public static class GameEvents
     /// </summary>
     public static event Action<BattleSnapshot> OnPartnerBattleSnapshotChanged;
 
+    /// <summary>
+    /// 파트너 전체화면 관전 진입/종료. 인자 = 지금 전체화면으로 열려 있는지(true=진입, false=종료).
+    /// PIP(축소) 상태는 포함하지 않는다 — PartnerSpectateView.IsExpanded와 동일 기준.
+    /// PartnerSpectateView.ToggleExpanded가 발행 → UIManager가 구독해 내 상점 HUD를 숨기고(진입)
+    /// 관전 진입 전 상태로 복원한다(종료). 표시 여부만 바꿀 뿐 ShopManager 상태·상점 예약/공용 풀은
+    /// 건드리지 않는다.
+    /// </summary>
+    public static event Action<bool> OnPartnerSpectateExpandedChanged;
+
     /// <summary>유닛 보드에 배치됨</summary>
     public static event Action<PokemonUnit> OnUnitPlaced;
 
@@ -341,6 +350,7 @@ public static class GameEvents
     public static void OpponentBoardChanged(BoardSnapshot snap) => OnOpponentBoardChanged?.Invoke(snap);
     public static void BoardResyncRequested() => OnBoardResyncRequested?.Invoke();
     public static void PartnerBattleSnapshotChanged(BattleSnapshot snapshot) => OnPartnerBattleSnapshotChanged?.Invoke(snapshot);
+    public static void PartnerSpectateExpandedChanged(bool expanded) => OnPartnerSpectateExpandedChanged?.Invoke(expanded);
     public static void UnitPlaced(PokemonUnit unit)  => OnUnitPlaced?.Invoke(unit);
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);

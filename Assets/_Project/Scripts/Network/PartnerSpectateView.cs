@@ -55,6 +55,25 @@ public class PartnerSpectateView : MonoBehaviour
     /// 다른 컴포넌트가 참조한다 — 이 클래스가 그 UI들을 직접 켜고 끄지는 않는다.</summary>
     public bool IsExpanded => _isExpanded;
 
+    /// <summary>
+    /// 지금 PIP/전체화면 어느 쪽으로든 관전 화면에 실제로 내용이 그려지고 있는지.
+    /// UpdateCameraState가 관전 카메라를 켤지 정할 때 쓰는 것과 같은 기준(_spectatorCamera.enabled)을
+    /// 그대로 읽는다 — 조건을 다시 계산하지 않고 이미 계산된 카메라 상태를 재사용한다.
+    /// UnitStatusBarHud가 미러 유닛 HP/마나 바를 그릴지 판단하는 데 쓴다.
+    /// </summary>
+    public bool IsShowingContent => _spectatorCamera != null && _spectatorCamera.enabled;
+
+    /// <summary>관전 카메라. UnitStatusBarHud가 미러 유닛 HP/마나 바 위치를 이 카메라 기준으로
+    /// 투영할 때 쓴다(WorldToViewportPoint). 아직 만들어지기 전(첫 미러 전투 전)이면 null.</summary>
+    public Camera SpectatorCamera => _spectatorCamera;
+
+    /// <summary>관전 화면을 그리는 RawImage. UnitStatusBarHud가 미러 HP/마나 바를 이 RawImage의
+    /// 자식으로 배치해 PIP/전체화면 전환·표시/숨김을 별도 처리 없이 그대로 따라가게 한다.</summary>
+    public RawImage PipRawImage => _pipRawImage;
+
+    /// <summary>미러 전투 컨트롤러. UnitStatusBarHud가 미러 BattleUnit 목록(MirrorUnits)을 읽을 때 쓴다.</summary>
+    public PartnerBattleMirrorController MirrorController => _mirrorController;
+
     private Vector2 _originalAnchorMin;
     private Vector2 _originalAnchorMax;
     private Vector2 _originalPivot;
@@ -110,6 +129,7 @@ public class PartnerSpectateView : MonoBehaviour
 
         GameEvents.OnStageEntered += HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged += HandlePartnerBattleSnapshotChanged;
+        GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
     }
 
     private void OnDisable()
@@ -118,6 +138,25 @@ public class PartnerSpectateView : MonoBehaviour
 
         GameEvents.OnStageEntered -= HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged -= HandlePartnerBattleSnapshotChanged;
+        GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
+
+        // 방어 처리 — ToggleExpanded()를 거치지 않고(씬 전환 등으로) 이 컴포넌트가 켜진 채로
+        // 비활성화/파괴되면 OnPartnerSpectateExpandedChanged(false)가 영영 발행되지 않아
+        // UIManager의 상점 HUD 숨김 상태가 고착될 수 있다. SetExpanded가 이미 false면 아무 일도
+        // 하지 않으므로(중복 발행 없음) 정상 종료 경로와 겹쳐도 안전하다. Destroy 시에는 OnDisable이
+        // OnDestroy보다 먼저 호출되므로 이 한 곳만으로 Disable/Destroy 양쪽을 커버한다.
+        if (_isExpanded) SetExpanded(false);
+    }
+
+    /// <summary>
+    /// 파트너 연결 끊김 감지 시, 전체화면 관전 중이었다면 자동으로 닫는다(상점 HUD 복원).
+    /// PIP(_debugShowPip)는 건드리지 않는다 — 일반 플레이에서는 항상 false로 꺼져 있는 QA 전용
+    /// 값이고, 상점 HUD 숨김도 PIP과는 무관(전체화면 전용)이라 강제로 끌 이유가 없다.
+    /// 재접속 판정/NetworkManager 로직에는 관여하지 않는다 — 여기서는 표시 상태만 정리한다.
+    /// </summary>
+    private void HandleOpponentDisconnected(float graceSeconds)
+    {
+        if (_isExpanded) SetExpanded(false);
     }
 
     /// <summary>
@@ -418,9 +457,20 @@ public class PartnerSpectateView : MonoBehaviour
     // ─────────────────────────────────────────
 
     /// <summary>PartnerViewButton 클릭 핸들러 — 관전 열기/닫기는 이 경로 하나뿐이다.</summary>
-    private void ToggleExpanded()
+    private void ToggleExpanded() => SetExpanded(!_isExpanded);
+
+    /// <summary>
+    /// 전체화면 관전 상태를 바꾸는 단일 진입점. _isExpanded 대입과
+    /// GameEvents.OnPartnerSpectateExpandedChanged 발행이 이 메서드 한 곳에만 있다 — 버튼 토글
+    /// (ToggleExpanded), 방어적 종료(OnDisable), 파트너 이탈 자동 종료(HandleOpponentDisconnected)가
+    /// 전부 이 메서드를 거치므로 상태 변경과 이벤트 발행이 어긋날 수 없다.
+    /// 이미 같은 상태면 아무 것도 하지 않는다 — 여러 경로가 동시에 "닫아라"를 요청해도
+    /// (예: 버튼으로 이미 닫은 뒤 파트너 이탈까지 겹쳐도) 이벤트가 중복 발행되지 않는다.
+    /// </summary>
+    private void SetExpanded(bool expanded)
     {
-        _isExpanded = !_isExpanded;
+        if (_isExpanded == expanded) return;
+        _isExpanded = expanded;
 
         if (_isExpanded)
         {
@@ -445,6 +495,9 @@ public class PartnerSpectateView : MonoBehaviour
         RefreshPanelVisibility();
         UpdatePipContent();
         UpdateViewButtonLabel();
+
+        // PIP(축소) 상태는 포함하지 않는다 — 전체화면 진입/종료만 알린다(UIManager의 상점 HUD 숨김/복원용).
+        GameEvents.PartnerSpectateExpandedChanged(_isExpanded);
     }
 
     /// <summary>

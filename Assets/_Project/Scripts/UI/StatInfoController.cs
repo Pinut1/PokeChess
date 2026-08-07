@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// 유닛을 <b>우클릭</b>하면 그 자리에 상세창(StatInfoPanelUI)을 띄운다.
@@ -64,6 +65,10 @@ public class StatInfoController : MonoBehaviour
 
     private StatInfoPanelUI _panel;
 
+    // 파트너 전체화면 관전 중 파트너 유닛 우클릭 판정용 참조(지연 탐색, 씬 배선 없음 —
+    // ItemInventoryUI/SynergyPanelUI와 동일 패턴).
+    private PartnerSpectateView _partnerSpectateView;
+
     private void Awake()
     {
         if (_camera == null) _camera = Camera.main;
@@ -78,6 +83,8 @@ public class StatInfoController : MonoBehaviour
         _pointAction.Enable();
         _openAction.Enable();
         _closeAction.Enable();
+
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
     }
 
     private void OnDisable()
@@ -85,7 +92,17 @@ public class StatInfoController : MonoBehaviour
         _pointAction.Disable();
         _openAction.Disable();
         _closeAction.Disable();
+
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
     }
+
+    /// <summary>
+    /// 전체화면 관전 진입/종료 어느 쪽이든 지금 열려 있는 상세창을 닫는다. 종료 시엔 파트너 데이터가
+    /// 더 이상 유효하지 않으므로 당연히 닫아야 하고, 진입 시에도 내 화면이 파트너 화면으로 덮이므로
+    /// (전체화면 배경 Image가 화면 전체 레이캐스트를 흡수 — PartnerSpectateView 주석 참고) 열려 있던
+    /// 내 유닛 정보가 그대로 남아 있을 이유가 없다. 실제 준비 상태/네트워크는 건드리지 않는다.
+    /// </summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded) => Close();
 
     private void Update()
     {
@@ -99,6 +116,13 @@ public class StatInfoController : MonoBehaviour
 
     private void HandleOpenPressed()
     {
+        // 전체화면 관전 중엔 파트너 유닛만 대상으로 한다 — 내 화면은 어차피 관전 배경 Image에
+        // 덮여 있고(위 HandlePartnerSpectateExpandedChanged 주석 참고), 관전 중 co-located Layer
+        // 구조상 3D Physics.Raycast는 Layer 분리와 무관하게 내 보드 콜라이더도 그대로 맞힐 수 있어
+        // 로컬 판정을 그대로 두면 잘못된(내) 유닛이 열릴 위험이 있다 — 그래서 관전 중이면 로컬
+        // 판정 자체를 시도하지 않고 여기서 완전히 갈라진다.
+        if (TryHandlePartnerOpen()) return;
+
         // 보드/벤치 유닛(Collider 있음)이 먼저다.
         if (TryRaycast(out RaycastHit hit))
         {
@@ -124,6 +148,130 @@ public class StatInfoController : MonoBehaviour
 
         // 빈 곳을 우클릭하면 닫는다.
         Close();
+    }
+
+    /// <summary>
+    /// 전체화면 파트너 관전 중일 때만 동작한다(PIP는 대상 아님 — PartnerSpectateView.IsExpanded 기준).
+    /// 아니면 false를 반환해 기존 로컬 판정으로 넘어간다. 전체화면 중이면(파트너 유닛을 맞혔든 못
+    /// 맞혔든) 항상 true를 반환해 로컬 판정을 완전히 대체한다.
+    /// </summary>
+    private bool TryHandlePartnerOpen()
+    {
+        PartnerSpectateView spectateView = EnsurePartnerSpectateView();
+        if (spectateView == null || !spectateView.IsExpanded) return false;
+
+        Camera spectatorCamera = spectateView.SpectatorCamera;
+        RawImage pipImage = spectateView.PipRawImage;
+        PartnerBattleMirrorController mirror = spectateView.MirrorController;
+
+        if (spectatorCamera == null || pipImage == null || mirror == null) { Close(); return true; }
+
+        Vector2 screenPos = PointerScreenPos();
+        bool isBattlePhase = GameManager.TryGet(out var gm) && gm.Phase != null &&
+                              gm.Phase.CurrentPhase == GamePhase.Battle;
+
+        if (isBattlePhase)
+        {
+            BattleUnit picked = PickPartnerBattleUnit(mirror, spectatorCamera, pipImage, screenPos);
+            if (picked != null)
+            {
+                if (_panel != null && _panel.BattleUnit == picked) Close();
+                else Open(p => p.Bind(picked));
+                return true;
+            }
+        }
+        else
+        {
+            OpponentBoardView.PartnerBoardUnitView? picked =
+                PickPartnerShopUnit(mirror, spectatorCamera, pipImage, screenPos);
+            if (picked.HasValue)
+            {
+                Open(p => p.Bind(picked.Value));
+                return true;
+            }
+        }
+
+        Close();
+        return true;
+    }
+
+    private PartnerSpectateView EnsurePartnerSpectateView()
+    {
+        if (_partnerSpectateView == null) _partnerSpectateView = FindFirstObjectByType<PartnerSpectateView>();
+        return _partnerSpectateView;
+    }
+
+    /// <summary>파트너 미러 전투 유닛 중 클릭 지점에 가장 가까운 것. PickBattleUnit(로컬)과 같은
+    /// 반경 기준의 화면 거리 판정이되, 위치를 관전 카메라+PipRawImage 사각형으로 투영한다
+    /// (UnitStatusBarHud.PlaceMirror와 동일한 좌표 변환 — 관전 화면이 실제로 보여주는 자리에 맞춘다).</summary>
+    private BattleUnit PickPartnerBattleUnit(PartnerBattleMirrorController mirror, Camera spectatorCamera,
+                                             RawImage pipImage, Vector2 screenPos)
+    {
+        IReadOnlyList<BattleUnit> units = mirror.MirrorUnits;
+        if (units == null) return null;
+
+        BattleUnit nearest = null;
+        float nearestDistance = _battlePickRadius;
+
+        foreach (var bu in units)
+        {
+            if (bu == null || !bu.IsAlive || bu.visual == null) continue;
+
+            Vector3 worldPos = bu.visual.transform.position + Vector3.up * _battlePickHeight;
+            if (!TryProjectToPartnerScreen(spectatorCamera, pipImage, worldPos, out Vector2 point)) continue;
+
+            float distance = Vector2.Distance(screenPos, point);
+            if (distance > nearestDistance) continue;
+
+            nearestDistance = distance;
+            nearest = bu;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>쇼핑 중 파트너 보드 유닛 중 클릭 지점에 가장 가까운 것. 콜라이더가 없는 미러
+    /// 비주얼이라(OpponentBoardView가 전부 제거함) PickPartnerBattleUnit과 같은 화면 거리 판정을 쓴다.</summary>
+    private OpponentBoardView.PartnerBoardUnitView? PickPartnerShopUnit(
+        PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage, Vector2 screenPos)
+    {
+        OpponentBoardView boardView = mirror.BoardView;
+        if (boardView == null) return null;
+
+        OpponentBoardView.PartnerBoardUnitView? nearest = null;
+        float nearestDistance = _battlePickRadius;
+
+        foreach (var view in boardView.ActiveUnitViews)
+        {
+            if (view.visual == null) continue;
+
+            Vector3 worldPos = view.visual.position + Vector3.up * _battlePickHeight;
+            if (!TryProjectToPartnerScreen(spectatorCamera, pipImage, worldPos, out Vector2 point)) continue;
+
+            float distance = Vector2.Distance(screenPos, point);
+            if (distance > nearestDistance) continue;
+
+            nearestDistance = distance;
+            nearest = view;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>월드 좌표를 관전 카메라 뷰포트 → PipRawImage 사각형으로 투영한다. UnitStatusBarHud.
+    /// PlaceMirror와 동일한 계산(카메라 뒤(z&lt;=0)면 실패) — 관전 화면에 실제로 보이는 자리를 그대로 쓴다.</summary>
+    private static bool TryProjectToPartnerScreen(Camera spectatorCamera, RawImage pipImage, Vector3 worldPos, out Vector2 screenPos)
+    {
+        Vector3 viewport = spectatorCamera.WorldToViewportPoint(worldPos);
+        if (viewport.z <= 0f) { screenPos = default; return false; }
+
+        Vector3[] corners = new Vector3[4];
+        pipImage.rectTransform.GetWorldCorners(corners);
+
+        screenPos = new Vector2(
+            Mathf.Lerp(corners[0].x, corners[2].x, viewport.x),
+            Mathf.Lerp(corners[0].y, corners[2].y, viewport.y));
+        return true;
     }
 
     private void Open(System.Action<StatInfoPanelUI> bind)

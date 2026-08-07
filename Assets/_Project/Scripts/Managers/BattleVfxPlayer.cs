@@ -19,24 +19,49 @@ public static class BattleVfxPlayer
     // 미등록 vfxId 경고는 id당 1회만 (매 시전마다 로그 스팸 방지).
     private static readonly HashSet<string> _warnedIds = new(System.StringComparer.OrdinalIgnoreCase);
 
-    // 전투 중 생성된 VFX 오브젝트들. 전투 종료 시 일괄 파괴하기 위해 추적.
-    private static readonly List<GameObject> _activeVfx = new();
+    /// <summary>
+    /// scope 미지정 호출(진화 연출 등 BattleManager 소속이 아닌 VFX)이 쓰는 공용 버킷.
+    /// 실전투/미러 BattleManager는 각자 자기 인스턴스(this)를 scope로 넘겨 별도 버킷에 쌓는다 —
+    /// 그래야 한쪽의 정리가 다른 쪽 VFX를 건드리지 않는다(ClearScope). ClearAllActive()는 이
+    /// 버킷을 포함한 전체를 지우는 기존 동작을 그대로 보존한다(다른 용도가 생길 경우 대비).
+    /// </summary>
+    private static readonly object _globalScope = new object();
 
-    /// <summary>전투 종료 시 모든 활성 VFX를 즉시 파괴한다. BattleManager에서 호출.</summary>
+    // scope(주로 BattleManager 인스턴스)별로 생성된 VFX 오브젝트들. 전투 종료 시 자기 scope분만 파괴하기 위해 추적.
+    private static readonly Dictionary<object, List<GameObject>> _activeVfxByScope = new();
+
+    /// <summary>모든 scope의 활성 VFX를 즉시 파괴한다(기존 전역 정리 동작 보존). 전투 종료 경로는
+    /// 더 이상 이 메서드를 쓰지 않고 <see cref="ClearScope"/>로 자기 scope만 정리한다.</summary>
     public static void ClearAllActive()
     {
-        foreach (var go in _activeVfx)
+        foreach (var list in _activeVfxByScope.Values)
+            foreach (var go in list)
+                if (go != null) Object.Destroy(go);
+        _activeVfxByScope.Clear();
+    }
+
+    /// <summary>
+    /// 특정 scope(보통 BattleManager 인스턴스 자신)가 생성한 VFX만 파괴한다. 다른 scope의 VFX는
+    /// 전혀 건드리지 않는다 — 실전투 종료가 미러 VFX를, 혹은 그 반대를 지우는 간섭을 막기 위함.
+    /// scope가 null이거나 등록된 적 없으면 아무 일도 하지 않는다.
+    /// </summary>
+    public static void ClearScope(object scope)
+    {
+        if (scope == null) return;
+        if (!_activeVfxByScope.TryGetValue(scope, out var list)) return;
+
+        foreach (var go in list)
             if (go != null) Object.Destroy(go);
-        _activeVfx.Clear();
+        _activeVfxByScope.Remove(scope);
     }
 
     /// <summary>대상 유닛들 위치에 VFX 생성. vfxId가 비었거나 미등록이면 조용히 무시(경고 1회).</summary>
-    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets)
+    public static void PlayOnUnits(string vfxId, IReadOnlyList<BattleUnit> targets, object scope = null, int layer = -1)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
 
-        SpawnPerTarget(entry, targets);
+        SpawnPerTarget(entry, targets, scope, layer);
     }
 
     /// <summary>
@@ -50,7 +75,8 @@ public static class BattleVfxPlayer
     /// <param name="aimTarget">조준 대상(보통 primaryTarget). aimMode가 FromCaster일 때만 쓴다.</param>
     public static void PlaySkill(string vfxId, IReadOnlyList<BattleUnit> targets,
                                  BattleUnit center, int areaRadiusInTiles,
-                                 BattleUnit caster = null, BattleUnit aimTarget = null)
+                                 BattleUnit caster = null, BattleUnit aimTarget = null,
+                                 object scope = null, int layer = -1)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
@@ -59,7 +85,7 @@ public static class BattleVfxPlayer
         if (entry.aimMode == VfxAimMode.TravelToTarget &&
             caster?.visual != null && aimTarget?.visual != null)
         {
-            SpawnTraveling(entry, caster.visual.transform.position, aimTarget.visual.transform.position);
+            SpawnTraveling(entry, caster.visual.transform.position, aimTarget.visual.transform.position, scope, layer);
             return;
         }
 
@@ -68,28 +94,28 @@ public static class BattleVfxPlayer
         if (entry.aimMode == VfxAimMode.FromCaster &&
             caster?.visual != null && aimTarget?.visual != null)
         {
-            SpawnAimed(entry, caster.visual.transform.position, aimTarget.visual.transform.position);
+            SpawnAimed(entry, caster.visual.transform.position, aimTarget.visual.transform.position, scope, layer);
             return;
         }
 
         if (entry.spawnMode == VfxSpawnMode.PerTarget || center?.visual == null)
         {
-            SpawnPerTarget(entry, targets);
+            SpawnPerTarget(entry, targets, scope, layer);
             return;
         }
 
         // Center: 대상이 0기여도 시전 연출은 보여준다(빗나감도 연출의 일부).
         float scale = entry.scaleWithRadius ? RadiusScale(areaRadiusInTiles) : 1f;
-        Spawn(entry, center.visual.transform.position, scale);
+        Spawn(entry, center.visual.transform.position, scale, scope, layer);
     }
 
-    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets)
+    private static void SpawnPerTarget(VfxEntry entry, IReadOnlyList<BattleUnit> targets, object scope, int layer)
     {
         if (targets == null) return;
         foreach (var t in targets)
         {
             if (t?.visual == null) continue;
-            Spawn(entry, t.visual.transform.position, 1f);
+            Spawn(entry, t.visual.transform.position, 1f, scope, layer);
         }
     }
 
@@ -107,11 +133,11 @@ public static class BattleVfxPlayer
     }
 
     /// <summary>단일 유닛 위치에 VFX 생성(시전자 플래시 등). 회전 없음.</summary>
-    public static void PlayOnUnit(string vfxId, BattleUnit target)
+    public static void PlayOnUnit(string vfxId, BattleUnit target, object scope = null, int layer = -1)
     {
         var entry = Resolve(vfxId);
         if (entry == null || target?.visual == null) return;
-        Spawn(entry, target.visual.transform.position);
+        Spawn(entry, target.visual.transform.position, 1f, scope, layer);
     }
 
     /// <summary>
@@ -123,16 +149,16 @@ public static class BattleVfxPlayer
     /// 그래서 출발점을 공격자로 옮기고, 파티클 수명을 실제 거리에 맞춰 대상에서 멈추게 한다.
     /// </summary>
     /// <summary>도발 적용 시 대상 머리 위에 재생하는 이펙트(스킬 시전 VFX와 별개).</summary>
-    public static void PlayTauntHit(BattleUnit target)
+    public static void PlayTauntHit(BattleUnit target, object scope = null, int layer = -1)
     {
         const string TAUNT_HIT_VFX = "VFX_Electric_Taunt_Hit";
         var entry = Resolve(TAUNT_HIT_VFX);
         if (entry == null || target?.visual == null) return;
 
-        Spawn(entry, target.visual.transform.position);
+        Spawn(entry, target.visual.transform.position, 1f, scope, layer);
     }
 
-    public static void PlayBasicAttack(string vfxId, BattleUnit attacker, BattleUnit target)
+    public static void PlayBasicAttack(string vfxId, BattleUnit attacker, BattleUnit target, object scope = null, int layer = -1)
     {
         var entry = Resolve(vfxId);
         if (entry == null || target?.visual == null) return;
@@ -142,32 +168,34 @@ public static class BattleVfxPlayer
         bool ranged = IsRangedVfx(vfxId) && attacker != null && attacker.visual != null;
         if (!ranged)
         {
-            Spawn(entry, hit);
+            Spawn(entry, hit, 1f, scope, layer);
             return;
         }
 
-        SpawnAimed(entry, attacker.visual.transform.position, hit);
+        SpawnAimed(entry, attacker.visual.transform.position, hit, scope, layer);
     }
 
     /// <summary>
     /// from에서 to 쪽을 보도록 회전해 하나 생성하고, 파티클 수명을 실제 거리에 맞춰 to에서 멈추게 한다.
     /// 원거리 평타(_L)와 조준형 스킬(aimMode=FromCaster)이 공유하는 투사체 연출 처리다.
     /// </summary>
-    private static void SpawnAimed(VfxEntry entry, Vector3 from, Vector3 to)
+    private static void SpawnAimed(VfxEntry entry, Vector3 from, Vector3 to, object scope, int layer)
     {
         Vector3 d = to - from;
         d.y = 0f;
         float distance = d.magnitude;
 
         // 같은 자리(예외)면 투사체가 의미 없으니 타격 이펙트로 폴백.
-        if (distance < 0.01f) { Spawn(entry, to); return; }
+        if (distance < 0.01f) { Spawn(entry, to, 1f, scope, layer); return; }
 
         Vector3 dir = d / distance;
         var go = Create(
             entry,
             from + dir * entry.forwardOffset,
             Quaternion.LookRotation(dir, Vector3.up),
-            1f);
+            1f,
+            scope,
+            layer);
 
         FixGrassBeamParticleVelocity(entry, go, dir);
 
@@ -195,18 +223,18 @@ public static class BattleVfxPlayer
     /// entry.travelPastTarget이 정한다. VfxTravelMover가 이동+파괴까지 전부 담당하므로,
     /// 여기서는 ScheduleDestroy를 별도로 걸지 않는다(파괴 타이머 중복 방지).
     /// </summary>
-    private static void SpawnTraveling(VfxEntry entry, Vector3 from, Vector3 to)
+    private static void SpawnTraveling(VfxEntry entry, Vector3 from, Vector3 to, object scope, int layer)
     {
         Vector3 d = to - from;
         d.y = 0f;
         float distance = d.magnitude;
 
         // 같은 자리면 이동이 의미 없으니 기존 타격 이펙트로 폴백(자체 lifetime로 파괴됨).
-        if (distance < 0.01f) { Spawn(entry, to); return; }
+        if (distance < 0.01f) { Spawn(entry, to, 1f, scope, layer); return; }
 
         Vector3 dir = d / distance;
         Vector3 pushedFrom = from + dir * entry.forwardOffset;
-        var go = Create(entry, pushedFrom, Quaternion.LookRotation(dir, Vector3.up), 1f);
+        var go = Create(entry, pushedFrom, Quaternion.LookRotation(dir, Vector3.up), 1f, scope, layer);
 
         var mover = go.AddComponent<VfxTravelMover>();
         mover.Begin(pushedFrom, to, entry.travelDuration, entry.travelPastTarget);
@@ -278,11 +306,11 @@ public static class BattleVfxPlayer
     /// 임의 월드 좌표에 VFX 생성. BattleUnit이 없는 연출(상점 단계 진화 등)에서 쓴다.
     /// 조회·미등록 경고 처리는 전투 VFX와 동일하다.
     /// </summary>
-    public static void PlayAt(string vfxId, Vector3 position, float scale = 1f)
+    public static void PlayAt(string vfxId, Vector3 position, float scale = 1f, object scope = null, int layer = -1)
     {
         var entry = Resolve(vfxId);
         if (entry == null) return;
-        Spawn(entry, position, scale);
+        Spawn(entry, position, scale, scope, layer);
     }
 
     private static VfxEntry Resolve(string vfxId)
@@ -312,9 +340,9 @@ public static class BattleVfxPlayer
         return entry;
     }
 
-    private static void Spawn(VfxEntry entry, Vector3 position, float scale = 1f)
+    private static void Spawn(VfxEntry entry, Vector3 position, float scale, object scope, int layer)
     {
-        var go = Create(entry, position, Quaternion.identity, scale);
+        var go = Create(entry, position, Quaternion.identity, scale, scope, layer);
         ScheduleDestroy(go, entry, 0f);
     }
 
@@ -326,7 +354,7 @@ public static class BattleVfxPlayer
     private static Quaternion PrefabRotation(VfxEntry entry)
         => entry.prefab != null ? entry.prefab.transform.rotation : Quaternion.identity;
 
-    private static GameObject Create(VfxEntry entry, Vector3 position, Quaternion rotation, float scale)
+    private static GameObject Create(VfxEntry entry, Vector3 position, Quaternion rotation, float scale, object scope, int layer)
     {
         // positionOffset은 월드 기준으로 더한다 — 조준 회전을 따라 돌면 "머리 위"가 대상 방향에 따라
         // 흔들려서, 높이 보정으로 쓰기 어려워진다.
@@ -334,7 +362,22 @@ public static class BattleVfxPlayer
                                     position + entry.positionOffset,
                                     rotation * PrefabRotation(entry));
         if (!Mathf.Approximately(scale, 1f)) go.transform.localScale *= scale;
-        _activeVfx.Add(go);
+
+        // layer<0(미지정)이면 프리팹 기본 Layer를 그대로 둔다(기존 동작 보존 — 진화 VFX 등).
+        // 실전투/미러 BattleManager는 각자의 LocalGameplayVisual/PartnerSpectateVisual을 넘긴다 —
+        // BattleManager.SetDefaultLayerRecursive를 그대로 재사용(복제하지 않음), 유닛 모델의
+        // ApplyVisualLayer와 동일 규칙(0=Default인 자식만 덮어씀, 의도적으로 다른 Layer는 보존).
+        if (layer >= 0)
+            BattleManager.SetDefaultLayerRecursive(go.transform, layer);
+
+        object trackScope = scope ?? _globalScope;
+        if (!_activeVfxByScope.TryGetValue(trackScope, out var list))
+        {
+            list = new List<GameObject>();
+            _activeVfxByScope[trackScope] = list;
+        }
+        list.Add(go);
+
         return go;
     }
 

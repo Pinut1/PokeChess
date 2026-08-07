@@ -17,6 +17,15 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitBenched     += MarkBoardDirty;
         GameEvents.OnUnitSold        += MarkBoardDirty;
         GameEvents.OnUnitChanged     += MarkBoardDirty;
+        // 장착/해제/획득/제거기·재조합기 사용은 전부 ItemManager가 InventoryChanged 하나로 통일해
+        // 발행한다(ItemManager.cs 전수 확인 — 누락 경로 없음). OnUnitChanged는 진화/폼 변경 트리거라
+        // 장착 아이템 변경은 잡지 못하므로, 이 이벤트를 board-dirty에 추가로 연결해야 파트너 화면의
+        // 장착 아이템 표시(BoardSnapshot.Entry.itemId0/1)와 인벤토리(§ inventoryItemIds 등)가
+        // 실시간으로 갱신된다.
+        GameEvents.OnInventoryChanged += MarkBoardDirtyForResync;
+        // 레벨업에 따른 배치 상한 변경도 스냅샷에 실어야 파트너 전체화면 관전의 유닛 수 상한 표시가
+        // 즉시 갱신된다(BoardSnapshot.unitCap).
+        GameEvents.OnUnitCapChanged   += HandleUnitCapChanged;
         GameEvents.OnGoldChanged     += HandleGoldChanged;
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested += MarkBoardDirtyForResync;
@@ -32,6 +41,8 @@ public class BoardSyncBroadcaster : MonoBehaviour
         GameEvents.OnUnitBenched     -= MarkBoardDirty;
         GameEvents.OnUnitSold        -= MarkBoardDirty;
         GameEvents.OnUnitChanged     -= MarkBoardDirty;
+        GameEvents.OnInventoryChanged -= MarkBoardDirtyForResync;
+        GameEvents.OnUnitCapChanged   -= HandleUnitCapChanged;
         GameEvents.OnGoldChanged     -= HandleGoldChanged;
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
         GameEvents.OnBoardResyncRequested -= MarkBoardDirtyForResync;
@@ -61,6 +72,8 @@ public class BoardSyncBroadcaster : MonoBehaviour
 
     /// <summary>재접속/파트너 재입장 시 변경 이벤트 없이도 현재 보드를 강제 재송출.</summary>
     private void MarkBoardDirtyForResync() => _boardDirty = true;
+
+    private void HandleUnitCapChanged(int _) => _boardDirty = true;
 
     private void HandleGoldChanged(int gold)
     {
@@ -124,7 +137,7 @@ public class BoardSyncBroadcaster : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null || gm.Board == null || gm.Network == null) return;
 
-        int[] data = BoardSnapshot.FromBoard(gm.Board).Encode();
+        int[] data = BoardSnapshot.FromBoard(gm.Board, gm.Item).Encode();
         gm.Network.BroadcastBoardSnapshot(data);
     }
 }

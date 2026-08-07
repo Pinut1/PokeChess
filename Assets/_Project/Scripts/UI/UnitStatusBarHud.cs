@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 유닛 머리 위 HP/마나 바를 모아서 관리한다. 바는 풀에서 재사용하고 매 프레임 위치·값만 갱신한다.
@@ -40,6 +41,14 @@ public class UnitStatusBarHud : MonoBehaviour
 
     private readonly List<UnitStatusBarUI> _pool = new();
 
+    // 파트너 관전(전투 중 미러 BattleUnit / 쇼핑 중 파트너 보드 공용) 유닛 바 전용 풀 — _pool과
+    // 완전히 분리해서 실전투 바와 서로 간섭하지 않는다. 부모도 다르다(PartnerSpectateView.PipRawImage
+    // 자식) — DrawPartnerBars 참고.
+    private readonly List<UnitStatusBarUI> _mirrorPool = new();
+
+    // GetWorldCorners 호출마다 새 배열을 만들지 않으려고 재사용하는 버퍼(PlaceMirror 전용).
+    private readonly Vector3[] _pipCornersBuffer = new Vector3[4];
+
     private void Awake()
     {
         if (_camera == null) _camera = Camera.main;
@@ -47,7 +56,18 @@ public class UnitStatusBarHud : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (_barPrefab == null || _barRoot == null || _camera == null) return;
+        if (_barPrefab != null) DrawLocalBars();
+
+        // 파트너 관전 바는 실전투 바와 독립적으로 매 프레임 갱신한다 — PIP 상태에서도 그려야 하므로
+        // 위 IsExpanded 분기(전체화면 전용)에 걸리지 않게 별도 메서드로 뺐다.
+        DrawPartnerBars();
+    }
+
+    /// <summary>내 로컬 유닛(실전투 또는 상점/보드 단계) 바를 그린다. 기존 LateUpdate 로직 그대로,
+    /// 미러 바 추가를 위해 이름만 붙여 분리했다.</summary>
+    private void DrawLocalBars()
+    {
+        if (_barRoot == null || _camera == null) return;
 
         // 파트너 전체화면 관전 중에는 내 로컬 유닛 상태바를 그리지 않는다 — 관전 카메라와 무관하게
         // Camera.main 기준으로 그려지므로, 그대로 두면 파트너 화면 위에 내 유닛 바가 겹쳐 보인다.
@@ -161,5 +181,179 @@ public class UnitStatusBarHud : MonoBehaviour
     {
         for (int i = startIndex; i < _pool.Count; i++)
             _pool[i].SetVisible(false);
+    }
+
+    // ─────────────────────────────────────────
+    // 파트너 관전 바 — 전투 중(미러 BattleUnit) / 쇼핑 중(파트너 보드) 공용
+    //
+    // 데이터 출처가 단계마다 다르다(로컬 바가 전투/그 외로 갈리는 것과 같은 이유).
+    //   전투 중 : PartnerBattleMirrorController.MirrorUnits(BattleManager.Units 그대로) — 미러
+    //             BattleUnit 값만 읽는다.
+    //   그 외    : PartnerBattleMirrorController.BoardView.ActiveUnitViews(OpponentBoardView가
+    //             BoardSnapshot으로 만든 미러 비주얼 정보) — 쇼핑 단계는 BattleUnit이 아예 없으므로
+    //             이 목록을 대신 읽는다.
+    // 두 경로 모두 실제 PokemonUnit/Board는 전혀 건드리지 않는다.
+    //
+    // 실전투 바(WorldToScreenPoint, Camera.main 기준 Overlay 배치)와 좌표계가 다르다 — 파트너 유닛은
+    // 실전투와 같은 3D 씬에 있지만 PartnerSpectateVisual Layer로만 관전 카메라에 보이므로,
+    // Camera.main 기준으로 투영하면 좌표는 나오지만 화면엔 (Layer가 가려서) 안 보이는 값이 나온다.
+    // 그래서 관전 카메라(SpectatorCamera)의 WorldToViewportPoint로 뽑은 0~1 비율을 관전 화면을
+    // 실제로 그리는 PipRawImage의 사각형에 매핑한다 — RawImage가 PIP든 전체화면이든 그 사각형
+    // 기준으로 좌표가 나오므로 별도 분기 없이 두 상태 모두에서 맞는 위치가 나온다.
+    //
+    // Layer 분리는 이 바에는 적용하지 않는다(적용해도 효과가 없다) — Screen Space Overlay UI는
+    // 카메라 CullingMask의 대상이 아니라서 GameObject.layer를 바꿔도 렌더링에 영향이 없다.
+    // 대신 바를 PipRawImage의 자식으로 두어 "관전 화면이 꺼져 있으면(비활성) 자식도 함께 안 보인다"
+    // 는 계층 활성 상태로 같은 효과(내 화면에 안 새고, 관전 화면 밖에서는 안 보임)를 낸다 —
+    // VFX/유닛 모델(LocalGameplayVisual/PartnerSpectateVisual)과 목적은 같고 수단만 이 UI 구조에 맞춘 것.
+    //
+    // 전투 중/쇼핑 중 두 갈래가 같은 풀(_mirrorPool)을 공유한다. 매 프레임 둘 중 하나만 실행해
+    // 그 결과(used)만으로 HideMirrorFrom을 한 번 호출한다 — 둘 다 매번 독립적으로 그리고 따로
+    // HideMirrorFrom을 부르면, 내용이 없는 쪽이 나중에 실행되며 방금 그린 바를 지워버리는
+    // 경합이 생긴다(예: 쇼핑 중엔 전투 갈래의 결과가 0이라 그 갈래가 나중에 돌면 전부 숨어버림).
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// 파트너 관전(PIP/전체화면) 바 그리기 진입점. 지금 파트너가 전투 중인지 쇼핑 중인지에 따라
+    /// 한쪽만 그리고, 그 결과 하나로만 풀을 정리한다(위 클래스 주석 참고). 관전 화면이 지금
+    /// 아무것도 보여주고 있지 않으면 전부 숨긴다.
+    /// </summary>
+    private void DrawPartnerBars()
+    {
+        if (_barPrefab == null || _partnerSpectateView == null) { HideMirrorFrom(0); return; }
+        if (!_partnerSpectateView.IsShowingContent) { HideMirrorFrom(0); return; }
+
+        Camera spectatorCamera = _partnerSpectateView.SpectatorCamera;
+        RawImage pipImage = _partnerSpectateView.PipRawImage;
+        PartnerBattleMirrorController mirror = _partnerSpectateView.MirrorController;
+
+        if (spectatorCamera == null || pipImage == null || mirror == null) { HideMirrorFrom(0); return; }
+
+        bool isBattlePhase = GameManager.TryGet(out var gm) && gm.Phase != null &&
+                              gm.Phase.CurrentPhase == GamePhase.Battle;
+
+        int used = isBattlePhase
+            ? DrawPartnerBattleBars(mirror, spectatorCamera, pipImage)
+            : DrawPartnerShopBars(mirror, spectatorCamera, pipImage);
+
+        HideMirrorFrom(used);
+    }
+
+    /// <summary>
+    /// 전투 중 — 미러 BattleUnit마다 HP/마나 바. 미러가 끝나 MirrorUnits가 비면(Abort/교체/정상
+    /// 종료 전부 BattleManager.Cleanup에서 _units를 비움) 별도 이벤트 없이 다음 프레임에 0을
+    /// 반환해 자동으로 사라진다.
+    /// </summary>
+    private int DrawPartnerBattleBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
+    {
+        IReadOnlyList<BattleUnit> units = mirror.MirrorUnits;
+        if (units == null) return 0;
+
+        int used = 0;
+        foreach (var bu in units)
+        {
+            if (bu == null || !bu.IsAlive || bu.visual == null) continue;
+
+            float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
+            float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
+
+            if (PlaceMirror(used, spectatorCamera, pipImage, bu.visual.transform.position, hp, mana,
+                            bu.team == BattleTeam.Ally, bu.maxHp, bu.displayItems, bu.displayStone))
+                used++;
+        }
+        return used;
+    }
+
+    /// <summary>
+    /// 쇼핑 중 — 파트너 보드 유닛마다 HP/마나 바. 쇼핑 단계는 BattleUnit이 없어(전투가 시작돼야
+    /// 만들어짐) OpponentBoardView가 BoardSnapshot으로 만든 미러 비주얼(ActiveUnitViews)을 대신 읽는다.
+    ///
+    /// HP는 항상 가득 참(1f), 마나는 항상 빔(스킬 보유 시 0, 없으면 -1로 숨김)으로 그린다 — 이건
+    /// 추측이 아니라 PokemonUnit.ResetForBattle()의 계약("전투 시작/라운드 진입 시 HP를 가득 채우고
+    /// 마나를 비움 — TFT 표준: 매 라운드 풀회복")을 그대로 반영한 것이다. BattleManager.Cleanup()도
+    /// 전투 종료 시 같은 메서드로 되돌리므로, 쇼핑 단계에 관찰되는 어떤 PokemonUnit도 이 상태를
+    /// 벗어나지 않는다(내 로컬 유닛의 쇼핑 단계 바도 UnitStatusBarHud.DrawUnitList에서 unit.currentHp/
+    /// MaxHp·unit.currentMana를 그대로 읽을 뿐이고, 그 값이 이 규칙 때문에 항상 가득/빔으로 나온다 —
+    /// 여기서는 그 결과를 상수로 대신할 뿐 계산 기준 자체는 로컬과 동일하다). 마나 바 표시 여부만은
+    /// 종의 실제 manaCost(스킬 보유 여부)로 판정한다 — 이건 유닛마다 달라 가정할 수 없는 값이라
+    /// OpponentBoardView가 넘겨준 PokemonData(species)로 직접 확인한다.
+    ///
+    /// maxHp는 눈금(ApplyTicks) 계산에만 쓰이는데, BoardSnapshot에는 itemId0/1까지만 있고
+    /// 진화의 돌/영웅증강 배율은 없어 실제 MaxHp를 정확히 재현할 수 없다 — 부정확한 값을 만들어
+    /// 쓰는 대신 0을 넘겨 눈금을 끈다(HP 채움 비율 자체는 영향 없음, UnitStatusBarUI.ApplyTicks 참고).
+    /// </summary>
+    private int DrawPartnerShopBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
+    {
+        OpponentBoardView boardView = mirror.BoardView;
+        if (boardView == null) return 0;
+
+        int used = 0;
+        foreach (var view in boardView.ActiveUnitViews)
+        {
+            if (view.visual == null) continue;
+
+            float mana = view.species != null && view.species.manaCost > 0 ? 0f : -1f;
+
+            if (PlaceMirror(used, spectatorCamera, pipImage, view.visual.position, 1f, mana,
+                            true, 0f, view.items, null))
+                used++;
+        }
+        return used;
+    }
+
+    /// <summary>
+    /// index번째 미러 바를 관전 카메라 뷰포트 → PipRawImage 로컬 좌표로 변환해 배치한다.
+    /// Place()와 값 갱신 로직(SetItems/아이템 리프트/SetValues)은 동일하게 따르되, 위치 계산과
+    /// 배치 대상(부모/좌표계)만 다르다.
+    /// </summary>
+    private bool PlaceMirror(int index, Camera spectatorCamera, RawImage pipImage, Vector3 worldPos,
+                             float hpRatio, float manaRatio, bool isAlly, float maxHp,
+                             IReadOnlyList<ItemData> items, EvolutionStoneData stone)
+    {
+        Vector3 viewport = spectatorCamera.WorldToViewportPoint(worldPos + Vector3.up * _heightOffset);
+        if (viewport.z <= 0f) return false; // 관전 카메라 뒤 — 그리지 않는다
+
+        // PipRawImage가 지금 화면(스크린 스페이스)에서 차지하는 사각형의 네 모서리를 그대로 읽어
+        // viewport 비율(0~1)을 그 사각형 안의 스크린 좌표로 매핑한다. Place()가 WorldToScreenPoint
+        // 결과를 bar.Rect.position(월드=스크린 좌표, Overlay 캔버스 관례)에 그대로 대입하는 것과
+        // 같은 방식이라 bar 프리팹의 Anchor 설정에 대한 가정이 없다 — PIP든 전체화면이든
+        // PipRawImage의 현재 크기만 따라간다.
+        Vector3[] corners = _pipCornersBuffer;
+        pipImage.rectTransform.GetWorldCorners(corners);
+        Vector3 bottomLeft = corners[0];
+        Vector3 topRight = corners[2];
+
+        Vector3 screenPos = new Vector3(
+            Mathf.Lerp(bottomLeft.x, topRight.x, viewport.x),
+            Mathf.Lerp(bottomLeft.y, topRight.y, viewport.y),
+            0f);
+
+        var bar = GetMirrorBar(index, pipImage.transform);
+        bar.SetVisible(true);
+
+        bar.SetItems(items, stone);
+        if (bar.HasVisibleItems) screenPos.y += _itemLiftPixels;
+
+        screenPos.x = Mathf.Round(screenPos.x);
+        screenPos.y = Mathf.Round(screenPos.y);
+
+        bar.Rect.position = screenPos;
+        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
+        return true;
+    }
+
+    private UnitStatusBarUI GetMirrorBar(int index, Transform parent)
+    {
+        while (_mirrorPool.Count <= index)
+            _mirrorPool.Add(Instantiate(_barPrefab, parent));
+
+        return _mirrorPool[index];
+    }
+
+    /// <summary>이번 프레임에 쓰지 않은 미러 바는 숨긴다(실전투 바 풀과 완전히 별개).</summary>
+    private void HideMirrorFrom(int startIndex)
+    {
+        for (int i = startIndex; i < _mirrorPool.Count; i++)
+            _mirrorPool[i].SetVisible(false);
     }
 }

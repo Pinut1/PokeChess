@@ -9,6 +9,11 @@ using UnityEngine;
 /// (TMP_Text로 받으므로 UGUI TextMeshProUGUI를 꽂아도 그대로 동작한다.)
 ///
 /// 값의 단일 소스는 BoardManager다. 폴링하지 않고 보드 구성이 바뀔 때만 다시 그린다.
+///
+/// 전체화면 파트너 관전 중에는 파트너 기준으로 전환한다(PIP는 제외) — SynergyPanelUI/ItemInventoryUI와
+/// 동일 패턴. 현재 배치 수는 BoardSnapshot.entries 중 onBoard 항목만 세어 재사용하고(새 필드 불필요),
+/// 상한은 ShopManager의 레벨→상한 계산을 이 파일이 중복 구현하지 않도록 BoardManager.UnitCap을 그대로
+/// BoardSnapshot.unitCap에 실어 보낸 값을 쓴다(BoardSyncBroadcaster.FromBoard/HandleUnitCapChanged).
 /// </summary>
 public class BoardCapacityLabel : MonoBehaviour
 {
@@ -41,6 +46,12 @@ public class BoardCapacityLabel : MonoBehaviour
     // OnUnitPlaced로 다시 그려질 때에야 뒤늦게 바뀌던 원인이다.
     private int _capFromEvent = -1;
 
+    /// <summary>지금 이 라벨이 내 보드가 아니라 파트너 보드 기준 수치를 보여주는 중인지.</summary>
+    private bool _showingPartnerCapacity;
+
+    // OpponentBoardView.LastSnapshot을 읽기 위한 캐시(지연 탐색) — SynergyPanelUI/ItemInventoryUI와 동일 패턴.
+    private OpponentBoardView _partnerBoardView;
+
     // 글자색 대신 머티리얼 발광색을 바꾼다. 공유본을 건드리면 같은 프리셋을 쓰는
     // 다른 텍스트까지 물들므로 인스턴스(fontMaterial)를 잡는다.
     private Material _material;
@@ -62,6 +73,9 @@ public class BoardCapacityLabel : MonoBehaviour
         // 전투 중에는 배치를 못 바꾸니 표시할 이유가 없다 — 준비 단계로 돌아오면 다시 켠다.
         GameEvents.OnPhaseChanged += HandlePhaseChanged;
 
+        GameEvents.OnOpponentBoardChanged += HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
+
         Refresh();
     }
 
@@ -72,17 +86,92 @@ public class BoardCapacityLabel : MonoBehaviour
         GameEvents.OnUnitSold     -= HandleRosterChanged;
         GameEvents.OnUnitCapChanged -= HandleCapChanged;
         GameEvents.OnPhaseChanged   -= HandlePhaseChanged;
+
+        GameEvents.OnOpponentBoardChanged -= HandlePartnerBoardChanged;
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
+
+        // 파트너 표시 도중 이 컴포넌트 자신이 먼저 비활성화되는 경우를 대비한 방어 처리
+        // (정상 경로는 HandlePartnerSpectateExpandedChanged(false)가 되돌린다) — SynergyPanelUI와 동일 원칙.
+        _showingPartnerCapacity = false;
     }
 
     private void Start() => Refresh(); // 매니저 초기화가 OnEnable보다 늦을 수 있어 한 번 더.
 
-    private void HandleRosterChanged(PokemonUnit _) => Refresh();
+    /// <summary>내 로스터 변경. 파트너 수치를 보여주는 중에는 보류한다 — 관전을 마치고 Refresh()로
+    /// 돌아갈 때 BoardManager를 다시 읽으므로 놓치는 변경은 없다(SynergyPanelUI와 동일 원칙).</summary>
+    private void HandleRosterChanged(PokemonUnit _)
+    {
+        if (_showingPartnerCapacity) return;
+        Refresh();
+    }
 
     /// <summary>상한 변경. 이벤트가 들고 온 값을 그대로 믿는다(_capFromEvent 주석 참고).</summary>
     private void HandleCapChanged(int cap)
     {
         _capFromEvent = cap;
+        if (_showingPartnerCapacity) return;
         Refresh();
+    }
+
+    /// <summary>
+    /// 파트너 전체화면 관전 진입/종료(GameEvents.OnPartnerSpectateExpandedChanged, PIP는 포함 안 함).
+    /// 진입 시 파트너의 마지막 보드 스냅샷으로 즉시 1회 계산해 표시하고, 종료 시 내 수치(Refresh)로
+    /// 정확히 되돌린다. 실제 BoardManager/UnitCap 상태는 전혀 건드리지 않는다 — 표시만 바꾼다.
+    /// </summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded)
+    {
+        _showingPartnerCapacity = expanded;
+
+        if (expanded)
+            RefreshFromPartner(EnsurePartnerBoardView()?.LastSnapshot);
+        else
+        {
+            // 관전 중 값이 그대로 남아 있으면 Refresh()가 "값이 그대로면 건드리지 않는다" 캐시에
+            // 걸려 화면이 안 바뀔 수 있어 무효화한다.
+            _shownCount = -1;
+            _shownCap = -1;
+            Refresh();
+        }
+    }
+
+    private OpponentBoardView EnsurePartnerBoardView()
+    {
+        if (_partnerBoardView == null) _partnerBoardView = FindFirstObjectByType<OpponentBoardView>();
+        return _partnerBoardView;
+    }
+
+    /// <summary>파트너 보드 갱신(GameEvents.OnOpponentBoardChanged). 파트너 수치를 보여주는 중일 때만
+    /// 반영한다 — 평소(내 수치 표시 중)에는 이 이벤트를 무시한다.</summary>
+    private void HandlePartnerBoardChanged(BoardSnapshot snap)
+    {
+        if (!_showingPartnerCapacity) return;
+        RefreshFromPartner(snap);
+    }
+
+    /// <summary>파트너 스냅샷으로부터 표시 수치를 계산한다. 현재 배치 수는 entries 중 onBoard 항목만
+    /// 세어 구한다(별도 필드 불필요) — 상한은 BoardSnapshot.unitCap(=파트너의 BoardManager.UnitCap)을
+    /// 그대로 쓴다.</summary>
+    private void RefreshFromPartner(BoardSnapshot snap)
+    {
+        if (_text == null) return;
+
+        if (!_visible)
+        {
+            _text.text = string.Empty;
+            if (_glowPulse != null) _glowPulse.enabled = false;
+            _shownCount = -1;
+            _shownCap   = -1;
+            return;
+        }
+
+        int count = 0;
+        if (snap != null)
+            foreach (var e in snap.entries)
+                if (e.onBoard) count++;
+
+        int cap = snap?.unitCap ?? 0;
+
+        ApplyCounts(count, cap);
     }
 
     /// <summary>
@@ -93,7 +182,13 @@ public class BoardCapacityLabel : MonoBehaviour
     private void HandlePhaseChanged(GamePhase phase)
     {
         _visible = phase == GamePhase.Shopping;
-        Refresh();
+
+        // 파트너 관전 중에 라운드가 전환되는 경우(예: 관전 중 전투 시작) — 로컬 Refresh()로 새지 않고
+        // 계속 파트너 기준으로 다시 그린다.
+        if (_showingPartnerCapacity)
+            RefreshFromPartner(EnsurePartnerBoardView()?.LastSnapshot);
+        else
+            Refresh();
     }
 
     private void Refresh()
@@ -119,6 +214,12 @@ public class BoardCapacityLabel : MonoBehaviour
         // BoardManager 캐시로 폴백한다 — 그땐 아직 아무도 이벤트를 쏘지 않았을 수 있다.
         int cap = _capFromEvent >= 0 ? _capFromEvent : gm.Board.UnitCap;
 
+        ApplyCounts(count, cap);
+    }
+
+    /// <summary>텍스트/발광색/펄스 반영. Refresh()(내 수치)와 RefreshFromPartner()(파트너 수치) 공용.</summary>
+    private void ApplyCounts(int count, int cap)
+    {
         // 값이 그대로면 건드리지 않는다 — TMP는 같은 문자열을 넣어도 메시를 다시 만든다.
         if (count == _shownCount && cap == _shownCap) return;
 
