@@ -31,6 +31,8 @@ public class SoundManager : Singleton<SoundManager>
     [SerializeField] private AudioMixerGroup _sfxMixerGroup;
 
     private float _sfxVolume = DEFAULT_VOLUME;
+    private float _bgmVolume = DEFAULT_VOLUME;
+    private float _bgmEntryVolume = 1f; // 현재 재생 중인 BGM의 SoundCatalog 배율 — 슬라이더 조작 시에도 유지해야 함
     private Coroutine _bgmIntroCoroutine;
 
     public SoundCatalog Catalog => _catalog;
@@ -60,21 +62,30 @@ public class SoundManager : Singleton<SoundManager>
     private void LoadAndApplySavedVolumes()
     {
         float masterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PREF_MASTER_VOLUME, AudioListener.volume));
-        float bgmVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PREF_BGM_VOLUME, DEFAULT_VOLUME));
+        _bgmVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PREF_BGM_VOLUME, DEFAULT_VOLUME));
         _sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PREF_SFX_VOLUME, DEFAULT_VOLUME));
 
         AudioListener.volume = masterVolume;
 
+        ApplyBgmVolume();
+    }
+
+    /// <summary>옵션 슬라이더(_bgmVolume)와 카탈로그 항목별 배율(_bgmEntryVolume)을 곱해 실제 AudioSource에 반영한다.</summary>
+    private void ApplyBgmVolume()
+    {
         if (_bgmSource != null)
-            _bgmSource.volume = bgmVolume;
+            _bgmSource.volume = _bgmVolume * _bgmEntryVolume;
     }
 
     // ─────────────────────────────────────────
     // BGM
     // ─────────────────────────────────────────
 
-    /// <summary>같은 클립이 이미 재생 중이면 이어서 재생(처음부터 다시 시작하지 않음), 다른 클립이면 교체.</summary>
-    public void PlayBgm(AudioClip clip, bool loop = true)
+    /// <summary>
+    /// 같은 클립이 이미 재생 중이면 이어서 재생(처음부터 다시 시작하지 않음), 다른 클립이면 교체.
+    /// volumeMultiplier는 SoundCatalog의 항목별 볼륨 배율(0~1) — 옵션 슬라이더 값 위에 곱해진다.
+    /// </summary>
+    public void PlayBgm(AudioClip clip, bool loop = true, float volumeMultiplier = 1f)
     {
         if (clip == null) return;
 
@@ -83,6 +94,9 @@ public class SoundManager : Singleton<SoundManager>
             Debug.LogWarning("[SoundManager] BGM AudioSource 미연결 — 재생 스킵");
             return;
         }
+
+        _bgmEntryVolume = Mathf.Clamp01(volumeMultiplier);
+        ApplyBgmVolume();
 
         if (_bgmSource.clip == clip && _bgmSource.isPlaying)
         {
@@ -107,8 +121,7 @@ public class SoundManager : Singleton<SoundManager>
         _bgmSource.Stop();
     }
 
-    /// <summary>SoundId로 BGM 재생. 실제 재생은 PlayBgm(AudioClip, bool)를 그대로 재사용 —
-    /// 중복 재생 방지 등 기존 규칙이 그대로 적용된다.</summary>
+    /// <summary>SoundId로 BGM 재생. 카탈로그에 등록된 항목별 볼륨 배율을 함께 적용한다.</summary>
     public void PlayBgm(SoundId id, bool loop = true)
     {
         if (id == SoundId.None) return;
@@ -119,13 +132,13 @@ public class SoundManager : Singleton<SoundManager>
             return;
         }
 
-        if (!_catalog.TryGetClip(id, out var clip))
+        if (!_catalog.TryGetClip(id, out var clip, out var entryVolume))
         {
             Debug.LogWarning($"[SoundManager] SoundCatalog에 '{id}' 클립 없음 — BGM 재생 스킵");
             return;
         }
 
-        PlayBgm(clip, loop);
+        PlayBgm(clip, loop, entryVolume);
     }
 
     /// <summary>
@@ -140,7 +153,8 @@ public class SoundManager : Singleton<SoundManager>
             return;
         }
 
-        if (!_catalog.TryGetClip(introId, out var introClip) || !_catalog.TryGetClip(loopId, out var loopClip))
+        if (!_catalog.TryGetClip(introId, out var introClip, out var introVolume) ||
+            !_catalog.TryGetClip(loopId, out var loopClip, out var loopVolume))
         {
             Debug.LogWarning($"[SoundManager] '{introId}' 또는 '{loopId}' 클립 없음 — BGM 재생 스킵");
             return;
@@ -152,15 +166,15 @@ public class SoundManager : Singleton<SoundManager>
             _bgmIntroCoroutine = null;
         }
 
-        PlayBgm(introClip, loop: false);
-        _bgmIntroCoroutine = StartCoroutine(SwitchToLoopAfter(introClip.length, loopClip));
+        PlayBgm(introClip, loop: false, volumeMultiplier: introVolume);
+        _bgmIntroCoroutine = StartCoroutine(SwitchToLoopAfter(introClip.length, loopClip, loopVolume));
     }
 
-    private IEnumerator SwitchToLoopAfter(float delay, AudioClip loopClip)
+    private IEnumerator SwitchToLoopAfter(float delay, AudioClip loopClip, float volumeMultiplier)
     {
         yield return new WaitForSecondsRealtime(delay);
         _bgmIntroCoroutine = null;
-        PlayBgm(loopClip, loop: true);
+        PlayBgm(loopClip, loop: true, volumeMultiplier: volumeMultiplier);
     }
 
     // ─────────────────────────────────────────
@@ -216,12 +230,9 @@ public class SoundManager : Singleton<SoundManager>
 
     public void SetBgmVolume(float value)
     {
-        float clamped = Mathf.Clamp01(value);
-
-        if (_bgmSource != null)
-            _bgmSource.volume = clamped;
-
-        PlayerPrefs.SetFloat(PREF_BGM_VOLUME, clamped);
+        _bgmVolume = Mathf.Clamp01(value);
+        ApplyBgmVolume();
+        PlayerPrefs.SetFloat(PREF_BGM_VOLUME, _bgmVolume);
     }
 
     public void SetSfxVolume(float value)

@@ -15,10 +15,10 @@ MonoBehaviour:
   _entries:
   - id: 1
     clip: {fileID: 8300000, guid: cdda464efd4e37148b581146574be00a, type: 3}
-    volume: 1
+    volume: 0.2
   - id: 2
     clip: {fileID: 8300000, guid: e282fcce192c14d45a39a364ce79a516, type: 3}
-    volume: 1
+    volume: 0.2
   - id: 3
     clip: {fileID: 8300000, guid: 3e375b619b0698a4e82a038440a815f9, type: 3}
     volume: 1
