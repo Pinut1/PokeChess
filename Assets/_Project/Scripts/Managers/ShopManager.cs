@@ -1227,6 +1227,14 @@ public class ShopManager : MonoBehaviour
 
         GameEvents.ShopRerolled();
 
+        // 방금 배치(TryPlaceInBench/TryPlaceUnit)가 내부적으로 CheckEvolution을 돌려 즉시 3마리
+        // 합체까지 성사시켰다면 unit은 그 합체에서 소비돼 이미 Destroy된 원본 중 하나다(Unity의
+        // 오버라이드 동등비교로 null처럼 판정됨). 그 경우 BoardManager.ExecuteMerge가 이미
+        // OnUnitEvolved(최종 진화 종 기준)를 발행했으므로, 여기서 구매 종 울음소리까지 겹쳐
+        // 재생하지 않는다 — 합체가 없었을 때만(=unit이 그대로 살아있을 때만) 구매 울음소리 발행.
+        if (unit != null)
+            GameEvents.PokemonPurchased(purchaseData);
+
         Debug.Log(
             $"[Shop] {purchaseData.pokemonName} 구매 " +
             $"(-{poolData.cost}G, 풀 기준 {poolData.pokemonName})"
@@ -2164,6 +2172,13 @@ public class ShopManager : MonoBehaviour
 
         ClearShopSlot(slot);
         GameEvents.ShopRerolled();
+
+        // Buy()의 로컬 풀 경로와 동일한 이유 — hasNormalSpace 배치가 내부 CheckEvolution으로 즉시
+        // 합체됐거나, else 분기(TryMergePurchasedCopies)로 합체됐다면 unit은 이미 소비돼 Destroy된
+        // 원본이라 Unity 동등비교로 null처럼 판정된다. 그 경우 OnUnitEvolved가 이미 발행됐으므로
+        // 구매 울음소리를 겹쳐 재생하지 않는다.
+        if (unit != null)
+            GameEvents.PokemonPurchased(purchaseData);
 
         Debug.Log(
             $"[SharedShopPool] {purchaseData.pokemonName} 구매 확정 " +

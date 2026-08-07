@@ -42,5 +42,6 @@ MonoBehaviour:
   shopBuyable: 0
   obtainBy: evolution
   modelPrefab: {fileID: 2941791700473659752, guid: a03cea65a8b9bc749bfdb8bd4da4f246, type: 3}
+  voiceClip: {fileID: 8300000, guid: b71c588d0c2fc02438e1b1dbaf391ac7, type: 3}
   icon: {fileID: 3732553783851658181, guid: e3facd069976e364db3aa3b860486280, type: 3}
   unitIcon: {fileID: -7363149911090211766, guid: e3facd069976e364db3aa3b860486280, type: 3}

@@ -39,12 +39,87 @@ public class SoundManager : Singleton<SoundManager>
     private float _bgmEntryVolume = 1f; // 현재 재생 중인 BGM의 SoundCatalog 배율 — 슬라이더 조작 시에도 유지해야 함
     private Coroutine _bgmIntroCoroutine;
 
+    /// <summary>
+    /// 포켓몬 Voice 공용 슬롯이 다음에 비는 시각(Time.unscaledTime 기준) — 구매/성급진화/일반진화/
+    /// 진화의 돌/통신진화 등 PlayPokemonVoice를 거치는 모든 Pokemon Voice가 이 값 하나를 공유한다.
+    /// "요청이 들어온 그 순간"(TryReserveVoiceSlot 호출 시점)에 즉시 이 값을 갱신해 슬롯을 선점한다 —
+    /// 실제 오디오 재생이 시작되는 시점을 기다리지 않는다. 그래야 구매처럼 다른 SFX(UnitBuy)가 끝나길
+    /// 기다리는 대기 구간에 들어온 다른 Voice 요청도, 그 대기 구간까지 포함해 정확히 걸러진다.
+    /// 일반 SFX(PlaySfx/PlaySfx(SoundId))는 이 값을 전혀 참조하지 않으므로 영향받지 않는다.
+    /// </summary>
+    private float _voiceSlotFreeAt = -1f;
+
     public SoundCatalog Catalog => _catalog;
 
-    private void OnEnable()  => GameEvents.OnBattleStart += HandleBattleStart;
-    private void OnDisable() => GameEvents.OnBattleStart -= HandleBattleStart;
+    private void OnEnable()
+    {
+        GameEvents.OnBattleStart += HandleBattleStart;
+
+        // 포켓몬 울음소리 — 구매 완료(OnPokemonPurchased)와 진화 완료(OnUnitEvolved, 성급/돌/통신교환 공용
+        // 단일 진입점) 양쪽 모두 여기 한 곳에서만 재생한다. 각 구매/진화 코드에 재생 호출을 복붙하지 않기
+        // 위해 SoundManager가 직접 이 두 이벤트를 구독한다(OnBattleStart와 동일한 기존 패턴 재사용).
+        GameEvents.OnPokemonPurchased += HandlePokemonPurchased;
+        GameEvents.OnUnitEvolved      += HandleUnitEvolved;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.OnBattleStart -= HandleBattleStart;
+        GameEvents.OnPokemonPurchased -= HandlePokemonPurchased;
+        GameEvents.OnUnitEvolved      -= HandleUnitEvolved;
+    }
 
     private void HandleBattleStart() => PlayBgm(SoundId.BattleStart);
+
+    /// <summary>
+    /// 구매 Voice 경로. TFT 관찰 동작대로 "UnitBuy SFX가 끝난 뒤 Voice"를 구현하되, 슬롯 자체는
+    /// 구매가 발생한 이 순간 바로 선점한다(TryReserveVoiceSlot — UnitBuy 대기 구간까지 포함해서
+    /// 선점해야, 그 대기 도중 들어온 다른 Voice 요청도 정확히 걸러진다). 이미 슬롯이 점유 중이면
+    /// 코루틴조차 시작하지 않고 조용히 버린다 — 큐잉하지 않는다.
+    /// UnitBuy SFX 자체(즉시 재생)는 ShopCardUI가 별도로 처리하므로 여기서 다시 재생하지 않는다.
+    /// 구매 판정/배치(ShopManager.Buy 등)는 이미 끝난 뒤 발행되는 GameEvents.PokemonPurchased를
+    /// 그대로 받으므로, 여기서 재생 시점만 늦춰도 구매 자체는 전혀 지연되지 않는다.
+    /// </summary>
+    private void HandlePokemonPurchased(PokemonData data)
+    {
+        if (data == null || data.voiceClip == null) return;
+
+        float buyDelay = 0f;
+        if (_catalog != null && _catalog.TryGetClip(SoundId.UnitBuy, out var buyClip, out _) && buyClip != null)
+            buyDelay = buyClip.length;
+
+        // UnitBuy 대기 + Voice 재생, 두 구간 전체를 지금 이 순간 한 번에 선점한다.
+        if (!TryReserveVoiceSlot(buyDelay + data.voiceClip.length)) return;
+
+        StartCoroutine(PlayReservedVoiceAfterDelay(data, buyDelay));
+    }
+
+    /// <summary>delay(UnitBuy 클립 길이)만큼 기다린 뒤 재생한다. 슬롯은 HandlePokemonPurchased가 이미
+    /// 선점해 뒀으므로 여기서 다시 확인·점유하지 않고 곧바로 PlaySfx만 호출한다(PlayPokemonVoice를
+    /// 다시 타면 그 안의 재점유 로직과 충돌한다 — 이미 내 몫으로 선점된 시간에 "점유 중"으로 걸려
+    /// 스스로를 막아버리기 때문).</summary>
+    private IEnumerator PlayReservedVoiceAfterDelay(PokemonData data, float delay)
+    {
+        if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
+        PlaySfx(data.voiceClip);
+    }
+
+    /// <summary>진화 완료 시점의 유닛 — unit.data는 이미 최종(진화 후) 종으로 스왑된 상태다
+    /// (BoardManager.ExecuteMerge/PokemonUnit.TryEquipStone/NetworkManager 통신진화 수신부 공통).
+    /// 재생 시점 자체는 기존과 동일하게 즉시(지연 없이) 시도한다 — PlayPokemonVoice 내부에서 공용
+    /// 슬롯이 이미 점유 중이면 이 진화 Voice만 스킵되고, 진화 판정/이펙트/SFX 등 다른 처리는
+    /// 전부 별개 구독자(BoardManager/UnitEvolveVfx 등)가 그대로 처리하므로 영향받지 않는다.</summary>
+    private void HandleUnitEvolved(PokemonUnit unit, bool isStarUp) => PlayPokemonVoice(unit != null ? unit.data : null);
+
+    /// <summary>슬롯이 비어 있으면(Time.unscaledTime이 _voiceSlotFreeAt를 지났으면) occupySeconds만큼
+    /// 즉시 선점하고 true, 이미 점유 중이면 false(스킵). PlayPokemonVoice(즉시 재생 경로)와
+    /// HandlePokemonPurchased(지연 재생 경로) 양쪽이 공유하는 유일한 판정 지점이다.</summary>
+    private bool TryReserveVoiceSlot(float occupySeconds)
+    {
+        if (Time.unscaledTime < _voiceSlotFreeAt) return false;
+        _voiceSlotFreeAt = Time.unscaledTime + occupySeconds;
+        return true;
+    }
 
     protected override void Awake()
     {
@@ -186,6 +261,26 @@ public class SoundManager : Singleton<SoundManager>
     // ─────────────────────────────────────────
 
     public void PlaySfx(AudioClip clip) => PlaySfx(clip, 1f);
+
+    /// <summary>
+    /// 포켓몬 울음소리 공통 재생 진입점 — 구매·성급진화·일반진화·진화의 돌·통신진화 등 "지금 당장"
+    /// 재생을 시도하는 모든 경로가 이 메서드 하나만 부르면 공용 Voice 슬롯 정책이 자동 적용된다.
+    /// PokemonData.voiceClip을 직접 재생한다(SoundId/SoundCatalog 미경유 — 140종을 SoundId enum에
+    /// 늘어놓지 않기 위해 종 데이터에 직접 물린 AudioClip을 쓴다).
+    /// data 또는 voiceClip이 비어 있으면(음원 미매칭 등) 조용히 무시한다.
+    ///
+    /// 슬롯이 이미 점유 중이면(다른 Pokemon Voice가 대기·재생 중) 이번 요청은 스킵한다 — 큐잉하지
+    /// 않는다. 구매만 예외로 "UnitBuy SFX가 끝날 때까지" 선행 대기가 필요해 HandlePokemonPurchased가
+    /// 직접 TryReserveVoiceSlot으로 미리 선점해두고, 대기가 끝나면 이 메서드를 거치지 않고 PlaySfx만
+    /// 호출한다(그 시점엔 이미 자기 몫으로 선점된 구간이라 여기서 다시 재확인하면 스스로 막힘).
+    /// </summary>
+    public void PlayPokemonVoice(PokemonData data)
+    {
+        if (data == null || data.voiceClip == null) return;
+        if (!TryReserveVoiceSlot(data.voiceClip.length)) return; // 슬롯 점유 중 — 이 Voice는 스킵
+
+        PlaySfx(data.voiceClip);
+    }
 
     /// <summary>volumeMultiplier는 SoundCatalog의 항목별 볼륨 배율(0~1) — 원본 클립마다 다른 녹음 크기를 맞추는 용도.</summary>
     public void PlaySfx(AudioClip clip, float volumeMultiplier)
