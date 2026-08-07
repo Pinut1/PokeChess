@@ -9,7 +9,11 @@ using UnityEngine.Audio;
 /// 볼륨 PlayerPrefs 키는 OptionsPanelUI가 쓰던 것을 그대로 재사용한다 — 저장(PlayerPrefs.Save
 /// 호출 타이밍)은 여전히 OptionsPanelUI(OnDisable/OnApplicationQuit)가 전담하고, 여기서는
 /// SetFloat(다음 Save 때 함께 기록됨)과 실제 AudioSource/AudioListener 반영만 담당한다.
+/// DefaultExecutionOrder(-100): 유니티는 서로 다른 오브젝트의 Awake 순서를 보장하지 않는다.
+/// TitleScreenUI.Awake()가 SoundManager.TryGet보다 먼저 돌면 인스턴스가 아직 없어 BGM 호출이
+/// 조용히(로그도 없이) 무시되므로, 다른 스크립트보다 확실히 먼저 초기화되도록 강제한다.
 /// </summary>
+[DefaultExecutionOrder(-100)]
 public class SoundManager : Singleton<SoundManager>
 {
     private const string PREF_MASTER_VOLUME = "MasterVolume";
