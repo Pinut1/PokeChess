@@ -1526,8 +1526,13 @@ public class BattleManager : MonoBehaviour
         ctx.target.TryTriggerSitrusBerry(); // 자뭉열매: 45% 미만 진입 순간 발동(전투당 1회)
 
         if (!ctx.target.IsAlive)
+        {
+            if (ctx.target.team == BattleTeam.Enemy && SoundManager.TryGet(out var deathSoundManager))
+                deathSoundManager.PlaySfx(SoundId.EnemyDeath);
+
             foreach (var effect in ctx.source.effects)
                 effect.OnKill(ctx.source, ctx.target);
+        }
     }
 
     /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지/치어리더 등 상시 배수) 반영.</summary>

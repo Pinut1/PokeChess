@@ -32,11 +32,13 @@ public class UIManager : MonoBehaviour
     [Header("Match History")]
     [SerializeField] private int _recentMatchCount = 10;
 
-    [Header("Canvas Shop Controls")]
-    [Tooltip("비어 있으면 GameSceneTest의 'Level Button'을 런타임에 찾습니다.")]
+    [Header("SFX")]
+    [Tooltip("비어 있으면 GameSceneTest의 'Level Button'을 런타임에 찾습니다. 클릭 시 SoundId.XpBuy 재생.")]
     [SerializeField] private Button _xpPurchaseButton;
-    [Tooltip("비어 있으면 GameSceneTest의 'ReRoll Button'을 런타임에 찾습니다.")]
+    [Tooltip("비어 있으면 GameSceneTest의 'ReRoll Button'을 런타임에 찾습니다. 클릭 시 SoundId.ShopReroll 재생.")]
     [SerializeField] private Button _shopRerollButton;
+
+    [Header("Canvas Shop Controls")]
     [Tooltip("비어 있으면 GameSceneTest의 'BattleRaedy_Button'을 런타임에 찾습니다.")]
     [SerializeField] private Button _battleReadyButton;
     [Tooltip("비어 있으면 UnitStore_Panel 아래의 ShopChange Button을 런타임에 찾습니다.")]
@@ -530,9 +532,17 @@ public class UIManager : MonoBehaviour
         _showUnitStoreButton?.onClick.RemoveListener(ShowUnitStore);
     }
 
-    private void HandleXpPurchaseButtonClicked() => GameEvents.RequestXpPurchase();
+    private void HandleXpPurchaseButtonClicked()
+    {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.XpBuy);
+        GameEvents.RequestXpPurchase();
+    }
 
-    private void HandleShopRerollButtonClicked() => GameEvents.RequestShopReroll();
+    private void HandleShopRerollButtonClicked()
+    {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.ShopReroll);
+        GameEvents.RequestShopReroll();
+    }
 
     private void HandleBattleReadyButtonClicked()
     {

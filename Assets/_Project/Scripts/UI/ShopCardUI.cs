@@ -70,7 +70,11 @@ public class ShopCardUI : MonoBehaviour, IShopCardView<PokemonData>,
     /// <summary>클릭 시 호출할 콜백 등록. 실제 구매 로직은 컨트롤러가 넘겨준다(ShopManager 직접 참조 안 함).</summary>
     public event Action Clicked;
 
-    private void HandleClicked() => Clicked?.Invoke();
+    private void HandleClicked()
+    {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UnitBuy);
+        Clicked?.Invoke();
+    }
 
     /// <summary>커서가 들고 날 때 발행(true=들어옴). 역할 설명창은 컨트롤러가 띄운다.</summary>
     public event Action<ShopCardUI, bool> Hovered;

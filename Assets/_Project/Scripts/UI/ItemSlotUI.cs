@@ -120,6 +120,7 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (IsEmpty || view == null) return;
 
         _dragging = true;
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.PickUp);
         DragBegan?.Invoke(this);
         Hovered?.Invoke(this, false); // 드래그 중에는 설명창이 커서를 가린다
 
@@ -154,6 +155,10 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (!_dragging) return;
 
         _dragging = false;
+
+        // Drop 사운드는 여기서 내지 않는다 — 이 시점엔 아직 결과(장착 성공/실패 등)를 모른다.
+        // 실제 판정은 상위 컨트롤러(ItemInventoryUI.HandleDropped)가 하므로 거기서 낸다
+        // (장착 성공/실패엔 ItemEquip/Error가 따로 있어 겹치지 않게 하려는 것).
 
         // 드래그 중 꺼뒀던 raycastTarget을 원래 값으로 되돌린다(원래 칸 안에서 다시 호버 가능해야 한다).
         for (int i = 0; i < _dragRaycastGraphics.Count; i++)

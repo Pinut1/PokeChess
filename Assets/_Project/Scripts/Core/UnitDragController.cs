@@ -135,6 +135,8 @@ public class UnitDragController : MonoBehaviour
             if (IsBattlePhase() && IsUnitOnBoard(unit)) return;
 
             _held = unit;
+
+            if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.PickUp);
         }
     }
 
@@ -192,7 +194,13 @@ public class UnitDragController : MonoBehaviour
             // 타일이 막힌 경우 아무것도 하지 않는다 — 아래 판매 폴백으로 흘러가면
             // 전투 중 타일 위에서 놓은 유닛이 팔릴 수 있으므로 else-if로 빠지지 않게 한다.
             if (!blockedByBattlePhase)
+            {
                 target.OnDropUnit(_held);
+
+                // 타일/벤치에 놓는 "일반 배치"만 Drop 사운드를 낸다 — 판매는 SellHeldUnit()
+                // 안(BoardManager.SellUnit)에서 UnitSell을 따로 재생하므로 여기서 또 내면 겹친다.
+                if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.Drop);
+            }
         }
         else if (IsPointerOverShopSellArea())
         {

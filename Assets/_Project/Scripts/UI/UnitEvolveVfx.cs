@@ -27,5 +27,11 @@ public class UnitEvolveVfx : MonoBehaviour
 
         float scale = isStarUp ? Mathf.Max(0.01f, _starUpScale) : 1f;
         BattleVfxPlayer.PlayAt(_vfxId, unit.transform.position + _offset, scale);
+
+        if (isStarUp && SoundManager.TryGet(out var sm))
+        {
+            SoundId sfx = unit.starLevel >= 3 ? SoundId.Evolution3Star : SoundId.Evolution2Star;
+            sm.PlaySfx(sfx);
+        }
     }
 }

@@ -180,26 +180,44 @@ public class ItemInventoryUI : MonoBehaviour
         }
 
         // 1) 인벤토리 슬롯 대상 재조합 — 조건을 만족해 "시도"했다면 성공/실패와 무관하게 여기서 끝낸다.
+        //    재조합은 전용 사운드가 없어 Drop을 그대로 낸다.
         if (TryResolveInventoryReforge(slot, gm))
         {
             _reforgeDragSource = null;
             CancelReforgeHold();
+            if (SoundManager.TryGet(out var reforgeSm)) reforgeSm.PlaySfx(SoundId.Drop);
             return;
         }
 
         _reforgeDragSource = null;
         CancelReforgeHold();
 
-        // 2) 기존 경로 — 3D 월드 유닛 대상 처리.
+        // 2) 기존 경로 — 3D 월드 유닛 대상 처리. 유닛이 없으면(빈 곳에 놓임) 아무 일도 안 일어난 것이라
+        //    소리 없이 끝낸다 — 판매 취소되는 경우 UnitDragController가 Drop을 안 내는 것과 동일 원칙.
         var unit = RaycastUnit(eventData.position);
         if (unit == null) return;
 
         // 도구는 장착이 아니라 "사용"이라 전용 경로로 보낸다(IMGUI 프로토타입과 동일 규칙).
         // 어느 도구인지는 인스펙터에 꽂아둔 표시용 데이터와 같은 에셋인지로 가른다.
-        if (slot.CurrentData == _removerData)  { gm.Item.UseRemover(unit);  return; }
-        if (slot.CurrentData == _reforgerData) { gm.Item.UseReforger(unit); return; }
+        // 제거기/재조합기도 전용 사운드가 없어 Drop을 그대로 낸다.
+        if (slot.CurrentData == _removerData)
+        {
+            gm.Item.UseRemover(unit);
+            if (SoundManager.TryGet(out var removerSm)) removerSm.PlaySfx(SoundId.Drop);
+            return;
+        }
+        if (slot.CurrentData == _reforgerData)
+        {
+            gm.Item.UseReforger(unit);
+            if (SoundManager.TryGet(out var reforgerSm)) reforgerSm.PlaySfx(SoundId.Drop);
+            return;
+        }
 
-        gm.Item.EquipToUnit(slot.CurrentData, unit);
+        // 장착 성공/실패는 ItemEquip/Error 전용 사운드가 있으므로 여기서는 Drop을 내지 않는다.
+        bool equipped = gm.Item.EquipToUnit(slot.CurrentData, unit);
+
+        if (SoundManager.TryGet(out var sm))
+            sm.PlaySfx(equipped ? SoundId.ItemEquip : SoundId.Error);
     }
 
     /// <summary>

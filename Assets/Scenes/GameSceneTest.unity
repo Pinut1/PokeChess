@@ -5827,6 +5827,45 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 500, y: 620}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &446409486
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1915979494}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccfa7e589c4d9bc40a4b074325694a0d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OptionsPanelUI
+  _titleSceneName: NetworkTest
+  _optionsPanelRoot: {fileID: 443742576}
+  _openOptionsButton: {fileID: 1875205819}
+  _masterRow: {fileID: 241857799987197960}
+  _bgmRow: {fileID: 973167375}
+  _sfxRow: {fileID: 863261468}
+  _windowedToggle: {fileID: 1481714783}
+  _fullscreenToggle: {fileID: 189148419}
+  _resolutionDropdown: {fileID: 1978200279}
+  _tabs:
+  - toggle: {fileID: 1329676929}
+    page: {fileID: 2044857250}
+    kind: 0
+  - toggle: {fileID: 184177061}
+    page: {fileID: 1513409279}
+    kind: 1
+  _applyButton: {fileID: 1322773557}
+  _cancelOptionsButton: {fileID: 1217888845}
+  _closeButton: {fileID: 661005550}
+  _restoreDefaultsButton: {fileID: 298441918}
+  _returnTitleButton: {fileID: 592135076}
+  _quitButton: {fileID: 1333276820}
+  _confirmModal: {fileID: 717841054}
+  _confirmMessageText: {fileID: 467555630}
+  _confirmButton: {fileID: 1214189950}
+  _cancelButton: {fileID: 799081727}
+  _modalDialog: {fileID: 6874664172847844001}
 --- !u!1 &456248206
 GameObject:
   m_ObjectHideFlags: 0
@@ -8696,8 +8735,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
   _recentMatchCount: 10
-  _xpPurchaseButton: {fileID: 0}
-  _shopRerollButton: {fileID: 0}
+  _xpPurchaseButton: {fileID: 1272654174}
+  _shopRerollButton: {fileID: 486002382}
   _battleReadyButton: {fileID: 0}
   _showItemStoreButton: {fileID: 0}
   _showUnitStoreButton: {fileID: 0}
@@ -8866,6 +8905,249 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+--- !u!1 &698346816
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 698346820}
+  - component: {fileID: 698346819}
+  - component: {fileID: 698346818}
+  - component: {fileID: 698346817}
+  m_Layer: 0
+  m_Name: SoundManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!82 &698346817
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 698346816}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!82 &698346818
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 698346816}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &698346819
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 698346816}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc787f559802a9d41976d9259e44f67b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SoundManager
+  _bgmSource: {fileID: 698346818}
+  _sfxSource: {fileID: 698346817}
+  _catalog: {fileID: 11400000, guid: 85c4eb47203cf924daab90afc5be290a, type: 2}
+--- !u!4 &698346820
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 698346816}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &706425082
 GameObject:
   m_ObjectHideFlags: 0
@@ -25026,45 +25308,6 @@ MonoBehaviour:
   _pipLabel: {fileID: 284082741}
   _externalViewButton: {fileID: 1118178793}
   _debugShowPip: 0
---- !u!114 &446409486
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1915979494}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ccfa7e589c4d9bc40a4b074325694a0d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OptionsPanelUI
-  _titleSceneName: NetworkTest
-  _optionsPanelRoot: {fileID: 443742576}
-  _openOptionsButton: {fileID: 1875205819}
-  _masterRow: {fileID: 241857799987197960}
-  _bgmRow: {fileID: 973167375}
-  _sfxRow: {fileID: 863261468}
-  _windowedToggle: {fileID: 1481714783}
-  _fullscreenToggle: {fileID: 189148419}
-  _resolutionDropdown: {fileID: 1978200279}
-  _tabs:
-  - toggle: {fileID: 1329676929}
-    page: {fileID: 2044857250}
-    kind: 0
-  - toggle: {fileID: 184177061}
-    page: {fileID: 1513409279}
-    kind: 1
-  _applyButton: {fileID: 1322773557}
-  _cancelOptionsButton: {fileID: 1217888845}
-  _closeButton: {fileID: 661005550}
-  _restoreDefaultsButton: {fileID: 298441918}
-  _returnTitleButton: {fileID: 592135076}
-  _quitButton: {fileID: 1333276820}
-  _confirmModal: {fileID: 717841054}
-  _confirmMessageText: {fileID: 467555630}
-  _confirmButton: {fileID: 1214189950}
-  _cancelButton: {fileID: 799081727}
-  _modalDialog: {fileID: 6874664172847844001}
 --- !u!1 &1924281625
 GameObject:
   m_ObjectHideFlags: 0
@@ -28075,3 +28318,4 @@ SceneRoots:
   - {fileID: 1788756592}
   - {fileID: 1915979498}
   - {fileID: 1524564248}
+  - {fileID: 698346820}

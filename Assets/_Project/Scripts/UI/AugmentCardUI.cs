@@ -53,6 +53,8 @@ public class AugmentCardUI : MonoBehaviour
         // 연타로 두 번 선택되는 것을 막는다(SelectAugment는 오퍼를 비우지만 같은 프레임 중복은 남는다).
         if (_button != null) _button.interactable = false;
 
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.AugmentChoice);
+
         _onSelected?.Invoke(_data);
     }
 }

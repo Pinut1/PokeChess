@@ -729,6 +729,8 @@ public class OptionsPanelUI : MonoBehaviour
         if (_optionsOpen) return;
         _optionsOpen = true;
 
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+
         _pendingFullScreen = _appliedFullScreen;
         _pendingResolutionIndex = _appliedResolutionIndex;
 
@@ -949,6 +951,8 @@ public class OptionsPanelUI : MonoBehaviour
     /// </summary>
     private void HandleApplyButtonClicked()
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.SettingApply);
+
         PlayerPrefs.SetFloat(PREF_MASTER_VOLUME, _masterVolume);
         PlayerPrefs.SetFloat(PREF_BGM_VOLUME, _bgmVolume);
         PlayerPrefs.SetFloat(PREF_SFX_VOLUME, _sfxVolume);
@@ -977,6 +981,8 @@ public class OptionsPanelUI : MonoBehaviour
     private void HandleRestoreDefaultsButtonClicked()
     {
         if (_tabs == null || _tabs.Length == 0) return;
+
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
 
         RestorePageDefaults(_tabs[CurrentTabIndex].kind);
 
@@ -1034,10 +1040,18 @@ public class OptionsPanelUI : MonoBehaviour
     }
 
     /// <summary>옵션 취소 — Close/Cancel/ESC가 공유하는 CloseOptionsPanel()을 그대로 호출한다.</summary>
-    private void HandleCancelOptionsButtonClicked() => CloseOptionsPanel();
+    private void HandleCancelOptionsButtonClicked()
+    {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+        CloseOptionsPanel();
+    }
 
     /// <summary>닫기 — Close/Cancel/ESC가 공유하는 CloseOptionsPanel()을 그대로 호출한다.</summary>
-    private void HandleCloseButtonClicked() => CloseOptionsPanel();
+    private void HandleCloseButtonClicked()
+    {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+        CloseOptionsPanel();
+    }
 
     /// <summary>
     /// 방 인원에 따라 역할이 갈리는 겸용 버튼.
@@ -1049,6 +1063,8 @@ public class OptionsPanelUI : MonoBehaviour
     /// </summary>
     private void HandleReturnTitleButtonClicked()
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+
         ClearSurrenderNotices();
 
         if (IsSurrenderAvailable())
@@ -1076,6 +1092,8 @@ public class OptionsPanelUI : MonoBehaviour
 
     private void HandleQuitButtonClicked()
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+
         ClearSurrenderNotices();
         OpenConfirmModal(ConfirmMode.QuitGame, "게임을 종료하시겠습니까?");
     }
@@ -1104,6 +1122,8 @@ public class OptionsPanelUI : MonoBehaviour
     /// <summary>ConfirmModal의 확인 버튼. 열려 있던 확인 종류에 해당하는 기존 로직만 실행한다.</summary>
     private void HandleConfirmButtonClicked()
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+
         ConfirmMode selectedMode = _confirmMode;
         CloseConfirmModal();
 
@@ -1127,6 +1147,7 @@ public class OptionsPanelUI : MonoBehaviour
     /// <summary>ConfirmModal의 취소 버튼. 아무 로직도 실행하지 않고 모달만 닫는다.</summary>
     private void HandleCancelButtonClicked()
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
         CloseConfirmModal();
     }
 

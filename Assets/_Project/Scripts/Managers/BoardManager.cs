@@ -871,6 +871,8 @@ public class BoardManager : MonoBehaviour
         if (onBoard) SetOccupant(coords, null);
         else         _bench[slot] = null;
 
+        if (SoundManager.TryGet(out var sellSoundManager)) sellSoundManager.PlaySfx(SoundId.UnitSell);
+
         GameEvents.UnitSold(unit); // ShopManager(환급) · SynergyManager(재계산) · BoardView(resync)
         Destroy(unit.gameObject);
         return true;

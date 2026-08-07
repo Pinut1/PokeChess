@@ -142,6 +142,8 @@ public class PlusleMinunChoicePanel : MonoBehaviour
         // 직전 선택에서 꺼둔 버튼을 되살린다.
         SetButtonsInteractable(true);
 
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.PlusleMinunChoiceUIOpen);
+
         SlideTo(_shownPosY);
     }
 
@@ -239,6 +241,8 @@ public class PlusleMinunChoicePanel : MonoBehaviour
     {
         // 같은 프레임에 두 번 눌리는 것을 막는다(패널이 내려가는 건 이벤트를 타고 한 박자 뒤에 온다).
         SetButtonsInteractable(false);
+
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.PlusleMinunChoiceClick);
 
         UIManager ui = Ui;
         if (ui == null)

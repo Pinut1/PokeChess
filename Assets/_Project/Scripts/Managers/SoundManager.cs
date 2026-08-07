@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -24,8 +25,14 @@ public class SoundManager : Singleton<SoundManager>
     [SerializeField] private SoundCatalog _catalog;
 
     private float _sfxVolume = DEFAULT_VOLUME;
+    private Coroutine _bgmIntroCoroutine;
 
     public SoundCatalog Catalog => _catalog;
+
+    private void OnEnable()  => GameEvents.OnBattleStart += HandleBattleStart;
+    private void OnDisable() => GameEvents.OnBattleStart -= HandleBattleStart;
+
+    private void HandleBattleStart() => PlayBgm(SoundId.BattleStart);
 
     protected override void Awake()
     {
@@ -81,6 +88,12 @@ public class SoundManager : Singleton<SoundManager>
 
     public void StopBgm()
     {
+        if (_bgmIntroCoroutine != null)
+        {
+            StopCoroutine(_bgmIntroCoroutine);
+            _bgmIntroCoroutine = null;
+        }
+
         if (_bgmSource == null) return;
         _bgmSource.Stop();
     }
@@ -104,6 +117,41 @@ public class SoundManager : Singleton<SoundManager>
         }
 
         PlayBgm(clip, loop);
+    }
+
+    /// <summary>
+    /// 인트로 클립을 한 번(non-loop) 재생한 뒤, 끝나는 시점에 자동으로 루프 클립으로 넘어간다.
+    /// (예: 타이틀 BGM — 오프닝이 있는 인트로 + 루프 파트가 분리된 소스일 때)
+    /// </summary>
+    public void PlayBgmWithIntro(SoundId introId, SoundId loopId)
+    {
+        if (_catalog == null)
+        {
+            Debug.LogWarning("[SoundManager] SoundCatalog 미연결 — BGM 재생 스킵");
+            return;
+        }
+
+        if (!_catalog.TryGetClip(introId, out var introClip) || !_catalog.TryGetClip(loopId, out var loopClip))
+        {
+            Debug.LogWarning($"[SoundManager] '{introId}' 또는 '{loopId}' 클립 없음 — BGM 재생 스킵");
+            return;
+        }
+
+        if (_bgmIntroCoroutine != null)
+        {
+            StopCoroutine(_bgmIntroCoroutine);
+            _bgmIntroCoroutine = null;
+        }
+
+        PlayBgm(introClip, loop: false);
+        _bgmIntroCoroutine = StartCoroutine(SwitchToLoopAfter(introClip.length, loopClip));
+    }
+
+    private IEnumerator SwitchToLoopAfter(float delay, AudioClip loopClip)
+    {
+        yield return new WaitForSecondsRealtime(delay);
+        _bgmIntroCoroutine = null;
+        PlayBgm(loopClip, loop: true);
     }
 
     // ─────────────────────────────────────────

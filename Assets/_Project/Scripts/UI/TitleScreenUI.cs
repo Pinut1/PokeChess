@@ -167,6 +167,9 @@ public class TitleScreenUI : MonoBehaviour
     private void EnterPressAnyKeyPhase()
     {
         SetPhase(TitlePhase.PressAnyKey);
+
+        if (SoundManager.TryGet(out var sm))
+            sm.PlayBgmWithIntro(SoundId.TitleBgmIntro, SoundId.TitleBgm);
     }
 
     /// <summary>

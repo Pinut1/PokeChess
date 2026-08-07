@@ -140,6 +140,8 @@ public class AugmentOfferPanel : MonoBehaviour
 
     private void HandleOfferReady(IReadOnlyList<AugmentData> offer)
     {
+        if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.AugmentOpen);
+
         for (int i = 0; i < _cards.Count; i++)
         {
             if (i < offer.Count)

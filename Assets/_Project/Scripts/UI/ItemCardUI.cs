@@ -74,13 +74,27 @@ public class ItemCardUI : MonoBehaviour, IShopCardView<ScriptableObject>,
 
     private void Awake()
     {
-        _buyButton.onClick.AddListener(() => Clicked?.Invoke());
+        _buyButton.onClick.AddListener(() =>
+        {
+            // 아이템 전용 클립이 아직 없어 유닛 구매(UnitBuy)를 그대로 재사용한다.
+            if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UnitBuy);
+            Clicked?.Invoke();
+        });
 
         if (_rerollButton != null)
-            _rerollButton.onClick.AddListener(() => RerollClicked?.Invoke());
+            _rerollButton.onClick.AddListener(() =>
+            {
+                // 아이템 전용 클립이 아직 없어 새로고침(ShopReroll)을 그대로 재사용한다.
+                if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.ShopReroll);
+                RerollClicked?.Invoke();
+            });
 
         if (_blockerButton != null)
-            _blockerButton.onClick.AddListener(ShowBlockReason);
+            _blockerButton.onClick.AddListener(() =>
+            {
+                if (SoundManager.TryGet(out var sm)) sm.PlaySfx(SoundId.UiClick);
+                ShowBlockReason();
+            });
     }
 
     public void Bind(ScriptableObject data)

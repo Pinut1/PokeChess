@@ -8,20 +8,39 @@ public enum SoundId
     None = 0,
 
     // ── BGM ──
-    TitleBgm,
-    GameBgm,
+    TitleBgmIntro,  // 한 번만 재생 후 TitleBgm으로 이어짐(SoundManager.PlayBgmWithIntro)
+    TitleBgm,       // 타이틀→게임까지 끊김 없이 계속 재생 — 별도 게임용 BGM 없음
 
-    // ── SFX ──
+    // ── SFX: 버튼(1) ──
     UiClick,
     ShopReroll,
+    XpBuy,
+    ShopLock,
+    ShopUnlock,
+    SettingApply,
+    PlusleMinunChoiceUIOpen,
+    PlusleMinunChoiceClick,
+
+    // ── SFX: 상호작용(2) ──
     UnitBuy,
     UnitSell,
     ItemBuy,
     ItemReroll,
+    PickUp,
+    Drop,
+    Evolution2Star,
+    Evolution3Star,
+    ItemEquip,
+    Error,
+    EnemyDeath,
+    AugmentOpen,
+    AugmentChoice,
+    InterestUp,
+
+    // ── SFX: 전투 ──
     BattleStart,
     RoundStart,
     Victory,
     Defeat,
-    Evolution,
     Reward,
 }
