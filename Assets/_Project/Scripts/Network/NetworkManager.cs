@@ -347,26 +347,25 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // OnEnable 구독이 끝난 뒤에 함).
         if (s_resyncAfterRejoinPending)
             _gameStarted = true;
+
+        // AuthValues(UserId) 초기화도 같은 이유로 Awake에서 먼저 끝내야 한다. 예전엔 Start()에서
+        // 했는데, TitleScreenUI.Start()의 Connect()가 이 NetworkManager.Start()보다 먼저 실행되면
+        // PhotonNetwork.IsConnected가 이미 true가 되어버려 저장 UserId 복원 분기가 스킵되고,
+        // Photon 서버가 새 UserId를 발급해버렸다(2026-08 확인 — 저장된 UserId와 Rejoin 시점 UserId가
+        // 달라 재입장이 실패하는 근본 원인이었음. 로그: 저장 UserId != Rejoin 직전 MyUserId).
+        EnsureAuthIdentity();
     }
 
-    private void Start()
+    /// <summary>
+    /// AuthValues(UserId)/닉네임을 Connect() 이전에 확정한다. Awake()에서만 호출 — Start 순서
+    /// 경합 회피 이유는 Awake() 주석 참고. 내용 자체는 예전 Start()에 있던 것과 동일하다(로직 변경 없음).
+    /// </summary>
+    private void EnsureAuthIdentity()
     {
-        // 진단 로그(2026-08, 재접속 복원 미실행 문제 추적용) — 로직 변경 없음. 어느 분기가 실제로
-        // 실행되는지(재접속 복원이 왜 안 도는지) 다음 테스트에서 바로 확정하기 위함.
-        Debug.Log($"[Network][Rejoin][Diag] Start() 진입 — _soloMode={_soloMode}, " +
-                  $"PhotonNetwork.IsConnected={PhotonNetwork.IsConnected}, " +
-                  $"s_resyncAfterRejoinPending={s_resyncAfterRejoinPending}, " +
-                  $"s_isResumingRejoinedMatch={s_isResumingRejoinedMatch}");
-
-        if (_soloMode)
-        {
-            Debug.LogWarning("[Network] 솔로 모드 — Photon 미사용, 즉시 라운드 1 시작");
-            BroadcastRoundStart(1);
-            return;
-        }
+        if (_soloMode) return;
 
         // 씬 로컬이라 GameManager는 씬마다 새로 생기지만, 이미 연결돼 있으면(로비→게임 전환 후)
-        // 닉네임/인증값을 다시 설정하지 않는다(재접속 식별자 보존). 씬 동기화는 Awake에서 이미 켬.
+        // 닉네임/인증값을 다시 설정하지 않는다(재접속 식별자 보존). 씬 동기화는 위에서 이미 켬.
         if (PhotonNetwork.IsConnected)
         {
             // AuthValues/닉네임은 건드리지 않지만(연결된 세션의 정체성 보존), 저장된 재접속 세션의
@@ -374,25 +373,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // 돌아온 경우(Photon 연결 자체는 끊기지 않음) 이 값들이 새 씬의 새 인스턴스에서 전혀
             // 채워지지 않던 문제(2026-08 확인) 수정 — 이 분기 자체를 타는 것과는 무관하게 필요하다.
             ReloadSavedRejoinSessionDisplayState();
-
-            // 이 인스턴스가 이미 라운드가 진행 중인 방에서 생성됐다면(s_resyncAfterRejoinPending이 세팅된
-            // 정상 재접속 경로가 아니더라도 — 예: PUN AutomaticallySyncScene을 타고 수동적으로 씬이
-            // 재생성된 경우) 신규 매치 시작으로 오판하지 않도록 _gameStarted를 미리 true로 간주한다.
-            // 정말 신규 매치라면 Room에 ROUND_PROP_KEY가 아직 없으므로 이 체크는 아무 영향이 없다.
-            // (OnPlayerPropertiesUpdate의 HasActiveRoundInRoom 방어와는 책임이 다르다 — 여기는 이 인스턴스의
-            // _gameStarted 자체를 최대한 이른 시점에 정확히 복원하는 초기화, 그쪽은 그 복원이 어떤 이유로든
-            // 누락됐을 때의 최종 방어선이다.)
-            if (!_gameStarted && HasActiveRoundInRoom())
-                _gameStarted = true;
-
-            // 재입장 성공 후 게임 씬으로 명시적으로 복귀한 경우 — 이 씬의 다른 매니저들이 Awake/OnEnable로
-            // GameEvents 구독을 마친 뒤(Start 시점엔 항상 보장됨) 예약된 재동기화를 실행한다.
-            if (s_resyncAfterRejoinPending)
-            {
-                s_resyncAfterRejoinPending = false;
-                Debug.Log("[Network][Rejoin] 게임 씬 로드 완료 — 예약된 재동기화 실행");
-                ResyncAfterReconnect();
-            }
             return;
         }
 
@@ -418,11 +398,53 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Debug.Log($"[Network][Rejoin] AuthValues.UserId 설정: {ShortUserId(userId)}... (저장값 재사용: {!string.IsNullOrEmpty(savedUserId)})");
     }
 
+    private void Start()
+    {
+        // 진단 로그(2026-08, 재접속 복원 미실행 문제 추적용) — 로직 변경 없음. 어느 분기가 실제로
+        // 실행되는지(재접속 복원이 왜 안 도는지) 다음 테스트에서 바로 확정하기 위함.
+        Debug.Log($"[Network][Rejoin][Diag] Start() 진입 — _soloMode={_soloMode}, " +
+                  $"PhotonNetwork.IsConnected={PhotonNetwork.IsConnected}, " +
+                  $"s_resyncAfterRejoinPending={s_resyncAfterRejoinPending}, " +
+                  $"s_isResumingRejoinedMatch={s_isResumingRejoinedMatch}");
+
+        if (_soloMode)
+        {
+            Debug.LogWarning("[Network] 솔로 모드 — Photon 미사용, 즉시 라운드 1 시작");
+            BroadcastRoundStart(1);
+            return;
+        }
+
+        // AuthValues(UserId)/닉네임 초기화는 Awake()의 EnsureAuthIdentity()가 이미 끝냈다(Start 순서
+        // 경합 회피 — Awake() 주석 참고). 여기 남는 건 다른 매니저의 OnEnable 구독이 끝난 뒤에만
+        // 실행해야 하는, 실제로 Start 타이밍이 필요한 재접속 복원 로직뿐이다.
+        if (PhotonNetwork.IsConnected)
+        {
+            // 이 인스턴스가 이미 라운드가 진행 중인 방에서 생성됐다면(s_resyncAfterRejoinPending이 세팅된
+            // 정상 재접속 경로가 아니더라도 — 예: PUN AutomaticallySyncScene을 타고 수동적으로 씬이
+            // 재생성된 경우) 신규 매치 시작으로 오판하지 않도록 _gameStarted를 미리 true로 간주한다.
+            // 정말 신규 매치라면 Room에 ROUND_PROP_KEY가 아직 없으므로 이 체크는 아무 영향이 없다.
+            // (OnPlayerPropertiesUpdate의 HasActiveRoundInRoom 방어와는 책임이 다르다 — 여기는 이 인스턴스의
+            // _gameStarted 자체를 최대한 이른 시점에 정확히 복원하는 초기화, 그쪽은 그 복원이 어떤 이유로든
+            // 누락됐을 때의 최종 방어선이다.)
+            if (!_gameStarted && HasActiveRoundInRoom())
+                _gameStarted = true;
+
+            // 재입장 성공 후 게임 씬으로 명시적으로 복귀한 경우 — 이 씬의 다른 매니저들이 Awake/OnEnable로
+            // GameEvents 구독을 마친 뒤(Start 시점엔 항상 보장됨) 예약된 재동기화를 실행한다.
+            if (s_resyncAfterRejoinPending)
+            {
+                s_resyncAfterRejoinPending = false;
+                Debug.Log("[Network][Rejoin] 게임 씬 로드 완료 — 예약된 재동기화 실행");
+                ResyncAfterReconnect();
+            }
+        }
+    }
+
     /// <summary>
     /// PlayerPrefs에 저장된 재접속 세션의 표시 상태(_pendingRejoinRoomName/_savedNickname)를 다시 읽어
     /// 반영한다. AuthValues는 여기서 건드리지 않는다 — Photon 연결이 유지된 채(방만 나가 타이틀로 돌아온
-    /// 경우) 호출해도 안전하도록 Start()의 "연결됨" 분기와 "신규 연결" 분기 양쪽에서 공용으로 쓴다.
-    /// 반환값(저장된 UserId)은 신규 연결 분기에서만 AuthValues 발급에 사용된다.
+    /// 경우) 호출해도 안전하도록 EnsureAuthIdentity()(Awake에서 호출)의 "연결됨" 분기와 "신규 연결" 분기
+    /// 양쪽에서 공용으로 쓴다. 반환값(저장된 UserId)은 신규 연결 분기에서만 AuthValues 발급에 사용된다.
     /// </summary>
     private string ReloadSavedRejoinSessionDisplayState()
     {
