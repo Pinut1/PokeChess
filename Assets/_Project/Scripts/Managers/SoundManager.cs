@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Audio;
 
 /// <summary>
 /// 프로젝트 전역 BGM/SFX 재생 및 볼륨 관리.
@@ -24,6 +25,11 @@ public class SoundManager : Singleton<SoundManager>
     [Header("사운드 카탈로그 (SoundId → AudioClip 매핑)")]
     [SerializeField] private SoundCatalog _catalog;
 
+    [Header("SFX 믹서 그룹 (선택 — 컴프레서/리미터로 겹침 시 음량 폭주 방지용)")]
+    [Tooltip("Audio Mixer에서 SFX용 그룹을 만들고 여기 연결하면 _sfxSource.outputAudioMixerGroup에 반영된다. " +
+             "비워두면 기존처럼 믹서 없이 바로 재생.")]
+    [SerializeField] private AudioMixerGroup _sfxMixerGroup;
+
     private float _sfxVolume = DEFAULT_VOLUME;
     private Coroutine _bgmIntroCoroutine;
 
@@ -46,6 +52,9 @@ public class SoundManager : Singleton<SoundManager>
         if (alreadyRegistered) return; // 중복 인스턴스 — base.Awake()에서 이미 Destroy 처리됨
 
         LoadAndApplySavedVolumes();
+
+        if (_sfxMixerGroup != null && _sfxSource != null)
+            _sfxSource.outputAudioMixerGroup = _sfxMixerGroup;
     }
 
     private void LoadAndApplySavedVolumes()
@@ -158,7 +167,10 @@ public class SoundManager : Singleton<SoundManager>
     // SFX
     // ─────────────────────────────────────────
 
-    public void PlaySfx(AudioClip clip)
+    public void PlaySfx(AudioClip clip) => PlaySfx(clip, 1f);
+
+    /// <summary>volumeMultiplier는 SoundCatalog의 항목별 볼륨 배율(0~1) — 원본 클립마다 다른 녹음 크기를 맞추는 용도.</summary>
+    public void PlaySfx(AudioClip clip, float volumeMultiplier)
     {
         if (clip == null) return;
 
@@ -168,10 +180,10 @@ public class SoundManager : Singleton<SoundManager>
             return;
         }
 
-        _sfxSource.PlayOneShot(clip, _sfxVolume);
+        _sfxSource.PlayOneShot(clip, _sfxVolume * Mathf.Clamp01(volumeMultiplier));
     }
 
-    /// <summary>SoundId로 SFX 재생. 실제 재생은 PlaySfx(AudioClip)를 그대로 재사용한다.</summary>
+    /// <summary>SoundId로 SFX 재생. 카탈로그에 등록된 항목별 볼륨 배율을 함께 적용한다.</summary>
     public void PlaySfx(SoundId id)
     {
         if (id == SoundId.None) return;
@@ -182,13 +194,13 @@ public class SoundManager : Singleton<SoundManager>
             return;
         }
 
-        if (!_catalog.TryGetClip(id, out var clip))
+        if (!_catalog.TryGetClip(id, out var clip, out var entryVolume))
         {
             Debug.LogWarning($"[SoundManager] SoundCatalog에 '{id}' 클립 없음 — SFX 재생 스킵");
             return;
         }
 
-        PlaySfx(clip);
+        PlaySfx(clip, entryVolume);
     }
 
     // ─────────────────────────────────────────

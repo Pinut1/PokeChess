@@ -15,51 +15,76 @@ MonoBehaviour:
   _entries:
   - id: 1
     clip: {fileID: 8300000, guid: cdda464efd4e37148b581146574be00a, type: 3}
+    volume: 1
   - id: 2
     clip: {fileID: 8300000, guid: e282fcce192c14d45a39a364ce79a516, type: 3}
+    volume: 1
   - id: 3
     clip: {fileID: 8300000, guid: 3e375b619b0698a4e82a038440a815f9, type: 3}
+    volume: 1
   - id: 4
     clip: {fileID: 8300000, guid: 2185c38189ca5be4aa50556c0f589049, type: 3}
+    volume: 1
   - id: 5
     clip: {fileID: 8300000, guid: 425a74a41ae4fb54384682a6af735e5a, type: 3}
+    volume: 1
   - id: 6
     clip: {fileID: 8300000, guid: 330f7efd163acc2498a5443f18b0e8e8, type: 3}
+    volume: 1
   - id: 7
     clip: {fileID: 8300000, guid: 8c3308147e4f46247b189020c68adeb2, type: 3}
+    volume: 1
   - id: 8
     clip: {fileID: 8300000, guid: 5be9e1ee0c0fa92408234ced669ed013, type: 3}
+    volume: 1
   - id: 9
     clip: {fileID: 8300000, guid: 0ac6d050fc0f3fb42b91de9831ba1bb0, type: 3}
+    volume: 1
   - id: 10
     clip: {fileID: 8300000, guid: e4ced2135135c18499760557502082b9, type: 3}
+    volume: 1
   - id: 11
     clip: {fileID: 8300000, guid: 39da3d9f7c636804390aa6c233563300, type: 3}
+    volume: 1
   - id: 12
     clip: {fileID: 8300000, guid: 1f830d3841d61bb4e9dbc8f3842cf751, type: 3}
+    volume: 1
   - id: 13
     clip: {fileID: 8300000, guid: 39da3d9f7c636804390aa6c233563300, type: 3}
+    volume: 1
   - id: 14
     clip: {fileID: 8300000, guid: 2185c38189ca5be4aa50556c0f589049, type: 3}
+    volume: 1
   - id: 15
     clip: {fileID: 8300000, guid: f1880ce0b5cc4e74cb9bc0e5792203a9, type: 3}
+    volume: 1
   - id: 16
     clip: {fileID: 8300000, guid: 59c6f546285741f45900da8263dd4917, type: 3}
+    volume: 1
   - id: 17
     clip: {fileID: 8300000, guid: da260a4919ebfef43ae982df90edd274, type: 3}
+    volume: 1
   - id: 18
     clip: {fileID: 8300000, guid: 0265377e53309ae428bb897d9d73a16d, type: 3}
+    volume: 1
   - id: 19
     clip: {fileID: 8300000, guid: cba754131fa8272458c3826967a341bd, type: 3}
+    volume: 1
   - id: 20
     clip: {fileID: 8300000, guid: 0dd853ace3ff27e479c58ebd4e5f35b5, type: 3}
+    volume: 1
   - id: 21
     clip: {fileID: 8300000, guid: 546ce6c597776a849a3e7d2521de896f, type: 3}
+    volume: 1
   - id: 22
     clip: {fileID: 8300000, guid: 5b31afc9b6698444d891ae9c209cd876, type: 3}
+    volume: 1
   - id: 23
     clip: {fileID: 8300000, guid: be848902b5781934cb0cbb440da556df, type: 3}
+    volume: 1
   - id: 24
     clip: {fileID: 8300000, guid: 7117e5d78950ea54481351c863fb8b7a, type: 3}
+    volume: 1
   - id: 25
     clip: {fileID: 0}
+    volume: 1
