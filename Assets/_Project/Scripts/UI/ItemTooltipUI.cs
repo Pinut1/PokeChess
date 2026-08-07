@@ -69,6 +69,9 @@ public class ItemTooltipUI : MonoBehaviour
     // 같은 대상이 두 줄로 들어와도 아이콘은 한 번만(이브이처럼 돌 여러 개가 걸린 종 대비).
     private readonly HashSet<int> _seenIds = new();
 
+    // 그릴 대상을 모았다가 코스트순으로 정렬해서 칸에 넣는다(시트 행 순서 그대로면 코스트가 섞인다).
+    private readonly List<PokemonData> _targets = new();
+
     // 경고는 종류당 1회만(호버할 때마다 로그가 쏟아지지 않게).
     private bool _warnedSlotShortage;
 
@@ -158,13 +161,18 @@ public class ItemTooltipUI : MonoBehaviour
         if (_unitSlotRoot != null) _unitSlotRoot.gameObject.SetActive(show);
     }
 
-    /// <summary>채운 칸 수. 남는 칸은 꺼서 그리드가 자리를 접게 한다.</summary>
+    /// <summary>
+    /// 채운 칸 수. 남는 칸은 꺼서 그리드가 자리를 접게 한다.
+    /// 표시 순서는 <b>저코스트 → 고코스트</b>다 — 시트(EvolutionMap) 행 순서를 그대로 쓰면
+    /// 코스트가 뒤섞여 나온다. 같은 코스트끼리는 id순이라 매번 같은 자리에 온다.
+    /// </summary>
     private int FillUnitSlots(EvolutionStoneData stone)
     {
         if (_unitSlotRoot == null) return 0;
 
         int shown = 0;
         _seenIds.Clear();
+        _targets.Clear();
 
         // 돌이 아닌 아이템도 이 함수를 지나간다 — 이땐 조회 없이 전 칸을 끄기만 하면 된다.
         var db = stone != null ? PokemonDatabase.Instance : null;
@@ -181,8 +189,17 @@ public class ItemTooltipUI : MonoBehaviour
                 // 이브이처럼 한 돌에 두 줄이 걸릴 여지가 있어 종 기준으로 한 번만 그린다.
                 if (!_seenIds.Add(target.id)) continue;
 
+                _targets.Add(target);
+            }
+
+            // 정렬을 칸에 넣기 전에 한다 — 넣으면서 정렬하면 상한에 걸렸을 때
+            // 잘려나가는 쪽이 "고코스트"가 아니라 "시트 뒷줄"이 된다.
+            _targets.Sort(CompareByCostThenId);
+
+            foreach (var target in _targets)
+            {
                 var slot = SlotAt(shown);
-                if (slot == null) continue; // 칸 상한 도달 — 남은 대상 수만 세고 아래에서 경고
+                if (slot == null) break; // 칸 상한 도달 — 아래에서 한 번만 경고
 
                 // placed:true 고정 — 시너지 툴팁과 달리 "지금 보드에 있나"는 상관없는 목록이라
                 // 흑백 처리를 하지 않는다. 테두리 색(코스트)만 살린다.
@@ -194,14 +211,21 @@ public class ItemTooltipUI : MonoBehaviour
         for (int i = shown; i < _slots.Count; i++)
             if (_slots[i] != null) _slots[i].SetEmpty();
 
-        if (stone != null && shown < _seenIds.Count && !_warnedSlotShortage)
+        if (stone != null && shown < _targets.Count && !_warnedSlotShortage)
         {
             _warnedSlotShortage = true;
-            Debug.LogWarning($"[ItemTooltip] '{stone.stoneName}' 대상 {_seenIds.Count}종 중 {shown}종만 표시됨 — " +
+            Debug.LogWarning($"[ItemTooltip] '{stone.stoneName}' 대상 {_targets.Count}종 중 {shown}종만 표시됨 — " +
                              "Unit Slot Prefab을 물리거나 Max Unit Slots를 늘릴 것", this);
         }
 
         return shown;
+    }
+
+    /// <summary>코스트 오름차순, 같으면 id순(표시 순서를 고정해 호버할 때마다 자리가 바뀌지 않게).</summary>
+    private static int CompareByCostThenId(PokemonData a, PokemonData b)
+    {
+        int byCost = a.cost.CompareTo(b.cost);
+        return byCost != 0 ? byCost : a.id.CompareTo(b.id);
     }
 
     /// <summary>i번째 칸. 없으면 프리팹에서 만들어 붙인다. 상한을 넘거나 프리팹이 없으면 null.</summary>
