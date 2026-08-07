@@ -171,6 +171,15 @@ public static class GameEvents
     public static event Action<PokemonUnit> OnUnitSold;
 
     /// <summary>
+    /// 상점 구매로 새 유닛이 생성·배치 완료됨(뷰 전용, 울음소리 재생용). 인자 = 구매한 PokemonData.
+    /// 합체 예외 구매(구매 즉시 3마리째로 성급진화)는 여기서 발행하지 않는다 — 그 경우는
+    /// BoardManager.ExecuteMerge가 이미 OnUnitEvolved(최종 종 기준)를 발행하므로, 여기서 또 발행하면
+    /// 같은 액션에 울음소리가 두 번(구매 종 + 진화 종) 겹친다. ShopManager.Buy()/ResolveSharedShopPurchase()의
+    /// "합체 없이 신규 배치" 성공 경로에서만 발행.
+    /// </summary>
+    public static event Action<PokemonData> OnPokemonPurchased;
+
+    /// <summary>
     /// 유닛의 종(data)·성(starLevel)이 배치/벤치 외의 경로로 바뀜 (예: 진화의 돌 장착/제거).
     /// BoardManager가 구독 → CheckEvolution 재실행해야 함. 안 그러면 돌 제거로 원복된
     /// 유닛이 같은 종 3마리를 채워도 합체가 트리거되지 않는다.
@@ -355,6 +364,7 @@ public static class GameEvents
     public static void UnitBenched(PokemonUnit unit) => OnUnitBenched?.Invoke(unit);
     public static void UnitPlacementRejected(string reason) => OnUnitPlacementRejected?.Invoke(reason);
     public static void UnitSold(PokemonUnit unit)    => OnUnitSold?.Invoke(unit);
+    public static void PokemonPurchased(PokemonData data) => OnPokemonPurchased?.Invoke(data);
     public static void UnitChanged(PokemonUnit unit) => OnUnitChanged?.Invoke(unit);
     public static void PlusleMinunChoiceReady(PokemonUnit unit) => OnPlusleMinunChoiceReady?.Invoke(unit);
     public static void PlusleMinunChoiceClosed() => OnPlusleMinunChoiceClosed?.Invoke();

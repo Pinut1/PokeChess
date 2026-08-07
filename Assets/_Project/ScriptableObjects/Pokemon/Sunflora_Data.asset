@@ -43,5 +43,6 @@ MonoBehaviour:
   shopBuyable: 0
   obtainBy: stone
   modelPrefab: {fileID: 3769264609492968301, guid: fc4b921ecc65414438e1bc349918f0ab, type: 3}
+  voiceClip: {fileID: 8300000, guid: f5273c006d0a5394d99618617b9ec779, type: 3}
   icon: {fileID: -5186403270690606801, guid: d83907b7df0b0fd43a73e208d8647dbd, type: 3}
   unitIcon: {fileID: -5766853905260072475, guid: d83907b7df0b0fd43a73e208d8647dbd, type: 3}

@@ -44,5 +44,6 @@ MonoBehaviour:
   shopBuyable: 0
   obtainBy: synergy
   modelPrefab: {fileID: 1469424305684025822, guid: 006fd09c94a694042bfb29648fc442da, type: 3}
+  voiceClip: {fileID: 8300000, guid: 901c3fc3ea884ab48807e880bb2b17fd, type: 3}
   icon: {fileID: -774372371, guid: 714a725d7bbddfc419a8ac84e03dc527, type: 3}
   unitIcon: {fileID: -1947250265, guid: 714a725d7bbddfc419a8ac84e03dc527, type: 3}

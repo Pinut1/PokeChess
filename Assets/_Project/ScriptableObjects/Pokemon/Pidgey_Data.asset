@@ -44,5 +44,6 @@ MonoBehaviour:
   shopBuyable: 1
   obtainBy: shop
   modelPrefab: {fileID: 3663222512595383064, guid: b547230743f7fd148aea684752d9df1e, type: 3}
+  voiceClip: {fileID: 8300000, guid: fde1c4793abc4a0428eeb347c78134f3, type: 3}
   icon: {fileID: 3748664229647704618, guid: 2f05be42d22804b439699dd97a7d6cc9, type: 3}
   unitIcon: {fileID: 7453715592699882671, guid: 2f05be42d22804b439699dd97a7d6cc9, type: 3}

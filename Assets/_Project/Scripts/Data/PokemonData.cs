@@ -76,6 +76,14 @@ public class PokemonData : ScriptableObject
     [Header("에셋 참조")]
     public GameObject modelPrefab;
 
+    /// <summary>
+    /// 이 포켓몬의 울음소리. 구매 완료·진화 완료(최종 종 기준) 시 SoundManager.PlayPokemonVoice가 재생한다.
+    /// 아이콘/일러스트와 동일하게 임포터가 건드리지 않는 수동 필드 — PokeChessImporter가 JSON을
+    /// 재임포트해도 유지된다. Assets/Art/SFX/pokemon_voice 폴더를 pokemonNameEn 기준으로 매칭하는
+    /// PokemonVoiceLinker(PokeChess/Link Pokemon Voices 메뉴)로 일괄 연결한다.
+    /// </summary>
+    public AudioClip voiceClip;
+
     /// <summary>상점 카드·스탯창에 쓰는 큰 일러스트. (Link Card Illustrations 메뉴가 채운다)</summary>
     public Sprite icon;
 
