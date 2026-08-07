@@ -31,7 +31,7 @@ Unity URP 기반 포켓몬 TFT 스타일 오토배틀 게임.
 - **TMP 폰트 아틀라스(`NEXON *SDF.asset`) 커밋 금지** — 다이나믹 아틀라스라 Play할 때마다 글리프가 추가돼 diff가 생긴다
 - **`CoinText` 이름 중복** — `Coin_Panel`(골드)과 `Coupon_Panel`(쿠폰) 두 곳. 이름만으로 찾으면 오작동
 - **상점 패널 Rect(1600×400)는 보이는 바보다 크다** — 벤치 행·전투시작 버튼까지 덮으므로 화면 영역 판정에 그대로 쓰면 오탐
-- **`PokemonData.range`는 사거리가 아니라 진화 단계 값이다** — 실제 평타 사거리는 `attackRange`(임포터가 `_L`=4/`_S`=1로 베이킹). 시트 컬럼명이 `range`라 사거리로 오해하기 쉽다(코드 수정 시 특히 주의). `BattleManager.cs`의 `BattleUnit` 생성부(493·787줄)가 `range = Mathf.Max(1, data.range)`로 `attackRange` 대신 `data.range`를 쓰고 있어 **실제 전투 사거리가 전부 진화 단계 값으로 잘못 적용되는 버그** 확인됨(예: 리자몽 `range:3`/`attackRange:4`인데 3으로 적용). **상세창(`StatInfoPanelUI`)은 `attackRange`를 정상 표시하므로 화면 표시와 실제 전투 동작이 어긋난다** — 예: 깜까미(`range:1`, `attackRange:4` 원거리)는 상세창엔 "사거리 4칸"으로 뜨지만 실전에선 1칸이라 근접까지 걸어가서 때림. 원거리 유닛 중 3단계 진화체만 우연히 `range=3`이라 그나마 사거리가 있는 것처럼 보여 지금까지 안 티났던 것으로 보임(반대로 근접 3단계 유닛은 3칸에서 때림). 수정 여부는 별도 확인 필요
+- ~~`PokemonData.range`는 사거리가 아니라 진화 단계 값이다~~ ✅ 수정 완료(8/7, PR #83): `BattleManager.cs`의 `CreateBotUnit`/`CreateEnemyUnit`이 `data.range` 대신 `data.attackRange`를 쓰도록 수정됨. 아군/미러전투 경로(`PokemonUnit.Range`, `phantom.Range`)는 원래부터 `attackRange`를 참조해 영향 없었음. 같은 PR에서 타겟 선정 로직도 개선(사거리 내 우선 → 이동 가능한 가장 가까운 적 → 기존 role 우선순위 폴백). **주의: `PokemonData.range` 필드 자체는 삭제되지 않고 여전히 존재**(시트 컬럼명도 그대로 `range`) — 진화 단계가 필요한 곳(합성 판정 등)엔 계속 정당하게 쓰인다. 사거리가 필요하면 반드시 `attackRange`를 쓸 것. 새 코드에서 `BattleUnit.range`/`PokemonUnit.Range`를 채울 때 실수로 `data.range`를 다시 끌어다 쓰지 않도록 코드리뷰 시 재확인.
 
 ## 폴더 구조
 ```
