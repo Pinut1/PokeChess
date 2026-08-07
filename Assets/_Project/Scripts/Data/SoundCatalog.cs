@@ -64,9 +64,10 @@ public class SoundCatalog : ScriptableObject
 
             // volume 필드가 나중에 추가돼 기존 항목엔 값이 없다(구조체 기본값 0) — 0은 "설정 안 함"으로
             // 보고 1(무배율)로 취급한다. 실수로 0을 남겨도 무음이 되는 대신 원래 크기로 재생된다.
-            if (entry.volume <= 0f) entry.volume = 1f;
+            var fixedEntry = entry;
+            if (fixedEntry.volume <= 0f) fixedEntry.volume = 1f;
 
-            _lookup[entry.id] = entry; // 정책: 같은 id가 여러 번 등록되면 리스트 뒤쪽 항목이 최종값
+            _lookup[fixedEntry.id] = fixedEntry; // 정책: 같은 id가 여러 번 등록되면 리스트 뒤쪽 항목이 최종값
         }
     }
 
