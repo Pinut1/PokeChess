@@ -17,6 +17,37 @@ using UnityEngine;
 /// </summary>
 public class OpponentBoardView : MonoBehaviour
 {
+    /// <summary>
+    /// 쇼핑 중 파트너 보드 유닛 1기의 표시 정보(읽기 전용). UnitStatusBarHud가 쇼핑 단계 파트너
+    /// HP/마나 바를 그릴 때만 이 값을 읽는다. species/items는 ScriptableObject 에셋 참조라 값을
+    /// 바꿔도 게임 데이터에 영향이 없고(에셋 자체를 바꾸지 않는 한), visual은 이 오브젝트가 이미
+    /// 관리하는 미러 전용 비주얼(콜라이더 제거·PartnerSpectateVisual Layer)이라 실제 PokemonUnit/
+    /// Board는 어디에도 노출하지 않는다.
+    /// </summary>
+    public readonly struct PartnerBoardUnitView
+    {
+        public readonly Transform visual;
+        public readonly PokemonData species;
+        public readonly int starLevel;
+        public readonly IReadOnlyList<ItemData> items;
+
+        public PartnerBoardUnitView(Transform visual, PokemonData species, int starLevel, IReadOnlyList<ItemData> items)
+        {
+            this.visual = visual;
+            this.species = species;
+            this.starLevel = starLevel;
+            this.items = items;
+        }
+    }
+
+    // Render()가 스냅샷마다 새로 채운다 — _active와 동일한 순서/생명주기(ReleaseActive에서 함께 비움).
+    private readonly List<PartnerBoardUnitView> _activeUnitViews = new();
+
+    /// <summary>지금 화면에 떠 있는 파트너 보드 유닛들의 표시 정보(읽기 전용). 미러 전투(BattleUnit)와
+    /// 달리 쇼핑 단계는 PokemonUnit이 아예 없으므로, 이 목록이 그 자리를 대신한다.</summary>
+    public IReadOnlyList<PartnerBoardUnitView> ActiveUnitViews => _activeUnitViews;
+
+
     [Header("파트너 보드 표시 위치(월드 오프셋)")]
     [Tooltip("내 보드 기준 파트너 보드를 띄울 오프셋. BattleManager의 적 미러(Z+10)와 겹치지 않게.")]
     [SerializeField] private Vector3 _boardOffset = new Vector3(0f, 0f, 14f);
@@ -103,6 +134,12 @@ public class OpponentBoardView : MonoBehaviour
     /// <summary>스냅샷을 한 번이라도 수신했는지. entries.Count(빈 스냅샷 여부)와는 다른 축이다 —
     /// PartnerSpectateView가 "아직 수신 전(준비 중)"과 "빈 필드 정상 수신"을 구분하는 데 쓴다.</summary>
     public bool HasSnapshot => _lastSnapshot != null;
+
+    /// <summary>마지막으로 받은 파트너 BoardSnapshot(읽기 전용). 인벤토리 섹션(inventoryItemIds/
+    /// inventoryStoneIds/hasRemover/reforgerCount)을 파트너 인벤토리 표시(ItemInventoryUI)가 읽는다.
+    /// 별도 가공 없이 그대로 노출 — 이 값을 바꿔도 실제 파트너 상태에는 전혀 영향이 없다(내가 받은
+    /// 사본일 뿐이며, 이 클래스 자신도 값을 바꾸지 않고 오직 다음 스냅샷으로 통째로 교체한다).</summary>
+    public BoardSnapshot LastSnapshot => _lastSnapshot;
 
     private Transform EnsureVisualRoot()
     {
@@ -258,7 +295,29 @@ public class OpponentBoardView : MonoBehaviour
             go.name = $"PartnerUnit_{speciesName}_{e.starLevel}star";
 
             _active.Add((poolKey, go));
+            _activeUnitViews.Add(new PartnerBoardUnitView(go.transform, data, e.starLevel, ResolveEquippedItems(e)));
         }
+    }
+
+    /// <summary>Entry.itemId0/itemId1 → ItemData 목록(0 또는 미등록 id는 건너뜀). BattleManager의
+    /// CreateMirrorBattleUnit이 itemId0/1을 ItemDatabase로 되찾는 것과 같은 방식.</summary>
+    private static List<ItemData> ResolveEquippedItems(BoardSnapshot.Entry e)
+    {
+        var items = new List<ItemData>(2);
+        ItemDatabase db = ItemDatabase.Instance;
+        if (db == null) return items;
+
+        if (e.itemId0 != 0)
+        {
+            ItemData item0 = db.GetById(e.itemId0);
+            if (item0 != null) items.Add(item0);
+        }
+        if (e.itemId1 != 0)
+        {
+            ItemData item1 = db.GetById(e.itemId1);
+            if (item1 != null) items.Add(item1);
+        }
+        return items;
     }
 
     /// <summary>speciesId → PokemonData 해석. 실패 시 null(캡슐 폴백) + 종당 1회만 경고.</summary>
@@ -326,6 +385,7 @@ public class OpponentBoardView : MonoBehaviour
             stack.Push(go);
         }
         _active.Clear();
+        _activeUnitViews.Clear();
     }
 
     private Color StarColor(int star)

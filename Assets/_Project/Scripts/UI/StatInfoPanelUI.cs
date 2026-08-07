@@ -126,9 +126,12 @@ public class StatInfoPanelUI : MonoBehaviour
              "비워두면 씬에서 찾아 쓴다 — 이 패널을 프리팹에서 생성하는 경우 씬 오브젝트를 인스펙터에 꽂을 수 없기 때문.")]
     [SerializeField] private ItemTooltipController _itemTooltip;
 
-    // 보드 유닛으로 열었으면 _unit, 전투 유닛(적 포함)으로 열었으면 _battleUnit 하나만 채워진다.
+    // 보드 유닛으로 열었으면 _unit, 전투 유닛(적 포함)으로 열었으면 _battleUnit, 쇼핑 중 파트너
+    // 유닛(읽기 전용 표시 데이터)으로 열었으면 _partnerView — 셋 중 하나만 채워진다.
     private PokemonUnit _unit;
     private BattleUnit _battleUnit;
+    private OpponentBoardView.PartnerBoardUnitView? _partnerView;
+    private float _partnerViewMaxHp; // Bind(PartnerBoardUnitView)에서 1회 계산해 캐시 — RefreshGauges 참고
     private RectTransform _rect;
 
     // 아이콘 칸마다 하나씩. _itemIcons와 같은 순서다(Awake에서 붙인다).
@@ -142,6 +145,9 @@ public class StatInfoPanelUI : MonoBehaviour
     /// <summary>전투 유닛으로 열려 있으면 그 유닛. 아니면 null.</summary>
     public BattleUnit BattleUnit => _battleUnit;
 
+    /// <summary>쇼핑 중 파트너 유닛(읽기 전용 표시 데이터)으로 열려 있는지.</summary>
+    public bool IsShowingPartnerView => _partnerView.HasValue;
+
     /// <summary>보드/벤치 유닛 정보를 채우고 창을 켠다.</summary>
     public void Bind(PokemonUnit unit)
     {
@@ -153,6 +159,7 @@ public class StatInfoPanelUI : MonoBehaviour
 
         _unit = unit;
         _battleUnit = null;
+        _partnerView = null;
         gameObject.SetActive(true);
 
         FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
@@ -191,6 +198,7 @@ public class StatInfoPanelUI : MonoBehaviour
 
         _battleUnit = unit;
         _unit = null;
+        _partnerView = null;
         gameObject.SetActive(true);
 
         // 판매가는 내 보드의 원본이 있을 때만 의미가 있다(적은 팔 수 없다).
@@ -207,10 +215,66 @@ public class StatInfoPanelUI : MonoBehaviour
         RefreshGauges();
     }
 
+    /// <summary>
+    /// 쇼핑 중 파트너 유닛(OpponentBoardView.PartnerBoardUnitView, 읽기 전용 표시 데이터)으로 창을 연다.
+    /// 실제 PokemonUnit이 없으므로(가짜 PokemonUnit을 만들어 속이지 않는다는 원칙) BoardSnapshot에서
+    /// 온 species/starLevel/items만으로 채울 수 있는 항목만 정확히 표시한다.
+    ///
+    /// 판매가는 항상 0/숨김 — 파트너 유닛은 팔 수 없고 실제 투자 이력(합성 패널티 등)도 알 수 없다.
+    /// 역할은 영웅증강 등으로 바뀐 값(roleOverride)을 BoardSnapshot이 담지 않으므로 종 기본값
+    /// (species.role)을 쓴다 — 내 로컬 유닛 값을 섞지 않고, 확인 가능한 범위에서만 표시.
+    /// 스탯(방어력/공격력/공격속도/주문력)은 PokemonUnit.ComputeFinalStats(기존 공식 재사용)를
+    /// 임시 인스턴스로 호출해 성급 배율+장착 아이템 보너스까지 반영한다 — 단, 진화의 돌/통신진화/
+    /// 영웅증강 배율처럼 BoardSnapshot에 없는 정보는 반영되지 않는다(정상 진화 기준으로 계산되므로
+    /// 그런 유닛은 실제보다 낮게 나올 수 있음 — 알려진 한계, 보고 문서에도 기재).
+    /// HP/마나는 UnitStatusBarHud.DrawPartnerShopBars와 동일한 근거(PokemonUnit.ResetForBattle 계약)로
+    /// 항상 가득/빔으로 표시한다.
+    /// </summary>
+    public void Bind(OpponentBoardView.PartnerBoardUnitView view)
+    {
+        if (view.species == null)
+        {
+            Hide();
+            return;
+        }
+
+        _battleUnit = null;
+        _unit = null;
+        _partnerView = view;
+        gameObject.SetActive(true);
+
+        FillIdentity(view.species, view.starLevel, view.species.role, sellSource: null, showSellPrice: false);
+
+        var phantomGO = new GameObject("PartnerStatPhantom");
+        var phantom = phantomGO.AddComponent<PokemonUnit>();
+        phantom.data = view.species;
+        phantom.starLevel = view.starLevel;
+        if (view.items != null)
+            foreach (ItemData item in view.items)
+                if (item != null) phantom.items.Add(item);
+
+        phantom.ComputeFinalStats(
+            out float finalMaxHp, out _,
+            out float finalAttack, out float finalSpellPower, out float finalAttackSpeed, out float finalDefense);
+        int range = phantom.Range;
+
+        Destroy(phantomGO);
+
+        // HP 절대 수치 표시(hpText)에 쓸 값 — RefreshGauges가 매 프레임 새로 만들지 않도록 Bind
+        // 시점에 한 번만 계산해 캐시한다. 실제 currentHp는 전송되지 않으므로(§ 클래스 doc) 항상 이
+        // maxHp 그대로("가득 참")를 쓴다 — 게이지 바는 UnitStatusBarHud와 같은 이유로 눈금은 끈다.
+        _partnerViewMaxHp = finalMaxHp;
+
+        FillStats(range, finalDefense, finalAttack, finalAttackSpeed, finalSpellPower);
+        FillItems(view.items, null); // 진화의 돌은 BoardSnapshot에 없음(이번 확장 범위 밖) — 항상 없음으로 표시
+        RefreshGauges();
+    }
+
     public void Hide()
     {
         _unit = null;
         _battleUnit = null;
+        _partnerView = null;
         gameObject.SetActive(false);
     }
 
@@ -345,8 +409,17 @@ public class StatInfoPanelUI : MonoBehaviour
             return;
         }
 
+        // 파트너 유닛의 미러 visual이 사라지면(스냅샷 갱신으로 다른 배치가 됨/보드에서 빠짐) 닫는다.
+        // OpponentBoardView는 스냅샷마다 활성 비주얼을 전부 풀로 반환했다 다시 배치하므로,
+        // Transform 참조가 그대로 남아있어도 비활성(SetActive(false))일 수 있어 activeInHierarchy로 확인한다.
+        if (_partnerView.HasValue && (_partnerView.Value.visual == null || !_partnerView.Value.visual.gameObject.activeInHierarchy))
+        {
+            Hide();
+            return;
+        }
+
         // 게이지만 매 프레임 갱신한다. 스탯은 전투 중 바뀌지 않으므로 Bind에서 끝낸다.
-        if (_unit != null || _battleUnit != null) RefreshGauges();
+        if (_unit != null || _battleUnit != null || _partnerView.HasValue) RefreshGauges();
     }
 
     // ─────────────────────────────────────────
@@ -573,6 +646,21 @@ public class StatInfoPanelUI : MonoBehaviour
 
             mana    = battleUnit != null ? battleUnit.currentMana : _unit.currentMana;
             maxMana = battleUnit != null ? battleUnit.maxMana     : _unit.EffectiveManaCost;
+        }
+        else if (_partnerView.HasValue)
+        {
+            // 쇼핑 중 파트너 유닛은 currentHp/currentMana 자체를 전송하지 않는다 — 필요가 없기
+            // 때문이다. PokemonUnit.ResetForBattle()의 계약("전투 시작/라운드 진입 시 HP를 가득
+            // 채우고 마나를 비움 — TFT 표준: 매 라운드 풀회복")과 BattleManager.Cleanup()이 전투
+            // 종료 시 같은 메서드를 호출하는 것을 근거로, 쇼핑 단계에 존재하는 어떤 유닛이든
+            // 이 상태를 벗어나지 않는다(UnitStatusBarHud.DrawPartnerShopBars와 동일 근거 — 임의
+            // 가정이 아니라 실제 게임 규칙) — 그래서 항상 가득 찬 것으로 표시한다.
+            // maxHp는 Bind에서 phantom PokemonUnit으로 미리 계산해 캐시해둔 값(_partnerViewMaxHp) —
+            // 진화의 돌/통신진화/영웅증강 배율은 BoardSnapshot에 없어 반영되지 않을 수 있다(알려진 한계).
+            maxHp = _partnerViewMaxHp;
+            hp = maxHp;
+            maxMana = _partnerView.Value.species != null ? _partnerView.Value.species.manaCost : 0;
+            mana = 0f;
         }
         else return;
 

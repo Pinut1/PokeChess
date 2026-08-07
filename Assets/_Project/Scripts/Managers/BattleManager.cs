@@ -99,10 +99,13 @@ public class BattleManager : MonoBehaviour
     private Transform _visualParent;
 
     /// <summary>
-    /// true면(기본값 = 실전투) BattleVfxPlayer.Play*를 기존과 동일하게 호출한다. 미러 인스턴스만
-    /// ConfigureMirrorVisuals에서 false로 설정한다 — BattleVfxPlayer._activeVfx가 static 전역이라
-    /// 실전투와 미러가 서로의 VFX를 지울 수 있어(ClearAllActive가 실전투 종료 시 전체를 지움),
-    /// 모델·이동·방향·사망 visual은 그대로 유지하되 평타/스킬/투사체/타격 VFX만 미러에서 생성하지 않는다.
+    /// true면 BattleVfxPlayer.Play*를 호출한다. 실전투/미러 인스턴스 모두 기본값 true를 그대로 쓴다.
+    /// 예전에는 미러 인스턴스에서 false로 꺼뒀다 — BattleVfxPlayer._activeVfx가 static 전역이라
+    /// 실전투와 미러가 서로의 VFX를 지울 위험이 있었기 때문(ClearAllActive가 실전투 종료 시 전체를
+    /// 지움). 지금은 BattleVfxPlayer가 scope(이 인스턴스 자신)별로 생성 목록을 분리해 관리하고
+    /// (ClearScope), Play* 호출부(BasicAttack 등)가 this를 scope로 넘기므로 이 문제가 해소됐다 —
+    /// 그래서 미러도 VFX를 켠 채로 안전하게 실행한다. 이 필드/게이트 자체는 향후 다시 끌 필요가
+    /// 생길 때를 대비해 구조만 유지한다(현재는 아무 경로도 false로 설정하지 않음).
     /// </summary>
     private bool _playBattleVfx = true;
 
@@ -168,8 +171,7 @@ public class BattleManager : MonoBehaviour
         {
             // 보드에 유닛이 하나도 없음 — 즉시 종료(엣지케이스), 승리로 처리
             Debug.Log("[Battle] 유닛 없음 → 승리로 처리 (엣지케이스)");
-            Cleanup();
-            BattleVfxPlayer.ClearAllActive();
+            Cleanup(); // 이 인스턴스 scope의 VFX 정리까지 Cleanup()이 담당(BattleVfxPlayer.ClearScope)
             GameEvents.BattleEnd(BattleEndReason.Victory);
             yield break;
         }
@@ -184,8 +186,7 @@ public class BattleManager : MonoBehaviour
         var result = new BattleLoopResult();
         yield return SimulateBattleLoop(result);
 
-        Cleanup();
-        BattleVfxPlayer.ClearAllActive();
+        Cleanup(); // 이 인스턴스 scope의 VFX 정리까지 Cleanup()이 담당(BattleVfxPlayer.ClearScope)
 
         // 30초 안에 승부가 안 났으면(조기 종료 없음) 오버타임으로 넘어간다(기획 확정 2026-07-30).
         BattleEndReason reason;
@@ -887,15 +888,35 @@ public class BattleManager : MonoBehaviour
     /// </summary>
     private void ApplyVisualLayer(GameObject root)
     {
-        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
-        int partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
-        if (localLayer < 0 || partnerLayer < 0 || root == null) return;
+        int targetLayer = ResolveVisualLayer();
+        if (targetLayer < 0 || root == null) return;
 
-        int targetLayer = _visualParent == null ? localLayer : partnerLayer;
         SetDefaultLayerRecursive(root.transform, targetLayer);
     }
 
-    private static void SetDefaultLayerRecursive(Transform node, int targetLayer)
+    /// <summary>
+    /// 이 인스턴스(실전투/미러)가 만드는 visual이 속해야 할 Layer. 유닛 모델(ApplyVisualLayer)과
+    /// 전투 VFX(BattleVfxPlayer.Play* 호출부) 양쪽이 같은 판정을 쓴다 — 둘이 서로 다른 기준으로
+    /// 갈리면 모델은 파트너 쪽인데 VFX만 로컬 화면에 새는 식의 불일치가 생긴다.
+    /// 두 Layer(LocalGameplayVisual/PartnerSpectateVisual)가 Editor에 없으면 -1(적용 안 함 — 기존
+    /// 프리팹 Layer를 그대로 둔다).
+    /// </summary>
+    private int ResolveVisualLayer()
+    {
+        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        int partnerLayer = LayerMask.NameToLayer("PartnerSpectateVisual");
+        if (localLayer < 0 || partnerLayer < 0) return -1;
+
+        return _visualParent == null ? localLayer : partnerLayer;
+    }
+
+    /// <summary>
+    /// node의 Layer가 Default(0)이면 targetLayer로 덮어쓰고 자식까지 재귀 적용한다. 의도적으로 다른
+    /// Layer가 찍힌 자식(0이 아님)은 보존한다. internal인 이유는 BattleVfxPlayer.Create()가 VFX
+    /// GameObject에도 같은 규칙을 적용할 때 이 메서드를 그대로 재사용하기 위함(복제 방지) — 이 밖의
+    /// 외부 호출은 없다.
+    /// </summary>
+    internal static void SetDefaultLayerRecursive(Transform node, int targetLayer)
     {
         if (node.gameObject.layer == 0) node.gameObject.layer = targetLayer;
         for (int i = 0; i < node.childCount; i++)
@@ -1259,9 +1280,10 @@ public class BattleManager : MonoBehaviour
     private void BasicAttack(BattleUnit attacker, BattleUnit target)
     {
         // 피해 적용 전 — 이번 틱에 죽어도 피격 위치에 재생(스킬 VFX와 동일 규칙).
-        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        // this를 scope로 넘겨 이 인스턴스(실전투/미러)가 만든 VFX만 자기 Cleanup()에서 정리되게 하고,
+        // ResolveVisualLayer()로 유닛 모델과 같은 기준의 Layer를 찍는다(로컬/파트너 화면 분리).
         if (_playBattleVfx)
-            BattleVfxPlayer.PlayBasicAttack(attacker.attackVfxId, attacker, target);
+            BattleVfxPlayer.PlayBasicAttack(attacker.attackVfxId, attacker, target, this, ResolveVisualLayer());
 
         ResolveDamage(new DamageContext(attacker, target, attacker.attack, DamageType.Physical, isBasicAttack: true));
 
@@ -1305,10 +1327,10 @@ public class BattleManager : MonoBehaviour
 
         var targets = GetSkillTargets(caster, primaryTarget);
         // 피해 적용 전 — 이번 틱에 죽어도 위치에 재생. 장판 중심은 타겟팅 기준과 동일하게 피격 대상.
-        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        // scope/layer는 BasicAttack과 같은 이유로 넘긴다(§ BasicAttack 주석 참고).
         if (_playBattleVfx)
             BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets, primaryTarget, caster.skillAreaRadius,
-                                      caster, primaryTarget);
+                                      caster, primaryTarget, this, ResolveVisualLayer());
 
         foreach (var t in targets)
         {
@@ -1342,11 +1364,11 @@ public class BattleManager : MonoBehaviour
 
         // 장판 중심은 타겟팅 기준과 일치시킨다 — 지원/날따름은 시전자 중심, 그 외(CC)는 피격 대상 중심.
         bool centeredOnCaster = isSupport || caster.skillEffectType == SkillEffectType.Taunt;
-        // _playBattleVfx가 false인 미러 인스턴스는 판정에 전혀 영향 없이 이 호출만 건너뛴다.
+        // scope/layer는 BasicAttack과 같은 이유로 넘긴다(§ BasicAttack 주석 참고).
         if (_playBattleVfx)
             BattleVfxPlayer.PlaySkill(caster.skillVfxId, targets,
                                       centeredOnCaster ? caster : primaryTarget, caster.skillAreaRadius,
-                                      caster, primaryTarget);
+                                      caster, primaryTarget, this, ResolveVisualLayer());
 
         // 날따름 지속시간(기획 확정): base 1.0s × 1.4(영웅증강) × 성급 배수(1.0/1.8/2.8)
         float tauntDuration = TAUNT_BASE_DURATION * TAUNT_HERO_STAT_MULT *
@@ -1371,10 +1393,9 @@ public class BattleManager : MonoBehaviour
                 case SkillEffectType.Taunt:
                     t.ApplyTaunt(caster, tauntDuration);
                     // 도발 적용 시 각 대상 위치에 이펙트 재생(스킬 시전 이펙트와 별개).
-                    // _playBattleVfx가 false인 미러 인스턴스는 판정(ApplyTaunt는 이미 위에서 처리됨)에
-                    // 전혀 영향 없이 이 호출만 건너뛴다.
+                    // scope/layer는 BasicAttack과 같은 이유로 넘긴다(§ BasicAttack 주석 참고).
                     if (_playBattleVfx)
-                        BattleVfxPlayer.PlayTauntHit(t);
+                        BattleVfxPlayer.PlayTauntHit(t, this, ResolveVisualLayer());
                     break;
                 case SkillEffectType.HpRegen:
                     t.ApplyHeal(caster.spellPower);
@@ -1687,6 +1708,13 @@ public class BattleManager : MonoBehaviour
 
         _mirrorTiles.Clear();
         _enemyTiles.Clear();
+
+        // 이 인스턴스(실전투 또는 미러)가 만든 VFX만 정리한다 — 정적 전역 리스트를 함께 쓰던 예전
+        // BattleVfxPlayer.ClearAllActive()와 달리 상대 인스턴스의 VFX는 건드리지 않는다. Cleanup()은
+        // RunBattle(실전투 정상 종료)과 RunMirrorBattle/AbortMirrorBattle/FinishMirrorBattle/
+        // HandleMirrorBattleException(미러 종료·중단·예외) 전부를 통과하는 단일 지점이라 여기 한 곳만
+        // 고치면 모든 종료 경로가 커버된다.
+        BattleVfxPlayer.ClearScope(this);
     }
 
     // ─────────────────────────────────────────
@@ -1699,10 +1727,10 @@ public class BattleManager : MonoBehaviour
     //
     // visual은 SpawnVisual/UpdateVisualPosition을 그대로 재사용해 만든다 — _visualOffset/
     // _visualParent(ConfigureMirrorVisuals가 세팅)만큼 실전투와 다른 위치·부모에 그려진다.
-    // 판정 좌표(BattleUnit.coords)는 절대 건드리지 않는다. BattleVfxPlayer(평타/스킬 VFX)는
-    // 이번 단계에서도 호출하지 않는다 — static _activeVfx 하나를 실전투와 공유해 서로의
-    // VFX를 지울 위험이 있는데(BattleManager.ClearAllActive 확인됨), 이번 범위(모델·이동·
-    // 방향전환·사망)에는 VFX가 필수가 아니라 안전한 쪽(호출 자체를 안 함)을 선택했다.
+    // 판정 좌표(BattleUnit.coords)는 절대 건드리지 않는다. BattleVfxPlayer(평타/스킬 VFX)도
+    // 실전투와 동일하게 호출한다 — BattleVfxPlayer가 scope(이 인스턴스)별로 생성 목록을 분리
+    // 관리하고(ClearScope), Play* 호출부가 ResolveVisualLayer()로 LocalGameplayVisual/
+    // PartnerSpectateVisual Layer를 찍어주므로 실전투 VFX와 서로 지우거나 화면이 섞이지 않는다.
     //
     // GameEvents.BattleStart/BattleEnd는 발행하지 않는다 — onComplete/onFailed 콜백으로만
     // 결과를 알린다. PlayerHealthManager/RoundPhaseManager/AugmentManager 등 이 두 이벤트를
@@ -1733,18 +1761,18 @@ public class BattleManager : MonoBehaviour
 
     /// <summary>
     /// 이 인스턴스를 미러 전투 전용으로 설정한다 — 이후 생성되는 모든 visual이 offset만큼
-    /// 이동해 표시되고 parent 아래로 모인다. 동시에 _playBattleVfx를 false로 꺼서
-    /// BattleVfxPlayer(static _activeVfx 공유) 호출을 전부 건너뛰게 한다 — 실전투 종료 시
-    /// ClearAllActive()가 미러 VFX까지 지우는 간섭을 막기 위함(모델·이동·방향·사망 visual은
-    /// BattleVfxPlayer를 거치지 않으므로 이 플래그와 무관하게 그대로 유지된다).
-    /// 실전투 인스턴스는 절대 호출하지 않는다(기본값 Vector3.zero/null/true를 그대로 유지해야
+    /// 이동해 표시되고 parent 아래로 모인다(_visualParent가 null이 아니게 됨 → ResolveVisualLayer()가
+    /// PartnerSpectateVisual을 반환하게 되는 것도 이 한 줄에서 갈린다).
+    /// _playBattleVfx는 건드리지 않는다 — 기본값 true를 실전투와 동일하게 그대로 쓴다. VFX가
+    /// 실전투와 서로 지우지 않는 것은 BattleVfxPlayer의 scope 분리(ClearScope)가, 화면이 섞이지
+    /// 않는 것은 Layer 분리(ResolveVisualLayer → BattleVfxPlayer.Create의 layer 인자)가 보장한다.
+    /// 실전투 인스턴스는 절대 호출하지 않는다(기본값 Vector3.zero/null을 그대로 유지해야
     /// 기존 동작이 보존된다). PartnerBattleMirrorController가 미러 BattleManager를 만든 직후 1회만 호출한다.
     /// </summary>
     public void ConfigureMirrorVisuals(Vector3 offset, Transform parent)
     {
         _visualOffset = offset;
         _visualParent = parent;
-        _playBattleVfx = false;
     }
 
     /// <summary>이 인스턴스의 Inspector 연결 적 진영 바닥 프리팹. 미러 인스턴스가 실제 로컬 인스턴스

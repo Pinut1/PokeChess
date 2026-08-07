@@ -31,8 +31,30 @@ public class PartnerBattleMirrorController : MonoBehaviour
     /// <summary>현재 표시 중인 미러 visual 개수(QA 상태 표시용). 미러 BattleManager가 없으면 0.</summary>
     public int MirrorVisualCount => _mirrorBattleManager != null ? _mirrorBattleManager.VisualUnitCount : 0;
 
+    /// <summary>
+    /// 미러 BattleManager의 현재 BattleUnit 목록(읽기 전용). 미러 HP/마나 바(UnitStatusBarHud)가
+    /// 이 값만 읽어 화면에 표시한다 — BattleManager.Units(기존 공개 API)를 그대로 재사용하며 새
+    /// 데이터 경로를 만들지 않는다. 미러 BattleManager가 아직 없으면 null.
+    /// 전투가 끝나면(Cleanup) 이 목록도 비므로, 폴링하는 쪽은 별도 이벤트 없이 빈 목록만 보고
+    /// 잔여 UI를 스스로 정리할 수 있다.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<BattleUnit> MirrorUnits =>
+        _mirrorBattleManager != null ? _mirrorBattleManager.Units : null;
+
     /// <summary>파트너 관전 카메라 등 외부에서도 같은 파트너 보드 오프셋을 쓰도록 공개.</summary>
     public Vector3 BoardOffset => FindBoardOffset();
+
+    /// <summary>파트너 보드 미리보기 뷰(쇼핑 중 파트너 유닛 표시). UnitStatusBarHud가 쇼핑 단계
+    /// 파트너 HP/마나 바를 그릴 때 ActiveUnitViews를 읽는 경로로 쓴다. 기존 EnsureOpponentBoardView
+    /// lazy-init 패턴을 그대로 타므로 별도 캐시를 새로 만들지 않는다. 아직 씬에서 못 찾았으면 null.</summary>
+    public OpponentBoardView BoardView
+    {
+        get
+        {
+            EnsureOpponentBoardView();
+            return _opponentBoardView;
+        }
+    }
 
     /// <summary>두 관전 전용 Layer(LocalGameplayVisual/PartnerSpectateVisual)가 Unity Editor에 모두
     /// 추가돼 있는지. OpponentBoardView의 판정을 그대로 전달한다(판정 기준을 한 곳에서만 계산) —

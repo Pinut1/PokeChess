@@ -27,6 +27,15 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     public bool IsEmpty => CurrentData == null;
 
+    /// <summary>
+    /// true면 드래그를 아예 시작하지 않는다(OnBeginDrag 최상단에서 차단). Hover(OnPointerEnter/Exit)는
+    /// 이 값과 무관하게 항상 정상 동작한다 — 파트너 인벤토리(읽기 전용) 표시 중에도 설명창 툴팁은
+    /// 보여야 하기 때문이다(ItemInventoryUI가 진입/종료 시 이 값만 토글). OnDrag/OnEndDrag는 이미
+    /// _dragging 가드를 갖고 있어(둘 다 "if (!_dragging) return;") 이 값 하나로 드래그→드롭 전체
+    /// 파이프라인이 막힌다 — Dropped 이벤트도 _dragging이 true였을 때만 발행되므로 별도 처리 불필요.
+    /// </summary>
+    public bool ReadOnly { get; set; }
+
     /// <summary>드래그를 놓았을 때 발행. 인자는 드롭 지점(스크린 좌표)을 담은 이벤트 데이터.</summary>
     public event Action<ItemSlotUI, PointerEventData> Dropped;
 
@@ -116,6 +125,8 @@ public class ItemSlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (ReadOnly) return; // 읽기 전용 — 드래그 자체를 시작하지 않는다(Hover는 이 검사를 거치지 않음)
+
         var view = ViewObject;
         if (IsEmpty || view == null) return;
 
