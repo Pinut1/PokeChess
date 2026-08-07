@@ -530,7 +530,7 @@ public class BattleManager : MonoBehaviour
             defense = data.defense,
             spellPower = data.spellPower,
             attackSpeed = data.attackSpeed,
-            range = Mathf.Max(1, data.range),
+            range = Mathf.Max(1, data.attackRange),
             attackCooldown = 0f,
             role = data.role ?? ""
         };
@@ -974,7 +974,7 @@ public class BattleManager : MonoBehaviour
             defense = data.defense * sm,
             spellPower = data.spellPower * star * sm,
             attackSpeed = data.attackSpeed,
-            range = Mathf.Max(1, data.range),
+            range = Mathf.Max(1, data.attackRange),
             attackCooldown = 0f,
             role = data.role ?? "",
             starLevel = Mathf.Clamp(e.starLevel, 1, 3)
@@ -1171,7 +1171,10 @@ public class BattleManager : MonoBehaviour
                 // 복귀 대상이 죽었으면 소비. 일시 언타겟(자뭉열매)이면 스냅샷은 남기고 이번 틱만 일반 타겟팅.
                 if (bu.tauntReturnTarget != null && !bu.tauntReturnTarget.IsAlive)
                     bu.tauntReturnTarget = null;
-                target = FindNearestEnemy(bu);
+
+                // 사거리 안 적 우선(있으면 그걸로 공격) → 없으면 이번 틱 전진 가능한 적 → 그마저 없으면
+                // 기존과 동일하게 우선순위 최상단(막혀 있어도 유지 — 이동 시도만 조용히 실패하고 제자리).
+                target = FindInRangeEnemy(bu) ?? FindReachableEnemy(bu) ?? FindNearestEnemy(bu);
             }
             bu.lastTickTarget = target; // 도발 발동 시 "원래 타겟" 스냅샷의 원천
             if (target == null) continue;
@@ -1578,6 +1581,79 @@ public class BattleManager : MonoBehaviour
             int dist = bu.coords.DistanceTo(other.coords);
 
             if (priority < bestPriority || (priority == bestPriority && dist < bestDist))
+            {
+                bestPriority = priority;
+                bestDist = dist;
+                best = other;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// role 우선순위(낮을수록 먼저) → 동순위 내 최단거리로, 현재 bu.range 안에 있는 적만 대상으로 타겟 선정.
+    /// FindNearestEnemy와 tie-break 규칙은 동일하고 사거리 필터만 추가됐다 — "앞이 막혀 못 가는 뒤쪽
+    /// 우선순위 적" 대신 지금 때릴 수 있는 적을 먼저 고르기 위함(일반 타겟팅에서만 사용, 도발 경로는 무관).
+    /// </summary>
+    private BattleUnit FindInRangeEnemy(BattleUnit bu)
+    {
+        BattleUnit best = null;
+        int bestPriority = int.MaxValue;
+        int bestDist = int.MaxValue;
+
+        foreach (var other in _units)
+        {
+            if (other.team == bu.team || !other.IsAlive || other.IsUntargetable) continue;
+
+            int dist = bu.coords.DistanceTo(other.coords);
+            if (dist > bu.range) continue;
+
+            int priority = ROLE_TARGET_PRIORITY.TryGetValue(other.role, out var p) ? p : DEFAULT_ROLE_PRIORITY;
+
+            if (priority < bestPriority || (priority == bestPriority && dist < bestDist))
+            {
+                bestPriority = priority;
+                bestDist = dist;
+                best = other;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// 사거리 안에 적이 없을 때의 이동 타겟 폴백. 거리 → 동일 거리일 때 role 우선순위 순으로 평가하되,
+    /// 이번 틱에 실제로 한 칸이라도 전진 가능한(= MoveTowards가 쓰는 것과 동일한 "더 가까워지는 빈
+    /// 인접 칸" 규칙을 통과하는) 적만 후보로 삼는다. 전체 경로 도달 가능성은 보지 않고 이번 틱 한
+    /// 걸음만 본다 — 그래서 별도 실패 카운터/타임아웃 없이 매틱 새로 판정해도 충분하다.
+    /// </summary>
+    private BattleUnit FindReachableEnemy(BattleUnit bu)
+    {
+        BattleUnit best = null;
+        int bestPriority = int.MaxValue;
+        int bestDist = int.MaxValue;
+
+        foreach (var other in _units)
+        {
+            if (other.team == bu.team || !other.IsAlive || other.IsUntargetable) continue;
+
+            int dist = bu.coords.DistanceTo(other.coords);
+
+            bool canStep = false;
+            foreach (var neighbor in bu.coords.GetNeighbors())
+            {
+                if (neighbor.DistanceTo(other.coords) < dist && !IsOccupied(neighbor))
+                {
+                    canStep = true;
+                    break;
+                }
+            }
+            if (!canStep) continue;
+
+            int priority = ROLE_TARGET_PRIORITY.TryGetValue(other.role, out var p) ? p : DEFAULT_ROLE_PRIORITY;
+
+            if (dist < bestDist || (dist == bestDist && priority < bestPriority))
             {
                 bestPriority = priority;
                 bestDist = dist;
