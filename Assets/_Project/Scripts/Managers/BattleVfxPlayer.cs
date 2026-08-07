@@ -376,6 +376,12 @@ public static class BattleVfxPlayer
             list = new List<GameObject>();
             _activeVfxByScope[trackScope] = list;
         }
+
+        // scope 없이(주로 _globalScope) 계속 쌓이기만 하던 문제 보완 — ClearScope는 BattleManager가
+        // 자기 scope에 대해서만 부르므로, 그 대상이 아닌 scope(진화 VFX 등)는 아무도 안 비워준다.
+        // 여기서 생성 시점마다 이미 파괴된(ScheduleDestroy로 소멸된) 항목을 같이 걷어내면, 별도
+        // 정리 호출 없이도 리스트 크기가 항상 "현재 살아있는 VFX 개수" 근처로 유지된다.
+        list.RemoveAll(g => g == null);
         list.Add(go);
 
         return go;
