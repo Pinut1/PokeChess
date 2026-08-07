@@ -9133,6 +9133,7 @@ MonoBehaviour:
   _bgmSource: {fileID: 698346818}
   _sfxSource: {fileID: 698346817}
   _catalog: {fileID: 11400000, guid: 85c4eb47203cf924daab90afc5be290a, type: 2}
+  _sfxMixerGroup: {fileID: 0}
 --- !u!4 &698346820
 Transform:
   m_ObjectHideFlags: 0
@@ -14747,7 +14748,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1118178792
 RectTransform:
   m_ObjectHideFlags: 0
