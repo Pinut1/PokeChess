@@ -6256,7 +6256,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &487947125
 RectTransform:
   m_ObjectHideFlags: 0
@@ -20704,6 +20704,7 @@ MonoBehaviour:
   _enemyTilePrefab: {fileID: 5824591497658974836, guid: e921a06b0f266a548b4687f31a2d4dd5, type: 3}
   _overtimeDuration: 5
   _overtimeSpeedMultiplier: 2
+  _moveInterval: 0.2
 --- !u!114 &1558058662
 MonoBehaviour:
   m_ObjectHideFlags: 0

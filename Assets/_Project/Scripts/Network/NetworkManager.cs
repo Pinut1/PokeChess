@@ -35,6 +35,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>타이틀 화면에 "이전 닉네임: ○○" 표시용으로만 쓰는 닉네임(재접속 인증에는 사용하지 않음).</summary>
     private const string PREF_LAST_NICKNAME = "LastPhotonNickname";
 
+    /// <summary>
+    /// QA 전용: 같은 PC에서 동일 빌드 exe를 여러 개 띄워 테스트할 때 재접속 PlayerPrefs가 서로
+    /// 덮어쓰는 문제를 피하기 위한 저장 키 슬롯. 커맨드라인 "-qaClient=값"으로 지정하며,
+    /// 인자가 없거나 형식이 이상하면 null로 남아 일반 실행과 100% 동일하게 동작한다(기존 키 그대로,
+    /// 마이그레이션 없음). 값 자체는 프로세스 실행 인자이므로 static readonly로 프로세스 동안 고정 —
+    /// NetworkManager는 씬마다 새 인스턴스가 생성되므로(위 s_resyncAfterRejoinPending과 같은 이유)
+    /// 인스턴스 필드가 아니라 정적 필드로 둬야 씬 전환 후에도 값이 유지된다.
+    /// 프로세스를 자동 식별하는 기능이 아니라 QA가 실행마다 명시적으로 고르는 테스트 프로필 개념이라,
+    /// 같은 슬롯을 두 프로세스에 동시에 쓰면 그 둘끼리는 여전히 같은 저장값을 공유한다(의도된 동작).
+    /// </summary>
+    private static readonly string s_qaSlot = ParseQaSlot();
+
+    /// <summary>커맨드라인에서 "-qaClient=값" 형태의 QA 슬롯 인자를 찾는다. 없거나 값이 비어 있으면 null.</summary>
+    private static string ParseQaSlot()
+    {
+        const string prefix = "-qaClient=";
+        foreach (var arg in System.Environment.GetCommandLineArgs())
+        {
+            if (!arg.StartsWith(prefix, System.StringComparison.Ordinal)) continue;
+
+            string slot = arg[prefix.Length..].Trim();
+            return string.IsNullOrEmpty(slot) ? null : slot;
+        }
+        return null;
+    }
+
+    /// <summary>재접속 PlayerPrefs 키에 QA 슬롯 접미사를 붙인다. s_qaSlot이 null이면(일반 실행) baseKey를 그대로 반환 —
+    /// 기존 저장값과 완전히 같은 키를 쓰므로 마이그레이션이 필요 없다.</summary>
+    private static string PrefKey(string baseKey) =>
+        s_qaSlot == null ? baseKey : $"{baseKey}_{s_qaSlot}";
+
     /// <summary>Start()에서 저장된 세션을 발견하면 채워지는 재입장 대상 방 이름. null이면 저장된 세션 없음(신규 로그인).
     /// 2026-08부터 이 값이 채워져 있어도 자동으로 재입장을 시도하지 않는다 — 타이틀 화면에서 사용자가
     /// AttemptRejoinSavedSession()/AbandonPreviousSession()을 명시적으로 호출할 때만 실제 요청이 나간다.</summary>
@@ -448,9 +479,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private string ReloadSavedRejoinSessionDisplayState()
     {
-        string savedUserId = PlayerPrefs.GetString(PREF_LAST_USER_ID, "");
-        string savedRoomName = PlayerPrefs.GetString(PREF_LAST_ROOM_NAME, "");
-        string savedNickname = PlayerPrefs.GetString(PREF_LAST_NICKNAME, "");
+        string savedUserId = PlayerPrefs.GetString(PrefKey(PREF_LAST_USER_ID), "");
+        string savedRoomName = PlayerPrefs.GetString(PrefKey(PREF_LAST_ROOM_NAME), "");
+        string savedNickname = PlayerPrefs.GetString(PrefKey(PREF_LAST_NICKNAME), "");
 
         Debug.Log($"[Network][Rejoin] 저장값 읽음: UserId={ShortUserId(savedUserId)}..., RoomName='{savedRoomName}', Nickname='{savedNickname}'");
 
@@ -520,9 +551,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         string roomName = PhotonNetwork.CurrentRoom.Name;
         string nickname = PhotonNetwork.NickName;
 
-        PlayerPrefs.SetString(PREF_LAST_USER_ID, userId);
-        PlayerPrefs.SetString(PREF_LAST_ROOM_NAME, roomName);
-        PlayerPrefs.SetString(PREF_LAST_NICKNAME, nickname);
+        PlayerPrefs.SetString(PrefKey(PREF_LAST_USER_ID), userId);
+        PlayerPrefs.SetString(PrefKey(PREF_LAST_ROOM_NAME), roomName);
+        PlayerPrefs.SetString(PrefKey(PREF_LAST_NICKNAME), nickname);
         PlayerPrefs.Save();
 
         Debug.Log($"[Network][Rejoin] 세션 저장: UserId={ShortUserId(userId)}..., RoomName={roomName}, Nickname={nickname}");
@@ -535,8 +566,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// _pendingRejoinRoomName 기준이라 이 정리로 정확히 갱신된다.</summary>
     private void ClearSavedRejoinSession(string reason)
     {
-        PlayerPrefs.DeleteKey(PREF_LAST_USER_ID);
-        PlayerPrefs.DeleteKey(PREF_LAST_ROOM_NAME);
+        PlayerPrefs.DeleteKey(PrefKey(PREF_LAST_USER_ID));
+        PlayerPrefs.DeleteKey(PrefKey(PREF_LAST_ROOM_NAME));
         PlayerPrefs.Save();
 
         _pendingRejoinRoomName = null;

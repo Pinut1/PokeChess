@@ -68,6 +68,7 @@ public class BattleUnit
     public float burnDamagePerTick;       // 화상 중 매틱 고정(True) 피해. 0이면 화상 없음.
     public float burnTicksRemaining;      // 화상 잔여 틱 수(시간이 아니라 틱 카운트).
     public float moveSpeedMultiplier = 1f; // 이동 가속 배수(moveSpdPctOnKill로 누적 가산).
+    public float moveCooldown;             // 0 이하가 되면 이동 가능(BattleManager._moveInterval 기반, attackCooldown과 동일 패턴).
 
     // ── CC 상태(기둥C) ──
     public float stunRemaining;           // 0보다 크면 행동 불능.
