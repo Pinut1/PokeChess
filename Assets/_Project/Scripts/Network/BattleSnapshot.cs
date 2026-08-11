@@ -36,6 +36,7 @@ public class BattleSnapshot
         public string skillId;             // "" = 스킬 없음(평타만). PokemonUnit.EffectiveSkill 기준(주입 스킬 우선).
         public int skillManaCost;          // PokemonUnit.EffectiveManaCost 기준(실제 전투 생성 경로와 동일 값).
         public string attackVfxIdOverride; // "" = 오버라이드 없음
+        public int attackRangeOverride;    // PokemonUnit.NoRangeOverride(-1) = 오버라이드 없음. 파치리스 영웅증강 등.
     }
 
     /// <summary>활성 시너지 1개(비활성은 담지 않음 — BattleManager.ApplySynergyBuffs가 쓰는 것과 동일 기준).</summary>

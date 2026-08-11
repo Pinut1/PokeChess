@@ -512,9 +512,16 @@ public class PartnerSpectateView : MonoBehaviour
     }
 
     /// <summary>
-    /// 관전을 여는 시점에 이미 전투 중(GamePhase.Battle)이고 NetworkManager에 파트너 BattleSnapshot이
-    /// 캐시돼 있으면 그 스냅샷으로 즉시 미러 전투를 시작한다. 이 경로가 없으면 전투가 시작된 뒤에
-    /// 관전을 연 사용자는 다음 라운드 스냅샷이 올 때까지 아무것도 못 본다.
+    /// 관전을 여는 시점에 NetworkManager에 캐시된 파트너 BattleSnapshot이 "현재 라운드" 것이면
+    /// 그 스냅샷으로 즉시 미러 전투를 시작한다. 이 경로가 없으면 전투가 시작된 뒤에 관전을 연
+    /// 사용자는 다음 라운드 스냅샷이 올 때까지 아무것도 못 본다.
+    ///
+    /// 판단 기준은 내 로컬 GamePhase.Battle 여부가 아니라 스냅샷의 roundIndex다 — 내 전투가
+    /// 먼저 끝나 Result로 넘어가도, RoundPhaseManager는 양쪽 팀 결과(OnTeamRoundResolved)가 모일
+    /// 때까지 다음 라운드로 넘어가지 않으므로(RoundPhaseManager.cs 참고) 그 사이엔 파트너가 아직
+    /// 이 스냅샷 그대로의 전투를 진행 중일 수 있다. 내 GamePhase로 막으면 이 구간에서 미러 전투가
+    /// 아예 시작되지 않는 문제가 있었다(2026-08 확인). 반대로 라운드가 이미 바뀌었으면(내가 다음
+    /// 라운드 쇼핑에 진입) 캐시된 스냅샷은 이전 라운드 것이므로 재생하지 않는다(stale 재생 방지).
     /// 이미 미러 전투가 실행 중이면(예: 방금 HandlePartnerBattleSnapshotChanged로 시작됐거나 QA로
     /// 이미 돌고 있는 경우) 중복 시작하지 않는다.
     /// </summary>
@@ -522,8 +529,8 @@ public class PartnerSpectateView : MonoBehaviour
     {
         if (_mirrorController == null || _mirrorController.IsRunning) return;
         if (!GameManager.TryGet(out var gm) || gm.Phase == null || gm.Network == null) return;
-        if (gm.Phase.CurrentPhase != GamePhase.Battle) return;
         if (!gm.Network.HasPartnerBattleSnapshot) return;
+        if (gm.Network.PartnerBattleSnapshot.roundIndex != gm.Phase.CurrentRound) return;
 
         StartOrReplaceMirrorBattle(gm.Network.PartnerBattleSnapshot);
     }

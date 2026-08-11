@@ -943,6 +943,29 @@ public class ShopManager : MonoBehaviour
         return evolvedData;
     }
 
+    /// <summary>
+    /// BoardManager가 성급합체 결과종을 결정할 때 쓰는 공개 조회 API(그룹 B — 상점 하위 1성이
+    /// 통신진화 대상인 계열: 주뱃→골뱃→크로뱃, 캐이시→윤겔라→후딘 등). basePokemonId가 현재
+    /// 플레이어에게 활성화된 통신진화 원본이면 true와 함께 그 진화체 데이터를 반환한다.
+    /// _activeTradeEvolutions Dictionary 자체는 밖으로 내보내지 않는다 — BoardManager가
+    /// ShopManager의 내부 구현 세부사항을 알 필요가 없게 한다. 상점 표시/구매 전용인
+    /// ResolveTradeEvolutionShopData(그룹 A 경로)와는 별개 메서드로 두어 기존 상점 로직에는
+    /// 전혀 영향을 주지 않는다.
+    /// </summary>
+    public bool TryResolveActiveTradeEvolution(int basePokemonId, out PokemonData evolvedData)
+    {
+        evolvedData = null;
+
+        if (!_activeTradeEvolutions.TryGetValue(basePokemonId, out int evolvedPokemonId))
+            return false;
+
+        evolvedData = PokemonDatabase.Instance != null
+            ? PokemonDatabase.Instance.GetById(evolvedPokemonId)
+            : null;
+
+        return evolvedData != null;
+    }
+
     // ──────────────────────────────────────────
     // 공용 풀 / 상점 확률 UI 조회 API
     // ──────────────────────────────────────────

@@ -2166,6 +2166,7 @@ public class BattleManager : MonoBehaviour
         phantom.isTradeEvolved = entry.isTradeEvolved;
         phantom.equippedStone = stone;
         phantom.roleOverride = entry.roleOverride;
+        phantom.attackRangeOverride = entry.attackRangeOverride;
 
         float maxHp = phantom.MaxHp;
         float attack = phantom.Attack;

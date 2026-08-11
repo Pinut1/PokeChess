@@ -1449,6 +1449,7 @@ public class BoardManager : MonoBehaviour
         int resultGrantedSkillManaCost = 0;
         bool resultHasHeroBerry = false;
         string resultAttackVfxIdOverride = null;
+        int resultAttackRangeOverride = PokemonUnit.NoRangeOverride;
 
         foreach (EvolutionCandidate candidate in consumed)
         {
@@ -1510,6 +1511,9 @@ public class BoardManager : MonoBehaviour
 
             if (!string.IsNullOrEmpty(unit.attackVfxIdOverride))
                 resultAttackVfxIdOverride = unit.attackVfxIdOverride;
+
+            if (unit.attackRangeOverride != PokemonUnit.NoRangeOverride)
+                resultAttackRangeOverride = unit.attackRangeOverride;
         }
 
         // 신규 생성 전에 기존 3마리의 논리 위치를 전부 비운다.
@@ -1565,6 +1569,8 @@ public class BoardManager : MonoBehaviour
             resultHasHeroBerry;
         evolvedUnit.attackVfxIdOverride =
             resultAttackVfxIdOverride;
+        evolvedUnit.attackRangeOverride =
+            resultAttackRangeOverride;
 
         /*
          * 진화의 돌로 만들어진 현재 종이면 종을 추가로 변경하지 않는다.
@@ -1595,6 +1601,21 @@ public class BoardManager : MonoBehaviour
                 if (nextData != null)
                 {
                     resultData = nextData;
+
+                    // 방금 결정된 일반 진화 결과(nextData, 예: 골뱃)가 현재 플레이어에게 활성화된
+                    // 통신진화 원본이면(예: 골뱃→크로뱃 활성화) 그 통신진화체로 최종 결과를 대신한다 —
+                    // 주뱃 3마리 합체가 골뱃을 거치지 않고 곧바로 크로뱃이 되는 지점(상점 하위 1성이
+                    // 통신진화 대상인 계열: 주뱃/캐이시/꼬마돌/고오스 등 전부 이 한 분기로 처리됨,
+                    // 포켓몬별 하드코딩 없음). ShopManager 내부 Dictionary는 직접 참조하지 않고
+                    // 공개 조회 API만 쓴다. 이 블록 자체가 이미 retainedStone==null &&
+                    // !resultEvolutionLocked && !resultTradeEvolved 안에서만 실행되므로(위 조건문),
+                    // 돌 진화·영웅증강 고정·이미 통신진화된 경우에는 이 분기가 절대 개입하지 않는다.
+                    if (GameManager.TryGet(out var gm) && gm.Shop != null &&
+                        gm.Shop.TryResolveActiveTradeEvolution(nextData.id, out PokemonData activeTradeEvolvedData))
+                    {
+                        resultData = activeTradeEvolvedData;
+                        evolvedUnit.isTradeEvolved = true;
+                    }
                 }
                 else
                 {

@@ -19,6 +19,9 @@ public class HeroPachirisuAugment : HeroAugment
     /// </summary>
     private const string TANKER_ATTACK_VFX_ID = "VFX_Electric_S";
 
+    /// <summary>탱커 전환 후 사거리(칸). 기획 확인 완료(2026-08-11): Tanker 역할은 전부 근접(1)이라 파치리스도 맞춘다.</summary>
+    private const int TANKER_ATTACK_RANGE = 1;
+
     protected override string SpeciesNameEn => "Pachirisu";
     protected override string OverriddenRole => PokemonRole.Tanker;
 
@@ -26,7 +29,7 @@ public class HeroPachirisuAugment : HeroAugment
     {
         if (unit.HasGrantedSkill) return; // 이미 적용됨
         unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), TAUNT_MANA_COST,
-                                       STAT_MULTIPLIER, TANKER_ATTACK_VFX_ID);
+                                       STAT_MULTIPLIER, TANKER_ATTACK_VFX_ID, TANKER_ATTACK_RANGE);
     }
 
     /// <summary>날따름 스킬 정의(기획 확정 2026-07-10: ENEMY_AREA r4, 시전자 중심 타겟팅은 BattleManager 전용 처리).</summary>

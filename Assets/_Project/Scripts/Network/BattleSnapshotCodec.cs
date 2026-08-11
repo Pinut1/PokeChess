@@ -21,12 +21,16 @@ using Photon.Pun;
 /// </summary>
 public static class BattleSnapshotCodec
 {
-    public const int CURRENT_VERSION = 1;
+    // v2(2026-08-11): UnitEntry에 attackRangeOverride(int) 추가 — 파치리스 영웅증강 등 사거리
+    // 오버라이드가 파트너 미러 전투에도 재현되도록. 레이아웃이 바뀌었으므로 버전을 올렸다
+    // (같은 빌드로만 접속하는 2인 코업 구조라 실사용 중 버전 mismatch는 사실상 없지만, 기존
+    // TryDecode의 버전 가드 관례를 그대로 따른다).
+    public const int CURRENT_VERSION = 2;
 
     // UnitEntry의 int 필드 개수(순서 고정): snapshotUnitIndex, speciesId, starLevel, q, r,
     // itemId0, itemId1, equippedStoneId, previousSpeciesId, isTradeEvolved, evolutionLocked,
-    // hasHeroBerry, skillManaCost.
-    private const int UNIT_INT_FIELDS = 13;
+    // hasHeroBerry, skillManaCost, attackRangeOverride.
+    private const int UNIT_INT_FIELDS = 14;
 
     // UnitEntry의 string 필드 개수(순서 고정): skillId, roleOverride, attackVfxIdOverride.
     private const int UNIT_STRING_FIELDS = 3;
@@ -157,7 +161,8 @@ public static class BattleSnapshotCodec
             roleOverride = unit.roleOverride ?? "",
             skillId = effectiveSkill != null && effectiveSkill.HasSkill ? effectiveSkill.skillId : "",
             skillManaCost = unit.EffectiveManaCost,
-            attackVfxIdOverride = unit.attackVfxIdOverride ?? ""
+            attackVfxIdOverride = unit.attackVfxIdOverride ?? "",
+            attackRangeOverride = unit.attackRangeOverride
         };
     }
 
@@ -189,7 +194,7 @@ public static class BattleSnapshotCodec
 
     /// <summary>
     /// ints 레이아웃: [snapshotVersion, playerActorNumber, roundIndex, cheerleaderChoice,
-    ///   synergyCount, (synergyId,tier)×synergyCount, unitCount, (유닛 13필드)×unitCount]
+    ///   synergyCount, (synergyId,tier)×synergyCount, unitCount, (유닛 14필드)×unitCount]
     /// floats 레이아웃: [heroStatMultiplier × unitCount]
     /// strings 레이아웃: [stageId, (skillId,roleOverride,attackVfxIdOverride)×unitCount]
     /// </summary>
@@ -241,6 +246,7 @@ public static class BattleSnapshotCodec
             ints[ii++] = e.evolutionLocked ? 1 : 0;
             ints[ii++] = e.hasHeroBerry ? 1 : 0;
             ints[ii++] = e.skillManaCost;
+            ints[ii++] = e.attackRangeOverride;
 
             floats[fi++] = e.heroStatMultiplier;
 
@@ -335,6 +341,7 @@ public static class BattleSnapshotCodec
             bool evolutionLocked = ints[ii++] != 0;
             bool hasHeroBerry = ints[ii++] != 0;
             int skillManaCost = ints[ii++];
+            int attackRangeOverride = ints[ii++];
 
             float heroStatMultiplier = floats[fi++];
 
@@ -348,6 +355,8 @@ public static class BattleSnapshotCodec
             if (starLevel < 1 || starLevel > 3) { error = $"잘못된 starLevel: {starLevel}"; return false; }
             if (itemId0 < 0 || itemId1 < 0 || equippedStoneId < 0 || previousSpeciesId < 0 || skillManaCost < 0)
             { error = "음수 ID/마나비용"; return false; }
+            if (attackRangeOverride != PokemonUnit.NoRangeOverride && attackRangeOverride < 1)
+            { error = $"잘못된 attackRangeOverride: {attackRangeOverride}"; return false; }
 
             result.units.Add(new BattleSnapshot.UnitEntry
             {
@@ -367,7 +376,8 @@ public static class BattleSnapshotCodec
                 roleOverride = roleOverride,
                 skillId = skillId,
                 skillManaCost = skillManaCost,
-                attackVfxIdOverride = attackVfxIdOverride
+                attackVfxIdOverride = attackVfxIdOverride,
+                attackRangeOverride = attackRangeOverride
             });
         }
 

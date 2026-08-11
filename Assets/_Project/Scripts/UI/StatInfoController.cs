@@ -167,10 +167,13 @@ public class StatInfoController : MonoBehaviour
         if (spectatorCamera == null || pipImage == null || mirror == null) { Close(); return true; }
 
         Vector2 screenPos = PointerScreenPos();
-        bool isBattlePhase = GameManager.TryGet(out var gm) && gm.Phase != null &&
-                              gm.Phase.CurrentPhase == GamePhase.Battle;
 
-        if (isBattlePhase)
+        // 로컬 GamePhase가 아니라 미러 자신의 실행 상태로 판단한다 — 내 전투가 먼저 끝나 Result로
+        // 넘어가도 파트너 미러 전투는 계속 실행 중일 수 있는데(RoundPhaseManager가 양쪽 결과가
+        // 모일 때까지 다음 라운드로 넘어가지 않음), 내 GamePhase를 기준으로 삼으면 그 사이 BoardSnapshot
+        // 정적 프리뷰로 잘못 전환돼 영웅증강 override(roleOverride 등)가 반영 안 된 원본값이 뜨는
+        // 문제가 있었다(2026-08 확인 — UnitStatusBarHud.DrawPartnerBars와 동일한 원인·동일한 기준으로 통일).
+        if (mirror.IsRunning)
         {
             BattleUnit picked = PickPartnerBattleUnit(mirror, spectatorCamera, pipImage, screenPos);
             if (picked != null)
