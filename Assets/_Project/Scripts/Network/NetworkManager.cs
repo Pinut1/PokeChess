@@ -735,6 +735,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 정상적으로 종료된 매치(항복 합의/패배 확인 등)에서 타이틀로 복귀할 때 전용으로 쓰는 진입점.
+    /// 저장된 재접속 세션(ClearSavedRejoinSession)을 먼저 정리한 뒤 기존 안전 경로
+    /// (RequestReturnToTitle → LeaveRoom → OnLeftRoom → TryLoadPendingTitleScene)를 그대로 탄다.
+    /// 세션을 지우지 않으면 이미 끝난 매치가 타이틀 화면에 "이전 게임이 정상적으로 종료되지
+    /// 않았습니다" 오탐으로 남아 [이전 게임으로 들어가기] 후보가 되어버린다(2026-08 확인).
+    /// 일반 타이틀 이동(솔로/1인 방에서 게임 도중 나가기 등)은 세션이 여전히 유효하므로
+    /// 이 메서드가 아니라 RequestReturnToTitle을 그대로 쓴다.
+    /// </summary>
+    public void RequestCompletedMatchReturnToTitle(string sceneName, string reason)
+    {
+        ClearSavedRejoinSession(reason);
+        RequestReturnToTitle(sceneName);
+    }
+
+    /// <summary>
     /// 타이틀 화면 [이전 게임으로 들어가기] 클릭 시 호출. 저장된 UserId(Start()에서 이미 AuthValues에 반영됨)로
     /// 저장된 RoomName에 재입장을 시도한다. 결과는 OnJoinedRoom(성공)/OnJoinRoomFailed(실패)에서 처리된다.
     /// </summary>
@@ -1455,11 +1470,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (accepted)
         {
+            // 항복 합의로 매치가 끝났다 — 더 이상 같은 방에서 재시작하지 않고 타이틀로 복귀한다.
+            // 실제 타이틀 이동은 이 이벤트를 구독하는 OptionsPanelUI가
+            // RequestCompletedMatchReturnToTitle을 통해 수행한다(양쪽 클라 모두 이 RPC를 실행하므로
+            // 각자 독립적으로 자기 화면에서 복귀한다).
             GameEvents.SessionEnded(SessionEndReason.Surrender);
-
-            // 일반 패배와 달리 항복은 양쪽 합의로 판이 끝난 것이므로 바로 재시작까지 이어간다.
-            // RestartGame() 자체가 마스터 권위 가드를 갖고 있어 비마스터 쪽 호출은 no-op된다.
-            RestartGame();
         }
         else
             _surrenderRejectedNotice = true;
@@ -2482,6 +2497,30 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode) return; // 파트너 없음 — 송출 불필요
         if (!PhotonNetwork.InRoom) return;
         photonView.RPC(nameof(RPC_OnBoardSnapshot), RpcTarget.Others, ++_localBoardRevision, data);
+    }
+
+    /// <summary>
+    /// 파트너 관전(PartnerSpectateView.SetExpanded(true))을 열 때 호출 — 상대에게 "지금 보드를
+    /// 다시 보내달라"고만 요청한다(요청 RPC 자체엔 보드 데이터를 싣지 않음). 게임 최초 진입 시의
+    /// 자동 push(BoardSyncBroadcaster의 OnUnitPlaced/OnUnitBenched 트리거)가 어떤 이유로든
+    /// 유실·지연되더라도, 관전을 여는 시점에 최신 상태를 한 번 더 확보하기 위한 pull 경로다
+    /// (2026-08 파트너 화면 초기 동기화 문제 대응).
+    /// 실제 재송출은 기존 재접속 재동기화와 동일한 경로(GameEvents.BoardResyncRequested →
+    /// BoardSyncBroadcaster.MarkBoardDirtyForResync → LateUpdate → BroadcastBoardSnapshot)를
+    /// 그대로 타므로 revision 증가/비교 로직도 손대지 않는다.
+    /// </summary>
+    public void RequestPartnerBoardSnapshot()
+    {
+        if (_soloMode) return; // 파트너 없음 — 요청 불필요
+        if (!PhotonNetwork.InRoom) return;
+        photonView.RPC(nameof(RPC_RequestBoardSnapshot), RpcTarget.Others);
+    }
+
+    /// <summary>파트너의 재송출 요청 수신 — 기존 재접속 재동기화와 동일한 신호를 그대로 발행한다.</summary>
+    [PunRPC]
+    private void RPC_RequestBoardSnapshot()
+    {
+        GameEvents.BoardResyncRequested();
     }
 
     /// <summary>
@@ -3649,6 +3688,10 @@ public class NetworkManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.LoadScene(titleSceneName);
     }
 
+    /// <summary>오프라인은 저장된 재접속 세션 자체가 없으므로(HasSavedSession 항상 false) 정리할 것 없이
+    /// RequestReturnToTitle과 동일하게 동작한다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void RequestCompletedMatchReturnToTitle(string sceneName, string reason) => RequestReturnToTitle(sceneName);
+
     /// <summary>오프라인은 파트너 이탈 자체가 없으므로 실제로 호출될 일은 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
     public void ConfirmPartnerDisconnectGiveUp() { }
 
@@ -3661,6 +3704,9 @@ public class NetworkManager : MonoBehaviour
 
     // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
     public void BroadcastBoardSnapshot(int[] _) { }
+
+    /// <summary>오프라인은 파트너가 없어 재송출을 요청할 대상 자체가 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void RequestPartnerBoardSnapshot() { }
 
     // 오프라인은 파트너가 없어 BattleSnapshot 송수신 자체가 없다(실구현과 동일 공개 API 유지용 스텁).
     public bool HasPartnerBattleSnapshot => false;

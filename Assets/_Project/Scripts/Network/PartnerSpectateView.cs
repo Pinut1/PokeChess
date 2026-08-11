@@ -481,6 +481,7 @@ public class PartnerSpectateView : MonoBehaviour
             TryStartMirrorBattleFromCache();
             PositionSpectatorCameraAtPartnerBoard();
             ExpandPip();
+            RequestPartnerBoardResync();
         }
         else
         {
@@ -498,6 +499,20 @@ public class PartnerSpectateView : MonoBehaviour
 
         // PIP(축소) 상태는 포함하지 않는다 — 전체화면 진입/종료만 알린다(UIManager의 상점 HUD 숨김/복원용).
         GameEvents.PartnerSpectateExpandedChanged(_isExpanded);
+    }
+
+    /// <summary>
+    /// 관전을 열 때마다 파트너에게 현재 BoardSnapshot을 다시 보내달라고 요청한다(pull). 게임 최초
+    /// 진입 시의 자동 push(BoardSyncBroadcaster)가 어떤 이유로든 유실·지연되더라도 관전을 여는
+    /// 시점에 최신 상태를 한 번 더 확보하기 위함(2026-08 파트너 화면 초기 동기화 문제 대응).
+    /// 이미 받은 스냅샷이 있어도 매번 다시 요청한다 — 요청 자체는 최신 상태 확보용일 뿐이고,
+    /// 응답이 올 때까지 기존 화면(OpponentBoardView._lastSnapshot)은 그대로 유지된다(요청을 보낸다고
+    /// 지금 보이는 파트너 보드를 지우지 않는다 — 새 스냅샷이 도착했을 때만 Render가 다시 그린다).
+    /// </summary>
+    private void RequestPartnerBoardResync()
+    {
+        if (GameManager.TryGet(out var gm) && gm.Network != null)
+            gm.Network.RequestPartnerBoardSnapshot();
     }
 
     /// <summary>

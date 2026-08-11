@@ -140,6 +140,13 @@ public class SellZone : MonoBehaviour, IDropTarget
         if (_zoneType != DropZoneType.Trade)
             return;
 
+        // 파트너 전체화면 관전 중엔 화면 뒤 실제 통신기가 클릭되지 않도록 차단한다. OnMouseDown은
+        // UnitDragController와 별개로 Main Camera 기준 자체 히트테스트를 쓰므로 관전 오버레이(Canvas
+        // RawImage)로는 막히지 않는다 — UnitDragController와 같은 기준(UIManager.IsPartnerSpectateExpanded)
+        // 으로 관전 상태 판단을 하나로 통일한다(2026-08 입력 관통 버그 대응).
+        if (GameManager.TryGet(out var uiGm) && uiGm.UI != null && uiGm.UI.IsPartnerSpectateExpanded)
+            return;
+
         NetworkManager network =
             GameManager.TryGet(out var gm) ? gm.Network : null;
 
