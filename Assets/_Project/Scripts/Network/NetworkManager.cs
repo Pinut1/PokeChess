@@ -2055,9 +2055,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         receivedUnit.isTradeEvolved =
             packet.isTradeEvolved || isTradeEvolution;
 
-        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다.
-        if (receivedUnit.isTradeEvolved) GameEvents.UnitEvolved(receivedUnit, false);
-
         receivedUnit.ResetForBattle();
 
         if (!board.TryPlaceInBench(receivedUnit))
@@ -2070,6 +2067,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
             return false;
         }
+
+        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다.
+        // TryPlaceInBench 성공(= 실제 벤치 위치 확정) 뒤에 발행해야 UnitEvolveVfx가 올바른
+        // 위치에서 재생된다(BoardManager.ExecuteMerge의 재배치→연출 순서와 동일한 원칙,
+        // 2026-08 확인 — 배치보다 먼저 발행하면 UnitFactory.Create 직후의 월드 원점에서 재생됨).
+        if (receivedUnit.isTradeEvolved) GameEvents.UnitEvolved(receivedUnit, false);
 
         /*
          * 여기까지 성공해야 유닛 소유권이 수신자에게 실제로 이동한 것이다.
