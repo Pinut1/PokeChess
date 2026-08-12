@@ -73,7 +73,15 @@ public class MatchRecorder : MonoBehaviour
 
     private void HandleLevelChanged(int level) => _selfLevel = level;
 
-    private void HandleOpponentBoardChanged(BoardSnapshot snap) => _lastPartnerBoard = snap;
+    // snap == null은 BoardSnapshot.Decode() 실패(버전 불일치/손상 payload, 2026-08 코드리뷰 대응)를
+    // 뜻한다. 그대로 대입하면 이미 받아둔 유효한 파트너 보드가 null로 덮어써져, 경기 종료 시
+    // BuildPartnerRecord가 파트너 보드 섹션을 통째로 빈 채 기록한다(PR #89 리뷰 후속 수정) — 마지막
+    // 유효 스냅샷을 유지한다.
+    private void HandleOpponentBoardChanged(BoardSnapshot snap)
+    {
+        if (snap == null) return;
+        _lastPartnerBoard = snap;
+    }
 
     private void HandleAugmentSelected(AugmentData data)
     {

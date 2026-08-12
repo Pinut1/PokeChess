@@ -270,6 +270,11 @@ public class OpponentBoardView : MonoBehaviour
 
     private void Render(BoardSnapshot snap)
     {
+        // snap == null은 BoardSnapshot.Decode() 실패(버전 불일치/손상 payload, 2026-08 코드리뷰
+        // 대응)를 뜻한다. Decode 문서가 "마지막 렌더 상태 유지"를 약속하므로, _lastSnapshot을
+        // 덮어쓰거나 ReleaseActive()로 기존 표시를 지우기 전에 여기서 걸러야 한다(PR #89 리뷰 후속 수정).
+        if (snap == null) return;
+
         _lastSnapshot = snap;
 
         EnsurePartnerBoardVisuals();
@@ -278,7 +283,7 @@ public class OpponentBoardView : MonoBehaviour
 
         // 활성분 전부 풀로 반환 후 스냅샷 기준으로 다시 배치.
         ReleaseActive();
-        if (_suppressed || board == null || snap == null) return;
+        if (_suppressed || board == null) return;
 
         foreach (BoardSnapshot.Entry e in snap.entries)
         {
