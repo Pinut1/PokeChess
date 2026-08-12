@@ -31,12 +31,23 @@ public class OpponentBoardView : MonoBehaviour
         public readonly int starLevel;
         public readonly IReadOnlyList<ItemData> items;
 
-        public PartnerBoardUnitView(Transform visual, PokemonData species, int starLevel, IReadOnlyList<ItemData> items)
+        /// <summary>영웅증강 등으로 바뀐 런타임 역할(BoardSnapshot.Entry.roleOverride 그대로). ""=오버라이드 없음.</summary>
+        public readonly string roleOverride;
+        /// <summary>영웅증강 등으로 바뀐 런타임 사거리. PokemonUnit.NoRangeOverride(-1)=오버라이드 없음.</summary>
+        public readonly int attackRangeOverride;
+        /// <summary>영웅증강 스탯 배수. 기본값 1f=배수 없음.</summary>
+        public readonly float heroStatMultiplier;
+
+        public PartnerBoardUnitView(Transform visual, PokemonData species, int starLevel, IReadOnlyList<ItemData> items,
+                                    string roleOverride, int attackRangeOverride, float heroStatMultiplier)
         {
             this.visual = visual;
             this.species = species;
             this.starLevel = starLevel;
             this.items = items;
+            this.roleOverride = roleOverride;
+            this.attackRangeOverride = attackRangeOverride;
+            this.heroStatMultiplier = heroStatMultiplier;
         }
     }
 
@@ -295,7 +306,8 @@ public class OpponentBoardView : MonoBehaviour
             go.name = $"PartnerUnit_{speciesName}_{e.starLevel}star";
 
             _active.Add((poolKey, go));
-            _activeUnitViews.Add(new PartnerBoardUnitView(go.transform, data, e.starLevel, ResolveEquippedItems(e)));
+            _activeUnitViews.Add(new PartnerBoardUnitView(go.transform, data, e.starLevel, ResolveEquippedItems(e),
+                e.roleOverride, e.attackRangeOverride, e.heroStatMultiplier));
         }
     }
 

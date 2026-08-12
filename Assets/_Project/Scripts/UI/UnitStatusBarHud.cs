@@ -214,9 +214,15 @@ public class UnitStatusBarHud : MonoBehaviour
     // ─────────────────────────────────────────
 
     /// <summary>
-    /// 파트너 관전(PIP/전체화면) 바 그리기 진입점. 지금 파트너가 전투 중인지 쇼핑 중인지에 따라
-    /// 한쪽만 그리고, 그 결과 하나로만 풀을 정리한다(위 클래스 주석 참고). 관전 화면이 지금
+    /// 파트너 관전(PIP/전체화면) 바 그리기 진입점. 지금 파트너 미러 전투가 실제로 실행 중인지에
+    /// 따라 한쪽만 그리고, 그 결과 하나로만 풀을 정리한다(위 클래스 주석 참고). 관전 화면이 지금
     /// 아무것도 보여주고 있지 않으면 전부 숨긴다.
+    ///
+    /// 전투/쇼핑 분기는 내 로컬 GamePhase가 아니라 mirror.IsRunning(미러 BattleManager 자신의
+    /// 실행 상태)으로 판단한다 — 내 전투가 먼저 끝나 Result로 넘어가도 파트너 미러 전투는 계속
+    /// 실행 중일 수 있는데(RoundPhaseManager가 양쪽 결과가 모일 때까지 다음 라운드로 넘어가지
+    /// 않음), 내 GamePhase를 기준으로 삼으면 그 사이 미러가 도는데도 BoardSnapshot 정적 프리뷰로
+    /// 잘못 전환돼 HP/MP 바가 사라지는 문제가 있었다(2026-08 확인).
     /// </summary>
     private void DrawPartnerBars()
     {
@@ -229,10 +235,7 @@ public class UnitStatusBarHud : MonoBehaviour
 
         if (spectatorCamera == null || pipImage == null || mirror == null) { HideMirrorFrom(0); return; }
 
-        bool isBattlePhase = GameManager.TryGet(out var gm) && gm.Phase != null &&
-                              gm.Phase.CurrentPhase == GamePhase.Battle;
-
-        int used = isBattlePhase
+        int used = mirror.IsRunning
             ? DrawPartnerBattleBars(mirror, spectatorCamera, pipImage)
             : DrawPartnerShopBars(mirror, spectatorCamera, pipImage);
 

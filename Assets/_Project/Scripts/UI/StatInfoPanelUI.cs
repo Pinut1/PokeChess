@@ -218,15 +218,15 @@ public class StatInfoPanelUI : MonoBehaviour
     /// <summary>
     /// 쇼핑 중 파트너 유닛(OpponentBoardView.PartnerBoardUnitView, 읽기 전용 표시 데이터)으로 창을 연다.
     /// 실제 PokemonUnit이 없으므로(가짜 PokemonUnit을 만들어 속이지 않는다는 원칙) BoardSnapshot에서
-    /// 온 species/starLevel/items만으로 채울 수 있는 항목만 정확히 표시한다.
+    /// 온 species/starLevel/items/roleOverride/attackRangeOverride/heroStatMultiplier만으로 채울 수
+    /// 있는 항목만 정확히 표시한다.
     ///
     /// 판매가는 항상 0/숨김 — 파트너 유닛은 팔 수 없고 실제 투자 이력(합성 패널티 등)도 알 수 없다.
-    /// 역할은 영웅증강 등으로 바뀐 값(roleOverride)을 BoardSnapshot이 담지 않으므로 종 기본값
-    /// (species.role)을 쓴다 — 내 로컬 유닛 값을 섞지 않고, 확인 가능한 범위에서만 표시.
-    /// 스탯(방어력/공격력/공격속도/주문력)은 PokemonUnit.ComputeFinalStats(기존 공식 재사용)를
-    /// 임시 인스턴스로 호출해 성급 배율+장착 아이템 보너스까지 반영한다 — 단, 진화의 돌/통신진화/
-    /// 영웅증강 배율처럼 BoardSnapshot에 없는 정보는 반영되지 않는다(정상 진화 기준으로 계산되므로
-    /// 그런 유닛은 실제보다 낮게 나올 수 있음 — 알려진 한계, 보고 문서에도 기재).
+    /// 역할/사거리/스탯 배수는 영웅증강 등으로 바뀐 런타임 값(BoardSnapshot.Entry.roleOverride 등,
+    /// 2026-08 확장)을 phantom에 그대로 옮겨 PokemonUnit의 기존 계산 프로퍼티(Role/Range/
+    /// ComputeFinalStats)를 그대로 재사용한다 — 파치리스/이브이 같은 특정 증강을 이 UI가 직접
+    /// 분기하지 않는다. 단, 진화의 돌/통신진화 배율처럼 여전히 BoardSnapshot에 없는 정보는 반영되지
+    /// 않는다(정상 진화 기준으로 계산되므로 그런 유닛은 실제보다 낮게 나올 수 있음 — 알려진 한계).
     /// HP/마나는 UnitStatusBarHud.DrawPartnerShopBars와 동일한 근거(PokemonUnit.ResetForBattle 계약)로
     /// 항상 가득/빔으로 표시한다.
     /// </summary>
@@ -243,15 +243,20 @@ public class StatInfoPanelUI : MonoBehaviour
         _partnerView = view;
         gameObject.SetActive(true);
 
-        FillIdentity(view.species, view.starLevel, view.species.role, sellSource: null, showSellPrice: false);
-
         var phantomGO = new GameObject("PartnerStatPhantom");
         var phantom = phantomGO.AddComponent<PokemonUnit>();
         phantom.data = view.species;
         phantom.starLevel = view.starLevel;
+        // ComputeFinalStats/Range/Role을 읽기 전에 반드시 먼저 설정해야 override가 반영된다
+        // (미러 전투 CreateMirrorBattleUnit과 동일한 순서 제약).
+        phantom.roleOverride = view.roleOverride;
+        phantom.attackRangeOverride = view.attackRangeOverride;
+        phantom.heroStatMultiplier = view.heroStatMultiplier;
         if (view.items != null)
             foreach (ItemData item in view.items)
                 if (item != null) phantom.items.Add(item);
+
+        FillIdentity(view.species, view.starLevel, phantom.Role, sellSource: null, showSellPrice: false);
 
         phantom.ComputeFinalStats(
             out float finalMaxHp, out _,

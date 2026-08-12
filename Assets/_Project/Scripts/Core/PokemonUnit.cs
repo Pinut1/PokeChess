@@ -63,6 +63,15 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>파치리스 영웅증강: 비어있지 않으면 <see cref="Role"/>이 이 값을 반환(서포터→탱커). 시너지는 data.synergies 그대로 유지.</summary>
     public string roleOverride;
 
+    /// <summary>attackRangeOverride "오버라이드 없음" 센티널. int?(Nullable)을 쓰지 않는 이유:
+    /// PokemonUnit은 MonoBehaviour라 합체 시 Instantiate로 복제되는데, Unity 직렬화는
+    /// System.Nullable&lt;T&gt;를 지원하지 않아 복제본에서 값이 조용히 null로 리셋된다(roleOverride처럼
+    /// string/float/bool은 안전, int?만 위험). 그래서 plain int + 센티널 패턴을 쓴다.</summary>
+    public const int NoRangeOverride = -1;
+
+    /// <summary>파치리스 영웅증강: NoRangeOverride가 아니면 <see cref="Range"/>가 이 값을 반환(원거리→근접, 기획 확정 2026-08-11). Pachirisu_Data.asset의 attackRange 원본은 건드리지 않는다.</summary>
+    public int attackRangeOverride = NoRangeOverride;
+
     /// <summary>파치리스 영웅증강: null이 아니면 전투에서 data.skill 대신 이 스킬을 시전(도발 부여). 마나비용은 grantedSkillManaCost(0이면 data.manaCost).</summary>
     public PokemonSkillData grantedSkill;
     public int grantedSkillManaCost;
@@ -103,9 +112,10 @@ public class PokemonUnit : MonoBehaviour
         GameEvents.UnitChanged(this);
     }
 
-    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입 + 스탯 배수 + 평타 VFX 교체). Augment Table v2: ×1.4.</summary>
+    /// <summary>파치리스 영웅증강 적용(역할 변경 + 스킬 주입 + 스탯 배수 + 평타 VFX 교체 + 사거리 근접화). Augment Table v2: ×1.4.</summary>
     public void ApplyParichisuHeroAugment(string newRole, PokemonSkillData tauntSkill, int manaCost = 0,
-                                          float statMultiplier = 1.4f, string attackVfxId = null)
+                                          float statMultiplier = 1.4f, string attackVfxId = null,
+                                          int attackRange = NoRangeOverride)
     {
         roleOverride          = newRole;
         grantedSkill          = tauntSkill;
@@ -113,6 +123,7 @@ public class PokemonUnit : MonoBehaviour
         heroStatMultiplier    = statMultiplier;
         hasHeroBerry          = true; // v2 자뭉열매(전투당 1회 언타겟+회복)
         if (!string.IsNullOrEmpty(attackVfxId)) attackVfxIdOverride = attackVfxId;
+        if (attackRange != NoRangeOverride) attackRangeOverride = attackRange;
         currentHp             = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }
@@ -201,8 +212,8 @@ public class PokemonUnit : MonoBehaviour
         data != null
             ? data.attackSpeed
             : 0f;
-    /// <summary>평타 사거리(칸). data.range는 진화 단계라 여기 쓰면 안 된다.</summary>
-    public int   Range        => data != null ? data.attackRange : 0;
+    /// <summary>평타 사거리(칸). data.range는 진화 단계라 여기 쓰면 안 된다. attackRangeOverride가 있으면 우선(파치리스 영웅증강 등).</summary>
+    public int   Range        => attackRangeOverride != NoRangeOverride ? attackRangeOverride : (data != null ? data.attackRange : 0);
     public int   ManaCost     => data != null ? data.manaCost : 0;
     public string Role        => !string.IsNullOrEmpty(roleOverride) ? roleOverride : (data != null ? data.role : "");
 

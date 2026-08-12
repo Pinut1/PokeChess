@@ -396,6 +396,13 @@ public class UIManager : MonoBehaviour
     ///
     /// 리롤은 무료 리롤 자원이 남아 있으면 골드와 무관하게 누를 수 있다.
     /// XP 구매는 최대 레벨(RequiredXp=0)에서도 의미가 없으므로 함께 막는다.
+    ///
+    /// 구매 가능 여부는 반드시 ShopManager(gm.Shop.Gold/RequiredXp)의 "지금 이 순간" 실제 값으로만
+    /// 계산한다 — UIManager의 _gold/_requiredXp 캐시는 골드/XP 변경이 여러 GameEvents로 나뉘어
+    /// 순차 발행될 때 서로 다른 시점의 값을 들고 있을 수 있어(예: 골드는 이미 갱신됐지만 XP는 아직),
+    /// 이 조합으로 affordable을 계산하면 같은 클릭 안에서 button.interactable이 실제로 여러 번
+    /// 바뀌며 마우스가 버튼 위에 그대로 있는데도 Hover(Highlighted) 표시가 갱신되지 않는 문제가
+    /// 있었다(2026-08 확인). ShopManager 쪽 값은 항상 최종 확정 상태 하나뿐이라 이 불일치가 없다.
     /// </summary>
     private void RefreshShopButtonAffordability()
     {
@@ -417,8 +424,8 @@ public class UIManager : MonoBehaviour
         if (_rerollFreeIndicator != null)
             _rerollFreeIndicator.SetActive(hasFreeReroll);
 
-        SetButtonAffordable(_shopRerollButton, hasFreeReroll || _gold >= shop.RerollCost);
-        SetButtonAffordable(_xpPurchaseButton, _requiredXp > 0 && _gold >= shop.BuyXpCostGold);
+        SetButtonAffordable(_shopRerollButton, hasFreeReroll || shop.Gold >= shop.RerollCost);
+        SetButtonAffordable(_xpPurchaseButton, shop.RequiredXp > 0 && shop.Gold >= shop.BuyXpCostGold);
     }
 
     /// <summary>
@@ -488,6 +495,17 @@ public class UIManager : MonoBehaviour
         if (_shopRerollButton == null)
             _shopRerollButton = FindSceneButton("ReRoll Button");
 
+        // 클릭 시 EventSystem이 이 두 버튼을 "선택(Selected)" 상태로 만들지 않게 한다. Selectable의
+        // currentSelectionState는 hasSelection이 isPointerInside보다 우선이라, 클릭 후에도 마우스가
+        // 버튼 위에 그대로 있으면 Highlighted가 아니라 Selected로 전환된다. 이 버튼들의 Selected
+        // 애니메이션 클립이 Normal과 동일해 "클릭 직후 Hover가 풀린 것처럼 보이는" 버그였다
+        // (2026-08 확인, [ShopButtonHoverTrace] 진단 로그로 실측). 이 두 버튼은 키보드/게임패드
+        // 내비게이션 대상이 아니므로 Navigation.Mode.None으로 바꿔도 기존 UI 흐름에 영향이 없다 —
+        // EventSystem.SetSelectedGameObject(null)을 클릭마다 호출하는 대신, 애초에 선택되지 않게
+        // 막는 방식이라 다른 시스템의 선택 상태를 건드리지 않는다.
+        DisableSelectionNavigation(_xpPurchaseButton);
+        DisableSelectionNavigation(_shopRerollButton);
+
         // 오브젝트명 오타는 af9955d4에서 교정됨(BattleRaedy_Button -> BattleReady_Button).
         // 아직 교정 전 씬을 쓰는 브랜치가 남아 있어 구 이름도 폴백으로 둔다.
         if (_battleReadyButton == null)
@@ -536,6 +554,22 @@ public class UIManager : MonoBehaviour
             Debug.LogWarning("[UIManager] Canvas 상점 컨트롤 일부를 찾지 못했습니다. Inspector 참조 또는 씬 오브젝트 이름을 확인하세요.");
             _canvasShopControlsWarningLogged = true;
         }
+    }
+
+    /// <summary>
+    /// Navigation.Mode를 None으로 바꿔 이 버튼이 EventSystem의 "선택(Selected)" 대상이 되지 않게 한다.
+    /// Selectable.OnPointerDown은 navigation.mode != None일 때만 EventSystem.SetSelectedGameObject를
+    /// 호출하므로, None으로 두면 클릭해도 애초에 선택되지 않아 currentSelectionState가 Selected로
+    /// 빠지지 않는다(Hover/Highlighted가 정상적으로 유지됨). 이 두 버튼은 키보드/게임패드 내비게이션을
+    /// 쓰지 않는 현재 UI 구조라 안전하다 — 다른 버튼의 Navigation은 건드리지 않는다.
+    /// </summary>
+    private static void DisableSelectionNavigation(Button button)
+    {
+        if (button == null) return;
+
+        Navigation nav = button.navigation;
+        nav.mode = Navigation.Mode.None;
+        button.navigation = nav;
     }
 
     private void UnbindCanvasShopControls()

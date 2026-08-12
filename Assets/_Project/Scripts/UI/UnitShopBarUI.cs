@@ -66,6 +66,13 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         GameEvents.OnUnitPlaced  += HandleRosterChanged;
         GameEvents.OnUnitBenched += HandleRosterChanged;
         GameEvents.OnUnitSold    += HandleRosterChanged;
+
+        // 통신교환 송신(BoardManager.RemoveUnitForTrade)은 판매가 아니라서 OnUnitSold를 발행하지
+        // 않고 OnBoardResyncRequested만 발행한다(재접속/재동기화와 공유하는 신호). 이 이벤트가 없으면
+        // 송신 직후에도 "보유 중" 강조를 재판정할 트리거가 없어 깜빡임이 그대로 남는다(2026-08 확인).
+        // Refresh()는 ShopManager.CurrentSlots를 다시 읽어 카드를 재바인딩만 하는 순수 UI 재계산이라
+        // (구매/리롤/골드 차감 등 부작용 없음) 재접속 재동기화처럼 다른 이유로 함께 발행돼도 안전하다.
+        GameEvents.OnBoardResyncRequested += Refresh;
     }
 
     protected override void Unsubscribe()
@@ -76,6 +83,8 @@ public class UnitShopBarUI : ShopBarUIBase<PokemonData, ShopCardUI>
         GameEvents.OnUnitPlaced  -= HandleRosterChanged;
         GameEvents.OnUnitBenched -= HandleRosterChanged;
         GameEvents.OnUnitSold    -= HandleRosterChanged;
+
+        GameEvents.OnBoardResyncRequested -= Refresh;
     }
 
     protected override IReadOnlyList<PokemonData> GetSlots()
