@@ -111,6 +111,15 @@ public class UnitDragController : MonoBehaviour
             return;
         }
 
+        // 파트너 전체화면 관전 중엔 3D 조작 차단(위와 동일한 방식). 관전 화면은 Canvas RawImage일
+        // 뿐이라 이 컨트롤러의 Main Camera 기반 Physics.Raycast를 막지 못해, 화면 뒤 내 실제
+        // 보드/벤치가 그대로 맞아 조작되는 입력 관통 버그가 있었다(2026-08 확인).
+        if (_uiManager != null && _uiManager.IsPartnerSpectateExpanded)
+        {
+            if (_held != null) CancelDrag();
+            return;
+        }
+
         if (_clickAction.WasPressedThisFrame()) TryPickUp();
         else if (_clickAction.IsPressed() && _held != null) DragUpdate();
         else if (_clickAction.WasReleasedThisFrame() && _held != null) Drop();

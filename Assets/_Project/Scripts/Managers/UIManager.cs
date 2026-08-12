@@ -92,6 +92,11 @@ public class UIManager : MonoBehaviour
     private bool _itemStorePanelActiveBeforeSpectate;
     private bool _battleReadyButtonActiveBeforeSpectate;
 
+    // 파트너 전체화면 관전 상태(SetExpanded(true)로 들어간 전체화면 한정, PIP 제외) 자체를 나타내는
+    // 값. _shopPanelsHiddenForSpectate(상점 HUD 숨김/복원 상태)와는 의미가 다르므로 재사용하지
+    // 않는다 — UnitDragController/SellZone 같은 3D 물리 입력 쪽이 "지금 관전 중인가"만 확인할 때 쓴다.
+    private bool _isPartnerSpectateExpanded;
+
     // ──────────────────────────────────────────
     // 전적 데이터 및 전적창 상태
     // ──────────────────────────────────────────
@@ -612,6 +617,10 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void HandlePartnerSpectateExpandedChanged(bool expanded)
     {
+        // 상점 HUD 숨김/복원의 중복 진입 방지 가드와는 별개로, "지금 전체화면 관전 중인가" 자체는
+        // 항상 이벤트 값 그대로 최신화한다(UnitDragController/SellZone의 3D 입력 차단 판단 기준).
+        _isPartnerSpectateExpanded = expanded;
+
         if (expanded)
         {
             if (_shopPanelsHiddenForSpectate) return; // 중복 진입 방지
@@ -995,6 +1004,13 @@ public class UIManager : MonoBehaviour
 
     /// <summary>선택 UI가 떠 있는 동안 3D 조작(드래그)을 막기 위해 UnitDragController가 참조한다.</summary>
     public bool IsPlusleMinunChoiceBlocking => IsPendingFormUnitValid();
+
+    /// <summary>
+    /// 파트너 전체화면 관전 중인가(PIP 제외, SetExpanded(true) 한정). 관전 오버레이(RawImage)는
+    /// Main Camera 기반 Physics 입력을 막지 못하므로, UnitDragController/SellZone처럼 3D 물리
+    /// 입력을 직접 다루는 쪽이 이 값을 보고 스스로 차단해야 한다(2026-08 입력 관통 버그 대응).
+    /// </summary>
+    public bool IsPartnerSpectateExpanded => _isPartnerSpectateExpanded;
 
     /// <summary>
     /// Canvas 패널이 없는 씬을 위한 IMGUI 폴백. 패널이 배선돼 있으면 그리지 않는다.

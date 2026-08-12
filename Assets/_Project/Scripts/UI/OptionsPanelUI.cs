@@ -178,7 +178,8 @@ public class OptionsPanelUI : MonoBehaviour
         IncomingSurrenderRequest,
         PartnerDisconnectWait,
         PartnerDisconnectEndConfirm,
-        PartnerGaveUp
+        PartnerGaveUp,
+        Defeat
     }
 
     private ModalContent _activeModal = ModalContent.None;
@@ -190,6 +191,10 @@ public class OptionsPanelUI : MonoBehaviour
 
     // 대기 모달에 [포기하기]를 이미 붙였는지. 유예가 끝난 뒤 매 프레임 다시 붙이지 않으려고 둔다.
     private bool _partnerGiveUpButtonShown;
+
+    // 패배(TeamHpZero) 확인 모달. 한 매치에 한 번만 뜨면 되므로(재오픈 방어) _defeatModalShown으로 막는다.
+    private bool _defeatModalShown;
+    private Coroutine _defeatModalRoutine;
 
     private void Awake()
     {
@@ -349,6 +354,7 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentDisconnected += HandlePartnerDisconnected;
         GameEvents.OnGracePeriodExpired   += HandlePartnerGiveUpAvailable;
         GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
+        GameEvents.OnSessionEnded         += HandleSessionEnded;
     }
 
     private void OnDisable()
@@ -356,6 +362,13 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentDisconnected -= HandlePartnerDisconnected;
         GameEvents.OnGracePeriodExpired   -= HandlePartnerGiveUpAvailable;
         GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
+        GameEvents.OnSessionEnded         -= HandleSessionEnded;
+
+        if (_defeatModalRoutine != null)
+        {
+            StopCoroutine(_defeatModalRoutine);
+            _defeatModalRoutine = null;
+        }
 
         PlayerPrefs.Save();
     }
@@ -386,6 +399,105 @@ public class OptionsPanelUI : MonoBehaviour
         // 떠 있던 대기 모달은 다음 Update의 PollPartnerDisconnectModals가 내린다.
     }
 
+    // ─────────────────────────────────────────
+    // 세션 종료 (GameEvents.OnSessionEnded 구독) — 항복 합의/패배 확인
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// NetworkManager가 이미 발행한 세션 종료 사유를 구독해 "반응"만 한다 — 여기서 SessionEnded를
+    /// 다시 발행하지 않는다(MatchRecorder가 같은 이벤트로 전적을 기록하므로 중복 발행하면 중복 기록됨).
+    /// <list type="bullet">
+    /// <item>Surrender — 이미 두 클라이언트가 옵션창에서 항복을 요청/승인한 상태라 별도 확인 없이
+    /// 곧바로 정상 종료 타이틀 복귀 경로를 탄다.</item>
+    /// <item>TeamHpZero — 패배 확인 모달을 띄운다(3초 뒤 확인 버튼 노출, ShowDefeatModal).</item>
+    /// <item>그 외(PartnerAbandoned/ReconnectFailed/BothDisconnected) — 기존 흐름
+    /// (HandlePartnerDisconnectGiveUp/HandlePartnerGaveUpConfirmed)이 이미 처리하므로 여기서는
+    /// 손대지 않는다.</item>
+    /// </list>
+    /// </summary>
+    private void HandleSessionEnded(SessionEndReason reason)
+    {
+        switch (reason)
+        {
+            case SessionEndReason.Surrender:
+                ReturnToTitleAfterMatchEnd(reason);
+                break;
+
+            case SessionEndReason.TeamHpZero:
+                ShowDefeatModal();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 패배 확인 모달을 띄운다. 처음 3초는 버튼 없이 안내만(ShowWaiting) 보여주고, 3초 뒤
+    /// SetPrimaryAction으로 확인 버튼을 뒤늦게 붙인다 — 패배 즉시 자동으로 타이틀로 이동하지
+    /// 않기 위함(요구사항). 한 매치에 한 번만 뜨면 되므로 _defeatModalShown으로 재오픈을 막는다.
+    /// </summary>
+    private void ShowDefeatModal()
+    {
+        if (_defeatModalShown || _modalDialog == null) return;
+        _defeatModalShown = true;
+
+        _activeModal = ModalContent.Defeat;
+        _modalDialog.ShowWaiting("패배했습니다.");
+
+        if (_defeatModalRoutine != null) StopCoroutine(_defeatModalRoutine);
+        _defeatModalRoutine = StartCoroutine(DefeatConfirmDelayRoutine());
+    }
+
+    /// <summary>Time.timeScale 영향을 받지 않는 3초 대기 후 확인 버튼을 붙인다.</summary>
+    private System.Collections.IEnumerator DefeatConfirmDelayRoutine()
+    {
+        yield return new WaitForSecondsRealtime(3f);
+        _defeatModalRoutine = null;
+
+        // 대기하는 3초 사이 모달이 이미 닫혔거나 다른 내용으로 바뀌었으면 버튼을 붙이지 않는다.
+        if (_modalDialog != null && _activeModal == ModalContent.Defeat)
+            _modalDialog.SetPrimaryAction("확인", HandleDefeatConfirmClicked);
+    }
+
+    /// <summary>패배 확인 모달의 [확인]. 정상 종료 타이틀 복귀 경로로 나간다.</summary>
+    private void HandleDefeatConfirmClicked()
+    {
+        _activeModal = ModalContent.None;
+        ReturnToTitleAfterMatchEnd(SessionEndReason.TeamHpZero);
+    }
+
+    /// <summary>
+    /// 정상적으로 종료된 매치(항복 합의/패배 확인)에서 타이틀로 복귀한다. 일반 타이틀 이동
+    /// (<see cref="ConfirmReturnToTitle"/>)과 씬 이름 검증·PlayerPrefs 저장 절차는 동일하되,
+    /// <see cref="NetworkManager.RequestCompletedMatchReturnToTitle"/>를 통해 저장된 재접속
+    /// 세션까지 함께 정리한다는 점만 다르다 — 이미 끝난 매치를 타이틀 화면의 [이전 게임으로
+    /// 들어가기] 후보로 남기지 않기 위함.
+    /// </summary>
+    private void ReturnToTitleAfterMatchEnd(SessionEndReason reason)
+    {
+        if (string.IsNullOrWhiteSpace(_titleSceneName))
+        {
+            Debug.LogWarning(
+                "[OptionsPanelUI] 타이틀 씬 이름이 설정되지 않았습니다.");
+
+            return;
+        }
+
+        if (!Application.CanStreamedLevelBeLoaded(_titleSceneName))
+        {
+            Debug.LogWarning(
+                $"[OptionsPanelUI] 빌드에 등록되지 않은 씬입니다: {_titleSceneName}");
+
+            return;
+        }
+
+        PlayerPrefs.Save();
+        Time.timeScale = 1f;
+
+        if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+            gameManager.Network.RequestCompletedMatchReturnToTitle(_titleSceneName, reason.ToString());
+        else
+            SceneManager.LoadScene(_titleSceneName);
+    }
+
     /// <summary>
     /// ESC 하나만 남았다. 나머지 모달은 전부 uGUI로 옮겨가 Update에서 상태를 보고 띄운다.
     /// </summary>
@@ -401,6 +513,11 @@ public class OptionsPanelUI : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        // 패배(TeamHpZero) 확인 모달이 최우선 — 이미 팀 HP 0으로 매치가 끝난 뒤라 파트너 이탈/항복
+        // 관련 모달이 그 위를 덮어써서는 안 된다. 오직 이 모달 자신의 확인 버튼으로만 내려간다.
+        if (_activeModal == ModalContent.Defeat)
+            return;
+
         // 파트너 이탈 관련이 최우선 — 그쪽이 모달을 잡고 있으면 항복 쪽은 손대지 않는다.
         // (IMGUI 시절 OnGUI 최상단의 early-return 두 개가 표현하던 우선순위를 그대로 옮긴 것)
         if (PollPartnerDisconnectModals())
@@ -676,6 +793,7 @@ public class OptionsPanelUI : MonoBehaviour
     /// <summary>ESC로 넘길 수 없는 모달인가 — 반드시 답해야 하거나, 애초에 고를 게 없는 대기 상태.</summary>
     private static bool IsForcedModal(ModalContent content) =>
         content == ModalContent.IncomingSurrenderRequest ||
+        content == ModalContent.Defeat ||
         IsPartnerDisconnectModal(content);
 
     private void HandleEscapeKey()
