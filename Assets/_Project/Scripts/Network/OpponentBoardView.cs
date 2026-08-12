@@ -37,9 +37,16 @@ public class OpponentBoardView : MonoBehaviour
         public readonly int attackRangeOverride;
         /// <summary>영웅증강 스탯 배수. 기본값 1f=배수 없음.</summary>
         public readonly float heroStatMultiplier;
+        /// <summary>통신진화로 얻은 종인지(BoardSnapshot.Entry.isTradeEvolved 그대로). PokemonUnit.IsSpecialEvolved
+        /// 판정(특수 진화 배율표 1.0/2.0/3.0 적용 여부)에 그대로 대응한다.</summary>
+        public readonly bool isTradeEvolved;
+        /// <summary>장착 중인 진화의 돌(BoardSnapshot.Entry.equippedStoneId를 EvolutionStoneDatabase로 해석).
+        /// 미장착이면 null.</summary>
+        public readonly EvolutionStoneData equippedStone;
 
         public PartnerBoardUnitView(Transform visual, PokemonData species, int starLevel, IReadOnlyList<ItemData> items,
-                                    string roleOverride, int attackRangeOverride, float heroStatMultiplier)
+                                    string roleOverride, int attackRangeOverride, float heroStatMultiplier,
+                                    bool isTradeEvolved, EvolutionStoneData equippedStone)
         {
             this.visual = visual;
             this.species = species;
@@ -48,6 +55,8 @@ public class OpponentBoardView : MonoBehaviour
             this.roleOverride = roleOverride;
             this.attackRangeOverride = attackRangeOverride;
             this.heroStatMultiplier = heroStatMultiplier;
+            this.isTradeEvolved = isTradeEvolved;
+            this.equippedStone = equippedStone;
         }
     }
 
@@ -307,7 +316,8 @@ public class OpponentBoardView : MonoBehaviour
 
             _active.Add((poolKey, go));
             _activeUnitViews.Add(new PartnerBoardUnitView(go.transform, data, e.starLevel, ResolveEquippedItems(e),
-                e.roleOverride, e.attackRangeOverride, e.heroStatMultiplier));
+                e.roleOverride, e.attackRangeOverride, e.heroStatMultiplier,
+                e.isTradeEvolved, ResolveEquippedStone(e)));
         }
     }
 
@@ -330,6 +340,15 @@ public class OpponentBoardView : MonoBehaviour
             if (item1 != null) items.Add(item1);
         }
         return items;
+    }
+
+    /// <summary>Entry.equippedStoneId → EvolutionStoneData(0 또는 미등록 id면 null). ResolveEquippedItems와
+    /// 동일한 방식으로 EvolutionStoneDatabase를 그대로 조회한다.</summary>
+    private static EvolutionStoneData ResolveEquippedStone(BoardSnapshot.Entry e)
+    {
+        if (e.equippedStoneId == 0) return null;
+        EvolutionStoneDatabase db = EvolutionStoneDatabase.Instance;
+        return db != null ? db.GetById(e.equippedStoneId) : null;
     }
 
     /// <summary>speciesId → PokemonData 해석. 실패 시 null(캡슐 폴백) + 종당 1회만 경고.</summary>

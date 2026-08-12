@@ -174,11 +174,13 @@ public class PartnerSpectateView : MonoBehaviour
     /// 새 파트너 BattleSnapshot을 수신했을 때(전투 시작 자동 전송 등) 관전 중이면 곧바로 미러 전투로
     /// 전환한다. 관전 중이 아니면 아무 것도 하지 않는다 — 스냅샷은 NetworkManager가 이미 캐시해뒀으므로
     /// (RPC_OnBattleSnapshot) 나중에 관전을 열 때 ToggleExpanded의 캐시 확인 경로(TryStartMirrorBattleFromCache)가
-    /// 따라잡는다.
+    /// 따라잡는다. 내 매치가 이미 끝났으면(IsMatchEnded) 새 스냅샷이 와도 미러를 새로 시작/교체하지
+    /// 않는다(2026-08 코드리뷰 대응 — 버튼 경로만 막고 이 이벤트 경로를 열어두면 우회로가 된다).
     /// </summary>
     private void HandlePartnerBattleSnapshotChanged(BattleSnapshot snapshot)
     {
         if (!_isExpanded) return;
+        if (GameManager.TryGet(out var gm) && gm.Phase != null && IsMatchEnded(gm.Phase.CurrentPhase)) return;
         StartOrReplaceMirrorBattle(snapshot);
     }
 
@@ -539,16 +541,30 @@ public class PartnerSpectateView : MonoBehaviour
     /// 라운드 쇼핑에 진입) 캐시된 스냅샷은 이전 라운드 것이므로 재생하지 않는다(stale 재생 방지).
     /// 이미 미러 전투가 실행 중이면(예: 방금 HandlePartnerBattleSnapshotChanged로 시작됐거나 QA로
     /// 이미 돌고 있는 경우) 중복 시작하지 않는다.
+    ///
+    /// 단, 내 매치가 이미 완전히 끝난 상태(Victory/GameOver)라면 roundIndex가 우연히 일치해도 막는다
+    /// (2026-08 코드리뷰 대응) — CurrentRound는 종료 후에도 바뀌지 않고 _partnerBattleSnapshot도
+    /// 클리어되지 않으므로, 이 가드가 없으면 게임이 끝난 뒤 PartnerViewButton으로 마지막 라운드
+    /// 전투가 계속 재생 가능했다. GamePhase.Battle만 허용하는 화이트리스트가 아니라 종료 상태
+    /// 두 개만 거르는 blacklist다 — "내 Phase가 Shopping/Battle이고 파트너가 아직 전투 중"인
+    /// 정상 케이스(위 문단)는 그대로 통과해야 하기 때문이다.
     /// </summary>
     private void TryStartMirrorBattleFromCache()
     {
         if (_mirrorController == null || _mirrorController.IsRunning) return;
         if (!GameManager.TryGet(out var gm) || gm.Phase == null || gm.Network == null) return;
+        if (IsMatchEnded(gm.Phase.CurrentPhase)) return;
         if (!gm.Network.HasPartnerBattleSnapshot) return;
         if (gm.Network.PartnerBattleSnapshot.roundIndex != gm.Phase.CurrentRound) return;
 
         StartOrReplaceMirrorBattle(gm.Network.PartnerBattleSnapshot);
     }
+
+    /// <summary>매치가 완전히 끝난 상태인지 — TryStartMirrorBattleFromCache/HandlePartnerBattleSnapshotChanged
+    /// 공용 blacklist 가드(2026-08 코드리뷰 대응). Shopping/Battle 등 진행 중 페이즈는 전부 허용해야
+    /// 하므로 화이트리스트가 아니라 종료 상태 두 개만 명시적으로 거른다.</summary>
+    private static bool IsMatchEnded(GamePhase phase) =>
+        phase == GamePhase.Victory || phase == GamePhase.GameOver;
 
     /// <summary>
     /// 최신 파트너 BattleSnapshot으로 미러 전투를 (다시) 시작한다. 쇼핑 적 프리뷰 중 "유닛"만 정리하고

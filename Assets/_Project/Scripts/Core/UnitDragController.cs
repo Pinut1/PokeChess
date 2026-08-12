@@ -78,6 +78,18 @@ public class UnitDragController : MonoBehaviour
     {
         if (_camera == null) return;
 
+        // 매치가 완전히 끝난 상태(Victory/GameOver)면 3D 조작 전면 차단(2026-08 코드리뷰 대응 —
+        // 승리/패배 결과 모달과 짝을 이루는 내부 안전장치). 결과 모달의 Dim은 uGUI 버튼 클릭만
+        // 막고 이 컨트롤러의 Camera 기반 Physics.Raycast는 막지 못한다(아래 관전 화면 차단과 같은
+        // 이유 — IsPartnerSpectateExpanded 주석 참고). GamePhase.Battle만 허용하는 화이트리스트가
+        // 아니라 종료 상태 두 개만 거르는 blacklist라, Shopping 중 파트너가 아직 Battle인 정상
+        // 진행 상황에는 전혀 영향을 주지 않는다.
+        if (IsMatchEndedPhase())
+        {
+            if (_held != null) CancelDrag();
+            return;
+        }
+
         // 통신교환(6b46074a)이 "쇼핑 페이즈에서만 드래그"를 완화했다:
         // 전투 중에도 벤치 유닛은 집어서 전송 대기열로 보낼 수 있어야 한다.
         // 필드 유닛만 전투 중 조작을 막는다 — master의 쇼핑 전용 검사로 되돌리지 말 것.
@@ -154,6 +166,14 @@ public class UnitDragController : MonoBehaviour
     {
         var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
         return phase != null && phase.CurrentPhase == GamePhase.Battle;
+    }
+
+    /// <summary>매치가 완전히 끝난 상태(Victory/GameOver)인지 — blacklist 가드(2026-08 코드리뷰 대응).
+    /// PartnerSpectateView.IsMatchEnded와 같은 판단 기준(Victory/GameOver만 거름)이다.</summary>
+    private static bool IsMatchEndedPhase()
+    {
+        var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
+        return phase != null && (phase.CurrentPhase == GamePhase.Victory || phase.CurrentPhase == GamePhase.GameOver);
     }
 
     /// <summary>

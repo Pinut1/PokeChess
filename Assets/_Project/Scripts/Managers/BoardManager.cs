@@ -1587,42 +1587,61 @@ public class BoardManager : MonoBehaviour
             !resultEvolutionLocked &&
             !resultTradeEvolved)
         {
-            string evolvedEn =
-                currentSpeciesData.evolvesIntoEn;
-
-            if (!string.IsNullOrEmpty(evolvedEn))
+            // 합체되는 종 자신(currentSpeciesData, 예: 골뱃)이 이미 활성화된 통신진화 원본인지
+            // evolvesIntoEn 유무보다 먼저 확인한다(2026-08 코드리뷰 대응). 골뱃/윤겔라/데구리/야돈/
+            // 고우스트/롱스톤/스라크처럼 통신진화 대상 중간체는 pokemon_data의 evolvesIntoEn이
+            // 비어 있어(자연진화 다음 단계가 없음) 아래 evolvesIntoEn 분기에 아예 도달하지 못한다.
+            // 전투 중 필드 보호로 미변환(pending) 상태로 남아 있던 같은 종 3마리가 먼저 합체되면
+            // (AddPendingStarEvolution 경로가 AddPendingTradeEvolution보다 먼저 처리되는 경우 등,
+            // 두 대기열은 서로 다른 GameEvents.OnPhaseChanged 구독자라 순서 보장이 없다) 이 분기가
+            // 없으면 리다이렉트를 영영 못 타 예: 골뱃×3 → (의도한 크로뱃이 아니라) 그냥 3성 골뱃이
+            // 나온다. ShopManager 내부 Dictionary는 직접 참조하지 않고 기존 공개 조회 API만
+            // 재사용한다 — 새 시스템/새 API 없음.
+            if (GameManager.TryGet(out var gm) && gm.Shop != null &&
+                gm.Shop.TryResolveActiveTradeEvolution(currentSpeciesData.id, out PokemonData ownTradeEvolvedData))
             {
-                PokemonData nextData =
-                    PokemonDatabase.Instance != null
-                        ? PokemonDatabase.Instance
-                            .GetByNameEn(evolvedEn)
-                        : null;
+                resultData = ownTradeEvolvedData;
+                evolvedUnit.isTradeEvolved = true;
+            }
+            else
+            {
+                string evolvedEn =
+                    currentSpeciesData.evolvesIntoEn;
 
-                if (nextData != null)
+                if (!string.IsNullOrEmpty(evolvedEn))
                 {
-                    resultData = nextData;
+                    PokemonData nextData =
+                        PokemonDatabase.Instance != null
+                            ? PokemonDatabase.Instance
+                                .GetByNameEn(evolvedEn)
+                            : null;
 
-                    // 방금 결정된 일반 진화 결과(nextData, 예: 골뱃)가 현재 플레이어에게 활성화된
-                    // 통신진화 원본이면(예: 골뱃→크로뱃 활성화) 그 통신진화체로 최종 결과를 대신한다 —
-                    // 주뱃 3마리 합체가 골뱃을 거치지 않고 곧바로 크로뱃이 되는 지점(상점 하위 1성이
-                    // 통신진화 대상인 계열: 주뱃/캐이시/꼬마돌/고오스 등 전부 이 한 분기로 처리됨,
-                    // 포켓몬별 하드코딩 없음). ShopManager 내부 Dictionary는 직접 참조하지 않고
-                    // 공개 조회 API만 쓴다. 이 블록 자체가 이미 retainedStone==null &&
-                    // !resultEvolutionLocked && !resultTradeEvolved 안에서만 실행되므로(위 조건문),
-                    // 돌 진화·영웅증강 고정·이미 통신진화된 경우에는 이 분기가 절대 개입하지 않는다.
-                    if (GameManager.TryGet(out var gm) && gm.Shop != null &&
-                        gm.Shop.TryResolveActiveTradeEvolution(nextData.id, out PokemonData activeTradeEvolvedData))
+                    if (nextData != null)
                     {
-                        resultData = activeTradeEvolvedData;
-                        evolvedUnit.isTradeEvolved = true;
+                        resultData = nextData;
+
+                        // 방금 결정된 일반 진화 결과(nextData, 예: 골뱃)가 현재 플레이어에게 활성화된
+                        // 통신진화 원본이면(예: 골뱃→크로뱃 활성화) 그 통신진화체로 최종 결과를 대신한다 —
+                        // 주뱃 3마리 합체가 골뱃을 거치지 않고 곧바로 크로뱃이 되는 지점(상점 하위 1성이
+                        // 통신진화 대상인 계열: 주뱃/캐이시/꼬마돌/고오스 등 전부 이 한 분기로 처리됨,
+                        // 포켓몬별 하드코딩 없음). ShopManager 내부 Dictionary는 직접 참조하지 않고
+                        // 공개 조회 API만 쓴다. 이 블록 자체가 이미 retainedStone==null &&
+                        // !resultEvolutionLocked && !resultTradeEvolved 안에서만 실행되므로(위 조건문),
+                        // 돌 진화·영웅증강 고정·이미 통신진화된 경우에는 이 분기가 절대 개입하지 않는다.
+                        if (GameManager.TryGet(out var gm2) && gm2.Shop != null &&
+                            gm2.Shop.TryResolveActiveTradeEvolution(nextData.id, out PokemonData activeTradeEvolvedData))
+                        {
+                            resultData = activeTradeEvolvedData;
+                            evolvedUnit.isTradeEvolved = true;
+                        }
                     }
-                }
-                else
-                {
-                    Debug.LogWarning(
-                        $"[Evolve] 진화체 '{evolvedEn}'가 " +
-                        "PokemonDatabase에 없습니다. 종을 유지합니다."
-                    );
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[Evolve] 진화체 '{evolvedEn}'가 " +
+                            "PokemonDatabase에 없습니다. 종을 유지합니다."
+                        );
+                    }
                 }
             }
         }

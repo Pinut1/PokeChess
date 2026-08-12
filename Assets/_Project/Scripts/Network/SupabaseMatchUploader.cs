@@ -30,6 +30,35 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     private const string PREFS_REFRESH_TOKEN = "supabase_refresh_token";
 
+    /// <summary>
+    /// QA 전용: 같은 PC에서 동일 빌드 exe를 여러 개 띄워 테스트할 때 Supabase refresh token
+    /// PlayerPrefs가 서로 덮어쓰는 문제를 피하기 위한 저장 키 슬롯(2026-08 코드리뷰 대응).
+    /// NetworkManager.s_qaSlot/ParseQaSlot/PrefKey와 동일한 의미·동작이지만 전부 private이라
+    /// 이 클래스에서 재사용할 수 없어(매니저 간 직접 참조 금지 원칙과도 맞지 않음) 최소한으로
+    /// 그대로 옮겨왔다. 커맨드라인 "-qaClient=값"으로 지정하며, 인자가 없거나 형식이 이상하면
+    /// null로 남아 일반 실행과 100% 동일하게 동작한다(기존 키 그대로, 마이그레이션 없음).
+    /// </summary>
+    private static readonly string s_qaSlot = ParseQaSlot();
+
+    /// <summary>커맨드라인에서 "-qaClient=값" 형태의 QA 슬롯 인자를 찾는다. 없거나 값이 비어 있으면 null.</summary>
+    private static string ParseQaSlot()
+    {
+        const string prefix = "-qaClient=";
+        foreach (var arg in System.Environment.GetCommandLineArgs())
+        {
+            if (!arg.StartsWith(prefix, System.StringComparison.Ordinal)) continue;
+
+            string slot = arg[prefix.Length..].Trim();
+            return string.IsNullOrEmpty(slot) ? null : slot;
+        }
+        return null;
+    }
+
+    /// <summary>Supabase refresh token PlayerPrefs 키에 QA 슬롯 접미사를 붙인다. s_qaSlot이 null이면
+    /// (일반 실행) baseKey를 그대로 반환 — 기존 저장값과 완전히 같은 키를 쓰므로 마이그레이션이 필요 없다.</summary>
+    private static string PrefKey(string baseKey) =>
+        s_qaSlot == null ? baseKey : $"{baseKey}_{s_qaSlot}";
+
     private string _accessToken       = "";
     private string _userId            = "";
     private string _upsertedNickname; // 마지막으로 서버에 반영한 닉네임 (중복 upsert 방지)
@@ -66,7 +95,7 @@ public class SupabaseMatchUploader : MonoBehaviour
 
     private IEnumerator EnsureSession()
     {
-        string refreshToken = PlayerPrefs.GetString(PREFS_REFRESH_TOKEN, "");
+        string refreshToken = PlayerPrefs.GetString(PrefKey(PREFS_REFRESH_TOKEN), "");
 
         if (!string.IsNullOrEmpty(refreshToken))
         {
@@ -100,9 +129,10 @@ public class SupabaseMatchUploader : MonoBehaviour
 
         _accessToken = session.access_token;
         _userId      = session.user != null ? session.user.id : "";
-        PlayerPrefs.SetString(PREFS_REFRESH_TOKEN, session.refresh_token);
+        PlayerPrefs.SetString(PrefKey(PREFS_REFRESH_TOKEN), session.refresh_token);
         PlayerPrefs.Save();
-        Debug.Log($"[Supabase] 세션 확보 (user {_userId[..Mathf.Min(8, _userId.Length)]}…)");
+        Debug.Log($"[Supabase] 세션 확보 (user {_userId[..Mathf.Min(8, _userId.Length)]}…" +
+                  $"{(s_qaSlot != null ? $", qaSlot={s_qaSlot}" : "")})");
     }
 
     private IEnumerator UpsertProfile()
