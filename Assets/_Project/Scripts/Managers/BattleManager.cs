@@ -71,6 +71,13 @@ public class BattleManager : MonoBehaviour
              "기획 미확정 수치(2026-07-30 기준).")]
     [SerializeField] private float _overtimeSpeedMultiplier = 2f;
 
+    [Tooltip("사거리 밖일 때 한 칸 이동하는 주기(초). SimulateTick(0.1초)과는 별개 — 타일 사이 보간/애니메이션 " +
+             "없이 즉시 스냅 이동이라 매 틱(초당 10칸) 그대로면 너무 빨라 보여서 도입. 유닛별 moveCooldown으로 " +
+             "관리하며, 실제 이동 간격은 이 값을 BattleUnit.moveSpeedMultiplier로 나눈 값이다(배속 아이템 효과 유지). " +
+             "0 이하로 두면 무한/초고속 이동이 될 수 있어 [Min]과 별개로 사용 시점에서도 최소값으로 방어한다.")]
+    [Min(0.02f)]
+    [SerializeField] private float _moveInterval = 0.2f;
+
     private readonly List<BattleUnit> _units = new();
     private readonly List<GameObject> _mirrorTiles = new();
 
@@ -79,6 +86,19 @@ public class BattleManager : MonoBehaviour
     // 원기둥 폴백 타일은 HexTile이 아니라 여기 담기지 않는다 — 색 구분도 되지 않는다.
     private readonly Dictionary<HexCoords, HexTile> _enemyTiles = new();
     private Coroutine _battleCoroutine;
+
+    // 이동 BFS(FindNextStep)가 보드 밖으로 벗어나지 않도록 쓰는 전투 가능 전체 좌표(아군 보드 +
+    // 그 미러인 적 진영). _enemyTiles는 시각화 캐시라 프리팹 미할당/미러전투 경로에서 비어있을 수
+    // 있어 이동 판정에 쓰면 안 된다 — BuildValidCoords()가 BoardManager.GetEnemyBattleCoords()로
+    // 직접 계산해 채운다. 전투 시작(SetupUnits/SetupMirrorUnits)마다 새로 채우고 Cleanup()에서 비운다.
+    private readonly HashSet<HexCoords> _validCoords = new();
+
+    // FindNextStep의 동일 areaDist(개선 없는) fallback 후보군에서만 참조하는 "직전에 있던 칸"
+    // 1개 기억(경로 캐시 아님 — 오직 A↔B 두 칸짜리 완전 대칭 막다른 자리에서 그 자리로 되돌아가는
+    // 왕복만 막는 용도). 유닛이 실제로 한 칸 이동할 때 MoveTowards가 갱신한다. BattleUnit.cs는
+    // 건드리지 않고 여기(BattleManager)에서만 관리 — 전투 시작(SetupUnits/SetupMirrorUnits)마다
+    // 새로 비우고 Cleanup()에서도 비워, 이전 전투의 BattleUnit 참조가 안 남게 한다.
+    private readonly Dictionary<BattleUnit, HexCoords> _previousCoords = new();
 
     /// <summary>파트너 관전 미러 전투 코루틴(실전투 _battleCoroutine과 완전히 별도 필드).
     /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
@@ -532,6 +552,7 @@ public class BattleManager : MonoBehaviour
             attackSpeed = data.attackSpeed,
             range = Mathf.Max(1, data.attackRange),
             attackCooldown = 0f,
+            moveCooldown = 0f,
             role = data.role ?? ""
         };
         ApplySkill(bu, data.skill, data.manaCost);
@@ -545,13 +566,32 @@ public class BattleManager : MonoBehaviour
     private void SetupUnits()
     {
         _units.Clear();
+        _previousCoords.Clear();
 
         var board = GameManager.Instance.Board;
+        BuildValidCoords(board);
 
         SetupAllyUnits(board);
         SetupEnemyUnits(board);
         ApplyOnCombatStartEffects();
         SetupVisuals(board);
+    }
+
+    /// <summary>
+    /// 전투 가능한 전체 헥스 좌표(아군 보드 전체 칸 + BoardManager.GetEnemyBattleCoords()로 계산한
+    /// 그 미러인 적 진영)를 _validCoords에 채운다. GetBoardSnapshot()은 배치된 유닛이 아니라 보드
+    /// 칸 전체(빈 칸 포함)를 키로 반환하므로 유효 좌표 판정에 그대로 쓸 수 있다(SetupAllyUnits와
+    /// 같은 근거). 이동 BFS(FindNextStep)가 보드 경계를 벗어나지 않도록 유닛 생성 전에 호출한다.
+    /// 실전투(SetupUnits)와 미러전투(SetupMirrorUnits) 양쪽에서 각자 호출한다.
+    /// </summary>
+    private void BuildValidCoords(BoardManager board)
+    {
+        _validCoords.Clear();
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+        {
+            _validCoords.Add(coords);
+            _validCoords.Add(board.GetEnemyBattleCoords(coords));
+        }
     }
 
     /// <summary>
@@ -976,6 +1016,7 @@ public class BattleManager : MonoBehaviour
             attackSpeed = data.attackSpeed,
             range = Mathf.Max(1, data.attackRange),
             attackCooldown = 0f,
+            moveCooldown = 0f,
             role = data.role ?? "",
             starLevel = Mathf.Clamp(e.starLevel, 1, 3)
         };
@@ -1036,6 +1077,7 @@ public class BattleManager : MonoBehaviour
             attackSpeed = unit.AttackSpeed,
             range = Mathf.Max(1, unit.Range), // 데이터 미설정(0) 시 인접칸까지는 사거리로 취급(TFT 근접 기본)
             attackCooldown = 0f,
+            moveCooldown = 0f,
             role = unit.Role,
             starLevel = Mathf.Clamp(unit.starLevel, 1, 3), // 날따름 지속시간 공식용
             hasSitrusBerry = unit.hasHeroBerry // 파치리스 영웅증강 v2 자뭉열매
@@ -1172,9 +1214,11 @@ public class BattleManager : MonoBehaviour
                 if (bu.tauntReturnTarget != null && !bu.tauntReturnTarget.IsAlive)
                     bu.tauntReturnTarget = null;
 
-                // 사거리 안 적 우선(있으면 그걸로 공격) → 없으면 이번 틱 전진 가능한 적 → 그마저 없으면
-                // 기존과 동일하게 우선순위 최상단(막혀 있어도 유지 — 이동 시도만 조용히 실패하고 제자리).
-                target = FindInRangeEnemy(bu) ?? FindReachableEnemy(bu) ?? FindNearestEnemy(bu);
+                // 사거리 안 적 우선(있으면 그걸로 공격) → 없으면 역할 우선순위 최상단 적.
+                // 예전엔 "이번 틱 전진 가능한 적"(FindReachableEnemy)을 한 단계 더 끼워 우선순위를
+                // 양보했지만, MoveTowards가 BFS 우회 이동으로 바뀌면서 더 이상 필요 없어졌다(막혀도
+                // 다음 틱에 우회 경로를 찾아 계속 전진하므로) — 순수 역할 우선순위만 남긴다.
+                target = FindInRangeEnemy(bu) ?? FindNearestEnemy(bu);
             }
             bu.lastTickTarget = target; // 도발 발동 시 "원래 타겟" 스냅샷의 원천
             if (target == null) continue;
@@ -1207,9 +1251,17 @@ public class BattleManager : MonoBehaviour
             }
             else
             {
-                int moveSteps = Mathf.Max(1, Mathf.RoundToInt(bu.moveSpeedMultiplier));
-                for (int i = 0; i < moveSteps && bu.coords.DistanceTo(target.coords) > bu.range; i++)
-                    MoveTowards(bu, target.coords);
+                // attackCooldown과 동일한 패턴(유닛별 쿨다운 감소 → 0 이하면 행동 후 재충전).
+                // 예전엔 moveSpeedMultiplier만큼 한 틱에 여러 칸을 스냅 이동시켰는데, 그러면
+                // _moveInterval로 "이동 빈도"를 늦추려는 의도와 배속 가산이 이중 적용된다 —
+                // 배속은 이제 간격을 줄이는 쪽(아래 나눗셈)으로만 반영하고, 한 틱당 최대 한 칸만
+                // 옮긴다(공격도 같은 이유로 틱당 한 번만 처리하는 기존 attackCooldown 구조와 동일).
+                bu.moveCooldown -= TICK_INTERVAL;
+                if (bu.moveCooldown <= 0f)
+                {
+                    MoveTowards(bu, target);
+                    bu.moveCooldown += Mathf.Max(0.02f, _moveInterval) / Mathf.Max(0.01f, bu.moveSpeedMultiplier);
+                }
             }
         }
 
@@ -1623,69 +1675,112 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 사거리 안에 적이 없을 때의 이동 타겟 폴백. 거리 → 동일 거리일 때 role 우선순위 순으로 평가하되,
-    /// 이번 틱에 실제로 한 칸이라도 전진 가능한(= MoveTowards가 쓰는 것과 동일한 "더 가까워지는 빈
-    /// 인접 칸" 규칙을 통과하는) 적만 후보로 삼는다. 전체 경로 도달 가능성은 보지 않고 이번 틱 한
-    /// 걸음만 본다 — 그래서 별도 실패 카운터/타임아웃 없이 매틱 새로 판정해도 충분하다.
+    /// 타겟을 공격할 수 있는 위치로 한 칸 이동. FindNextStep이 고른 다음 칸으로 옮기기만 한다
+    /// (자기 자신이면 이동 없음 — 완전 봉쇄). 실제로 이동했을 때만 옮기기 전 좌표를
+    /// _previousCoords에 남긴다 — FindNextStep이 다음 호출에서 "방금 왔던 칸으로 즉시
+    /// 되돌아가는" 동일 areaDist fallback 선택만 피하는 데 쓴다(경로 캐시 아님).
+    /// moveSpeedMultiplier로 한 틱에 여러 스텝을 밟는 유닛은 SimulateTick의 반복 호출로
+    /// 스텝마다 이 함수가 다시 불려, 매 스텝 현재 위치·점유 상태 기준으로 새로 계산된다
+    /// (같은 틱 안에서도 경로를 고정하지 않고, _previousCoords도 스텝마다 갱신된다).
     /// </summary>
-    private BattleUnit FindReachableEnemy(BattleUnit bu)
+    private void MoveTowards(BattleUnit bu, BattleUnit target)
     {
-        BattleUnit best = null;
-        int bestPriority = int.MaxValue;
-        int bestDist = int.MaxValue;
+        HexCoords next = FindNextStep(bu, target);
+        if (next == bu.coords) return;
 
-        foreach (var other in _units)
-        {
-            if (other.team == bu.team || !other.IsAlive || other.IsUntargetable) continue;
-
-            int dist = bu.coords.DistanceTo(other.coords);
-
-            bool canStep = false;
-            foreach (var neighbor in bu.coords.GetNeighbors())
-            {
-                if (neighbor.DistanceTo(other.coords) < dist && !IsOccupied(neighbor))
-                {
-                    canStep = true;
-                    break;
-                }
-            }
-            if (!canStep) continue;
-
-            int priority = ROLE_TARGET_PRIORITY.TryGetValue(other.role, out var p) ? p : DEFAULT_ROLE_PRIORITY;
-
-            if (dist < bestDist || (dist == bestDist && priority < bestPriority))
-            {
-                bestPriority = priority;
-                bestDist = dist;
-                best = other;
-            }
-        }
-
-        return best;
+        _previousCoords[bu] = bu.coords;
+        bu.coords = next;
+        UpdateVisualPosition(bu);
     }
 
-    /// <summary>목표 쪽으로 거리를 줄이는 인접 칸 중, 다른 살아있는 유닛이 없는 칸으로 한 칸 이동.</summary>
-    private void MoveTowards(BattleUnit bu, HexCoords targetCoords)
+    /// <summary>
+    /// bu.coords에서 시작해 (유효 좌표 ∩ 미점유) 칸만으로 BFS 전체 탐색을 한 번 수행하고,
+    /// 아래 기준으로 가장 좋은 도달 가능한 칸까지의 첫 스텝을 돌려준다(캐시 없음 — 호출마다 새로 계산):
+    ///   1차: target을 bu.range 이내에서 때릴 수 있는 빈 칸(= 공격 가능 영역, areaDist == 0)
+    ///        중 가장 가까운(스텝 적은) 칸.
+    ///   2차: 1차 후보가 하나도 없으면(전부 점유돼 있거나 경로가 막혀 있으면), 도달 가능한 칸 중
+    ///        공격 가능 영역까지 남은 거리(areaDist = max(0, dist(target) - bu.range))가 지금
+    ///        서 있는 칸보다 실제로 더 작은 칸 — range 1(근접)이든 2 이상(원거리)이든 동일 기준.
+    ///   3차: 2차처럼 더 나아지는 칸은 없지만, 지금과 "동일한" 최소 areaDist를 유지하는 도달
+    ///        가능한 칸이 있으면 그쪽으로 계속 이동(제자리 고정 금지 — 타겟 주변 우회 유지).
+    /// 세 기준을 areaDist → steps → CompareCoords(결정적 tie-break, 네트워크 동기화용) 순
+    /// 사전식 비교로 통합했다 — areaDist가 작을수록 항상 이긴다(1차가 2차·3차를 항상 이김).
+    ///
+    /// 물리적 즉시 backtrack 방지: 후보의 "실제로 이번 스텝에 내디딜 첫 칸"(firstStep[current])이
+    /// 직전에 있던 칸(_previousCoords[bu])과 같으면 그 후보는 통째로 제외한다. tier(areaDist)나
+    /// target에 관계없이 항상 적용되는 조건이라 target이 바뀌어도 우회되지 않는다 — 예전 버전은
+    /// "지금 칸과 areaDist가 같은 후보"에만 이 제외를 걸었는데, target이 바뀌면 같은 물리적 칸이
+    /// 다른 target 기준으로는 "동률(3차)"이 아니라 "개선(2차)"으로 재분류되면서 제외 대상에서
+    /// 빠져나가 즉시 되돌아가는 경우가 있었다(둘 다 target 상대값인 areaDist에 걸려 있었기 때문).
+    /// firstStep 비교는 target과 무관한 순수 기하 판정이라 이 우회가 불가능하다.
+    /// 이 제외는 BFS 탐색(아래 이웃 확장) 자체에는 전혀 관여하지 않는다 — 직전 칸을 "지나서"
+    /// 더 좋은 칸에 도달하는 경로는 그대로 탐색되고, 그 경로의 실제 firstStep이 직전 칸이
+    /// 아니라면(대개 그렇다 — 직전 칸은 여기로 오기 직전 위치이므로 그 자체가 막다른 골목이
+    /// 아닌 한 그 칸을 거치지 않는 다른 진입 방향이 있다) 정상적으로 선택된다. 오직 "이번 틱에
+    /// 실제로 내딛는 첫 걸음 자체가 방금 온 칸"인 경우만 걸러지고, 그런 후보밖에 없으면(진짜
+    /// A↔B 막다른 자리) 그 자리에서 대기한다 — 되돌아가느니 대기를 우선한다.
+    /// </summary>
+    private HexCoords FindNextStep(BattleUnit bu, BattleUnit target)
     {
-        int currentDist = bu.coords.DistanceTo(targetCoords);
-        HexCoords best = bu.coords;
-        int bestDist = currentDist;
+        int startAreaDist = Mathf.Max(0, bu.coords.DistanceTo(target.coords) - bu.range);
+        bool hasPrev = _previousCoords.TryGetValue(bu, out HexCoords prevCoords);
 
-        foreach (var neighbor in bu.coords.GetNeighbors())
+        var stepCount = new Dictionary<HexCoords, int>();
+        var firstStep = new Dictionary<HexCoords, HexCoords>();
+        var queue = new Queue<HexCoords>();
+        stepCount[bu.coords] = 0;
+        queue.Enqueue(bu.coords);
+
+        bool hasBest = false;
+        HexCoords best = default;
+        int bestAreaDist = int.MaxValue;
+        int bestSteps = int.MaxValue;
+
+        while (queue.Count > 0)
         {
-            int dist = neighbor.DistanceTo(targetCoords);
-            if (dist < bestDist && !IsOccupied(neighbor))
+            HexCoords current = queue.Dequeue();
+            int steps = stepCount[current];
+
+            if (steps > 0)
             {
-                bestDist = dist;
-                best = neighbor;
+                int areaDist = Mathf.Max(0, current.DistanceTo(target.coords) - bu.range);
+
+                // 지금보다 나빠지는 칸은 후보 자체가 아니고(뒷걸음 금지), firstStep이 직전 칸과
+                // 같은 후보(=이번 스텝에 바로 되돌아가는 경로)는 tier/target 무관하게 항상 제외.
+                bool isImmediateBacktrack = hasPrev && firstStep[current].Equals(prevCoords);
+                bool eligible = areaDist <= startAreaDist && !isImmediateBacktrack;
+
+                if (eligible)
+                {
+                    bool better;
+                    if (!hasBest) better = true;
+                    else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
+                    else if (steps != bestSteps) better = steps < bestSteps;
+                    else better = CompareCoords(current, best) < 0;
+
+                    if (better)
+                    {
+                        bestAreaDist = areaDist;
+                        bestSteps = steps;
+                        best = current;
+                        hasBest = true;
+                    }
+                }
+            }
+
+            foreach (var neighbor in current.GetNeighbors())
+            {
+                if (stepCount.ContainsKey(neighbor)) continue;
+                if (!_validCoords.Contains(neighbor)) continue;
+                if (IsOccupied(neighbor)) continue;
+
+                stepCount[neighbor] = steps + 1;
+                firstStep[neighbor] = current.Equals(bu.coords) ? neighbor : firstStep[current];
+                queue.Enqueue(neighbor);
             }
         }
 
-        if (best != bu.coords)
-        {
-            bu.coords = best;
-            UpdateVisualPosition(bu);
-        }
+        return hasBest ? firstStep[best] : bu.coords;
     }
 
     private bool IsOccupied(HexCoords coords)
@@ -1784,6 +1879,8 @@ public class BattleManager : MonoBehaviour
 
         _mirrorTiles.Clear();
         _enemyTiles.Clear();
+        _validCoords.Clear();
+        _previousCoords.Clear();
 
         // 이 인스턴스(실전투 또는 미러)가 만든 VFX만 정리한다 — 정적 전역 리스트를 함께 쓰던 예전
         // BattleVfxPlayer.ClearAllActive()와 달리 상대 인스턴스의 VFX는 건드리지 않는다. Cleanup()은
@@ -2041,6 +2138,7 @@ public class BattleManager : MonoBehaviour
     {
         failReason = null;
         _units.Clear();
+        _previousCoords.Clear();
 
         foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
         {
@@ -2066,6 +2164,7 @@ public class BattleManager : MonoBehaviour
             failReason = "BoardManager 연결 안 됨(좌표 변환 불가)";
             return false;
         }
+        BuildValidCoords(board);
 
         // SpawnMirrorEnemies(폴백)가 아니라 SpawnEnemiesFromStage(정상 경로)를 그대로 재사용한다 —
         // GetEnemyBattleCoords는 순수 좌표 변환(보드 모양)이라 로컬 보드를 넘겨도 결과가 같다.
@@ -2191,6 +2290,7 @@ public class BattleManager : MonoBehaviour
             attackSpeed = attackSpeed,
             range = Mathf.Max(1, range),
             attackCooldown = 0f,
+            moveCooldown = 0f,
             role = role,
             starLevel = Mathf.Clamp(entry.starLevel, 1, 3),
             hasSitrusBerry = entry.hasHeroBerry
