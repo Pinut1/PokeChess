@@ -10,10 +10,30 @@ using UnityEngine;
 /// 전체화면 관전에 장착 아이템/인벤토리를 보여주기 위해 최소한으로 확장했다(2026-08).
 ///
 /// PUN2 RPC는 int[] 같은 기본 배열을 그대로 직렬화하므로 커스텀 타입 등록 없이 전송 가능.
-/// 인코딩: [count, (speciesId, starLevel, onBoard, a, b, itemId0, itemId1,
-///          roleOverride, attackRangeOverride, heroStatMultiplier) × count,
+/// 인코딩(v2, 2026-08 코드리뷰 대응): [MAGIC, 0, 0, 0, 0, unitCap(legacy용 사본), version, count,
+///          (speciesId, starLevel, onBoard, a, b, itemId0, itemId1, roleOverride,
+///          attackRangeOverride, heroStatMultiplier, isTradeEvolved, equippedStoneId) × count,
 ///          invItemCount, itemId × invItemCount, invStoneCount, stoneId × invStoneCount,
 ///          hasRemover(0/1), reforgerCount, unitCap]
+///
+///   - 앞 6개 int(LEGACY_PREFIX_SIZE)는 "legacy-safe compatibility prefix"다. v1(버전 개념이
+///     아예 없던 구버전 — 첫 int를 곧바로 entries count로 읽음)과 v2+ 사이를 잇는 1회성 다리로,
+///     v1 Decoder가 이 6개를 자신의 기존 파싱 순서(count→itemCount→stoneCount→hasRemover→
+///     reforgerCount→unitCap)로 읽어도 반드시 entries 0개·인벤토리 0개·hasRemover false·
+///     reforgerCount 0·정확한 unitCap으로 안전하게 끝나도록 값을 맞춰 넣는다(2026-08 코드리뷰
+///     후속 대응, git 히스토리 기준 v1 Decode의 정확한 소비 순서로 인덱스 단위 검증 완료).
+///     v1 Decoder는 이 6개 int만 읽고 함수를 끝내므로(그 뒤는 아예 읽지 않음) data[6] 이후는
+///     v1 쪽에서 전혀 관여하지 않는다.
+///   - LEGACY_COMPAT_MAGIC(data[0]): 반드시 음수인 상수. v1 payload의 첫 int(entries count)는
+///     List.Count라 항상 0 이상이므로, 음수 MAGIC은 v1 payload와 확률이 아니라 구조적으로
+///     절대 충돌하지 않는다 — "우연히 count==2였을 때만 버전 오판"하던 이전(2026-08 1차 대응)
+///     버전만 있던 구조의 결함을 근본적으로 없앤다.
+///   - version(data[6]): CURRENT_VERSION과 다르면 Decode가 즉시 null을 반환한다(필드 밀림으로
+///     잘못된 값을 조용히 만들어내는 대신 명시적으로 실패 — BattleSnapshotCodec.CURRENT_VERSION과
+///     같은 원칙). v3 이후 레이아웃이 또 바뀌어도 이 6-int legacy prefix를 다시 늘릴 필요는 없다
+///     — v2+ Decoder는 이미 MAGIC부터 확인하므로, v2 Decoder가 v3 payload를 받아도 MAGIC은
+///     일치하고 version만 달라 정상적으로(경고 후 null) 거부된다. legacy prefix는 "버전 개념이
+///     전혀 없던 v1"과의 호환에만 필요한 값이라 한 번만 만들면 된다.
 ///   - onBoard == 1: a=q, b=r (보드 큐브 좌표; s는 -q-r로 복원)
 ///   - onBoard == 0: a=slot, b=0 (벤치 슬롯)
 ///   - itemId0/itemId1 == 0: 해당 슬롯 미장착 (BattleSnapshot.UnitEntry와 동일 의미)
@@ -24,12 +44,34 @@ using UnityEngine;
 ///   - attackRangeOverride: PokemonUnit.NoRangeOverride(-1)=오버라이드 없음, 그 외 실제 사거리값.
 ///   - heroStatMultiplier: ×100 스케일 정수(예: 1.4 → 140). 오버라이드 없는 기본값 1f는 100으로
 ///     인코딩되며, 이는 "배수 없음"과 값이 같아 의미상 자연스럽게 no-op로 복원된다.
+///   - isTradeEvolved: 0/1. PokemonUnit.isTradeEvolved 그대로 — 파트너 프리뷰가 특수진화 성급
+///     배율표(SPECIAL_STAR_MULTIPLIER)를 골라 쓰기 위해 필요(2026-08 코드리뷰 대응, 기존엔 없어서
+///     통신진화/돌진화 유닛이 항상 일반 배율로 낮게 표시됐다).
+///   - equippedStoneId: 0 = 미장착. EvolutionStoneData.id 그대로(itemId0/1과 같은 규약).
 ///   - 꼬리(인벤토리) 섹션은 유닛 배치와 무관한 플레이어 레벨 데이터라 entries 뒤에 이어 붙인다.
-///     Decode는 각 섹션 진입 전 idx가 배열 범위 안인지 확인해, 꼬리가 없는(구버전) 데이터를 받아도
-///     예외 없이 그 지점에서 멈춘다(기본값 유지) — 이번 확장 자체에는 버전 협상이 없으므로 방어용.
+///     Decode는 각 섹션 진입 전 idx가 배열 범위 안인지 확인해, 꼬리가 잘린 데이터를 받아도 예외
+///     없이 그 지점에서 멈춘다(기본값 유지) — version이 맞은 뒤의 "부분 전송"에 대한 방어이며,
+///     레이아웃 자체가 다른(구버전) 데이터는 위 version 체크가 먼저 걸러낸다.
 /// </summary>
 public class BoardSnapshot
 {
+    /// <summary>현재 페이로드 버전. 필드 추가 등으로 레이아웃이 바뀔 때마다 올린다(v1: 기존 10필드,
+    /// v2: isTradeEvolved/equippedStoneId 2필드 추가 — 2026-08 코드리뷰 대응). v3 이후로도 이
+    /// 상수만 올리면 되고, LEGACY_COMPAT_MAGIC/LEGACY_PREFIX_SIZE는 다시 건드릴 필요 없다.</summary>
+    public const int CURRENT_VERSION = 2;
+
+    /// <summary>legacy-safe prefix 식별자(data[0]). 버전 개념이 없던 v1 Decoder는 이 자리를
+    /// entries count로 읽는데, List.Count는 절대 음수가 될 수 없으므로 음수 상수를 쓰면 v1 payload와
+    /// 구조적으로 충돌 불가능하다(count가 우연히 이 값과 같아지는 시나리오 자체가 존재하지 않음).
+    /// 값 자체의 의미는 없고 "반드시 음수"라는 성질만 중요하다.</summary>
+    private const int LEGACY_COMPAT_MAGIC = -20260812;
+
+    /// <summary>legacy-safe prefix 길이(MAGIC + legacy itemCount/stoneCount/hasRemover/reforgerCount
+    /// + legacy unitCap = 6). v1 Decoder가 MAGIC을 음수 count로 읽어 entries 루프를 0회 건너뛴 뒤
+    /// 이어서 소비하는 정확히 6개 필드에 대응한다(git 히스토리 기준 v1 Decode 순서로 검증됨) — v1
+    /// Decoder는 이 6개를 다 읽으면 함수를 끝내므로 data[LEGACY_PREFIX_SIZE] 이후는 절대 읽지 않는다.</summary>
+    private const int LEGACY_PREFIX_SIZE = 6;
+
     public struct Entry
     {
         public int speciesId;
@@ -42,6 +84,8 @@ public class BoardSnapshot
         public string roleOverride;     // "" = 오버라이드 없음. PokemonUnit.roleOverride와 동일 의미.
         public int attackRangeOverride; // PokemonUnit.NoRangeOverride(-1) = 오버라이드 없음.
         public float heroStatMultiplier; // PokemonUnit.heroStatMultiplier. 기본값 1f = 배수 없음.
+        public bool isTradeEvolved;     // PokemonUnit.isTradeEvolved 그대로.
+        public int equippedStoneId;     // 0 = 미장착. EvolutionStoneData.id.
     }
 
     /// <summary>roleOverride 문자열 ↔ int[] 정수 인덱스 왕복 전용(BoardSnapshot의 int[] 단일 채널
@@ -74,7 +118,7 @@ public class BoardSnapshot
         return ROLE_OVERRIDE_TABLE[tableIndex];
     }
 
-    private const int FIELDS_PER_ENTRY = 10;
+    private const int FIELDS_PER_ENTRY = 12; // v2: 기존 10 + isTradeEvolved + equippedStoneId
 
     public readonly List<Entry> entries = new();
 
@@ -110,7 +154,9 @@ public class BoardSnapshot
                 itemId1 = EquippedItemIdAt(unit, 1),
                 roleOverride = unit.roleOverride ?? "",
                 attackRangeOverride = unit.attackRangeOverride,
-                heroStatMultiplier = unit.heroStatMultiplier
+                heroStatMultiplier = unit.heroStatMultiplier,
+                isTradeEvolved = unit.isTradeEvolved,
+                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0
             });
         }
 
@@ -130,7 +176,9 @@ public class BoardSnapshot
                 itemId1 = EquippedItemIdAt(unit, 1),
                 roleOverride = unit.roleOverride ?? "",
                 attackRangeOverride = unit.attackRangeOverride,
-                heroStatMultiplier = unit.heroStatMultiplier
+                heroStatMultiplier = unit.heroStatMultiplier,
+                isTradeEvolved = unit.isTradeEvolved,
+                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0
             });
         }
 
@@ -158,10 +206,13 @@ public class BoardSnapshot
         return unit.items[slot].id;
     }
 
-    /// <summary>RPC 전송용 int[]로 직렬화.</summary>
+    /// <summary>RPC 전송용 int[]로 직렬화. 맨 앞에 legacy-safe prefix(6-int) + CURRENT_VERSION을
+    /// 싣는다(2026-08 코드리뷰 대응, 클래스 doc의 layout/WHY 참고).</summary>
     public int[] Encode()
     {
-        int size = 1 + entries.Count * FIELDS_PER_ENTRY
+        int size = LEGACY_PREFIX_SIZE // MAGIC + legacy itemCount/stoneCount/hasRemover/reforgerCount + legacy unitCap
+                   + 1  // version
+                   + 1 + entries.Count * FIELDS_PER_ENTRY
                    + 1 + inventoryItemIds.Count
                    + 1 + inventoryStoneIds.Count
                    + 1  // hasRemover
@@ -171,6 +222,15 @@ public class BoardSnapshot
         var data = new int[size];
         int idx = 0;
 
+        // legacy-safe prefix — v1(버전 없던 구버전) Decoder 전용 미끼. 클래스 doc 참고.
+        data[idx++] = LEGACY_COMPAT_MAGIC;
+        data[idx++] = 0; // legacy itemCount → v1 Decoder가 inventoryItemIds를 비운 채 종료
+        data[idx++] = 0; // legacy stoneCount → v1 Decoder가 inventoryStoneIds를 비운 채 종료
+        data[idx++] = 0; // legacy hasRemover(false)
+        data[idx++] = 0; // legacy reforgerCount
+        data[idx++] = unitCap; // legacy unitCap — v1 Decoder가 마지막으로 읽는 필드, 실제 값을 그대로 사용
+
+        data[idx++] = CURRENT_VERSION;
         data[idx++] = entries.Count;
         foreach (var e in entries)
         {
@@ -184,6 +244,8 @@ public class BoardSnapshot
             data[idx++] = EncodeRoleOverride(e.roleOverride);
             data[idx++] = e.attackRangeOverride;
             data[idx++] = Mathf.RoundToInt(e.heroStatMultiplier * HERO_STAT_MULTIPLIER_SCALE);
+            data[idx++] = e.isTradeEvolved ? 1 : 0;
+            data[idx++] = e.equippedStoneId;
         }
 
         data[idx++] = inventoryItemIds.Count;
@@ -199,14 +261,42 @@ public class BoardSnapshot
         return data;
     }
 
-    /// <summary>RPC로 받은 int[]를 스냅샷으로 복원. 각 섹션 진입 전 idx 범위를 확인해, 꼬리가 잘린
-    /// (구버전) 데이터를 받아도 예외 없이 그 지점까지만 채우고 멈춘다.</summary>
+    /// <summary>RPC로 받은 int[]를 스냅샷으로 복원. data[0]이 LEGACY_COMPAT_MAGIC과 다르면(=v1
+    /// payload이거나 손상된 데이터) 즉시 null, legacy prefix를 건너뛴 뒤 version이 CURRENT_VERSION과
+    /// 다르면 역시 즉시 null을 반환한다 — 필드 밀림으로 잘못된 값을 만들어내는 대신 명시적으로
+    /// 실패한다(2026-08 코드리뷰 대응 — BattleSnapshotCodec.CURRENT_VERSION과 같은 원칙, 클래스 doc의
+    /// layout/WHY 참고). 호출부(NetworkManager.RPC_OnBoardSnapshot → OpponentBoardView.Render)는 이미
+    /// snap == null을 무시하고 마지막으로 렌더된 상태를 유지하므로 별도 방어 코드 없이 안전하다.
+    /// MAGIC·version이 맞은 뒤에는 각 섹션 진입 전 idx 범위를 확인해, 꼬리가 잘린 데이터를 받아도
+    /// 예외 없이 그 지점까지만 채우고 멈춘다.</summary>
     public static BoardSnapshot Decode(int[] data)
     {
         var snap = new BoardSnapshot();
         if (data == null || data.Length == 0) return snap;
 
-        int idx = 0;
+        if (data.Length < LEGACY_PREFIX_SIZE + 1) // legacy prefix(6) + version(1) 최소 헤더 길이
+        {
+            Debug.LogWarning($"[BoardSnapshot] 헤더 길이 부족({data.Length}) — 스냅샷 무시");
+            return null;
+        }
+
+        if (data[0] != LEGACY_COMPAT_MAGIC)
+        {
+            Debug.LogWarning($"[BoardSnapshot] MAGIC 불일치({data[0]}) — 구버전(v1) 또는 손상된 payload로 간주, 스냅샷 무시");
+            return null;
+        }
+
+        int idx = LEGACY_PREFIX_SIZE; // legacy-safe prefix(data[0..5], v1 Decoder 전용)는 건너뜀
+
+        int version = data[idx++];
+        if (version != CURRENT_VERSION)
+        {
+            Debug.LogWarning($"[BoardSnapshot] 지원하지 않는 버전 {version}(현재 {CURRENT_VERSION}) — 스냅샷 무시");
+            return null;
+        }
+
+        if (idx >= data.Length) return snap; // 버전만 오고 나머지가 잘린 경우 — 빈 스냅샷으로 안전 반환
+
         int count = data[idx++];
         for (int i = 0; i < count && idx + FIELDS_PER_ENTRY - 1 < data.Length; i++)
         {
@@ -221,7 +311,9 @@ public class BoardSnapshot
                 itemId1 = data[idx++],
                 roleOverride = DecodeRoleOverride(data[idx++]),
                 attackRangeOverride = data[idx++],
-                heroStatMultiplier = data[idx++] / (float)HERO_STAT_MULTIPLIER_SCALE
+                heroStatMultiplier = data[idx++] / (float)HERO_STAT_MULTIPLIER_SCALE,
+                isTradeEvolved = data[idx++] == 1,
+                equippedStoneId = data[idx++]
             });
         }
 

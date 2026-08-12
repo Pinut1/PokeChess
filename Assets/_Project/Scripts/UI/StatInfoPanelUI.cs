@@ -225,8 +225,9 @@ public class StatInfoPanelUI : MonoBehaviour
     /// 역할/사거리/스탯 배수는 영웅증강 등으로 바뀐 런타임 값(BoardSnapshot.Entry.roleOverride 등,
     /// 2026-08 확장)을 phantom에 그대로 옮겨 PokemonUnit의 기존 계산 프로퍼티(Role/Range/
     /// ComputeFinalStats)를 그대로 재사용한다 — 파치리스/이브이 같은 특정 증강을 이 UI가 직접
-    /// 분기하지 않는다. 단, 진화의 돌/통신진화 배율처럼 여전히 BoardSnapshot에 없는 정보는 반영되지
-    /// 않는다(정상 진화 기준으로 계산되므로 그런 유닛은 실제보다 낮게 나올 수 있음 — 알려진 한계).
+    /// 분기하지 않는다. 진화의 돌/통신진화 여부도 마찬가지로 BoardSnapshot.Entry(isTradeEvolved/
+    /// equippedStoneId, 2026-08 확장)에서 그대로 옮겨 IsSpecialEvolved 판정(특수 진화 배율표
+    /// 1.0/2.0/3.0)이 실제 유닛과 동일하게 적용된다.
     /// HP/마나는 UnitStatusBarHud.DrawPartnerShopBars와 동일한 근거(PokemonUnit.ResetForBattle 계약)로
     /// 항상 가득/빔으로 표시한다.
     /// </summary>
@@ -252,6 +253,8 @@ public class StatInfoPanelUI : MonoBehaviour
         phantom.roleOverride = view.roleOverride;
         phantom.attackRangeOverride = view.attackRangeOverride;
         phantom.heroStatMultiplier = view.heroStatMultiplier;
+        phantom.isTradeEvolved = view.isTradeEvolved;
+        phantom.equippedStone = view.equippedStone;
         if (view.items != null)
             foreach (ItemData item in view.items)
                 if (item != null) phantom.items.Add(item);
@@ -271,7 +274,7 @@ public class StatInfoPanelUI : MonoBehaviour
         _partnerViewMaxHp = finalMaxHp;
 
         FillStats(range, finalDefense, finalAttack, finalAttackSpeed, finalSpellPower);
-        FillItems(view.items, null); // 진화의 돌은 BoardSnapshot에 없음(이번 확장 범위 밖) — 항상 없음으로 표시
+        FillItems(view.items, view.equippedStone);
         RefreshGauges();
     }
 

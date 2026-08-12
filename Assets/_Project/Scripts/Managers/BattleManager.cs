@@ -595,11 +595,15 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 전투 결정론 정렬 기준 — q 오름차순, 같으면 r 오름차순. 전투 셋업 시점(SetupUnits 안)에만
-    /// 1회 쓰인다. BoardManager.GetBoardSnapshot()이 반환하는 Dictionary는 순회 순서를 공식
-    /// 보장하지 않아(현재는 삽입 이력에 우연히 의존), 두 클라이언트가 항상 같은 순서로
-    /// BattleUnit을 만들도록 소비 지점(BattleManager)에서만 명시 정렬한다 — 공용 API인
-    /// BoardManager.GetBoardSnapshot() 자체의 반환 순서는 바꾸지 않는다(다른 소비처 영향 회피).
+    /// 전투 결정론 정렬 기준 — q 오름차순, 같으면 r 오름차순(2026-08 코드리뷰 대응 — 실제 호출부에
+    /// 맞게 정정). 두 가지 목적으로 쓰인다:
+    /// (1) BoardManager.GetBoardSnapshot()이 반환하는 Dictionary는 순회 순서를 공식 보장하지
+    ///     않아(현재는 삽입 이력에 우연히 의존), 두 클라이언트가 항상 같은 순서로 BattleUnit을
+    ///     만들도록 소비 지점(BattleManager)에서만 명시 정렬한다 — 공용 API인
+    ///     BoardManager.GetBoardSnapshot() 자체의 반환 순서는 바꾸지 않는다(다른 소비처 영향 회피).
+    ///     SetupAllyUnits/SpawnMirrorEnemies/SpawnMutantBots/SpawnMirrorMutantBots에서 이 목적으로 쓴다.
+    /// (2) FindNextStep의 areaDist → steps 다음 마지막 순위인 결정적 tie-break(네트워크 동기화용)에서도
+    ///     쓰인다 — 전투 셋업 시점 1회성 호출이 아니다.
     /// </summary>
     private static int CompareCoords(HexCoords a, HexCoords b)
     {
@@ -1679,9 +1683,12 @@ public class BattleManager : MonoBehaviour
     /// (자기 자신이면 이동 없음 — 완전 봉쇄). 실제로 이동했을 때만 옮기기 전 좌표를
     /// _previousCoords에 남긴다 — FindNextStep이 다음 호출에서 "방금 왔던 칸으로 즉시
     /// 되돌아가는" 동일 areaDist fallback 선택만 피하는 데 쓴다(경로 캐시 아님).
-    /// moveSpeedMultiplier로 한 틱에 여러 스텝을 밟는 유닛은 SimulateTick의 반복 호출로
-    /// 스텝마다 이 함수가 다시 불려, 매 스텝 현재 위치·점유 상태 기준으로 새로 계산된다
-    /// (같은 틱 안에서도 경로를 고정하지 않고, _previousCoords도 스텝마다 갱신된다).
+    /// 이 함수는 SimulateTick 한 번(TICK_INTERVAL)당 최대 1회만 호출되고, 호출될 때마다 정확히
+    /// 한 칸만 옮긴다(2026-08 코드리뷰 대응 — 같은 틱 안에서 반복 호출되던 이전 동작 설명 정정).
+    /// moveSpeedMultiplier는 이 함수의 호출 횟수나 이동 칸수가 아니라, 호출 주기인
+    /// bu.moveCooldown의 재충전 간격(Max(0.02, _moveInterval) / moveSpeedMultiplier)에만 반영된다 —
+    /// 배율이 높을수록 여러 SimulateTick에 걸쳐 더 자주(간격이 짧게) 호출될 뿐이다. 매 호출 시점의
+    /// 현재 위치·점유 상태 기준으로 새로 계산되는 점(경로 캐시 아님)은 이전과 동일하다.
     /// </summary>
     private void MoveTowards(BattleUnit bu, BattleUnit target)
     {
@@ -1716,9 +1723,17 @@ public class BattleManager : MonoBehaviour
     /// 이 제외는 BFS 탐색(아래 이웃 확장) 자체에는 전혀 관여하지 않는다 — 직전 칸을 "지나서"
     /// 더 좋은 칸에 도달하는 경로는 그대로 탐색되고, 그 경로의 실제 firstStep이 직전 칸이
     /// 아니라면(대개 그렇다 — 직전 칸은 여기로 오기 직전 위치이므로 그 자체가 막다른 골목이
-    /// 아닌 한 그 칸을 거치지 않는 다른 진입 방향이 있다) 정상적으로 선택된다. 오직 "이번 틱에
-    /// 실제로 내딛는 첫 걸음 자체가 방금 온 칸"인 경우만 걸러지고, 그런 후보밖에 없으면(진짜
-    /// A↔B 막다른 자리) 그 자리에서 대기한다 — 되돌아가느니 대기를 우선한다.
+    /// 아닌 한 그 칸을 거치지 않는 다른 진입 방향이 있다) 정상적으로 선택된다.
+    ///
+    /// 막다른 자리 fallback(2026-08 코드리뷰 대응): "이번 틱에 실제로 내딛는 첫 걸음 자체가
+    /// 방금 온 칸"인 후보만 있는 경우, 예전에는 무조건 제자리 대기였다. 하지만 _previousCoords는
+    /// 실제 이동이 성공했을 때만 갱신되므로(MoveTowards), 대기 상태에서는 절대 갱신되지 않는다 —
+    /// 막힌 지형(그리드 경계·점유 밀집)이 그대로 유지되는 한 같은 이유로 계속 대기해 사실상
+    /// 영구 정지로 이어질 수 있었다. 그래서 backtrack 후보군을 버리지 않고 별도로 추적해뒀다가,
+    /// 진짜로 backtrack을 배제한 정상 후보가 "하나도 없을 때만"(hasBest == false) fallback으로
+    /// 사용한다 — 다른 정상 경로가 하나라도 있으면 기존과 동일하게 절대 선택되지 않으므로
+    /// A↔B 즉시 왕복 방지 목적은 그대로 유지된다. fallback도 areaDist → steps → CompareCoords
+    /// 순서의 동일한 사전식 비교로 고른다.
     /// </summary>
     private HexCoords FindNextStep(BattleUnit bu, BattleUnit target)
     {
@@ -1736,6 +1751,13 @@ public class BattleManager : MonoBehaviour
         int bestAreaDist = int.MaxValue;
         int bestSteps = int.MaxValue;
 
+        // 막다른 자리 fallback 후보 — backtrack 제외 없이 같은 기준으로 추적한다.
+        // hasBest가 끝까지 false일 때만(=정상 후보가 전혀 없을 때만) 사용한다.
+        bool hasFallback = false;
+        HexCoords fallback = default;
+        int fallbackAreaDist = int.MaxValue;
+        int fallbackSteps = int.MaxValue;
+
         while (queue.Count > 0)
         {
             HexCoords current = queue.Dequeue();
@@ -1745,25 +1767,43 @@ public class BattleManager : MonoBehaviour
             {
                 int areaDist = Mathf.Max(0, current.DistanceTo(target.coords) - bu.range);
 
-                // 지금보다 나빠지는 칸은 후보 자체가 아니고(뒷걸음 금지), firstStep이 직전 칸과
-                // 같은 후보(=이번 스텝에 바로 되돌아가는 경로)는 tier/target 무관하게 항상 제외.
-                bool isImmediateBacktrack = hasPrev && firstStep[current].Equals(prevCoords);
-                bool eligible = areaDist <= startAreaDist && !isImmediateBacktrack;
-
-                if (eligible)
+                if (areaDist <= startAreaDist)
                 {
-                    bool better;
-                    if (!hasBest) better = true;
-                    else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
-                    else if (steps != bestSteps) better = steps < bestSteps;
-                    else better = CompareCoords(current, best) < 0;
+                    // 지금보다 나빠지는 칸은 후보 자체가 아니고(뒷걸음 금지), firstStep이 직전
+                    // 칸과 같은 후보(=이번 스텝에 바로 되돌아가는 경로)는 정상 후보에서 제외한다.
+                    bool isImmediateBacktrack = hasPrev && firstStep[current].Equals(prevCoords);
 
-                    if (better)
+                    if (!isImmediateBacktrack)
                     {
-                        bestAreaDist = areaDist;
-                        bestSteps = steps;
-                        best = current;
-                        hasBest = true;
+                        bool better;
+                        if (!hasBest) better = true;
+                        else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
+                        else if (steps != bestSteps) better = steps < bestSteps;
+                        else better = CompareCoords(current, best) < 0;
+
+                        if (better)
+                        {
+                            bestAreaDist = areaDist;
+                            bestSteps = steps;
+                            best = current;
+                            hasBest = true;
+                        }
+                    }
+                    else
+                    {
+                        bool betterFallback;
+                        if (!hasFallback) betterFallback = true;
+                        else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
+                        else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
+                        else betterFallback = CompareCoords(current, fallback) < 0;
+
+                        if (betterFallback)
+                        {
+                            fallbackAreaDist = areaDist;
+                            fallbackSteps = steps;
+                            fallback = current;
+                            hasFallback = true;
+                        }
                     }
                 }
             }
@@ -1780,7 +1820,9 @@ public class BattleManager : MonoBehaviour
             }
         }
 
-        return hasBest ? firstStep[best] : bu.coords;
+        if (hasBest) return firstStep[best];
+        if (hasFallback) return firstStep[fallback];
+        return bu.coords;
     }
 
     private bool IsOccupied(HexCoords coords)

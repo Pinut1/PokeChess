@@ -2068,12 +2068,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return false;
         }
 
-        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다.
-        // TryPlaceInBench 성공(= 실제 벤치 위치 확정) 뒤에 발행해야 UnitEvolveVfx가 올바른
-        // 위치에서 재생된다(BoardManager.ExecuteMerge의 재배치→연출 순서와 동일한 원칙,
-        // 2026-08 확인 — 배치보다 먼저 발행하면 UnitFactory.Create 직후의 월드 원점에서 재생됨).
-        if (receivedUnit.isTradeEvolved) GameEvents.UnitEvolved(receivedUnit, false);
-
         /*
          * 여기까지 성공해야 유닛 소유권이 수신자에게 실제로 이동한 것이다.
          *
@@ -2141,6 +2135,23 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 );
             }
         }
+
+        // 진화체로 받은 경우에만 연출. 베이스 핸드오버는 진화가 아니다. 반드시 위 if/else if 블록
+        // (합체를 유발할 수 있는 마지막 지점 — isTradeEvolution 분기의 ApplyTradeEvolutionToOwnedUnits
+        // + board.RecheckEvolution(receivedUnit), 또는 이미 통신진화된 유닛 재전송 분기)이 전부 끝난
+        // "합체 여부가 확정된" 뒤에 발행해야 한다. TryPlaceInBench 직후(합체 확정 전)에 발행했더니
+        // (2026-08 최초 수정) 이 시점엔 아직 receivedUnit이 벤치에 살아있어 정상적으로 발행됐지만,
+        // 뒤이어 ApplyTradeEvolutionToOwnedUnits가 기존 보유 유닛들을 같은 진화체로 바꾸고
+        // board.RecheckEvolution(receivedUnit)이 그제서야 3마리 합체를 성사시켜, receivedUnit이
+        // 뒤늦게 합체 재료로 소비되고 BoardManager.ExecuteMerge가 최종 결과 유닛으로 또 한 번
+        // GameEvents.UnitEvolved를 발행하면서 벤치 위치에 중복 VFX가 남는 문제가 실측(런타임 로그)으로
+        // 확인됐다(2026-08 QA). receivedUnit이 지금(모든 합체 트리거가 끝난 뒤)도 실제로 벤치에
+        // 남아 있는지를 기존 공개 조회 API(GetUnitsInBench)로 다시 확인해, 합체로 소비됐다면
+        // (stillInBenchAfterRecheck=false) 여기서 발행하지 않는다 — 그 경우 BoardManager.ExecuteMerge가
+        // 이미 살아있는 최종 결과 유닛 기준으로 GameEvents.UnitEvolved를 발행했다.
+        bool stillInBenchAfterRecheck = board.GetUnitsInBench().Contains(receivedUnit);
+        if (stillInBenchAfterRecheck && receivedUnit != null && receivedUnit.isTradeEvolved)
+            GameEvents.UnitEvolved(receivedUnit, false);
 
         /*
          * 유닛 생성, 장비 복원, 진화 상태 복원, 벤치 배치가
@@ -2280,6 +2291,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         unit.data = evolvedData;
         unit.isTradeEvolved = true;
+        unit.RefreshVisual(); // data(종) 변경 직후 모델 갱신 — PokemonUnit.TryEquipStone과 동일 관례
+                               // (2026-08 QA 확인: 이게 없으면 데이터는 진화체로 바뀌어도 화면 모델은
+                               // 그대로 남는다. ExecuteMerge도 새 유닛 생성 뒤 RefreshVisual을 호출함).
         unit.ResetForBattle();
 
         return true;
