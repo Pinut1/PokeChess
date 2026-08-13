@@ -30,6 +30,10 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+
+        if (!IsQaBuildDefined(report.summary.platform)) return;
+
+
         string outputPath = report.summary.outputPath;
         if (string.IsNullOrEmpty(outputPath))
         {
@@ -45,14 +49,33 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+        if (!File.Exists(outputPath) || File.GetLastWriteTimeUtc(outputPath) < report.summary.buildStartedAt)
+        {
+            Debug.LogWarning($"[QaLauncherBatchGenerator] 빌드 산출물이 이번 빌드로 갱신되지 않아 QA BAT를 생성하지 않습니다. outputPath={outputPath}");
+            return;
+        }
+
         WriteLauncherBat(exeDirectory, "QA_Client_A.bat", exeFileName, "A");
         WriteLauncherBat(exeDirectory, "QA_Client_B.bat", exeFileName, "B");
+    }
+
+    /// <summary>빌드 대상 그룹의 Scripting Define Symbols에 "QA_BUILD"가 있는지 확인한다.</summary>
+    private static bool IsQaBuildDefined(BuildTarget platform)
+    {
+        var namedBuildTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(platform));
+        string defineSymbols = PlayerSettings.GetScriptingDefineSymbols(namedBuildTarget);
+        foreach (string symbol in defineSymbols.Split(';'))
+        {
+            if (symbol == "QA_BUILD") return true;
+        }
+        return false;
     }
 
     private static void WriteLauncherBat(string directory, string batFileName, string exeFileName, string qaSlot)
     {
         string batPath = Path.Combine(directory, batFileName);
-        string content = $"@echo off\r\nstart \"\" \"%~dp0{exeFileName}\" -qaClient={qaSlot}\r\n";
+        string escapedExeFileName = exeFileName.Replace("%", "%%");
+        string content = $"@echo off\r\nstart \"\" \"%~dp0{escapedExeFileName}\" -qaClient={qaSlot}\r\n";
 
         try
         {
