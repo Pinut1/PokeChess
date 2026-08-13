@@ -30,7 +30,9 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+
         if (!IsQaBuildDefined(report.summary.platform)) return;
+
 
         string outputPath = report.summary.outputPath;
         if (string.IsNullOrEmpty(outputPath))
