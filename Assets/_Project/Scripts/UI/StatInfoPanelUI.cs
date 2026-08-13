@@ -667,7 +667,10 @@ public class StatInfoPanelUI : MonoBehaviour
             // 진화의 돌/통신진화/영웅증강 배율은 BoardSnapshot에 없어 반영되지 않을 수 있다(알려진 한계).
             maxHp = _partnerViewMaxHp;
             hp = maxHp;
-            maxMana = _partnerView.Value.species != null ? _partnerView.Value.species.manaCost : 0;
+            // 종의 원본 manaCost가 아니라 effectiveManaCost(PokemonUnit.EffectiveManaCost가 BoardSnapshot을
+            // 타고 그대로 전달된 값)를 써야 영웅증강으로 스킬을 주입받은 유닛(원본 종 manaCost=0)도
+            // 정확히 마나 게이지가 뜬다(2026-08 코드리뷰 대응 — UnitStatusBarHud.DrawPartnerShopBars와 동일 원인).
+            maxMana = _partnerView.Value.effectiveManaCost;
             mana = 0f;
         }
         else return;
