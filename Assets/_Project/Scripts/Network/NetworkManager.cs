@@ -1381,6 +1381,109 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         );
     }
 
+    /// <summary>
+    /// QA 패널의 "특정 종 지급" 버튼이 호출하는 공개 진입점. RequestSharedDebugUnitByCost와 동일한
+    /// authority 규칙(MasterClient가 실제 차감 → 결과 회신 → 요청자가 로컬 생성)이되, 코스트 무작위
+    /// 선택이 아니라 지정한 pokemonId 하나만 다룬다.
+    /// </summary>
+    public bool RequestSharedDebugUnitBySpecies(int pokemonId)
+    {
+        if (!UsesSharedShopPool) return false;
+        if (pokemonId <= 0) return false;
+
+        int actorNumber =
+            PhotonNetwork.LocalPlayer != null
+                ? PhotonNetwork.LocalPlayer.ActorNumber
+                : 0;
+
+        if (actorNumber <= 0) return false;
+
+        if (IsMasterClient)
+        {
+            ProcessSharedDebugUnitBySpecies(actorNumber, pokemonId);
+        }
+        else
+        {
+            photonView.RPC(
+                nameof(RPC_RequestSharedDebugUnitBySpecies),
+                RpcTarget.MasterClient,
+                pokemonId
+            );
+        }
+
+        return true;
+    }
+
+    /// <summary>비마스터 클라이언트의 QA 지정 종 획득 요청을 MasterClient가 수신한다.</summary>
+    [PunRPC]
+    private void RPC_RequestSharedDebugUnitBySpecies(int pokemonId, PhotonMessageInfo info)
+    {
+        if (!IsMasterClient || info.Sender == null) return;
+        ProcessSharedDebugUnitBySpecies(info.Sender.ActorNumber, pokemonId);
+    }
+
+    /// <summary>
+    /// MasterClient가 지정 종의 공용 풀 재고를 확인·차감한다. ProcessSharedDebugUnitByCost와 동일한
+    /// 흐름이되 코스트 무작위 선택 없이 지정 pokemonId 하나만 다룬다.
+    /// </summary>
+    private void ProcessSharedDebugUnitBySpecies(int actorNumber, int pokemonId)
+    {
+        if (!IsMasterClient) return;
+
+        Player target =
+            PhotonNetwork.CurrentRoom != null
+                ? PhotonNetwork.CurrentRoom.GetPlayer(actorNumber)
+                : null;
+
+        if (target == null)
+        {
+            Debug.LogWarning($"[SharedShopPool][QA] 요청 플레이어를 찾을 수 없음: actor={actorNumber}");
+            return;
+        }
+
+        ShopManager shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        PokemonData data =
+            PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetById(pokemonId) : null;
+
+        bool success = shop != null && data != null && shop.TryAuthorityTakeDebugUnitBySpecies(data);
+
+        // 먼저 요청자에게 결과를 전달한다. 요청자는 로컬 ShopManager에서 실제 벤치 생성을 시도하고,
+        // 생성/배치에 실패하면 RequestSharedShopReturn(pokemonId, 1)으로 카피를 다시 반환한다.
+        photonView.RPC(
+            nameof(RPC_ResolveSharedDebugUnitBySpecies),
+            target,
+            pokemonId,
+            success
+        );
+
+        if (!success)
+        {
+            Debug.LogWarning($"[SharedShopPool][QA] 지정 종(id={pokemonId}) 획득 실패 — 남은 공용 풀 없음 또는 처리 실패");
+            return;
+        }
+
+        BroadcastSharedPoolMirror(-1, 0, System.Array.Empty<int>());
+
+        Debug.Log($"[SharedShopPool][QA] actor={actorNumber}, 지정 종 지급 승인, pokemonId={pokemonId}");
+    }
+
+    /// <summary>MasterClient가 확인·차감한 QA 지정 종의 결과를 요청한 클라이언트가 수신한다.
+    /// 실제 생성과 벤치 배치는 로컬 ShopManager가 처리한다.</summary>
+    [PunRPC]
+    private void RPC_ResolveSharedDebugUnitBySpecies(int pokemonId, bool success)
+    {
+        ShopManager shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+
+        if (shop == null)
+        {
+            if (success && pokemonId > 0) RequestSharedShopReturn(pokemonId, 1);
+            Debug.LogError("[SharedShopPool][QA] ShopManager 없음 — QA 유닛 생성 불가");
+            return;
+        }
+
+        shop.ResolveSharedDebugUnitBySpecies(pokemonId, success);
+    }
+
     private void BroadcastSharedPoolMirror(int actorNumber, int revision, int[] slots)
     {
         if (!IsMasterClient) return;
@@ -3778,6 +3881,10 @@ public class NetworkManager : MonoBehaviour
     /// ShopManager가 로컬 풀 직접 획득 방식으로 처리한다.
     /// </summary>
     public bool RequestSharedDebugUnitByCost(int cost) => false;
+
+    /// <summary>오프라인에서는 공유 풀이 없으므로 false(실구현과 동일 공개 API 유지용 스텁).
+    /// ShopManager가 로컬 풀 직접 획득 방식으로 처리한다.</summary>
+    public bool RequestSharedDebugUnitBySpecies(int pokemonId) => false;
 
     /// <summary>오프라인(1인)은 씬 로드 즉시 라운드 1 시작.</summary>
     public void NotifySceneReady()              => BroadcastRoundStart(1);

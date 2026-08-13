@@ -658,8 +658,20 @@ public class QAManager : MonoBehaviour
         DrawBenchQuickSellButton();
 
         GUILayout.Space(10f);
-        GUILayout.Label("A-1. 영웅증강 QA — 이브이/파치리스 (정식 HeroAugment.Tag() 재사용)");
-        DrawHeroAugmentButtons();
+        GUILayout.Label("A-1. 증강 대상 유닛 QA 지급 — 이브이/파치리스 (반복 지급으로 실제 합체 재현)");
+        DrawHeroUnitGrantButtons();
+
+        GUILayout.Space(10f);
+        GUILayout.Label("A-2. 진화의 돌 QA 기본 종 지급 (EvolutionStoneDatabase에서 자동 계산, 돌 자체는 Item 탭)");
+        DrawEvolutionStoneBaseGrantButtons();
+
+        GUILayout.Space(10f);
+        GUILayout.Label("A-3. 통신진화 QA 기본 종 지급 (TradeEvolutionData에서 자동 계산, 최종 진화체 아님)");
+        DrawTradeEvolutionBaseGrantButtons();
+
+        GUILayout.Space(10f);
+        GUILayout.Label("A-4. 증강 QA — 정식 AugmentManager.SelectAugment() 재사용");
+        DrawAugmentQaButtons();
 
         GUILayout.Space(10f);
         GUILayout.Label("B. 조회 모드");
@@ -736,76 +748,202 @@ public class QAManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 영웅증강 QA — 대상 종(이브이/파치리스) 지급 + 정식 HeroAugment 적용. 랜덤 등장을 기다리지 않고
-    /// 재현하는 용도. 성급은 여기서 강제하지 않는다 — 지급 버튼을 반복 눌러 실제 BoardManager
-    /// 3합체 로직으로 별을 올린다(2026-08 QA 정리: 별도 강제 로직 없이 정식 경로만 재사용).
+    /// 영웅증강 대상 종(이브이/파치리스) 1마리 QA 지급. 랜덤 상점을 오래 돌리지 않고 재현하는 용도.
+    /// 여러 마리가 필요하면 버튼을 반복 눌러 실제 BoardManager 3합체 로직을 그대로 태운다(성급 강제 없음).
     /// </summary>
-    private void DrawHeroAugmentButtons()
+    private void DrawHeroUnitGrantButtons()
     {
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("이브이 지급", GUILayout.Width(COST_CELL_WIDTH)))
-            GiveHeroUnitToBench("Eevee", "이브이");
-        if (GUILayout.Button("이브이 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
-            ApplyHeroAugmentToAll(new HeroEeveeAugment(), "Eevee", "이브이");
-        GUILayout.EndHorizontal();
-
-        GUILayout.BeginHorizontal();
+            GiveSpecificUnitByNameEn("Eevee", "이브이");
         if (GUILayout.Button("파치리스 지급", GUILayout.Width(COST_CELL_WIDTH)))
-            GiveHeroUnitToBench("Pachirisu", "파치리스");
-        if (GUILayout.Button("파치리스 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
-            ApplyHeroAugmentToAll(new HeroPachirisuAugment(), "Pachirisu", "파치리스");
+            GiveSpecificUnitByNameEn("Pachirisu", "파치리스");
         GUILayout.EndHorizontal();
     }
 
-    /// <summary>PokemonDatabase.GetByNameEn + UnitFactory.Create + BoardManager.TryPlaceInBench — 전부
-    /// 정식 공개 API. 상점 풀은 차감하지 않는다(보상 지급과 동일 규칙).</summary>
-    private void GiveHeroUnitToBench(string speciesNameEn, string label)
+    /// <summary>
+    /// EvolutionStoneDatabase.all의 각 돌이 가진 mappings(targetPokemon)을 순회해 진화의 돌 대상
+    /// 기본 종을 자동으로 모은다(중복 제거). QA 코드에 종 이름을 하드코딩하지 않는다 — 데이터가
+    /// 바뀌면 버튼 목록도 자동으로 바뀐다.
+    /// </summary>
+    private void DrawEvolutionStoneBaseGrantButtons()
     {
-        string action = $"{label} QA 지급";
-        if (!GameManager.TryGet(out var gm) || gm.Board == null)
-        {
-            LogFailure(action, "GameManager/BoardManager 연결 안 됨");
-            return;
-        }
-
-        PokemonData data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(speciesNameEn) : null;
-        if (data == null) { LogFailure(action, "PokemonData를 찾지 못함"); return; }
-        if (!gm.Board.HasBenchSpace()) { LogFailure(action, "벤치가 가득 참"); return; }
-
-        PokemonUnit unit = UnitFactory.Create(data);
-        if (unit == null || !gm.Board.TryPlaceInBench(unit))
-        {
-            if (unit != null) Destroy(unit.gameObject);
-            LogFailure(action, "벤치 배치 실패");
-            return;
-        }
-
-        LogSuccess(action, "1마리 지급(상점 풀 미차감)");
+        DrawSpeciesGrantButtonGrid(GetEvolutionStoneBaseSpecies());
     }
 
-    /// <summary>보유 중인 대상 종 전부에 정식 HeroAugment.Tag()를 태운다(OnUnitBenched는 Augment의
-    /// 공개 상속 메서드 — protected Tag()로 이어짐). role/배율/사거리/VFX/마나비용을 QA에 다시
-    /// 적지 않는다 — HeroEeveeAugment/HeroPachirisuAugment가 소유한 값을 그대로 재사용.</summary>
-    private void ApplyHeroAugmentToAll(HeroAugment augment, string speciesNameEn, string label)
+    /// <summary>
+    /// TradeEvolutionData.mappings(통신진화 직접 대상)마다 PokemonDatabase에서 evolvesIntoEn으로
+    /// 역추적한 "가장 초기 기본 종"을 자동으로 모은다(역추적 대상이 없으면 직접 대상 자신). 최종
+    /// 특수진화체(크로뱃 등)는 지급하지 않는다 — 자연 합체/통신진화 흐름 전체를 검증하기 위함.
+    /// </summary>
+    private void DrawTradeEvolutionBaseGrantButtons()
     {
-        string action = $"{label} 영웅증강 적용";
-        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+        DrawSpeciesGrantButtonGrid(GetTradeEvolutionBaseSpecies());
+    }
+
+    /// <summary>종 목록을 한 줄에 4개씩 지급 버튼으로 그린다(공용 레이아웃 — 두 섹션이 공유).</summary>
+    private void DrawSpeciesGrantButtonGrid(IEnumerable<PokemonData> species)
+    {
+        const int perRow = 4;
+        int count = 0;
+
+        foreach (PokemonData data in species)
         {
-            LogFailure(action, "GameManager/BoardManager 연결 안 됨");
+            if (data == null) continue;
+            if (count % perRow == 0) GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button(data.pokemonName, GUILayout.Width(COST_CELL_WIDTH)))
+                GiveSpecificUnit(data);
+
+            count++;
+            if (count % perRow == 0) GUILayout.EndHorizontal();
+        }
+
+        if (count == 0) GUILayout.Label("(대상 종 없음 — 데이터베이스 확인 필요)");
+        else if (count % perRow != 0) GUILayout.EndHorizontal();
+    }
+
+    /// <summary>진화의 돌마다 mappings에 있는 targetPokemon 영문명을 PokemonDatabase에서 조회해
+    /// 중복 없이 모은다.</summary>
+    private static IEnumerable<PokemonData> GetEvolutionStoneBaseSpecies()
+    {
+        var db = EvolutionStoneDatabase.Instance;
+        var pdb = PokemonDatabase.Instance;
+        if (db == null || pdb == null) yield break;
+
+        var seen = new HashSet<PokemonData>();
+        foreach (EvolutionStoneData stone in db.all)
+        {
+            if (stone?.mappings == null) continue;
+            foreach (EvolutionMapping m in stone.mappings)
+            {
+                PokemonData data = pdb.GetByNameEn(m.targetPokemon);
+                if (data != null && seen.Add(data)) yield return data;
+            }
+        }
+    }
+
+    /// <summary>통신진화 매핑마다 직접 대상 종을 구하고, PokemonDatabase 전체를 evolvesIntoEn 기준으로
+    /// 역탐색해 자연진화로 그 종이 되는 가장 초기 기본 종을 찾는다(없으면 직접 대상 자신을 기본 종으로 본다).</summary>
+    private static IEnumerable<PokemonData> GetTradeEvolutionBaseSpecies()
+    {
+        TradeEvolutionData td = TradeEvolutionData.Instance;
+        PokemonDatabase pdb = PokemonDatabase.Instance;
+        if (td == null || pdb == null) yield break;
+
+        var seen = new HashSet<PokemonData>();
+        foreach (TradeEvolutionMapping mapping in td.mappings)
+        {
+            PokemonData directTarget = pdb.GetByNameEn(mapping.targetPokemonEn);
+            if (directTarget == null) continue;
+
+            PokemonData baseSpecies = FindNaturalPreEvolution(pdb, directTarget) ?? directTarget;
+            if (seen.Add(baseSpecies)) yield return baseSpecies;
+        }
+    }
+
+    private static PokemonData FindNaturalPreEvolution(PokemonDatabase pdb, PokemonData target)
+    {
+        foreach (PokemonData p in pdb.all)
+            if (p != null && string.Equals(p.evolvesIntoEn, target.pokemonNameEn, System.StringComparison.OrdinalIgnoreCase))
+                return p;
+        return null;
+    }
+
+    private void GiveSpecificUnitByNameEn(string speciesNameEn, string label)
+    {
+        PokemonData data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(speciesNameEn) : null;
+        if (data == null) { LogFailure($"{label} QA 지급", "PokemonData를 찾지 못함"); return; }
+        GiveSpecificUnit(data);
+    }
+
+    /// <summary>ShopManager.DebugGrantSpecificUnit(data) — 코스트별 랜덤 지급(HandleGrantByCost)과
+    /// 동일하게 실제 공용 풀을 차감하는 정식 경로를 그대로 쓴다. 풀 차감/복원 로직을 QA에 복제하지
+    /// 않는다.</summary>
+    private void GiveSpecificUnit(PokemonData data)
+    {
+        string action = $"{data.pokemonName} QA 지급";
+        if (!GameManager.TryGet(out var gm) || gm.Shop == null)
+        {
+            LogFailure(action, "GameManager/ShopManager 연결 안 됨");
             return;
         }
 
-        int applied = 0;
-        foreach (var unit in CombinedUnits(gm.Board))
+        bool success = gm.Shop.DebugGrantSpecificUnit(data);
+        if (success)
         {
-            if (unit == null || unit.data == null) continue;
-            if (!string.Equals(unit.data.pokemonNameEn, speciesNameEn, System.StringComparison.OrdinalIgnoreCase)) continue;
-            augment.OnUnitBenched(unit);
-            applied++;
+            LogSuccess(action, "1마리 지급(공용 풀 차감)");
+            _poolComputed = false;
+            _poolPending = true;
+            StartCoroutine(DelayedPoolRefresh());
+        }
+        else
+        {
+            LogFailure(action, "지급 실패(풀 소진 또는 벤치 만원 — 콘솔 로그 참고)");
+        }
+    }
+
+    /// <summary>
+    /// 현재 선택 가능한 증강 6종(AugmentCatalog.All) 전부를 QA에서 즉시 적용한다. 일반 4종 +
+    /// 영웅증강 2종 모두 같은 ApplyAugmentById 하나로 처리 — 증강별 수치를 QA에 옮겨 적지 않는다.
+    /// </summary>
+    private void DrawAugmentQaButtons()
+    {
+        GUILayout.Label("일반 증강");
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("골드를 획득했다!", GUILayout.Width(COST_CELL_WIDTH * 1.4f)))
+            ApplyAugmentById(AugmentId.EconomyGold, "골드를 획득했다!");
+        if (GUILayout.Button("구독서비스", GUILayout.Width(COST_CELL_WIDTH * 1.4f)))
+            ApplyAugmentById(AugmentId.EconomyShop, "구독서비스");
+        if (GUILayout.Button("하이퍼 티켓", GUILayout.Width(COST_CELL_WIDTH * 1.4f)))
+            ApplyAugmentById(AugmentId.RerollTicket, "하이퍼 티켓");
+        if (GUILayout.Button("진화 스페셜리스트", GUILayout.Width(COST_CELL_WIDTH * 1.4f)))
+            ApplyAugmentById(AugmentId.GambleStone, "진화 스페셜리스트");
+        GUILayout.EndHorizontal();
+
+        GUILayout.Label("영웅증강 (대상 유닛은 위 A-1 지급 버튼 사용)");
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("이브이 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
+            ApplyAugmentById(AugmentId.HeroEevee, "이브이 영웅증강");
+        if (GUILayout.Button("파치리스 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
+            ApplyAugmentById(AugmentId.HeroPachirisu, "파치리스 영웅증강");
+        GUILayout.EndHorizontal();
+    }
+
+    /// <summary>
+    /// AugmentCatalog에서 augmentId로 AugmentData를 찾아 AugmentManager.SelectAugment()를 그대로
+    /// 호출한다 — 정식 3택1 선택과 완전히 같은 경로(AugmentFactory 생성 → Apply → 활성 목록 편입 →
+    /// GameEvents.AugmentSelected 발행). 중복 선택 방지·최대 보유 수 제한도 SelectAugment 자체가
+    /// 처리하므로 QA가 따로 검사하지 않는다.
+    /// </summary>
+    private void ApplyAugmentById(AugmentId id, string label)
+    {
+        string action = $"{label} 적용";
+        if (!GameManager.TryGet(out var gm) || gm.Augment == null)
+        {
+            LogFailure(action, "GameManager/AugmentManager 연결 안 됨");
+            return;
         }
 
-        if (applied > 0) LogSuccess(action, $"{applied}마리");
-        else LogFailure(action, $"보유한 {label} 없음");
+        AugmentData data = null;
+        foreach (var d in AugmentCatalog.All)
+            if (d != null && d.augmentId == id) { data = d; break; }
+        if (data == null) { LogFailure(action, "AugmentCatalog에 없음"); return; }
+
+        bool ownedBefore = IsAugmentOwned(gm, id);
+        gm.Augment.SelectAugment(data);
+        bool ownedAfter = IsAugmentOwned(gm, id);
+
+        if (!ownedBefore && ownedAfter) LogSuccess(action, "정식 경로로 적용 완료");
+        else if (ownedBefore) LogFailure(action, "이미 보유 중(중복 선택 무시)");
+        else LogFailure(action, "적용 실패(최대 보유 수 초과 등 — 콘솔 참고)");
+    }
+
+    private static bool IsAugmentOwned(GameManager gm, AugmentId id)
+    {
+        foreach (var a in gm.Augment.ActiveAugments)
+            if (a?.Data != null && a.Data.augmentId == id) return true;
+        return false;
     }
 
     /// <summary>
