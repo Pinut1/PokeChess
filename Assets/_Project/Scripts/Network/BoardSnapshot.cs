@@ -10,9 +10,10 @@ using UnityEngine;
 /// 전체화면 관전에 장착 아이템/인벤토리를 보여주기 위해 최소한으로 확장했다(2026-08).
 ///
 /// PUN2 RPC는 int[] 같은 기본 배열을 그대로 직렬화하므로 커스텀 타입 등록 없이 전송 가능.
-/// 인코딩(v2, 2026-08 코드리뷰 대응): [MAGIC, 0, 0, 0, 0, unitCap(legacy용 사본), version, count,
+/// 인코딩(v3, 2026-08 파트너 마나바 수정 대응): [MAGIC, 0, 0, 0, 0, unitCap(legacy용 사본), version, count,
 ///          (speciesId, starLevel, onBoard, a, b, itemId0, itemId1, roleOverride,
-///          attackRangeOverride, heroStatMultiplier, isTradeEvolved, equippedStoneId) × count,
+///          attackRangeOverride, heroStatMultiplier, isTradeEvolved, equippedStoneId,
+///          effectiveManaCost) × count,
 ///          invItemCount, itemId × invItemCount, invStoneCount, stoneId × invStoneCount,
 ///          hasRemover(0/1), reforgerCount, unitCap]
 ///
@@ -48,6 +49,9 @@ using UnityEngine;
 ///     배율표(SPECIAL_STAR_MULTIPLIER)를 골라 쓰기 위해 필요(2026-08 코드리뷰 대응, 기존엔 없어서
 ///     통신진화/돌진화 유닛이 항상 일반 배율로 낮게 표시됐다).
 ///   - equippedStoneId: 0 = 미장착. EvolutionStoneData.id 그대로(itemId0/1과 같은 규약).
+///   - effectiveManaCost: PokemonUnit.EffectiveManaCost 그대로. 0 = 마나바 없음(스킬 없음), 그 외 값이면
+///     파트너 프리뷰가 마나바를 표시한다(2026-08 코드리뷰 대응 — 기존엔 없어서 영웅증강으로 스킬을
+///     주입받은 유닛(원본 종 manaCost=0)의 파트너 쇼핑 프리뷰에 마나바가 아예 안 뜨는 문제가 있었다).
 ///   - 꼬리(인벤토리) 섹션은 유닛 배치와 무관한 플레이어 레벨 데이터라 entries 뒤에 이어 붙인다.
 ///     Decode는 각 섹션 진입 전 idx가 배열 범위 안인지 확인해, 꼬리가 잘린 데이터를 받아도 예외
 ///     없이 그 지점에서 멈춘다(기본값 유지) — version이 맞은 뒤의 "부분 전송"에 대한 방어이며,
@@ -56,9 +60,10 @@ using UnityEngine;
 public class BoardSnapshot
 {
     /// <summary>현재 페이로드 버전. 필드 추가 등으로 레이아웃이 바뀔 때마다 올린다(v1: 기존 10필드,
-    /// v2: isTradeEvolved/equippedStoneId 2필드 추가 — 2026-08 코드리뷰 대응). v3 이후로도 이
-    /// 상수만 올리면 되고, LEGACY_COMPAT_MAGIC/LEGACY_PREFIX_SIZE는 다시 건드릴 필요 없다.</summary>
-    public const int CURRENT_VERSION = 2;
+    /// v2: isTradeEvolved/equippedStoneId 2필드 추가, v3: effectiveManaCost 1필드 추가(2026-08
+    /// 파트너 마나바 표시 오류 대응) — 전부 2026-08 코드리뷰 대응). v4 이후로도 이 상수만 올리면
+    /// 되고, LEGACY_COMPAT_MAGIC/LEGACY_PREFIX_SIZE는 다시 건드릴 필요 없다.</summary>
+    public const int CURRENT_VERSION = 3;
 
     /// <summary>legacy-safe prefix 식별자(data[0]). 버전 개념이 없던 v1 Decoder는 이 자리를
     /// entries count로 읽는데, List.Count는 절대 음수가 될 수 없으므로 음수 상수를 쓰면 v1 payload와
@@ -86,6 +91,7 @@ public class BoardSnapshot
         public float heroStatMultiplier; // PokemonUnit.heroStatMultiplier. 기본값 1f = 배수 없음.
         public bool isTradeEvolved;     // PokemonUnit.isTradeEvolved 그대로.
         public int equippedStoneId;     // 0 = 미장착. EvolutionStoneData.id.
+        public int effectiveManaCost;   // PokemonUnit.EffectiveManaCost 그대로. 0 = 마나바 없음.
     }
 
     /// <summary>roleOverride 문자열 ↔ int[] 정수 인덱스 왕복 전용(BoardSnapshot의 int[] 단일 채널
@@ -118,7 +124,7 @@ public class BoardSnapshot
         return ROLE_OVERRIDE_TABLE[tableIndex];
     }
 
-    private const int FIELDS_PER_ENTRY = 12; // v2: 기존 10 + isTradeEvolved + equippedStoneId
+    private const int FIELDS_PER_ENTRY = 13; // v3: 기존 10 + isTradeEvolved + equippedStoneId + effectiveManaCost
 
     public readonly List<Entry> entries = new();
 
@@ -156,7 +162,8 @@ public class BoardSnapshot
                 attackRangeOverride = unit.attackRangeOverride,
                 heroStatMultiplier = unit.heroStatMultiplier,
                 isTradeEvolved = unit.isTradeEvolved,
-                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0
+                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0,
+                effectiveManaCost = unit.EffectiveManaCost
             });
         }
 
@@ -178,7 +185,8 @@ public class BoardSnapshot
                 attackRangeOverride = unit.attackRangeOverride,
                 heroStatMultiplier = unit.heroStatMultiplier,
                 isTradeEvolved = unit.isTradeEvolved,
-                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0
+                equippedStoneId = unit.equippedStone != null ? unit.equippedStone.id : 0,
+                effectiveManaCost = unit.EffectiveManaCost
             });
         }
 
@@ -246,6 +254,7 @@ public class BoardSnapshot
             data[idx++] = Mathf.RoundToInt(e.heroStatMultiplier * HERO_STAT_MULTIPLIER_SCALE);
             data[idx++] = e.isTradeEvolved ? 1 : 0;
             data[idx++] = e.equippedStoneId;
+            data[idx++] = e.effectiveManaCost;
         }
 
         data[idx++] = inventoryItemIds.Count;
@@ -313,7 +322,8 @@ public class BoardSnapshot
                 attackRangeOverride = data[idx++],
                 heroStatMultiplier = data[idx++] / (float)HERO_STAT_MULTIPLIER_SCALE,
                 isTradeEvolved = data[idx++] == 1,
-                equippedStoneId = data[idx++]
+                equippedStoneId = data[idx++],
+                effectiveManaCost = data[idx++]
             });
         }
 

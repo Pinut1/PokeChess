@@ -663,11 +663,14 @@ public class StatInfoPanelUI : MonoBehaviour
             // 종료 시 같은 메서드를 호출하는 것을 근거로, 쇼핑 단계에 존재하는 어떤 유닛이든
             // 이 상태를 벗어나지 않는다(UnitStatusBarHud.DrawPartnerShopBars와 동일 근거 — 임의
             // 가정이 아니라 실제 게임 규칙) — 그래서 항상 가득 찬 것으로 표시한다.
-            // maxHp는 Bind에서 phantom PokemonUnit으로 미리 계산해 캐시해둔 값(_partnerViewMaxHp) —
-            // 진화의 돌/통신진화/영웅증강 배율은 BoardSnapshot에 없어 반영되지 않을 수 있다(알려진 한계).
+            // maxHp는 Bind에서 phantom PokemonUnit(진화의 돌/통신진화/영웅증강 값 포함)으로
+            // 미리 계산해 캐시해둔 값(_partnerViewMaxHp).
             maxHp = _partnerViewMaxHp;
             hp = maxHp;
-            maxMana = _partnerView.Value.species != null ? _partnerView.Value.species.manaCost : 0;
+            // 종의 원본 manaCost가 아니라 effectiveManaCost(PokemonUnit.EffectiveManaCost가 BoardSnapshot을
+            // 타고 그대로 전달된 값)를 써야 영웅증강으로 스킬을 주입받은 유닛(원본 종 manaCost=0)도
+            // 정확히 마나 게이지가 뜬다(2026-08 코드리뷰 대응 — UnitStatusBarHud.DrawPartnerShopBars와 동일 원인).
+            maxMana = _partnerView.Value.effectiveManaCost;
             mana = 0f;
         }
         else return;

@@ -43,10 +43,14 @@ public class OpponentBoardView : MonoBehaviour
         /// <summary>장착 중인 진화의 돌(BoardSnapshot.Entry.equippedStoneId를 EvolutionStoneDatabase로 해석).
         /// 미장착이면 null.</summary>
         public readonly EvolutionStoneData equippedStone;
+        /// <summary>PokemonUnit.EffectiveManaCost(BoardSnapshot.Entry.effectiveManaCost 그대로). 0이면
+        /// 마나바를 표시하지 않는다 — 영웅증강으로 스킬을 주입받은 유닛(원본 종 manaCost=0)도 정확히
+        /// 반영하기 위해 종의 manaCost 대신 이 값을 쓴다.</summary>
+        public readonly int effectiveManaCost;
 
         public PartnerBoardUnitView(Transform visual, PokemonData species, int starLevel, IReadOnlyList<ItemData> items,
                                     string roleOverride, int attackRangeOverride, float heroStatMultiplier,
-                                    bool isTradeEvolved, EvolutionStoneData equippedStone)
+                                    bool isTradeEvolved, EvolutionStoneData equippedStone, int effectiveManaCost)
         {
             this.visual = visual;
             this.species = species;
@@ -57,6 +61,7 @@ public class OpponentBoardView : MonoBehaviour
             this.heroStatMultiplier = heroStatMultiplier;
             this.isTradeEvolved = isTradeEvolved;
             this.equippedStone = equippedStone;
+            this.effectiveManaCost = effectiveManaCost;
         }
     }
 
@@ -322,7 +327,7 @@ public class OpponentBoardView : MonoBehaviour
             _active.Add((poolKey, go));
             _activeUnitViews.Add(new PartnerBoardUnitView(go.transform, data, e.starLevel, ResolveEquippedItems(e),
                 e.roleOverride, e.attackRangeOverride, e.heroStatMultiplier,
-                e.isTradeEvolved, ResolveEquippedStone(e)));
+                e.isTradeEvolved, ResolveEquippedStone(e), e.effectiveManaCost));
         }
     }
 

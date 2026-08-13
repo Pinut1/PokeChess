@@ -132,7 +132,7 @@ public class UnitStatusBarHud : MonoBehaviour
             float maxHp = unit.MaxHp;
             float hp = maxHp > 0f ? unit.currentHp / maxHp : 0f;
 
-            float maxMana = unit.data.manaCost;
+            float maxMana = unit.EffectiveManaCost;
             float mana = maxMana > 0f ? unit.currentMana / maxMana : -1f;
 
             if (Place(used, unit.transform.position, hp, mana, true, maxHp,
@@ -277,13 +277,14 @@ public class UnitStatusBarHud : MonoBehaviour
     /// 전투 종료 시 같은 메서드로 되돌리므로, 쇼핑 단계에 관찰되는 어떤 PokemonUnit도 이 상태를
     /// 벗어나지 않는다(내 로컬 유닛의 쇼핑 단계 바도 UnitStatusBarHud.DrawUnitList에서 unit.currentHp/
     /// MaxHp·unit.currentMana를 그대로 읽을 뿐이고, 그 값이 이 규칙 때문에 항상 가득/빔으로 나온다 —
-    /// 여기서는 그 결과를 상수로 대신할 뿐 계산 기준 자체는 로컬과 동일하다). 마나 바 표시 여부만은
-    /// 종의 실제 manaCost(스킬 보유 여부)로 판정한다 — 이건 유닛마다 달라 가정할 수 없는 값이라
-    /// OpponentBoardView가 넘겨준 PokemonData(species)로 직접 확인한다.
+    /// 여기서는 그 결과를 상수로 대신할 뿐 계산 기준 자체는 로컬과 동일하다). 마나 바 표시 여부는
+    /// PartnerBoardUnitView.effectiveManaCost(PokemonUnit.EffectiveManaCost가 BoardSnapshot을 타고
+    /// 그대로 전달된 값)로 판정한다 — 종의 원본 manaCost가 아니라 이 값을 써야 영웅증강으로 스킬을
+    /// 주입받은 유닛(원본 종 manaCost=0)도 정확히 마나바가 뜬다(2026-08 코드리뷰 대응).
     ///
-    /// maxHp는 눈금(ApplyTicks) 계산에만 쓰이는데, BoardSnapshot에는 itemId0/1까지만 있고
-    /// 진화의 돌/영웅증강 배율은 없어 실제 MaxHp를 정확히 재현할 수 없다 — 부정확한 값을 만들어
-    /// 쓰는 대신 0을 넘겨 눈금을 끈다(HP 채움 비율 자체는 영향 없음, UnitStatusBarUI.ApplyTicks 참고).
+    /// maxHp는 눈금(ApplyTicks) 계산에만 쓰이는데, 여기서는 phantom PokemonUnit을 만들어 정확히
+    /// 재현하지 않고(StatInfoPanelUI.Bind와 달리) 0을 넘겨 눈금만 끈다(HP 채움 비율 자체는 영향
+    /// 없음, UnitStatusBarUI.ApplyTicks 참고).
     /// </summary>
     private int DrawPartnerShopBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
     {
@@ -295,7 +296,7 @@ public class UnitStatusBarHud : MonoBehaviour
         {
             if (view.visual == null) continue;
 
-            float mana = view.species != null && view.species.manaCost > 0 ? 0f : -1f;
+            float mana = view.effectiveManaCost > 0 ? 0f : -1f;
 
             if (PlaceMirror(used, spectatorCamera, pipImage, view.visual.position, 1f, mana,
                             true, 0f, view.items, null))

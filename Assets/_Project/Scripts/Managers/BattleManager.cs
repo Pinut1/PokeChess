@@ -143,7 +143,7 @@ public class BattleManager : MonoBehaviour
     /// <summary>준비 단계에 세워둔 적 프리뷰. 전투 중에는 비어 있다(그때는 Units를 쓸 것).</summary>
     public IReadOnlyList<BattleUnit> PreviewEnemies => _previewEnemies;
 
-    /// <summary>전투 중인 유닛 스냅샷(읽기 전용). BalanceCheckHarness가 실측 스탯을 확인하는 용도.</summary>
+    /// <summary>전투 유닛 목록(읽기 전용). 전투 HUD, 유닛 정보 조회, 파트너 미러 전투 표시에서 쓴다.</summary>
     public IReadOnlyList<BattleUnit> Units => _units;
 
     private void OnEnable()
@@ -1327,8 +1327,6 @@ public class BattleManager : MonoBehaviour
 
     /// <summary>
     /// 방어 비율 경감 계수. def 1당 유효체력 +1%. (관통은 여기서 def를 깎는 식으로 확장)
-    /// public인 이유: BalanceCheckHarness가 밸런스 시트 기대값과 대조할 때 이 함수를 직접 호출한다.
-    /// 하네스가 공식을 복사해두면 검증 의미가 없어지므로 실제 계산 경로를 노출한다.
     /// </summary>
     public static float Mitigation(float def) => 100f / (100f + Mathf.Max(0f, def));
 
