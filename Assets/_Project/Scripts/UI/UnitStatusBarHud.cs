@@ -282,9 +282,9 @@ public class UnitStatusBarHud : MonoBehaviour
     /// 그대로 전달된 값)로 판정한다 — 종의 원본 manaCost가 아니라 이 값을 써야 영웅증강으로 스킬을
     /// 주입받은 유닛(원본 종 manaCost=0)도 정확히 마나바가 뜬다(2026-08 코드리뷰 대응).
     ///
-    /// maxHp는 눈금(ApplyTicks) 계산에만 쓰이는데, BoardSnapshot에는 itemId0/1까지만 있고
-    /// 진화의 돌/영웅증강 배율은 없어 실제 MaxHp를 정확히 재현할 수 없다 — 부정확한 값을 만들어
-    /// 쓰는 대신 0을 넘겨 눈금을 끈다(HP 채움 비율 자체는 영향 없음, UnitStatusBarUI.ApplyTicks 참고).
+    /// maxHp는 눈금(ApplyTicks) 계산에만 쓰이는데, 여기서는 phantom PokemonUnit을 만들어 정확히
+    /// 재현하지 않고(StatInfoPanelUI.Bind와 달리) 0을 넘겨 눈금만 끈다(HP 채움 비율 자체는 영향
+    /// 없음, UnitStatusBarUI.ApplyTicks 참고).
     /// </summary>
     private int DrawPartnerShopBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
     {

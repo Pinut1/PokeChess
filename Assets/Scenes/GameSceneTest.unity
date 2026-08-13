@@ -20458,14 +20458,10 @@ GameObject:
   - component: {fileID: 1558058666}
   - component: {fileID: 1558058644}
   - component: {fileID: 1558058667}
-  - component: {fileID: 1558058668}
   - component: {fileID: 1558058670}
   - component: {fileID: 1558058672}
-  - component: {fileID: 1558058671}
   - component: {fileID: 1558058673}
   - component: {fileID: 1558058674}
-  - component: {fileID: 1558058675}
-  - component: {fileID: 1558058676}
   - component: {fileID: 1558058677}
   - component: {fileID: 1558058678}
   - component: {fileID: 1558058679}
@@ -20802,18 +20798,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63153d96d674a504caa2acc985a6b853, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewardManager
---- !u!114 &1558058668
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c39320e141bbb344aa95a4d48aeca37b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TradeDebugTest
 --- !u!114 &1558058670
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -20827,22 +20811,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PrototypeHud
   _showShopDebugBar: 0
---- !u!114 &1558058671
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 02d2d67f784ddd1499d57609276aa925, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ItemInventoryHud
-  _camera: {fileID: 1293587738}
-  _raycastMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &1558058672
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -20882,30 +20850,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b7edb818b61f434883a064f1f10805b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchRecorder
---- !u!114 &1558058675
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c47ce8d9326b4f8aa7f4cc18a739ceca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GoldTransferDebugTest
---- !u!114 &1558058676
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1558058640}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1ff1c33b366bae54a8ebd65c698879df, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EeveeHeroDebugTest
 --- !u!114 &1558058677
 MonoBehaviour:
   m_ObjectHideFlags: 0

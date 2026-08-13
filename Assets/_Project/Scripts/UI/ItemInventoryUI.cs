@@ -5,9 +5,8 @@ using UnityEngine.EventSystems;
 /// 인벤토리 20칸을 ItemManager 보유 목록과 동기화하고, 드롭 지점의 유닛에 장착을 위임한다.
 /// 칸은 고정 개수(씬의 itemBox_Panel 20개 = ItemManager.MAX_INVENTORY_SIZE)라 생성/파괴가 없다.
 ///
-/// 기존 IMGUI 프로토타입(ItemInventoryHud)의 정식 uGUI 버전이다.
 /// 유닛 탐지 방식(카메라 레이캐스트 → GetComponentInParent&lt;PokemonUnit&gt;)과
-/// 쇼핑 페이즈 제한은 프로토타입·UnitDragController와 동일하게 맞췄다.
+/// 쇼핑 페이즈 제한은 UnitDragController와 동일하게 맞췄다.
 /// 장착 해제는 이 컴포넌트의 범위가 아니다(아이템 제거기로 별도 담당).
 /// </summary>
 public class ItemInventoryUI : MonoBehaviour

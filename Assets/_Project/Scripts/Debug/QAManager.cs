@@ -658,6 +658,10 @@ public class QAManager : MonoBehaviour
         DrawBenchQuickSellButton();
 
         GUILayout.Space(10f);
+        GUILayout.Label("A-1. 영웅증강 QA — 이브이/파치리스 (정식 HeroAugment.Tag() 재사용)");
+        DrawHeroAugmentButtons();
+
+        GUILayout.Space(10f);
         GUILayout.Label("B. 조회 모드");
         DrawUnitInspectModeToggle();
 
@@ -729,6 +733,79 @@ public class QAManager : MonoBehaviour
     {
         if (!GameManager.TryGet(out var gm) || gm.Shop == null) return;
         RecomputePool(gm.Shop);
+    }
+
+    /// <summary>
+    /// 영웅증강 QA — 대상 종(이브이/파치리스) 지급 + 정식 HeroAugment 적용. 랜덤 등장을 기다리지 않고
+    /// 재현하는 용도. 성급은 여기서 강제하지 않는다 — 지급 버튼을 반복 눌러 실제 BoardManager
+    /// 3합체 로직으로 별을 올린다(2026-08 QA 정리: 별도 강제 로직 없이 정식 경로만 재사용).
+    /// </summary>
+    private void DrawHeroAugmentButtons()
+    {
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("이브이 지급", GUILayout.Width(COST_CELL_WIDTH)))
+            GiveHeroUnitToBench("Eevee", "이브이");
+        if (GUILayout.Button("이브이 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
+            ApplyHeroAugmentToAll(new HeroEeveeAugment(), "Eevee", "이브이");
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("파치리스 지급", GUILayout.Width(COST_CELL_WIDTH)))
+            GiveHeroUnitToBench("Pachirisu", "파치리스");
+        if (GUILayout.Button("파치리스 영웅증강 적용", GUILayout.Width(COST_CELL_WIDTH * 1.6f)))
+            ApplyHeroAugmentToAll(new HeroPachirisuAugment(), "Pachirisu", "파치리스");
+        GUILayout.EndHorizontal();
+    }
+
+    /// <summary>PokemonDatabase.GetByNameEn + UnitFactory.Create + BoardManager.TryPlaceInBench — 전부
+    /// 정식 공개 API. 상점 풀은 차감하지 않는다(보상 지급과 동일 규칙).</summary>
+    private void GiveHeroUnitToBench(string speciesNameEn, string label)
+    {
+        string action = $"{label} QA 지급";
+        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+        {
+            LogFailure(action, "GameManager/BoardManager 연결 안 됨");
+            return;
+        }
+
+        PokemonData data = PokemonDatabase.Instance != null ? PokemonDatabase.Instance.GetByNameEn(speciesNameEn) : null;
+        if (data == null) { LogFailure(action, "PokemonData를 찾지 못함"); return; }
+        if (!gm.Board.HasBenchSpace()) { LogFailure(action, "벤치가 가득 참"); return; }
+
+        PokemonUnit unit = UnitFactory.Create(data);
+        if (unit == null || !gm.Board.TryPlaceInBench(unit))
+        {
+            if (unit != null) Destroy(unit.gameObject);
+            LogFailure(action, "벤치 배치 실패");
+            return;
+        }
+
+        LogSuccess(action, "1마리 지급(상점 풀 미차감)");
+    }
+
+    /// <summary>보유 중인 대상 종 전부에 정식 HeroAugment.Tag()를 태운다(OnUnitBenched는 Augment의
+    /// 공개 상속 메서드 — protected Tag()로 이어짐). role/배율/사거리/VFX/마나비용을 QA에 다시
+    /// 적지 않는다 — HeroEeveeAugment/HeroPachirisuAugment가 소유한 값을 그대로 재사용.</summary>
+    private void ApplyHeroAugmentToAll(HeroAugment augment, string speciesNameEn, string label)
+    {
+        string action = $"{label} 영웅증강 적용";
+        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+        {
+            LogFailure(action, "GameManager/BoardManager 연결 안 됨");
+            return;
+        }
+
+        int applied = 0;
+        foreach (var unit in CombinedUnits(gm.Board))
+        {
+            if (unit == null || unit.data == null) continue;
+            if (!string.Equals(unit.data.pokemonNameEn, speciesNameEn, System.StringComparison.OrdinalIgnoreCase)) continue;
+            augment.OnUnitBenched(unit);
+            applied++;
+        }
+
+        if (applied > 0) LogSuccess(action, $"{applied}마리");
+        else LogFailure(action, $"보유한 {label} 없음");
     }
 
     /// <summary>
@@ -1489,10 +1566,9 @@ public class QAManager : MonoBehaviour
     // ── 실제 유닛 조회 모드 상세 ──
 
     /// <summary>
-    /// ItemInventoryHud에는 실제 PokemonUnit을 선택/조회하는 public 메서드가 전혀 없어(전부
-    /// private) 재사용할 수 없었다. 대신 PokemonUnit 자체의 공개 프로퍼티(MaxHp/Attack/Defense/
-    /// AttackSpeed/SpellPower/Range, StarMultiplier, IsSpecialEvolved, EffectiveSkill 등)와
-    /// TradeEvolutionData.GetBaseOf(공개)를 직접 조회한다. 장비 적용 후 최종 수치만 공개 API가 없어 제외.
+    /// PokemonUnit의 공개 프로퍼티(MaxHp/Attack/Defense/AttackSpeed/SpellPower/Range,
+    /// StarMultiplier, IsSpecialEvolved, EffectiveSkill 등)와 TradeEvolutionData.GetBaseOf(공개)만
+    /// 조회해 조립한다. 장비 적용 후 최종 수치는 공개 API가 없어 제외.
     /// </summary>
     private void DrawRuntimeDetailContent()
     {
