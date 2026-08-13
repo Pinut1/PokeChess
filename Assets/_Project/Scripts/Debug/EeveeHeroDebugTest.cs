@@ -160,13 +160,20 @@ public class EeveeHeroDebugTest : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// 정식 HeroEeveeAugment.Tag()를 그대로 태운다(공개 상속 메서드 OnUnitBenched → 내부 protected
+    /// Tag() 경유) — role/statMultiplier를 여기 다시 하드코딩하지 않는다. 정식 값이 나중에 바뀌어도
+    /// 이 Debug 버튼이 자동으로 같은 값을 쓰게 하기 위함(2026-08 코드리뷰 대응, 기존엔 인자 없이
+    /// ApplyEeveeHeroAugment()를 호출해 PokemonRole.Magician 역할 전환이 누락됐었다).
+    /// </summary>
     private static string ApplyAugmentToAllEevees(GameManager gm)
     {
         int applied = 0;
+        var augment = new HeroEeveeAugment();
         foreach (var unit in AllOwnedUnits(gm))
         {
             if (!IsEevee(unit) || unit.evolutionLocked) continue;
-            unit.ApplyEeveeHeroAugment();
+            augment.OnUnitBenched(unit);
             applied++;
         }
         return applied > 0 ? $"영웅증강 적용: {applied}마리" : "대상 이브이 없음(미적용분)";
@@ -186,16 +193,23 @@ public class EeveeHeroDebugTest : MonoBehaviour
                           : "진화잠금 이브이 없음(① 먼저)";
     }
 
+    /// <summary>
+    /// 정식 HeroPachirisuAugment.Tag()를 그대로 태운다(공개 상속 메서드 OnUnitBenched → 내부 protected
+    /// Tag() 경유) — statMultiplier/attackVfxId/attackRange를 여기 다시 하드코딩하지 않는다. 정식 값이
+    /// 나중에 바뀌어도 이 Debug 버튼이 자동으로 같은 값을 쓰게 하기 위함(2026-08 코드리뷰 대응, 기존엔
+    /// role/skill/manaCost 3개만 넘겨 attackVfxId/attackRange가 누락되고 사거리가 원본 종(원거리)으로
+    /// 남는 문제가 있었다).
+    /// </summary>
     private static string ApplyAugmentToAllPachirisu(GameManager gm)
     {
         int applied = 0, already = 0, seen = 0;
+        var augment = new HeroPachirisuAugment();
         foreach (var unit in AllOwnedUnits(gm))
         {
             if (!IsSpecies(unit, "Pachirisu")) continue;
             seen++;
             if (unit.HasGrantedSkill) { already++; continue; }
-            unit.ApplyParichisuHeroAugment(PokemonRole.Tanker,
-                HeroPachirisuAugment.CreateTauntSkill(), HeroPachirisuAugment.TAUNT_MANA_COST);
+            augment.OnUnitBenched(unit);
             applied++;
         }
         string msg = $"도발 증강 — 파치리스 {seen}마리 발견, 신규 적용 {applied}, 기적용 {already}";
