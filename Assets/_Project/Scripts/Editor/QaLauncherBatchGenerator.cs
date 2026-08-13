@@ -24,7 +24,7 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
-        if (report.summary.result != BuildResult.Succeeded)
+        if (report.summary.totalErrors > 0)
         {
             Debug.LogWarning("[QaLauncherBatchGenerator] 빌드가 실패/취소되어 QA BAT를 생성하지 않습니다.");
             return;
@@ -49,6 +49,12 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+        if (!File.Exists(outputPath) || File.GetLastWriteTimeUtc(outputPath) < report.summary.buildStartedAt)
+        {
+            Debug.LogWarning($"[QaLauncherBatchGenerator] 빌드 산출물이 이번 빌드로 갱신되지 않아 QA BAT를 생성하지 않습니다. outputPath={outputPath}");
+            return;
+        }
+
         WriteLauncherBat(exeDirectory, "QA_Client_A.bat", exeFileName, "A");
         WriteLauncherBat(exeDirectory, "QA_Client_B.bat", exeFileName, "B");
     }
@@ -68,7 +74,8 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
     private static void WriteLauncherBat(string directory, string batFileName, string exeFileName, string qaSlot)
     {
         string batPath = Path.Combine(directory, batFileName);
-        string content = $"@echo off\r\nstart \"\" \"%~dp0{exeFileName}\" -qaClient={qaSlot}\r\n";
+        string escapedExeFileName = exeFileName.Replace("%", "%%");
+        string content = $"@echo off\r\nstart \"\" \"%~dp0{escapedExeFileName}\" -qaClient={qaSlot}\r\n";
 
         try
         {
