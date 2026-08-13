@@ -24,6 +24,14 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+        if (report.summary.result != BuildResult.Succeeded)
+        {
+            Debug.LogWarning("[QaLauncherBatchGenerator] 빌드가 실패/취소되어 QA BAT를 생성하지 않습니다.");
+            return;
+        }
+
+        if (!IsQaBuildDefined(report.summary.platform)) return;
+
         string outputPath = report.summary.outputPath;
         if (string.IsNullOrEmpty(outputPath))
         {
@@ -41,6 +49,18 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
 
         WriteLauncherBat(exeDirectory, "QA_Client_A.bat", exeFileName, "A");
         WriteLauncherBat(exeDirectory, "QA_Client_B.bat", exeFileName, "B");
+    }
+
+    /// <summary>빌드 대상 그룹의 Scripting Define Symbols에 "QA_BUILD"가 있는지 확인한다.</summary>
+    private static bool IsQaBuildDefined(BuildTarget platform)
+    {
+        var namedBuildTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(platform));
+        string defineSymbols = PlayerSettings.GetScriptingDefineSymbols(namedBuildTarget);
+        foreach (string symbol in defineSymbols.Split(';'))
+        {
+            if (symbol == "QA_BUILD") return true;
+        }
+        return false;
     }
 
     private static void WriteLauncherBat(string directory, string batFileName, string exeFileName, string qaSlot)
