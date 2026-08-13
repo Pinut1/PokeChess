@@ -24,6 +24,12 @@ public class QaLauncherBatchGenerator : IPostprocessBuildWithReport
             return;
         }
 
+        if (report.summary.result != BuildResult.Succeeded)
+        {
+            Debug.LogWarning("[QaLauncherBatchGenerator] 빌드가 실패/취소되어 QA BAT를 생성하지 않습니다.");
+            return;
+        }
+
         string outputPath = report.summary.outputPath;
         if (string.IsNullOrEmpty(outputPath))
         {
