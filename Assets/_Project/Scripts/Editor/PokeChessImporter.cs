@@ -1071,16 +1071,42 @@ public static class PokeChessImporter
         so.healTakenDmgPct = 0f;
         so.shieldPctOnFatalHit = 0f;
         so.attackBonus = 0f;
+        so.attackPct = 0f;
         so.spAtkPct = 0f;
+        so.spellPowerBonus = 0f;
         so.attackSpeedBonus = 0f;
         so.moveSpdPctOnKill = 0f;
         so.defenseBonus = 0f;
+        so.defensePct = 0f;
         so.spDefBonus = 0f;
         so.reflectPhysPct = 0f;
         so.reflectSpPct = 0f;
         so.defSpDefPerAttacker = 0f;
         so.criPct = 0f;
         so.criDmgPct = 0f;
+        so.manaRegenBonus = 0f;
+        so.hpConditionalSpAtkPct = 0f;
+        so.combatStartShieldPct = 0f;
+        so.shieldDuration = 0f;
+        so.onShieldEndSkillDamageAmpPct = 0f;
+        so.hpThresholdPct = 0f;
+        so.thresholdShieldPct = 0f;
+        so.shieldDecayDuration = 0f;
+        so.periodicInterval = 0f;
+        so.periodicSkillDamageAmpPct = 0f;
+        so.periodicAttackSpeedPct = 0f;
+        so.basicAttackDamageAmpPerStackPct = 0f;
+        so.skillDamageAmpPerStackPct = 0f;
+        so.maxCombatStacks = 0f;
+        so.maxStackDamageAmpPct = 0f;
+        so.maxStackAttackSpeedPct = 0f;
+        so.gainStackOnTakeDamage = false;
+        so.damageAmpPct = 0f;
+        so.skillDamageAmpPct = 0f;
+        so.healLowestAllyPctOfDamage = 0f;
+        so.adjacentAllyAttackSpeedPct = 0f;
+        so.adjacentAllySpellPowerBonus = 0f;
+        so.adjacentAllyManaBonus = 0f;
         so.burnNearOnPhysHit = false;
         so.ccImmune = false;
     }
@@ -1094,14 +1120,58 @@ public static class PokeChessImporter
         switch (key.ToUpperInvariant())
         {
             case "HP" when !isPercent:  so.hpBonus += value; break;
+            case "HP" when isPercent:   so.maxHpPct += value; break;
             case "AD" when !isPercent:  so.attackBonus += value; break;
+            case "AD" when isPercent:   so.attackPct += value; break;
             case "AP" when isPercent:   so.spAtkPct += value; break;
+            case "AP" when !isPercent:  so.spellPowerBonus += value; break;
             case "AS" when isPercent:   so.attackSpeedBonus += value; break;
             case "DEF" when !isPercent: so.defenseBonus += value; break;
+            case "DEF" when isPercent:  so.defensePct += value; break;
             case "CRT" when isPercent:  so.criPct += value; break;
+            case "MP" when !isPercent:  so.manaRegenBonus += value; break;
+            case "AMP" when isPercent:  so.damageAmpPct += value; break; // 치리열매/야타비열매 등 상시 공용 피해증폭
 
-            // MP(시작 마나), VMP(모든 피해 흡혈), AMP(피해 증폭),
-            // flat AP 및 % AD/DEF는 현재 ItemData/BattleUnit에 대응 필드가 없다.
+            // 아래 4개는 GeneralItem 8종 공통 약어(HP/AD/AP/AS/DEF/CRT/MP/AMP)가 아니라, 개별 아이템의
+            // "고유 효과" 수치를 그대로 필드명으로 받는 전용 키다(티라프열매/대파/랑사열매/기합의머리띠,
+            // 2026-08 기획 확정 1차분). isPercent는 값의 성격이 필드명에 이미 내포돼 있어 참조하지 않는다.
+            case "DEFSPDEFPERATTACKER":   so.defSpDefPerAttacker += value; break;   // 티라프열매 — 나를 타겟 중인 적 1명당 DEF+N
+            case "CRIDMGPCT":             so.criDmgPct += value; break;             // 대파/랑사열매 — 치명타 피해량 +N%
+            case "HEALTAKENDMGPCT":       so.healTakenDmgPct += value; break;       // 기합의머리띠 — 받은 최종 피해량의 N% 회복
+            case "HPCONDITIONALSPATKPCT": so.hpConditionalSpAtkPct += value; break; // 기합의머리띠 — HP>50%면 2배가 되는 주문력 N%
+            case "HPREGENPERCENT":        so.hpRegenPercent += value; break;        // 먹다남은음식 — 매초 잃은 체력의 N% 회복
+
+            // 아래 9개는 2026-08 기획 확정 2차분(규살열매/조개껍질방울/의문열매/초점렌즈/캄라열매)
+            // 보호막·시간 기반 고유효과 전용 키. 위와 같은 원칙(필드명=키, isPercent 미참조).
+            case "COMBATSTARTSHIELDPCT":        so.combatStartShieldPct += value; break;        // 규살열매
+            case "SHIELDDURATION":              so.shieldDuration += value; break;              // 규살열매/조개껍질방울 공용
+            case "ONSHIELDENDSKILLDAMAGEAMPPCT": so.onShieldEndSkillDamageAmpPct += value; break; // 규살열매
+            case "HPTHRESHOLDPCT":              so.hpThresholdPct += value; break;               // 조개껍질방울/의문열매 공용
+            case "THRESHOLDSHIELDPCT":          so.thresholdShieldPct += value; break;           // 조개껍질방울/의문열매 공용
+            case "SHIELDDECAYDURATION":         so.shieldDecayDuration += value; break;          // 의문열매
+            case "PERIODICINTERVAL":            so.periodicInterval += value; break;             // 초점렌즈/캄라열매 공용
+            case "PERIODICSKILLDAMAGEAMPPCT":   so.periodicSkillDamageAmpPct += value; break;     // 초점렌즈
+            case "PERIODICATTACKSPEEDPCT":      so.periodicAttackSpeedPct += value; break;        // 캄라열매
+
+            // 아래 6개는 2026-08 기획 확정 3차분(왕의징표석/선제공격손톱) 스택형 고유효과 전용 키.
+            case "BASICATTACKDAMAGEAMPPERSTACKPCT": so.basicAttackDamageAmpPerStackPct += value; break; // 왕의징표석/선제공격손톱 공용
+            case "SKILLDAMAGEAMPPERSTACKPCT":       so.skillDamageAmpPerStackPct += value; break;       // 왕의징표석
+            case "MAXCOMBATSTACKS":                 so.maxCombatStacks += value; break;                 // 왕의징표석/선제공격손톱 공용
+            case "MAXSTACKDAMAGEAMPPCT":            so.maxStackDamageAmpPct += value; break;            // 왕의징표석
+            case "MAXSTACKATTACKSPEEDPCT":          so.maxStackAttackSpeedPct += value; break;          // 선제공격손톱
+            case "GAINSTACKONTAKEDAMAGE":           so.gainStackOnTakeDamage = value > 0; break;        // 왕의징표석
+
+            // 아래 2개는 2026-08 기획 확정 4차분(삐삐인형/큰뿌리) 상시/기본형 고유효과 전용 키.
+            case "SKILLDAMAGEAMPPCT":           so.skillDamageAmpPct += value; break;           // 삐삐인형 — 상시 스킬피해 N%
+            case "HEALLOWESTALLYPCTOFDAMAGE":   so.healLowestAllyPctOfDamage += value; break;    // 큰뿌리
+
+            // 아래 3개는 2026-08 기획 확정 5차분(구애머리띠/라즈열매) 전투 시작 인접 아군 오라 전용 키.
+            case "ADJACENTALLYATTACKSPEEDPCT":  so.adjacentAllyAttackSpeedPct += value; break;   // 구애머리띠
+            case "ADJACENTALLYSPELLPOWERBONUS": so.adjacentAllySpellPowerBonus += value; break;  // 라즈열매
+            case "ADJACENTALLYMANABONUS":       so.adjacentAllyManaBonus += value; break;        // 라즈열매
+
+            // VMP(오마니뱀프)는 최종 기획에서 별도 전투 훅이 필요해 후속 작업으로 분리 — 이번 범위 밖.
+            // flat CRT 등 현재 데이터에 없는 조합도 미지원.
             default:
                 Debug.LogWarning($"[PokeChess] 현재 런타임 미지원 GeneralItem 스탯: {key}={value}{(isPercent ? "%" : "")}");
                 break;

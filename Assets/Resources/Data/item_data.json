@@ -6,7 +6,8 @@
     "description": "적의 공격 대상이 되면 방어력이 10, 내구력이 10 증가. 공격하는 적이 늘어나면 중첩되어 적용",
     "stats": [
       { "key": "HP", "value": 100, "isPercent": false, "hasValue": true },
-      { "key": "DEF", "value": 30, "isPercent": false, "hasValue": true }
+      { "key": "DEF", "value": 30, "isPercent": false, "hasValue": true },
+      { "key": "defSpDefPerAttacker", "value": 20, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -15,7 +16,8 @@
     "nameEn": "Sitrus Berry",
     "description": "최대 체력 18% 획득",
     "stats": [
-      { "key": "HP", "value": 500, "isPercent": false, "hasValue": true }
+      { "key": "HP", "value": 500, "isPercent": false, "hasValue": true },
+      { "key": "HP", "value": 18, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -26,7 +28,8 @@
     "stats": [
       { "key": "HP", "value": 300, "isPercent": false, "hasValue": true },
       { "key": "DEF", "value": 10, "isPercent": true, "hasValue": true },
-      { "key": "MP", "value": 2, "isPercent": false, "hasValue": true }
+      { "key": "MP", "value": 2, "isPercent": false, "hasValue": true },
+      { "key": "hpRegenPercent", "value": 2, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -36,7 +39,9 @@
     "description": "2가지 효과 획득:\n\n주문력 15%\n\n모든 피해 흡혈 12%\n\n체력이 50%를 넘을 때 주문력 두 배로 증가\n\n체력이 50% 아래일 때 모든 피해 흡혈 두 배로 증가",
     "stats": [
       { "key": "CRT", "value": 20, "isPercent": true, "hasValue": true },
-      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true },
+      { "key": "hpConditionalSpAtkPct", "value": 15, "isPercent": true, "hasValue": true },
+      { "key": "healTakenDmgPct", "value": 12, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -46,7 +51,8 @@
     "description": "정밀을 얻습니다\n\n정밀: 스킬 피해에 치명타가 적용될 수 있습니다. 추가 정밀 획득 시 치명타 피해량이 10% 증가합니다",
     "stats": [
       { "key": "AP", "value": 35, "isPercent": false, "hasValue": true },
-      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true }
+      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true },
+      { "key": "criDmgPct", "value": 10, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -57,7 +63,10 @@
     "stats": [
       { "key": "HP", "value": 100, "isPercent": false, "hasValue": true },
       { "key": "AP", "value": 20, "isPercent": false, "hasValue": true },
-      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true }
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "combatStartShieldPct", "value": 25, "isPercent": true, "hasValue": true },
+      { "key": "shieldDuration", "value": 8, "isPercent": false, "hasValue": true },
+      { "key": "onShieldEndSkillDamageAmpPct", "value": 25, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -68,7 +77,9 @@
     "stats": [
       { "key": "AD", "value": 15, "isPercent": true, "hasValue": true },
       { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
-      { "key": "VMP", "value": 20, "isPercent": true, "hasValue": true }
+      { "key": "hpThresholdPct", "value": 40, "isPercent": true, "hasValue": true },
+      { "key": "thresholdShieldPct", "value": 25, "isPercent": true, "hasValue": true },
+      { "key": "shieldDuration", "value": 5, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -78,7 +89,10 @@
     "description": "체력이 60%일 때, 장착 유닛 최대 체력의 40%에 해당하는 보호막 획득. 보호막은 4초에 걸쳐 빠르게 사라짐",
     "stats": [
       { "key": "HP", "value": 300, "isPercent": false, "hasValue": true },
-      { "key": "AD", "value": 40, "isPercent": true, "hasValue": true }
+      { "key": "AD", "value": 40, "isPercent": true, "hasValue": true },
+      { "key": "hpThresholdPct", "value": 60, "isPercent": true, "hasValue": true },
+      { "key": "thresholdShieldPct", "value": 40, "isPercent": true, "hasValue": true },
+      { "key": "shieldDecayDuration", "value": 4, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -88,8 +102,7 @@
     "description": "이 검의 주인은 더없는 평화와 안정을 찾게 됩니다. 주인의 적들도 마찬가지고요.\n\n공격력 55% 증가, 피해 증폭 15% 증가",
     "stats": [
       { "key": "AD", "value": 55, "isPercent": true, "hasValue": true },
-      { "key": "DEF", "value": 10, "isPercent": true, "hasValue": true },
-      { "key": "AMP", "value": 0, "isPercent": false, "hasValue": false }
+      { "key": "AMP", "value": 10, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -99,7 +112,12 @@
     "description": "공격하거나 피해를 받으면 공격력 2%, 주문력 2% 증가 (최대 25회 중첩)\n\n최대 중첩 시 피해 증폭 10% 획득 및 군중 제어 효과에 면역이 됨",
     "stats": [
       { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
-      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true }
+      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "basicAttackDamageAmpPerStackPct", "value": 2, "isPercent": true, "hasValue": true },
+      { "key": "skillDamageAmpPerStackPct", "value": 2, "isPercent": true, "hasValue": true },
+      { "key": "maxCombatStacks", "value": 25, "isPercent": false, "hasValue": true },
+      { "key": "maxStackDamageAmpPct", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "gainStackOnTakeDamage", "value": 1, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -109,7 +127,8 @@
     "description": "모든 요소로부터 얻는 주문력 10% 증가",
     "stats": [
       { "key": "AP", "value": 15, "isPercent": false, "hasValue": true },
-      { "key": "MP", "value": 5, "isPercent": false, "hasValue": true }
+      { "key": "MP", "value": 5, "isPercent": false, "hasValue": true },
+      { "key": "skillDamageAmpPct", "value": 10, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -129,7 +148,9 @@
     "description": "전투 시작: 전투 중 5초마다 주문력 20% 증가",
     "stats": [
       { "key": "AP", "value": 30, "isPercent": false, "hasValue": true },
-      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true },
+      { "key": "periodicInterval", "value": 5, "isPercent": false, "hasValue": true },
+      { "key": "periodicSkillDamageAmpPct", "value": 20, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -138,7 +159,9 @@
     "nameEn": "Salac Berry",
     "description": "매초 공격 속도 7% 획득 (중첩 가능)",
     "stats": [
-      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true }
+      { "key": "AS", "value": 10, "isPercent": true, "hasValue": true },
+      { "key": "periodicInterval", "value": 1, "isPercent": false, "hasValue": true },
+      { "key": "periodicAttackSpeedPct", "value": 7, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -149,7 +172,10 @@
     "stats": [
       { "key": "AD", "value": 10, "isPercent": false, "hasValue": true },
       { "key": "AS", "value": 10, "isPercent": true, "hasValue": true },
-      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true }
+      { "key": "DEF", "value": 20, "isPercent": false, "hasValue": true },
+      { "key": "basicAttackDamageAmpPerStackPct", "value": 3.5, "isPercent": true, "hasValue": true },
+      { "key": "maxCombatStacks", "value": 15, "isPercent": false, "hasValue": true },
+      { "key": "maxStackAttackSpeedPct", "value": 15, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -159,7 +185,8 @@
     "description": "정밀을 얻습니다.\n\n정밀: 스킬 피해에 치명타가 적용될 수 있습니다. 추가 정밀 획득 시 치명타 피해량이 10% 증가합니다",
     "stats": [
       { "key": "AD", "value": 35, "isPercent": true, "hasValue": true },
-      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true }
+      { "key": "CRT", "value": 35, "isPercent": true, "hasValue": true },
+      { "key": "criDmgPct", "value": 10, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -170,8 +197,8 @@
     "stats": [
       { "key": "AD", "value": 20, "isPercent": false, "hasValue": true },
       { "key": "AP", "value": 20, "isPercent": false, "hasValue": true },
-      { "key": "VMP", "value": 15, "isPercent": true, "hasValue": true },
-      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true }
+      { "key": "MP", "value": 1, "isPercent": false, "hasValue": true },
+      { "key": "healLowestAllyPctOfDamage", "value": 20, "isPercent": true, "hasValue": true }
     ]
   },
   {
@@ -180,7 +207,8 @@
     "nameEn": "Choice Band",
     "description": "전투 시작: 장착 유닛과 2칸 내에 있는 같은 열의 아군이 공격 속도 30% 획득",
     "stats": [
-      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true }
+      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true },
+      { "key": "adjacentAllyAttackSpeedPct", "value": 30, "isPercent": false, "hasValue": true }
     ]
   },
   {
@@ -189,7 +217,9 @@
     "nameEn": "Razz Berry",
     "description": "전투 시작: 장착 유닛과 2칸 내에 있는 같은 열의 아군이 주문력 25와 마나 10 획득",
     "stats": [
-      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true }
+      { "key": "HP", "value": 250, "isPercent": false, "hasValue": true },
+      { "key": "adjacentAllySpellPowerBonus", "value": 25, "isPercent": false, "hasValue": true },
+      { "key": "adjacentAllyManaBonus", "value": 10, "isPercent": false, "hasValue": true }
     ]
   }
 ]

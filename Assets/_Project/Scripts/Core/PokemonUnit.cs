@@ -236,22 +236,21 @@ public class PokemonUnit : MonoBehaviour
         finalAttackSpeed = AttackSpeed;
         finalDefense = Defense;
 
-        // 정보창은 치명타를 표시하지 않지만 공용 공식 시그니처상 필요한 버림값.
+        // 정보창은 치명타/마나회복/피해증폭을 표시하지 않지만 공용 공식 시그니처상 필요한 버림값.
         float critChance = 0f;
         float critMultiplier = 0f;
+        float manaRegenBonus = 0f;
+        float skillDamageAmpPct = 0f;
+        float damageAmpPct = 0f;
 
-        if (items == null) return;
-
-        foreach (ItemData item in items)
-        {
-            if (item == null) continue;
-
-            ItemStatFormula.Apply(
-                item,
-                ref finalMaxHp, ref finalCurrentHp,
-                ref finalAttack, ref finalSpellPower, ref finalAttackSpeed, ref finalDefense,
-                ref critChance, ref critMultiplier);
-        }
+        ItemStatFormula.ApplyAll(
+            items,
+            ref finalMaxHp, ref finalCurrentHp,
+            ref finalAttack, ref finalSpellPower, ref finalAttackSpeed, ref finalDefense,
+            ref critChance, ref critMultiplier,
+            ref manaRegenBonus,
+            ref skillDamageAmpPct,
+            ref damageAmpPct);
     }
 
     private void Start()

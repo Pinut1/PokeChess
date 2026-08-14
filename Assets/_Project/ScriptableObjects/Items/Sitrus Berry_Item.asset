@@ -21,22 +21,52 @@ MonoBehaviour:
     value: 500
     isPercent: 0
     hasValue: 1
+  - key: HP
+    value: 18
+    isPercent: 1
+    hasValue: 1
   hpBonus: 500
-  maxHpPct: 0
+  maxHpPct: 18
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
+  attackPct: 0
   spAtkPct: 0
+  spellPowerBonus: 0
+  hpConditionalSpAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 0
+  defensePct: 0
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0
+  manaRegenBonus: 0
+  combatStartShieldPct: 0
+  shieldDuration: 0
+  onShieldEndSkillDamageAmpPct: 0
+  hpThresholdPct: 0
+  thresholdShieldPct: 0
+  shieldDecayDuration: 0
+  periodicInterval: 0
+  periodicSkillDamageAmpPct: 0
+  periodicAttackSpeedPct: 0
+  basicAttackDamageAmpPerStackPct: 0
+  skillDamageAmpPerStackPct: 0
+  maxCombatStacks: 0
+  maxStackDamageAmpPct: 0
+  maxStackAttackSpeedPct: 0
+  gainStackOnTakeDamage: 0
+  damageAmpPct: 0
+  skillDamageAmpPct: 0
+  healLowestAllyPctOfDamage: 0
+  adjacentAllyAttackSpeedPct: 0
+  adjacentAllySpellPowerBonus: 0
+  adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 38f4224dbac7c9e4a957c1fcfa0e531b, type: 3}

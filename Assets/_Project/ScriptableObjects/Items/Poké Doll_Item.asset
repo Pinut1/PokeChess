@@ -15,8 +15,8 @@ MonoBehaviour:
   id: 11
   itemName: "\uC090\uC090\uC778\uD615"
   itemNameEn: "Pok\xE9 Doll"
-  description: "\uBAA8\uB4E0 \uC694\uC18C\uB85C\uBD80\uD130 \uC5BB\uB294 \uC2A4\uD0AC
-    \uD53C\uD574\uB7C9 10% \uC99D\uAC00"
+  description: "\uBAA8\uB4E0 \uC694\uC18C\uB85C\uBD80\uD130 \uC5BB\uB294 \uC8FC\uBB38\uB825
+    10% \uC99D\uAC00"
   sourceStats:
   - key: AP
     value: 15
@@ -26,22 +26,52 @@ MonoBehaviour:
     value: 5
     isPercent: 0
     hasValue: 1
+  - key: skillDamageAmpPct
+    value: 10
+    isPercent: 1
+    hasValue: 1
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
+  attackPct: 0
   spAtkPct: 0
+  spellPowerBonus: 15
+  hpConditionalSpAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 0
+  defensePct: 0
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0
+  manaRegenBonus: 5
+  combatStartShieldPct: 0
+  shieldDuration: 0
+  onShieldEndSkillDamageAmpPct: 0
+  hpThresholdPct: 0
+  thresholdShieldPct: 0
+  shieldDecayDuration: 0
+  periodicInterval: 0
+  periodicSkillDamageAmpPct: 0
+  periodicAttackSpeedPct: 0
+  basicAttackDamageAmpPerStackPct: 0
+  skillDamageAmpPerStackPct: 0
+  maxCombatStacks: 0
+  maxStackDamageAmpPct: 0
+  maxStackAttackSpeedPct: 0
+  gainStackOnTakeDamage: 0
+  damageAmpPct: 0
+  skillDamageAmpPct: 10
+  healLowestAllyPctOfDamage: 0
+  adjacentAllyAttackSpeedPct: 0
+  adjacentAllySpellPowerBonus: 0
+  adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 38c60992a93037241be1768d5834aa83, type: 3}

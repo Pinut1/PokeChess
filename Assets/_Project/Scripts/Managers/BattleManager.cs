@@ -645,12 +645,33 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>[기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산(평타스탯형만, 조건부 효과는 후속).</summary>
+    /// <summary>[기둥B] 전투 시작 1회 — 장착템 등 효과의 OnCombatStart로 스탯 가산.
+    /// 3단계로 나눠 실행한다(2026-08 기획 확정 5차분, 구애머리띠/라즈열매 오라 도입으로 필요해짐):
+    /// 1단계 ItemStatEffect(평타스탯형, 유닛 자신의 정적 스탯)를 전체 유닛에 먼저 적용해야
+    /// ItemStatFormula.ApplyAll의 대입식(attackSpeed = attackSpeed×(1+pct%))이 "아직 오라를 안 받은
+    /// 자기 자신의 기준값"으로 정확히 계산된다 — 순서가 바뀌면 이미 다른 유닛에게서 받은 오라 보너스까지
+    /// 자기 정적 %가 잘못 재곱셈하게 된다.
+    /// 2단계 나머지(ItemConditionalEffect 등, 오라 포함)는 그 뒤 전체 유닛에 적용.
+    /// 3단계는 2단계에서 여러 오라가 누적했을 수 있는 pendingAuraAttackSpeedPct를 유닛당 딱 1번만
+    /// attackSpeed에 곱해 소비한다(오라 2개=+60%가 복리 ×1.69가 아니라 합산 후 단일 곱 ×1.6이 되도록).</summary>
     private void ApplyOnCombatStartEffects()
     {
         foreach (var bu in _units)
             foreach (var effect in bu.effects)
-                effect.OnCombatStart(bu);
+                if (effect is ItemStatEffect)
+                    effect.OnCombatStart(bu);
+
+        foreach (var bu in _units)
+            foreach (var effect in bu.effects)
+                if (!(effect is ItemStatEffect))
+                    effect.OnCombatStart(bu);
+
+        foreach (var bu in _units)
+        {
+            if (bu.pendingAuraAttackSpeedPct <= 0f) continue;
+            bu.attackSpeed += bu.attackSpeed * (bu.pendingAuraAttackSpeedPct * 0.01f);
+            bu.pendingAuraAttackSpeedPct = 0f;
+        }
     }
 
     /// <summary>전투 유닛 시각화 + 미러 보드(상대 보드 시각 분리) 생성.</summary>
@@ -1029,6 +1050,9 @@ public class BattleManager : MonoBehaviour
 
         // 트레이너 보유 아이템 → 아군과 동일한 효과 훅을 적 BattleUnit에도 부착.
         // (아군은 unit.items 리스트, 적은 시트 itemSet1/itemSet2를 ItemDatabase로 해석)
+        // ItemStatEffect는 아이템별로 하나씩 만들지 않고 마지막에 전체 목록으로 1개만 부착한다 —
+        // 순서 무관 합산 계산(ItemStatFormula.ApplyAll)을 위해서다(§CreateBattleUnit과 동일 패턴).
+        var resolvedEnemyItems = new List<ItemData>();
         foreach (var itemNameEn in e.HeldItemsEn)
         {
             var itemDb = ItemDatabase.Instance;
@@ -1039,11 +1063,13 @@ public class BattleManager : MonoBehaviour
                 continue;
             }
 
-            bu.effects.Add(new ItemStatEffect(item));
             bu.effects.Add(new ItemConditionalEffect(item, this));
             bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
             if (item.ccImmune) bu.HasCcImmuneItem = true;
+            resolvedEnemyItems.Add(item);
         }
+        if (resolvedEnemyItems.Count > 0)
+            bu.effects.Add(new ItemStatEffect(resolvedEnemyItems));
 
         return bu;
     }
@@ -1095,13 +1121,16 @@ public class BattleManager : MonoBehaviour
             bu.attackVfxId = unit.EffectiveAttackVfxId;
         }
 
+        // ItemStatEffect는 아이템별로 하나씩 만들지 않고 마지막에 전체 목록으로 1개만 부착한다 —
+        // 순서 무관 합산 계산(ItemStatFormula.ApplyAll)을 위해서다.
         foreach (var item in unit.items)
         {
-            bu.effects.Add(new ItemStatEffect(item));
             bu.effects.Add(new ItemConditionalEffect(item, this));
             bu.displayItems.Add(item); // HP바 아래 아이콘 표시용
             if (item.ccImmune) bu.HasCcImmuneItem = true;
         }
+        if (unit.items.Count > 0)
+            bu.effects.Add(new ItemStatEffect(unit.items));
 
         // 돌은 이미 종족 교체로 반영돼 있어 효과 훅이 없다 — 아이콘 표시용으로만 넘긴다.
         bu.displayStone = unit.equippedStone;
@@ -1181,6 +1210,8 @@ public class BattleManager : MonoBehaviour
                 effect.OnTick(bu, TICK_INTERVAL);
 
             if (!bu.IsAlive) continue; // 화상/도트 등으로 이번 틱에 죽었으면 행동 스킵
+
+            SyncShieldVfx(bu); // 추적 보호막 출처 기준 상태 VFX ON/OFF + 위치 추적(수치 로직 무관)
         }
 
         TickBurn();
@@ -1195,8 +1226,9 @@ public class BattleManager : MonoBehaviour
             if (bu.berryActive)
                 bu.TickBerry(TICK_INTERVAL, HasOtherAliveAlly(bu));
 
-            // 마나 충전(기획 확정): 초당 10 고정. 스턴 중에도 차오른다(행동만 불능).
-            GainMana(bu, MANA_PER_SECOND * TICK_INTERVAL);
+            // 마나 충전(기획 확정): 초당 10 고정 + 아이템 MP flat 가산(manaRegenBonus), 이후 GainMana가
+            // manaGainMultiplier(정령 시너지 등 배수)를 곱한다 — (10+MP) × multiplier. 스턴 중에도 차오른다(행동만 불능).
+            GainMana(bu, (MANA_PER_SECOND + bu.manaRegenBonus) * TICK_INTERVAL);
 
             if (bu.stunRemaining > 0f) continue; // 행동 불능 — 이동/공격 모두 스킵
             if (bu.IsUntargetable) continue;     // 자뭉열매 시식 중 — 행동 불능(마나는 위에서 충전됨)
@@ -1277,8 +1309,102 @@ public class BattleManager : MonoBehaviour
                 Destroy(bu.visual);
                 bu.visual = null;
                 bu.facing = null; // visual과 함께 파괴됨 — 참조를 남기면 다음 틱에 파괴된 객체를 만진다
+
+                // 보호막 상태 VFX는 visual의 자식이 아니라 world-space 독립 오브젝트라 자동으로 같이
+                // 파괴되지 않는다 — 명시적으로 정리해야 한다.
+                if (bu.shieldVfxInstance != null)
+                    Destroy(bu.shieldVfxInstance);
+                bu.shieldVfxInstance = null;
+                bu.shieldSources.Clear();
+                bu.skillShieldSource = null;
             }
         }
+    }
+
+    // ── 아이템 고유효과 VFX(2026-08, 기존 VFX 재사용만) ──
+
+    private const string SHIELD_STATE_VFX_ID = "VFX_Shield_State"; // Shield_gold.prefab, VfxDatabase 등록
+
+    // 기존 SHIELD 스킬 VFX 8종(_Shield/ 폴더)이 전부 루트 localScale 0.4로 통일돼 있고, world-space에
+    // 독립 생성돼(부모 없음) 종족 모델 scale을 전혀 상속하지 않는 것과 동일한 관례를 따른다 — 유닛
+    // 몸집별로 계산하지 않고 고정 절대값 하나만 쓴다. 실제 값은 Unity에서 Shield_gold를 눈으로 보고
+    // 확정 필요(임시 0.4).
+    private const float SHIELD_FIXED_SCALE = 0.4f;
+
+    private static bool _shieldVfxMissingWarned;
+
+    /// <summary>
+    /// 추적 보호막 출처(스킬 SHIELD/Apicot/Shell Bell/Micle) 기준 상태 VFX. BattleUnit.shieldSources에
+    /// remainingAmount>0인 출처가 하나라도 있으면 유지, 전부 0이면 제거 — WATER 시너지 등 미추적
+    /// 보호막은 shieldSources에 아예 들어가지 않으므로 이 판정에 절대 영향을 주지 않는다(WATER만
+    /// 남아있으면 Shield_gold는 뜨지 않음).
+    ///
+    /// 기존 SHIELD 스킬 8종(_Shield/ 폴더, BattleVfxPlayer.PlaySkill 경유)과 동일하게 world-space에
+    /// 독립 생성한다(bu.visual의 자식이 아님) — 종족 모델 프리팹마다 제각각인 scale을 원천적으로
+    /// 상속하지 않는다. 위치만 매틱 bu.visual.transform.position으로 추적하고, scale은 고정값
+    /// (SHIELD_FIXED_SCALE)만 쓴다. BattleVfxPlayer는 생성 즉시 lifetime 뒤 자동 Destroy가 전제라
+    /// "출처가 남아있는 동안 계속 유지"라는 상태형 요구와 맞지 않아 쓰지 않는다 — VfxDatabase에서
+    /// 프리팹만 조회해 직접 Instantiate/Destroy한다.
+    /// </summary>
+    private void SyncShieldVfx(BattleUnit bu)
+    {
+        // 안전한 매틱 정리 지점 — 이번 틱의 흡수(AbsorbShieldDamage)/시간 갱신(OnTick)이 전부 끝난
+        // 뒤라 순회 중 컬렉션 변경 문제가 없다. remainingAmount만 바꾸던 단계와 분리된 별도 단계.
+        bu.shieldSources.RemoveAll(s => s.remainingAmount <= 0f);
+
+        if (!_playBattleVfx) return;
+
+        bool hasActiveShieldSource = HasActiveShieldSource(bu);
+
+        if (hasActiveShieldSource && bu.shieldVfxInstance == null && bu.visual != null)
+        {
+            var entry = VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(SHIELD_STATE_VFX_ID) : null;
+            if (entry == null || entry.prefab == null)
+            {
+                if (!_shieldVfxMissingWarned)
+                {
+                    Debug.LogWarning($"[Vfx] '{SHIELD_STATE_VFX_ID}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.");
+                    _shieldVfxMissingWarned = true;
+                }
+                return;
+            }
+
+            var go = Instantiate(entry.prefab, bu.visual.transform.position, Quaternion.identity);
+            go.transform.localScale = Vector3.one * SHIELD_FIXED_SCALE;
+
+            int layer = ResolveVisualLayer();
+            if (layer >= 0) SetDefaultLayerRecursive(go.transform, layer);
+
+            bu.shieldVfxInstance = go;
+        }
+        else if (!hasActiveShieldSource && bu.shieldVfxInstance != null)
+        {
+            Destroy(bu.shieldVfxInstance);
+            bu.shieldVfxInstance = null;
+        }
+        else if (bu.shieldVfxInstance != null && bu.visual != null)
+        {
+            bu.shieldVfxInstance.transform.position = bu.visual.transform.position; // 위치만 매틱 추적
+        }
+    }
+
+    private static bool HasActiveShieldSource(BattleUnit bu)
+    {
+        foreach (var source in bu.shieldSources)
+            if (source.remainingAmount > 0f) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 단일 대상 위치에 1회성 VFX 재생(아이템 고유효과 발동 연출). 기존 BattleVfxPlayer.PlayOnUnit을
+    /// _playBattleVfx 게이트 + ResolveVisualLayer()까지 한 번에 감싼 얇은 래퍼 — ItemConditionalEffect처럼
+    /// 이 두 private 멤버에 직접 접근할 수 없는 다른 클래스도 실전투/미러 동일한 Layer 규칙을 그대로
+    /// 따르게 하기 위함(internal이라 같은 어셈블리 내 호출만 가능).
+    /// </summary>
+    internal void PlaySingleTargetVfx(string vfxId, BattleUnit target)
+    {
+        if (!_playBattleVfx) return;
+        BattleVfxPlayer.PlayOnUnit(vfxId, target, this, ResolveVisualLayer());
     }
 
     /// <summary>매틱 burnTicksRemaining>0인 모든 유닛에 고정(True) 피해. 아이템 보유와 무관하게 "화상이 옮은" 유닛 전체 대상.</summary>
@@ -1295,12 +1421,17 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>self를 사거리 내에 둔 적 팀 유닛 수(defSpDefPerAttacker용 근사 — 타겟 캐싱이 없어 "공격 중"의 정확한 정의는 없음).</summary>
-    public int CountAttackersInRange(BattleUnit self)
+    /// <summary>self를 실제로 타겟 중인 적 팀 유닛 수(defSpDefPerAttacker용, 티라프열매 기획 확정
+    /// 2026-08 — "사거리 내 적 수"가 아니라 "나를 공격 대상으로 삼고 있는 적 수"). lastTickTarget은
+    /// SimulateTick의 타겟팅 루프(두 번째 foreach)에서 매틱 갱신되는데, OnTick(이 메서드의 유일한
+    /// 호출측인 ItemConditionalEffect)은 그보다 앞선 첫 번째 foreach에서 도므로 정확히 1틱
+    /// (TICK_INTERVAL)만큼 지연된 값을 읽는다 — 화면상 체감되지 않는 수준이라 별도 보정하지 않는다.
+    /// 죽은 유닛은 lastTickTarget이 남아 있어도 IsAlive 검사로 제외된다.</summary>
+    public int CountUnitsTargeting(BattleUnit self)
     {
         int count = 0;
         foreach (var other in _units)
-            if (other.team != self.team && other.IsAlive && self.coords.DistanceTo(other.coords) <= other.range)
+            if (other.team != self.team && other.IsAlive && other.lastTickTarget == self)
                 count++;
         return count;
     }
@@ -1459,6 +1590,21 @@ public class BattleManager : MonoBehaviour
                     break;
                 case SkillEffectType.Shield:
                     t.ApplyShield(caster.spellPower);
+                    // 스킬 SHIELD 출처 등록/합산(2026-08 확정) — 재시전 시 이전 출처가 아직 살아있으면
+                    // 그 객체에 합산(가산형, shield += 와 동일 철학), 없거나 이미 소진됐으면 새로 생성한다.
+                    // 종료된 객체를 리스트에 남겨둔 채 재사용하지 않는다(RemoveAll이 정리한 뒤에도 문제
+                    // 없도록 항상 "살아있는지"부터 확인).
+                    if (t.skillShieldSource != null && t.skillShieldSource.remainingAmount > 0f)
+                    {
+                        t.skillShieldSource.remainingAmount += caster.spellPower;
+                    }
+                    else
+                    {
+                        var skillSource = new ShieldSource(ShieldSourceType.Skill, caster.spellPower,
+                            ShieldDecayType.None, 0f, t.NextShieldSequence());
+                        t.skillShieldSource = skillSource;
+                        t.shieldSources.Add(skillSource);
+                    }
                     break;
                 case SkillEffectType.ManaRegen: // 기획 확정: 회복량 = spellPower × 0.5 (즉시 지급)
                     GainMana(t, caster.spellPower * SUPPORT_SPELLPOWER_COEF);
@@ -1524,8 +1670,10 @@ public class BattleManager : MonoBehaviour
         return result;
     }
 
-    /// <summary>team 진영에서 살아있는 유닛 중 currentHp/maxHp 비율이 가장 낮은 유닛.</summary>
-    private BattleUnit LowestHpRatioAlly(BattleTeam team)
+    /// <summary>team 진영에서 살아있는 유닛 중 currentHp/maxHp 비율이 가장 낮은 유닛. 동률이면
+    /// _units 순회 순서상 먼저 나온 쪽(결정론). ItemConditionalEffect(큰뿌리)가 재사용할 수 있도록
+    /// public — 기존 스킬 HP_REGEN/SHIELD 타겟팅과 동일한 판정 기준을 그대로 공유한다(새 로직 없음).</summary>
+    public BattleUnit LowestHpRatioAlly(BattleTeam team)
     {
         BattleUnit weakest = null;
         float weakestRatio = float.MaxValue;
@@ -1588,6 +1736,28 @@ public class BattleManager : MonoBehaviour
         foreach (var effect in ctx.source.effects)
             effect.OnDealDamage(ctx.source, ctx);
 
+        // 피해 증폭 파이프라인(기획 확정, 2026-08): 기본 피해 → 평타/스킬 전용 Amp → 공용 AMP → 크리
+        // → 경감. "공격자 효과(OnDealDamage)" 단계 직후에 위치시켜 크리·경감보다 먼저 적용한다.
+        //
+        // 평타/스킬 전용 증폭 — 서로 배타적(같은 히트가 평타이면서 스킬일 수 없음). 같은 계열 내에서는
+        // basicAttackDamageAmpPct/skillDamageAmpPct 자체가 이미 여러 아이템의 값을 가산해 담고 있으므로
+        // (왕의징표석+선제공격손톱처럼) 여기서는 그 합계를 1번만 곱한다 — 복리 아님. HP_REGEN/SHIELD/
+        // ManaRegen/AsBuff 등 비피해 스킬은 ResolveDamage 자체를 타지 않아 자동으로 제외된다.
+        if (ctx.isBasicAttack)
+        {
+            if (ctx.source.basicAttackDamageAmpPct > 0f)
+                ctx.amount *= 1f + ctx.source.basicAttackDamageAmpPct * 0.01f;
+        }
+        else if (ctx.source.skillDamageAmpPct > 0f)
+        {
+            ctx.amount *= 1f + ctx.source.skillDamageAmpPct * 0.01f;
+        }
+
+        // 공용 AMP(damageAmpPct, 왕의징표석 25스택 등) — 평타/스킬 모두 적용. 위 전용 증폭과는 별도
+        // 단계로 순차 곱한다(같은 계열끼리의 복리가 아니라 "서로 다른 계열끼리의 순차 곱").
+        if (ctx.source.damageAmpPct > 0f)
+            ctx.amount *= 1f + ctx.source.damageAmpPct * 0.01f;
+
         // 크리 (현재 결정론적 기대값 — 각자 보드 로컬 시뮬이라 추후 RNG 크리로 교체 가능)
         ctx.amount *= CritFactor(ctx.source);
 
@@ -1595,11 +1765,35 @@ public class BattleManager : MonoBehaviour
         if (ctx.type != DamageType.True)
             ctx.amount *= Mitigation(ctx.target.defense);
 
+        // 보호막 흡수 — 아이템 보유 여부와 무관하게 항상 정확히 1회 실행(2026-08 확정, 기존
+        // ItemConditionalEffect.OnTakeDamage 내부에 있던 흡수 블록을 여기로 이동). preShieldAmount는
+        // "공격받았다"는 사실 자체를 쓰는 효과(왕의징표석 등)를 위한 스냅샷 — 흡수로 줄어들기 전 값.
+        ctx.preShieldAmount = ctx.amount;
+        ShieldAbsorbResult shieldResult = ctx.target.AbsorbShieldDamage(ctx.amount);
+        ctx.amount = shieldResult.remainingDamage;
+        ctx.depletedShieldSources = shieldResult.depletedSources;
+
         foreach (var effect in ctx.target.effects)
             effect.OnTakeDamage(ctx.target, ctx);
 
         // 피해 적용. 피격 비례 마나 획득은 기획 확정(초당 충전만)으로 제거됨.
+        float hpBeforeDamage = ctx.target.currentHp;
         ctx.target.currentHp -= ctx.amount;
+
+        // 실제로 HP에서 줄어든 양(오버킬 제외, 보호막이 이미 흡수한 만큼도 제외 — ctx.amount는 보호막
+        // 흡수 이후 값이라 여기 반영돼 있음). ctx.amount를 그대로 "가한 피해"로 오인하면 과잉 피해분
+        // (예: HP30인 대상에게 100 피해)까지 큰뿌리 회복 계산에 들어가 버리므로 반드시 실측 차이로
+        // 구한다. 공격자 effects에 알려 큰뿌리(자신이 가한 최종 피해량 기준 아군 회복) 등이 쓴다 —
+        // 이 시점은 증폭·크리·경감·보호막 흡수·HP 반영까지 전부 끝난 뒤라 "최종 피해량" 요건을 만족한다.
+        float actualHpDamage = Mathf.Max(0f, hpBeforeDamage - Mathf.Max(0f, ctx.target.currentHp));
+        foreach (var effect in ctx.source.effects)
+            effect.OnDealDamageResolved(ctx.source, ctx.target, actualHpDamage);
+
+        // OnTakeDamage 단계에서 예약된 자가 회복(ctx.pendingSelfHeal, 기합의머리띠 등)을 피해 적용
+        // "직후"에 넣는다 — 피해 적용 전에 먼저 걸면 만피 상태에서 MaxHP 클램프에 막혀 회복분이
+        // 소실된다(2026-08 실측 확인). 이 피해로 죽었으면(currentHp<=0) 회복하지 않는다(사후 부활 방지).
+        if (ctx.pendingSelfHeal > 0f && ctx.target.currentHp > 0f)
+            ctx.target.currentHp = Mathf.Min(ctx.target.maxHp, ctx.target.currentHp + ctx.pendingSelfHeal);
 
         ctx.target.TryTriggerSitrusBerry(); // 자뭉열매: 45% 미만 진입 순간 발동(전투당 1회)
 
@@ -1613,8 +1807,9 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지/치어리더 등 상시 배수) 반영.</summary>
-    private static void GainMana(BattleUnit unit, float amount)
+    /// <summary>마나 획득(스킬 보유 유닛만, maxMana 상한). manaGainMultiplier(정령 시너지/치어리더 등 상시 배수) 반영.
+    /// public — 라즈열매(ItemConditionalEffect.OnCombatStart)가 동일한 clamp 경로를 재사용하기 위해 개방.</summary>
+    public static void GainMana(BattleUnit unit, float amount)
     {
         if (!unit.HasSkill) return;
         unit.currentMana = Mathf.Min(unit.maxMana, unit.currentMana + amount * unit.manaGainMultiplier);
@@ -1904,6 +2099,12 @@ public class BattleManager : MonoBehaviour
                 Destroy(bu.visual);
             bu.visual = null;
             bu.facing = null;
+
+            if (bu.shieldVfxInstance != null)
+                Destroy(bu.shieldVfxInstance);
+            bu.shieldVfxInstance = null;
+            bu.shieldSources.Clear();
+            bu.skillShieldSource = null;
 
             if (bu.source != null)
             {
@@ -2340,19 +2541,27 @@ public class BattleManager : MonoBehaviour
         ApplySkill(bu, skill, entry.skillManaCost);
         bu.attackVfxId = !string.IsNullOrEmpty(entry.attackVfxIdOverride) ? entry.attackVfxIdOverride : species.attackVfxId;
 
-        if (item0 != null) AttachMirrorItemEffects(bu, item0);
-        if (item1 != null) AttachMirrorItemEffects(bu, item1);
+        // ItemStatEffect는 아이템별로 하나씩 만들지 않고 마지막에 전체 목록으로 1개만 부착한다 —
+        // 순서 무관 합산 계산(ItemStatFormula.ApplyAll, CreateBattleUnit과 동일 패턴)을 위해서다.
+        var mirrorItems = new List<ItemData>(2);
+        if (item0 != null) mirrorItems.Add(item0);
+        if (item1 != null) mirrorItems.Add(item1);
+        foreach (var mi in mirrorItems)
+            AttachMirrorItemConditionalEffect(bu, mi);
+        if (mirrorItems.Count > 0)
+            bu.effects.Add(new ItemStatEffect(mirrorItems));
 
         bu.displayStone = stone;
 
         return bu;
     }
 
-    /// <summary>CreateBattleUnit의 아이템 훅 부착부와 같은 내용(둘 다 4줄 수준이라 공용 private
-    /// 메서드로만 뽑고, CreateBattleUnit 본문은 회귀 위험 때문에 건드리지 않는다).</summary>
-    private void AttachMirrorItemEffects(BattleUnit bu, ItemData item)
+    /// <summary>CreateBattleUnit의 아이템 조건부 효과 부착부와 같은 내용(둘 다 3줄 수준이라 공용
+    /// private 메서드로만 뽑고, CreateBattleUnit 본문은 회귀 위험 때문에 건드리지 않는다).
+    /// ItemStatEffect(순서 무관 합산 계산)는 호출측(CreateMirrorBattleUnit)이 전체 목록을 모아
+    /// 별도로 1개만 부착한다 — 이 메서드는 건드리지 않는다.</summary>
+    private void AttachMirrorItemConditionalEffect(BattleUnit bu, ItemData item)
     {
-        bu.effects.Add(new ItemStatEffect(item));
         bu.effects.Add(new ItemConditionalEffect(item, this));
         bu.displayItems.Add(item);
         if (item.ccImmune) bu.HasCcImmuneItem = true;
