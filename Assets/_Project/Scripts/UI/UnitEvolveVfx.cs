@@ -26,7 +26,13 @@ public class UnitEvolveVfx : MonoBehaviour
         if (unit == null || string.IsNullOrEmpty(_vfxId)) return;
 
         float scale = isStarUp ? Mathf.Max(0.01f, _starUpScale) : 1f;
-        BattleVfxPlayer.PlayAt(_vfxId, unit.transform.position + _offset, scale);
+
+        // 진화 VFX는 로컬 전용 연출(네트워크 동기화 없음, 클래스 주석 참고) — LocalGameplayVisual로
+        // 태깅해 파트너 관전 카메라(PartnerSpectateVisual만 보는 게 아니라 Default까지 렌더)에서도
+        // 보이던 문제를 막는다. Layer가 Unity Editor에 없으면 -1이 반환되고, BattleVfxPlayer.Create가
+        // layer<0일 때 프리팹 기본 Layer를 그대로 두는 기존 폴백을 그대로 탄다.
+        int localLayer = LayerMask.NameToLayer("LocalGameplayVisual");
+        BattleVfxPlayer.PlayAt(_vfxId, unit.transform.position + _offset, scale, layer: localLayer);
 
         if (isStarUp && SoundManager.TryGet(out var sm))
         {
