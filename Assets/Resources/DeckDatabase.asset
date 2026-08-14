@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 430267b8ea374573ae55ee5e6ec91a5d, type: 3}
   m_Name: DeckDatabase
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   decks:
   - deckId: 1
     deckName: "[\uD558\uC774\uD37C \uD2F0\uCF13] \uB3C5 \uD56B\uC0BC"
@@ -231,7 +231,7 @@ MonoBehaviour:
       \uB77C\uC774\uCE04"
     unitCount: 9
     activeSynergies:
-    - Cheerleader(1/1)
+    - Cheer(1/1)
     - Electric(4/4)
     - Grass(5/9)
     - Poison(3/9)
