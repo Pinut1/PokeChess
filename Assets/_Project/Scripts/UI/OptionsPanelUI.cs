@@ -64,6 +64,15 @@ public class OptionsPanelUI : MonoBehaviour
              "비어 있거나 Build Settings에 등록되지 않은 경우 이동하지 않습니다.")]
     [SerializeField] private string _titleSceneName = "";
 
+    [Header("컨텍스트")]
+    [Tooltip("true면 공용 설정(볼륨/화면/해상도/적용/기본값복원/닫기)만 쓰는 인스턴스로 동작한다 " +
+             "(타이틀 화면용). 게임씬 전용 GameEvents 구독(파트너 이탈/세션 종료/게임 클리어)과 " +
+             "그에 딸린 Update 폴링(항복·파트너 이탈 모달)을 전부 건너뛴다 — 항복/타이틀이동/게임종료/" +
+             "확인모달/공용 안내모달 필드는 이 인스턴스에서 애초에 연결하지 않는 것이 원칙이다(연결해도 " +
+             "이벤트 구독 자체가 없어 무해하지만, Inspector에 게임씬 전용 참조를 남기지 않는 것을 권장). " +
+             "게임씬 인스턴스는 반드시 false(기본값)로 두어 기존 동작을 그대로 유지한다.")]
+    [SerializeField] private bool _settingsOnly;
+
     [Header("옵션 패널 (uGUI)")]
     [Tooltip("옵션 패널 루트. SetActive(true/false)로 여닫는다.")]
     [SerializeField] private GameObject _optionsPanelRoot;
@@ -360,6 +369,11 @@ public class OptionsPanelUI : MonoBehaviour
 
     private void OnEnable()
     {
+        // 설정 전용(타이틀) 인스턴스는 항복/파트너 이탈/세션 종료/게임 클리어 어느 것도 절대
+        // 일어나지 않는 화면이므로 구독 자체를 하지 않는다 — OnDisable의 대응 -=는 구독한 적 없는
+        // 핸들러를 떼는 것이라 C# 이벤트상 안전한 no-op이라 그대로 둬도 된다.
+        if (_settingsOnly) return;
+
         GameEvents.OnOpponentDisconnected += HandlePartnerDisconnected;
         GameEvents.OnGracePeriodExpired   += HandlePartnerGiveUpAvailable;
         GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
@@ -568,6 +582,11 @@ public class OptionsPanelUI : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        // 설정 전용(타이틀) 인스턴스는 항복/파트너 이탈/패배/승리 폴링 자체를 하지 않는다 — 게임씬
+        // 상태(_activeModal 등)가 이 인스턴스에서는 애초에 None으로만 머무르므로 OnGUI의 ESC 처리는
+        // 손대지 않아도 자연히 "옵션창 토글"로만 수렴한다(별도 분기 불필요).
+        if (_settingsOnly) return;
+
         // 패배(TeamHpZero)/승리(챕터 클리어) 확인 모달이 최우선 — 이미 매치가 완전히 끝난 뒤라
         // 파트너 이탈/항복 관련 모달이 그 위를 덮어써서는 안 된다. 오직 이 모달 자신의 확인
         // 버튼으로만 내려간다.
@@ -902,8 +921,11 @@ public class OptionsPanelUI : MonoBehaviour
     // 옵션 패널 열기/닫기 (uGUI)
     // ─────────────────────────────────────────
 
-    /// <summary>설정 버튼/ESC로 옵션 패널을 연다. 현재 저장된 값을 스냅샷으로 남기고 uGUI에 반영한다.</summary>
-    private void OpenOptionsPanel()
+    /// <summary>
+    /// 설정 버튼/ESC로 옵션 패널을 연다. 현재 저장된 값을 스냅샷으로 남기고 uGUI에 반영한다.
+    /// public인 이유: 타이틀 씬의 SettingsButton(TitleScreenUI)이 다른 클래스에서 직접 호출한다.
+    /// </summary>
+    public void OpenOptionsPanel()
     {
         if (_optionsOpen) return;
         _optionsOpen = true;

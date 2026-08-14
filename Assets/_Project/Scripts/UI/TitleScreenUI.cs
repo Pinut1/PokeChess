@@ -78,6 +78,10 @@ public class TitleScreenUI : MonoBehaviour
     [SerializeField] private Button _quitButton;
     [Tooltip("입장 실패 등 로비 안내 문구. 비어 있으면 꺼진다.")]
     [SerializeField] private TMP_Text _lobbyMessageText;
+    [Tooltip("설정 화면을 연다. QuitButton과 같은 LoginRow에 둔다.")]
+    [SerializeField] private Button _settingsButton;
+    [Tooltip("게임씬과 공유하는 OptionsPanelUI. 타이틀용 인스턴스는 반드시 SettingsOnly=true로 둘 것.")]
+    [SerializeField] private OptionsPanelUI _optionsPanelUI;
 
     [Header("공용 모달")]
     [Tooltip("이전 세션 관련 안내/확인 팝업(ModalDialog_Pf). Canvas 직계에 둘 것.")]
@@ -125,6 +129,7 @@ public class TitleScreenUI : MonoBehaviour
         if (_rejoinButton != null) _rejoinButton.onClick.AddListener(HandleRejoinClicked);
         if (_backButton != null) _backButton.onClick.AddListener(HandleBackClicked);
         if (_quitButton != null) _quitButton.onClick.AddListener(HandleQuitClicked);
+        if (_settingsButton != null) _settingsButton.onClick.AddListener(HandleSettingsClicked);
 
         if (_roomList != null) _roomList.RoomJoinFailed += SetLobbyMessage;
 
@@ -360,6 +365,11 @@ public class TitleScreenUI : MonoBehaviour
     private void HandleBackClicked()
     {
         EnterLoginPhase();
+    }
+
+    private void HandleSettingsClicked()
+    {
+        if (_optionsPanelUI != null) _optionsPanelUI.OpenOptionsPanel();
     }
 
     private void HandleQuitClicked()
