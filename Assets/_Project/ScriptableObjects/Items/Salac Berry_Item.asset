@@ -15,8 +15,7 @@ MonoBehaviour:
   id: 14
   itemName: "\uCE84\uB77C\uC5F4\uB9E4"
   itemNameEn: Salac Berry
-  description: "\uB9E4\uCD08 \uACF5\uACA9 \uC18D\uB3C4 7% \uD68D\uB4DD (\uC911\uCCA9
-    \uAC00\uB2A5)"
+  description: "\uB9E4\uCD08 \uACF5\uACA9 \uC18D\uB3C4 7% \uD68D\uB4DD"
   sourceStats:
   - key: AS
     value: 10

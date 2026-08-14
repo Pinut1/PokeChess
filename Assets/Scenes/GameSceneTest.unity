@@ -5840,6 +5840,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OptionsPanelUI
   _titleSceneName: NetworkTest
+  _settingsOnly: 0
   _optionsPanelRoot: {fileID: 443742576}
   _openOptionsButton: {fileID: 1875205819}
   _masterRow: {fileID: 241857799987197960}

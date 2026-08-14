@@ -15,9 +15,8 @@ MonoBehaviour:
   id: 15
   itemName: "\uC120\uC81C\uACF5\uACA9\uC190\uD1B1"
   itemNameEn: Quick Claw
-  description: "\uAE30\uBCF8 \uACF5\uACA9 \uC2DC \uACF5\uACA9\uB825 3.5% (\uCD5C\uB300
-    15\uD68C \uC911\uCCA9) \uD68D\uB4DD.\n\n\uAE30\uBCF8 \uACF5\uACA9 15\uD68C \uD6C4
-    \uACF5\uACA9 \uC18D\uB3C4 15% \uD68D\uB4DD"
+  description: "\uAE30\uBCF8 \uACF5\uACA9 \uC2DC \uACF5\uACA9\uB825 3.5% \uD68D\uB4DD.\n\n\uAE30\uBCF8
+    \uACF5\uACA9 15\uD68C \uD6C4 \uACF5\uACA9 \uC18D\uB3C4 15% \uD68D\uB4DD"
   sourceStats:
   - key: AD
     value: 10

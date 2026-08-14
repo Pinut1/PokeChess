@@ -19,7 +19,7 @@ public enum AugmentTier
 public enum AugmentId
 {
     EconomyGold,    // ECONOMY_GOLD — 골드를 획득했다! (즉시 50G + 이자율 2)
-    EconomyShop,    // ECONOMY_SHOP — 구독서비스 (4코 상점 확정 오픈 2회 + 회당 4G)
+    EconomyShop,    // ECONOMY_SHOP — 구독서비스 (4코 상점 확정 오픈 1회 + 4G)
     HeroPachirisu,  // HERO_PACHIRISU — 기술머신:날따름 (탱커 전환 + 도발 + ×1.4)
     HeroEevee,      // HERO_EEVEE — 기술머신:나인이볼부스트 (진화잠금 + 마법사 전환 + ×1.4)
     RerollTicket,   // REROLL_TICKET — 하이퍼 티켓 (즉시 리롤 5 + 45% 환급)

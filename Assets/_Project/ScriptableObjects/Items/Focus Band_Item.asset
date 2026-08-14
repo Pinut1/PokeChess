@@ -15,11 +15,9 @@ MonoBehaviour:
   id: 4
   itemName: "\uAE30\uD569\uC758\uBA38\uB9AC\uB760"
   itemNameEn: Focus Band
-  description: "2\uAC00\uC9C0 \uD6A8\uACFC \uD68D\uB4DD:\n\n\uC8FC\uBB38\uB825 15%\n\n\uBAA8\uB4E0
-    \uD53C\uD574 \uD761\uD608 12%\n\n\uCCB4\uB825\uC774 50%\uB97C \uB118\uC744 \uB54C
-    \uC8FC\uBB38\uB825 \uB450 \uBC30\uB85C \uC99D\uAC00\n\n\uCCB4\uB825\uC774 50%
-    \uC544\uB798\uC77C \uB54C \uBAA8\uB4E0 \uD53C\uD574 \uD761\uD608 \uB450 \uBC30\uB85C
-    \uC99D\uAC00"
+  description: "2\uAC00\uC9C0 \uD6A8\uACFC \uD68D\uB4DD: \n\n\uC8FC\uBB38\uB825 15%\n\uBAA8\uB4E0
+    \uBC1B\uC740 \uD53C\uD574\uB7C9 12% \uD68C\uBCF5\n\n\uCCB4\uB825\uC774 50%\uB97C
+    \uB118\uC744 \uB54C \uC8FC\uBB38\uB825 \uB450 \uBC30\uB85C \uC99D\uAC00"
   sourceStats:
   - key: CRT
     value: 20
@@ -81,4 +79,4 @@ MonoBehaviour:
   adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
-  icon: {fileID: 21300000, guid: 7fbdb809ec5f89a4a84799254848a684, type: 3}
+  icon: {fileID: 21300000, guid: 65a3905e4d135d04c906e82cde866fa2, type: 3}
