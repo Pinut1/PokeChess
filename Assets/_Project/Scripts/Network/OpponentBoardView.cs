@@ -135,7 +135,9 @@ public class OpponentBoardView : MonoBehaviour
         return ready;
     }
 
-    /// <summary>true면 Render를 호출해도 아무것도 그리지 않는다(파트너 미러 전투와 동시 표시되는 것 방지용).</summary>
+    /// <summary>true면 Render가 필드(onBoard=true) 엔트리만 그리지 않는다(파트너 미러 전투와 필드가
+    /// 동시 표시되는 것 방지용). 벤치(onBoard=false)는 미러 전투 중에도 계속 BoardSnapshot으로
+    /// 실시간 표시해야 하므로 이 플래그의 영향을 받지 않는다.</summary>
     private bool _suppressed;
 
     /// <summary>Render가 마지막으로 받은 스냅샷. 억제 해제 시 다시 그리기 위해 보관.</summary>
@@ -262,15 +264,15 @@ public class OpponentBoardView : MonoBehaviour
     }
 
     /// <summary>
-    /// 표시를 일시적으로 끄거나 켠다. 끄면 현재 활성 비주얼을 전부 풀로 반환하고,
-    /// 새 스냅샷이 도착해도 억제 중엔 그리지 않는다. 다시 켜면 마지막 스냅샷을 즉시 재렌더한다.
-    /// 이번 QA 테스트 범위에서만 쓰는 용도라 GameEvents/자동 페이즈 연결은 하지 않는다(호출측 책임).
+    /// 필드 표시를 일시적으로 끄거나 켠다(벤치는 영향받지 않음). 마지막 스냅샷이 있으면 새 억제
+    /// 상태를 반영해 즉시 재렌더한다 — suppressed=false면 필드+벤치 전체를, suppressed=true면
+    /// 필드만 제외하고 벤치는 그대로 다시 그린다(Render() 내부 onBoard 필터링). 이번 QA 테스트
+    /// 범위에서만 쓰는 용도라 GameEvents/자동 페이즈 연결은 하지 않는다(호출측 책임).
     /// </summary>
     public void SetSuppressed(bool suppressed)
     {
         _suppressed = suppressed;
-        if (suppressed) ReleaseActive();
-        else if (_lastSnapshot != null) Render(_lastSnapshot);
+        if (_lastSnapshot != null) Render(_lastSnapshot);
     }
 
     private void Render(BoardSnapshot snap)
@@ -288,10 +290,13 @@ public class OpponentBoardView : MonoBehaviour
 
         // 활성분 전부 풀로 반환 후 스냅샷 기준으로 다시 배치.
         ReleaseActive();
-        if (_suppressed || board == null) return;
+        if (board == null) return;
 
         foreach (BoardSnapshot.Entry e in snap.entries)
         {
+            // 미러 전투 중(_suppressed)엔 필드만 건너뛴다 — 벤치는 계속 BoardSnapshot으로 실시간 표시.
+            if (_suppressed && e.onBoard) continue;
+
             Vector3 basePos = e.onBoard
                 ? board.CoordsToWorldPosition(new HexCoords(e.a, e.b))
                 : board.BenchSlotWorldPosition(e.a);

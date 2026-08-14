@@ -164,9 +164,10 @@ public class PartnerBattleMirrorController : MonoBehaviour
     }
 
     /// <summary>
-    /// 쇼핑 단계 파트너 보드 표시(OpponentBoardView)와 미러 유닛이 같은 자리에 겹쳐 보이지
-    /// 않도록, 미러 전투가 실행되는 동안만 잠깐 끈다. RoundPhaseManager/자동 페이즈 전환과는
-    /// 연결하지 않는다 — 이 QA 테스트 흐름 안에서만 켜고 끈다.
+    /// 쇼핑 단계 파트너 보드 필드 표시(OpponentBoardView)와 미러 전투 필드 유닛이 같은 자리에
+    /// 겹쳐 보이지 않도록, 미러 전투가 실행되는 동안만 필드 렌더만 잠깐 끈다(벤치는
+    /// OpponentBoardView.SetSuppressed 내부에서 영향받지 않아 계속 표시된다). RoundPhaseManager/
+    /// 자동 페이즈 전환과는 연결하지 않는다 — 이 QA 테스트 흐름 안에서만 켜고 끈다.
     /// </summary>
     private void SetOpponentBoardSuppressed(bool suppressed)
     {
