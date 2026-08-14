@@ -192,6 +192,18 @@ public class PartnerSpectateView : MonoBehaviour
             _spectatorTexture.Release();
             Destroy(_spectatorTexture);
         }
+
+        // _mirrorController(PartnerBattleMirrorController)는 DontDestroyOnLoad라 이 컴포넌트가
+        // 씬 전환으로 파괴돼도 그 자식 MirrorBattleManager 아래 남은 적 프리뷰 타일/모델과 진행 중
+        // 미러 전투 비주얼은 저절로 사라지지 않는다(2026-08 QA: 타이틀 화면에 이전 게임 보드/적군
+        // 타일이 잔존하는 버그의 원인). 이 컴포넌트는 항상 활성 오브젝트에 붙어 있어(클래스 주석)
+        // OnDestroy가 오직 씬 언로드 시에만 호출되므로, 여기서 정리해도 단순 패널 닫기 동작에는
+        // 영향이 없다.
+        if (_mirrorController != null)
+        {
+            _mirrorController.ClearPartnerEnemyPreview();
+            _mirrorController.StopMirrorBattle();
+        }
     }
 
     private void Update()
