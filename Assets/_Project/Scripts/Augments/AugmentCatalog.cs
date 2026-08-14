@@ -18,7 +18,7 @@ public static class AugmentCatalog
         Define(1, AugmentId.EconomyGold, "골드를 획득했다!", "ECONOMY_GOLD",
                "즉시 50골드를 획득합니다. 이자 수익이 2골드로 증가합니다. 이자는 저축한 10골드당 추가로 획득하는 골드입니다."),
         Define(2, AugmentId.EconomyShop, "구독서비스", "ECONOMY_SHOP",
-               "100% 확정으로 서로 다른 4단계 포켓몬으로 구성된 상점을 엽니다. 즉시 1회, 1~3라운드 중 1회 추가로 총 2회 발동하며, 매 발동 시 4골드를 획득합니다."),
+               "100% 확정으로 서로 다른 4단계 포켓몬으로 구성된 상점을 엽니다. 즉시 1회 발동하며, 4골드를 획득합니다."),
         Define(3, AugmentId.HeroPachirisu, "기술머신:날따름", "HERO_PACHIRISU",
                "파치리스를 획득합니다. 아군 파치리스가 날따름 스킬을 배우고 탱커로 변하며 능력치가 1.4배가 됩니다."),
         Define(4, AugmentId.HeroEevee, "기술머신:나인이볼부스트", "HERO_EEVEE",
