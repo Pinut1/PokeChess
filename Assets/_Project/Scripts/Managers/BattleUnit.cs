@@ -29,6 +29,7 @@ public class BattleUnit
     public float currentMana;
     public float maxMana;            // = PokemonData.manaCost
     public float manaGainMultiplier = 1f; // 마나 충전 속도 배수(정령 시너지/치어리더 등). 1=기본.
+    public float manaRegenBonus;     // 아이템 MP 스탯 — 초당 마나 충전량에 flat 가산(배수 곱셈 전). 기본 0.
     public SkillEffectType skillEffectType;  // 효과 분기 (Attack/Spell=데미지, Stun/Slow/Taunt=CC, HpRegen/Shield/ManaRegen/AsBuff=지원)
     public SkillTargetType skillTargetType;
     public int   skillAreaRadius;    // *_Area: 중심 반경(칸)
@@ -44,6 +45,7 @@ public class BattleUnit
     public float attackCooldown;   // 0 이하가 되면 공격 가능
     public GameObject visual;
     public UnitFacing facing;      // visual에 붙은 회전 컴포넌트(타겟 바라보기). visual과 생명주기 동일.
+    public GameObject shieldVfxInstance; // 공용 보호막 상태 VFX(BattleManager.SyncShieldVfx가 관리). world-space 독립 생성 — visual의 자식 아님.
 
     // ── 효과 훅(기둥B) — 아이템/스킬/시너지가 전투 틱에 꽂히는 진입점 ──
     public readonly List<ICombatEffect> effects = new();
@@ -64,7 +66,72 @@ public class BattleUnit
     public EvolutionStoneData displayStone;
 
     // ── 조건부 아이템 효과 상태(기둥B 2단계) ──
-    public float shield;                  // 보호막 흡수량. 0 이하면 없음(shieldPctOnFatalHit).
+    public float shield;                  // 보호막 총량(권위값). 모든 출처(스킬/장비/WATER 시너지/shieldPctOnFatalHit)가
+                                           // 여기 합산된다 — 이 필드 자체는 절대 "파생값"으로 바꾸지 않는다(2026-08 확정).
+
+    // ── 보호막 출처 추적(2026-08 확정) ──
+    // shieldSources는 "추적 대상"(스킬 SHIELD/Apicot/Shell Bell/Micle)만 담는다. WATER 시너지·
+    // shieldPctOnFatalHit(현재 미사용)는 의도적으로 여기 들어가지 않는 미추적 보호막이다 — shield 필드에는
+    // 반영되지만 shieldSources 목록·상태 VFX 판정에는 절대 나타나지 않는다.
+    //
+    // 신규 전투 규칙(2026-08 확정): 피해는 shieldSources를 FIFO(리스트 Add 순서=생성 순서)로 먼저 소진한
+    // 뒤, 추적 출처가 전부 바닥나야만 남은 흡수량이 WATER 등 미추적 보호막에서 빠져나간다. 이 우선순위는
+    // 기존 코드에 없던 새 규칙이며 AbsorbShieldDamage 안에서만 구현된다(shield 필드 자체엔 이 우선순위가
+    // 드러나지 않음 — shieldSources 목록만이 이 규칙의 근거).
+    public readonly List<ShieldSource> shieldSources = new();
+    public ShieldSource skillShieldSource; // 유닛당 스킬은 최대 1개 — 재시전 시 이 참조가 살아있으면 합산, 아니면 새로 생성.
+
+    private int _nextShieldSequence;
+    /// <summary>이 유닛 안에서 ShieldSource를 새로 만들 때마다 호출 — 유닛별 로컬 카운터라 정적/공유 상태가
+    /// 전혀 없고, Time.time 등 비결정적 값도 쓰지 않아 실전투/미러가 항상 같은 순서를 재현한다.</summary>
+    public int NextShieldSequence() => _nextShieldSequence++;
+
+    private static readonly IReadOnlyList<ShieldSource> EmptyDepletedShieldSources = System.Array.Empty<ShieldSource>();
+
+    /// <summary>
+    /// 보호막 흡수를 정확히 1곳에서 처리하는 공용 진입점(BattleManager.ResolveDamage가 아이템 보유 여부와
+    /// 무관하게 항상 1회 호출). shieldSources를 FIFO로 먼저 소진하고, 남은 흡수량은 shield 필드에서만
+    /// 차감돼 "미추적 보호막(WATER 등)이 나중에 소진된다"는 규칙을 코드 한 곳에서 구현한다.
+    /// 각 출처의 remainingAmount만 정확히 줄어들 뿐 다른 출처는 절대 건드리지 않는다.
+    /// </summary>
+    public ShieldAbsorbResult AbsorbShieldDamage(float incomingDamage)
+    {
+        if (shield <= 0f || incomingDamage <= 0f)
+            return new ShieldAbsorbResult(incomingDamage, EmptyDepletedShieldSources);
+
+        float absorbed = Mathf.Min(shield, incomingDamage);
+        float toDistribute = absorbed;
+        List<ShieldSource> depleted = null;
+
+        foreach (var source in shieldSources)
+        {
+            if (toDistribute <= 0f) break;
+            if (source.remainingAmount <= 0f) continue; // 이미 소진된 출처는 건너뜀(재차감 방지)
+
+            float take = Mathf.Min(source.remainingAmount, toDistribute);
+            source.remainingAmount -= take;
+            toDistribute -= take;
+
+            if (source.remainingAmount <= 0f)
+                (depleted ??= new List<ShieldSource>()).Add(source);
+        }
+        // toDistribute>0으로 남았다면 = 추적 출처를 다 쓰고도 남은 흡수량 = WATER 등 미추적 보호막 몫.
+        // shieldSources는 여기서 더 건드리지 않고, 아래 shield 차감 한 줄로만 자연스럽게 반영된다.
+
+        shield -= absorbed;
+        return new ShieldAbsorbResult(incomingDamage - absorbed, (IReadOnlyList<ShieldSource>)depleted ?? EmptyDepletedShieldSources);
+    }
+
+    public float skillDamageAmpPct;       // 스킬 피해 증폭 누적치(%p). 규살열매/초점렌즈/왕의징표석 등이 가산.
+                                           // 평타에는 적용 안 됨(ResolveDamage에서 !isBasicAttack만 적용).
+    public float basicAttackDamageAmpPct; // 평타 피해 증폭 누적치(%p). 왕의징표석/선제공격손톱 등이 가산.
+                                           // 스킬에는 적용 안 됨(ResolveDamage에서 isBasicAttack만 적용).
+    public float damageAmpPct;            // 공용 피해 증폭 누적치(%p, AMP). 평타/스킬 모두 적용.
+                                           // skillDamageAmpPct/basicAttackDamageAmpPct와 별도로 순차 곱(복리 아님).
+    public float pendingAuraAttackSpeedPct; // 구애머리띠 등 "전투 시작 인접 아군" 공격속도% 오라의 임시 누적분(%p).
+                                             // ApplyOnCombatStartEffects 2단계에서 여러 오라가 각각 이 필드에 더하기만 하고,
+                                             // 모든 유닛의 2단계가 끝난 뒤 3단계에서 attackSpeed에 딱 1번만 곱해 소비한다
+                                             // (오라 2개=+60%를 ×1.3×1.3=1.69가 아니라 ×1.6으로 만들기 위한 장치).
     public float burnDamagePerTick;       // 화상 중 매틱 고정(True) 피해. 0이면 화상 없음.
     public float burnTicksRemaining;      // 화상 잔여 틱 수(시간이 아니라 틱 카운트).
     public float moveSpeedMultiplier = 1f; // 이동 가속 배수(moveSpdPctOnKill로 누적 가산).

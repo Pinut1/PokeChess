@@ -15,39 +15,61 @@ MonoBehaviour:
   id: 9
   itemName: "\uCE58\uB9AC\uC5F4\uB9E4"
   itemNameEn: Liechi Berry
-  description: "\uC774 \uC5F4\uB9E4\uC758 \uC8FC\uC778\uC740 \uB354\uC5C6\uB294 \uD3C9\uD654\uC640
+  description: "\uC774 \uAC80\uC758 \uC8FC\uC778\uC740 \uB354\uC5C6\uB294 \uD3C9\uD654\uC640
     \uC548\uC815\uC744 \uCC3E\uAC8C \uB429\uB2C8\uB2E4. \uC8FC\uC778\uC758 \uC801\uB4E4\uB3C4
     \uB9C8\uCC2C\uAC00\uC9C0\uACE0\uC694.\n\n\uACF5\uACA9\uB825 55% \uC99D\uAC00,
-    \uD53C\uD574\uC99D\uD3ED 15% \uC99D\uAC00"
+    \uD53C\uD574 \uC99D\uD3ED 15% \uC99D\uAC00"
   sourceStats:
   - key: AD
     value: 55
     isPercent: 1
     hasValue: 1
-  - key: DEF
+  - key: AMP
     value: 10
     isPercent: 1
     hasValue: 1
-  - key: AMP
-    value: 0
-    isPercent: 0
-    hasValue: 0
   hpBonus: 0
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
+  attackPct: 55
   spAtkPct: 0
+  spellPowerBonus: 0
+  hpConditionalSpAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 0
+  defensePct: 0
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0
+  manaRegenBonus: 0
+  combatStartShieldPct: 0
+  shieldDuration: 0
+  onShieldEndSkillDamageAmpPct: 0
+  hpThresholdPct: 0
+  thresholdShieldPct: 0
+  shieldDecayDuration: 0
+  periodicInterval: 0
+  periodicSkillDamageAmpPct: 0
+  periodicAttackSpeedPct: 0
+  basicAttackDamageAmpPerStackPct: 0
+  skillDamageAmpPerStackPct: 0
+  maxCombatStacks: 0
+  maxStackDamageAmpPct: 0
+  maxStackAttackSpeedPct: 0
+  gainStackOnTakeDamage: 0
+  damageAmpPct: 10
+  skillDamageAmpPct: 0
+  healLowestAllyPctOfDamage: 0
+  adjacentAllyAttackSpeedPct: 0
+  adjacentAllySpellPowerBonus: 0
+  adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 279760b89f577df4d815330c80254cd3, type: 3}

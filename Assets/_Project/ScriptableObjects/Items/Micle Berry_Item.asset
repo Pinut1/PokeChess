@@ -27,22 +27,60 @@ MonoBehaviour:
     value: 40
     isPercent: 1
     hasValue: 1
+  - key: hpThresholdPct
+    value: 60
+    isPercent: 1
+    hasValue: 1
+  - key: thresholdShieldPct
+    value: 40
+    isPercent: 1
+    hasValue: 1
+  - key: shieldDecayDuration
+    value: 4
+    isPercent: 0
+    hasValue: 1
   hpBonus: 300
   maxHpPct: 0
   hpRegenPercent: 0
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
+  attackPct: 40
   spAtkPct: 0
+  spellPowerBonus: 0
+  hpConditionalSpAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 0
+  defensePct: 0
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0
+  manaRegenBonus: 0
+  combatStartShieldPct: 0
+  shieldDuration: 0
+  onShieldEndSkillDamageAmpPct: 0
+  hpThresholdPct: 60
+  thresholdShieldPct: 40
+  shieldDecayDuration: 4
+  periodicInterval: 0
+  periodicSkillDamageAmpPct: 0
+  periodicAttackSpeedPct: 0
+  basicAttackDamageAmpPerStackPct: 0
+  skillDamageAmpPerStackPct: 0
+  maxCombatStacks: 0
+  maxStackDamageAmpPct: 0
+  maxStackAttackSpeedPct: 0
+  gainStackOnTakeDamage: 0
+  damageAmpPct: 0
+  skillDamageAmpPct: 0
+  healLowestAllyPctOfDamage: 0
+  adjacentAllyAttackSpeedPct: 0
+  adjacentAllySpellPowerBonus: 0
+  adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 919dbee5cfe50c1418c302776998e845, type: 3}

@@ -24,4 +24,9 @@ public interface ICombatEffect
 
     /// <summary>self가 가해자이고 victim이 이 피해로 사망했을 때.</summary>
     void OnKill(BattleUnit self, BattleUnit victim) { }
+
+    /// <summary>self가 가해자일 때, 피해가 실제로 target의 HP에 반영된 직후(증폭·크리·경감·보호막
+    /// 흡수까지 전부 끝난 뒤). actualHpDamage는 target의 currentHp가 실제로 줄어든 양(오버킬 제외,
+    /// 보호막이 막은 만큼 제외) — ctx.amount와 다를 수 있으므로 이 값만 신뢰할 것(큰뿌리 등).</summary>
+    void OnDealDamageResolved(BattleUnit self, BattleUnit target, float actualHpDamage) { }
 }

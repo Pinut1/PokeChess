@@ -27,9 +27,17 @@ MonoBehaviour:
     value: 20
     isPercent: 0
     hasValue: 1
-  - key: VMP
-    value: 20
+  - key: hpThresholdPct
+    value: 40
     isPercent: 1
+    hasValue: 1
+  - key: thresholdShieldPct
+    value: 25
+    isPercent: 1
+    hasValue: 1
+  - key: shieldDuration
+    value: 5
+    isPercent: 0
     hasValue: 1
   hpBonus: 0
   maxHpPct: 0
@@ -37,16 +45,42 @@ MonoBehaviour:
   healTakenDmgPct: 0
   shieldPctOnFatalHit: 0
   attackBonus: 0
+  attackPct: 15
   spAtkPct: 0
+  spellPowerBonus: 0
+  hpConditionalSpAtkPct: 0
   attackSpeedBonus: 0
   moveSpdPctOnKill: 0
   defenseBonus: 20
+  defensePct: 0
   spDefBonus: 0
   reflectPhysPct: 0
   reflectSpPct: 0
   defSpDefPerAttacker: 0
   criPct: 0
   criDmgPct: 0
+  manaRegenBonus: 0
+  combatStartShieldPct: 0
+  shieldDuration: 5
+  onShieldEndSkillDamageAmpPct: 0
+  hpThresholdPct: 40
+  thresholdShieldPct: 25
+  shieldDecayDuration: 0
+  periodicInterval: 0
+  periodicSkillDamageAmpPct: 0
+  periodicAttackSpeedPct: 0
+  basicAttackDamageAmpPerStackPct: 0
+  skillDamageAmpPerStackPct: 0
+  maxCombatStacks: 0
+  maxStackDamageAmpPct: 0
+  maxStackAttackSpeedPct: 0
+  gainStackOnTakeDamage: 0
+  damageAmpPct: 0
+  skillDamageAmpPct: 0
+  healLowestAllyPctOfDamage: 0
+  adjacentAllyAttackSpeedPct: 0
+  adjacentAllySpellPowerBonus: 0
+  adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
   icon: {fileID: 21300000, guid: 1a34bcbb9a2d248409f69d2595b33c93, type: 3}
