@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   id: 8
   itemName: "\uC758\uBB38\uC5F4\uB9E4"
-  itemNameEn: Micle Berry
+  itemNameEn: Enigma Berry
   description: "\uCCB4\uB825\uC774 60%\uC77C \uB54C, \uC7A5\uCC29 \uC720\uB2DB \uCD5C\uB300
     \uCCB4\uB825\uC758 40%\uC5D0 \uD574\uB2F9\uD558\uB294 \uBCF4\uD638\uB9C9 \uD68D\uB4DD.
     \uBCF4\uD638\uB9C9\uC740 4\uCD08\uC5D0 \uAC78\uCCD0 \uBE60\uB974\uAC8C \uC0AC\uB77C\uC9D0"
@@ -83,4 +83,4 @@ MonoBehaviour:
   adjacentAllyManaBonus: 0
   burnNearOnPhysHit: 0
   ccImmune: 0
-  icon: {fileID: 21300000, guid: 919dbee5cfe50c1418c302776998e845, type: 3}
+  icon: {fileID: 21300000, guid: c9dd52b5df3ec8a4189b8ada24ce26ad, type: 3}
