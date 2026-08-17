@@ -315,6 +315,11 @@ public class BattleManager : MonoBehaviour
                     result.overtimeAllyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리) — 기존 동시 전멸 규칙 유지
                     yield break;
                 }
+
+                // 배속(simTicksPerWait > 1)일 때 SimulateTick() 여러 번이 한 프레임에 몰려 렌더가
+                // 버벅이는 것을 막는다 — 마지막 반복이 아니면 한 프레임 양보. 현실 시간 축(오버타임
+                // 총 길이)은 바깥 WaitForSeconds(TICK_INTERVAL)가 그대로 담당하므로 영향 없다.
+                if (i < simTicksPerWait - 1) yield return null;
             }
 
             yield return new WaitForSeconds(TICK_INTERVAL);
