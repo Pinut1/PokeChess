@@ -351,6 +351,9 @@ MonoBehaviour:
   _itemIcons:
   - {fileID: 2441979348335101009}
   - {fileID: 5538341326212076045}
+  _itemTooltip: {fileID: 0}
+  _roleTooltip: {fileID: 0}
+  _roleImage: {fileID: 0}
 --- !u!1 &643249615903803825
 GameObject:
   m_ObjectHideFlags: 0
@@ -1800,6 +1803,7 @@ GameObject:
   - component: {fileID: 869525031084419869}
   - component: {fileID: 4375709357390476598}
   - component: {fileID: 1939829613354412162}
+  - component: {fileID: 1200585443595033530}
   m_Layer: 5
   m_Name: Role_Image
   m_TagString: Untagged
@@ -1865,6 +1869,18 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 12
+--- !u!114 &1200585443595033530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4378974563355085003}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16ac12d808f88eb4da17380588593f0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoleHoverTarget
 --- !u!1 &4504135609513046477
 GameObject:
   m_ObjectHideFlags: 0
