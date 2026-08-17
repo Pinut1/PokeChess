@@ -28,8 +28,9 @@ public class TextTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerE
 
     private void Awake()
     {
-        if (_tooltip == null)
-            _tooltip = FindFirstObjectByType<RoleTooltipController>(FindObjectsInactive.Include);
+        // 씬에 설명창이 둘(상점용/스탯창용)이라 아무거나 잡으면 모양이 뒤바뀐다.
+        // 여러 개면 경고를 남기는 공용 탐색을 쓴다.
+        if (_tooltip == null) _tooltip = RoleTooltipController.FindInScene(this);
 
         EnsureRaycastTarget();
     }
