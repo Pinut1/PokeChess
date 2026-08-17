@@ -148,6 +148,7 @@ GameObject:
   - component: {fileID: 3365900451656339520}
   - component: {fileID: 2558382636914948411}
   - component: {fileID: 1070375212825698974}
+  - component: {fileID: 6182759592364120665}
   m_Layer: 5
   m_Name: RoleTooltip_Pf
   m_TagString: Untagged
@@ -213,3 +214,33 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 15
+--- !u!114 &6182759592364120665
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7772441130972437316}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8233ba03439c3d243b3e855db56db2a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoleTooltipUI
+  _roleText: {fileID: 4659231214794816198}
+  _roleFormat: '{0}({1})'
+  _itemArea: {fileID: 0}
+  _itemSlotTemplate: {fileID: 0}
+  _itemLabel: {fileID: 0}
+  _roleLabels:
+  - role: Tanker
+    korean: "\uD0F1\uCEE4"
+  - role: Warrior
+    korean: "\uC804\uC0AC"
+  - role: Assassin
+    korean: "\uC554\uC0B4\uC790"
+  - role: Magician
+    korean: "\uB9C8\uBC95\uC0AC"
+  - role: Archer
+    korean: "\uC6D0\uAC70\uB9AC\uB51C\uB7EC"
+  - role: Supporter
+    korean: "\uC11C\uD3EC\uD130"

@@ -70,17 +70,35 @@ public class RoleTooltipController : MonoBehaviour
             return;
         }
 
-        Show(owner, unit.Role);
+        // 진화잠금(나인이볼부스트 이브이 등)이면 돌 추천을 빼야 하므로 유닛 상태를 같이 넘긴다.
+        Show(owner, unit.Role, unit.data, unit.evolutionLocked);
     }
 
     /// <summary>역할 문자열을 직접 넘기는 진입점.</summary>
-    public void Show(object owner, string role)
+    public void Show(object owner, string role) => Show(owner, role, null, false);
+
+    /// <summary>
+    /// <b>인스펙터에서 부르는 진입점</b>(EventTrigger의 PointerEnter 등). 인자가 하나뿐이라
+    /// UnityEvent에 그대로 물릴 수 있다 — 스크립트를 새로 만들지 않고 간단한 안내 툴팁을 붙일 때 쓴다.
+    ///
+    /// 넘긴 문구는 <b>그대로</b> 나온다. 역할군 대응표에 없는 문자열은 형식을 입히지 않기 때문에
+    /// "옵션", "1-3 야생동물" 같은 안내문을 그대로 띄울 수 있다.
+    ///
+    /// 닫을 때는 <see cref="HideAll"/>을 PointerExit에 물리면 된다(인자가 없어 인스펙터에서 부를 수 있다).
+    /// </summary>
+    public void ShowText(string text) => Show(this, text, null, false);
+
+    /// <summary>
+    /// 역할과 함께 <b>지금 보고 있는 유닛</b>을 넘기는 진입점.
+    /// 설명창에 아이템 줄이 물려 있으면 그 유닛이 쓸 수 있는 진화의 돌까지 뒤에 붙는다.
+    /// </summary>
+    public void Show(object owner, string role, PokemonData pokemon, bool evolutionLocked)
     {
         if (_panel == null) return;
 
         _panel.gameObject.SetActive(true);
 
-        if (!_panel.Bind(role))
+        if (!_panel.Bind(role, pokemon, evolutionLocked))
         {
             // Hide(owner)를 쓰면 안 된다 — 아직 _owner를 이 owner로 바꾸기 전이라
             // "네 것이 아니다"라는 가드에 걸려 무시되고, 이전 유닛의 역할이 화면에 남는다.

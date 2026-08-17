@@ -126,6 +126,13 @@ public class StatInfoPanelUI : MonoBehaviour
              "비워두면 씬에서 찾아 쓴다 — 이 패널을 프리팹에서 생성하는 경우 씬 오브젝트를 인스펙터에 꽂을 수 없기 때문.")]
     [SerializeField] private ItemTooltipController _itemTooltip;
 
+    [Tooltip("역할군 설명창. 비어 있으면 씬에서 찾는다(프리팹은 씬 오브젝트를 참조할 수 없다). " +
+             "Role_Image에 커서를 올리면 이 역할군이 쓰는 추천 아이템이 뜬다.")]
+    [SerializeField] private RoleTooltipController _roleTooltip;
+
+    [Tooltip("역할군 아이콘(Role_Image). 비어 있으면 Role Text의 부모에서 찾는다.")]
+    [SerializeField] private Image _roleImage;
+
     // 보드 유닛으로 열었으면 _unit, 전투 유닛(적 포함)으로 열었으면 _battleUnit, 쇼핑 중 파트너
     // 유닛(읽기 전용 표시 데이터)으로 열었으면 _partnerView — 셋 중 하나만 채워진다.
     private PokemonUnit _unit;
@@ -136,6 +143,13 @@ public class StatInfoPanelUI : MonoBehaviour
 
     // 아이콘 칸마다 하나씩. _itemIcons와 같은 순서다(Awake에서 붙인다).
     private ItemHoverTarget[] _itemHovers;
+
+    // Role_Image에 런타임으로 붙이는 커서 감지기. 지금 표시 중인 역할군을 들고 있는다.
+    private RoleHoverTarget _roleHover;
+
+    // 역할군 설명창에 넘길 현재 표시 대상. 보드/전투/파트너 어느 경로로 열렸든 여기에 담긴다.
+    private string _currentRole;
+    private PokemonData _currentData;
 
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
 
@@ -297,7 +311,68 @@ public class StatInfoPanelUI : MonoBehaviour
         if (_itemTooltip == null)
             _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
 
+        if (_roleTooltip == null) _roleTooltip = FindRoleTooltip();
+
         SetupItemHovers();
+        SetupRoleHover();
+    }
+
+    /// <summary>
+    /// 인스펙터에 안 물렸을 때의 폴백. 씬에 역할군 설명창이 <b>여러 개일 수 있다</b> —
+    /// 상점 카드용(역할 이름만)과 스탯창용(추천 아이템까지)을 따로 두기 때문이다.
+    /// 그런 경우 어느 것을 잡을지 보장할 수 없으므로, 조용히 아무거나 쓰지 않고 경고를 남긴다.
+    /// </summary>
+    private RoleTooltipController FindRoleTooltip()
+    {
+        var found = FindObjectsByType<RoleTooltipController>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (found == null || found.Length == 0) return null;
+
+        if (found.Length > 1)
+        {
+            Debug.LogWarning(
+                $"[StatInfoPanelUI] 역할군 설명창이 씬에 {found.Length}개 있습니다 — " +
+                "어느 것을 쓸지 정할 수 없어 첫 번째를 씁니다. " +
+                "상점용과 스탯창용을 나눠 뒀다면 Role Tooltip을 인스펙터에 직접 물려 주세요.", this);
+        }
+
+        return found[0];
+    }
+
+    /// <summary>
+    /// 역할군 아이콘에 커서 감지기를 붙인다. 아이템 칸과 같은 방식으로 런타임에 붙여
+    /// 프리팹 배선을 늘리지 않는다.
+    /// </summary>
+    private void SetupRoleHover()
+    {
+        // 인스펙터에 안 물렸으면 문서화된 구조(Role_Image/RoleText)에서 부모를 찾는다.
+        if (_roleImage == null && _roleText != null)
+            _roleImage = _roleText.GetComponentInParent<Image>();
+
+        if (_roleImage == null) return;
+
+        // Raycast Target이 꺼져 있으면 커서 이벤트가 아예 오지 않는다 — 여기서 보장한다.
+        _roleImage.raycastTarget = true;
+
+        _roleHover = _roleImage.GetComponent<RoleHoverTarget>();
+        if (_roleHover == null) _roleHover = _roleImage.gameObject.AddComponent<RoleHoverTarget>();
+
+        _roleHover.Hovered += HandleRoleHovered;
+    }
+
+    private void HandleRoleHovered(RoleHoverTarget target, bool entered)
+    {
+        if (_roleTooltip == null) return;
+
+        if (!entered || string.IsNullOrEmpty(_currentRole))
+        {
+            _roleTooltip.Hide(target);
+            return;
+        }
+
+        // 보드 유닛으로 연 경우엔 진화잠금 여부까지 반영된다(나인이볼부스트 이브이 등).
+        _roleTooltip.Show(target, _currentRole, _currentData, _unit != null && _unit.evolutionLocked);
     }
 
     /// <summary>
@@ -331,6 +406,8 @@ public class StatInfoPanelUI : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_roleHover != null) _roleHover.Hovered -= HandleRoleHovered;
+
         if (_itemHovers == null) return;
 
         foreach (ItemHoverTarget hover in _itemHovers)
@@ -448,6 +525,10 @@ public class StatInfoPanelUI : MonoBehaviour
         }
 
         SetText(_nameText, data.pokemonName);
+
+        _currentRole = role;
+        _currentData = data;
+
         SetText(_roleText, FormatRole(role));
         ApplyStarIcon(starLevel);
 
