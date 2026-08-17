@@ -87,6 +87,9 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
     /// <summary>지금 이 설명창을 띄운 쪽. 다른 칸의 늦은 Exit이 새로 연 창을 끄는 걸 막는다.</summary>
     private object _owner;
 
+    // 내용이 바뀌어 크기를 다시 재야 하는지. Show에서만 서고 Place가 한 번 쓰고 내린다.
+    private bool _layoutDirty = true;
+
     private void Awake()
     {
         if (_root == null) _root = transform as RectTransform;
@@ -116,6 +119,9 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
 
         _root.gameObject.SetActive(true);
         Bind(data, role, attackRange, recommendedItems);
+
+        // 내용이 바뀌었으니 다음 Place에서 한 번 다시 잰다.
+        _layoutDirty = true;
 
         // 배치도 위 어떤 칸보다도 앞에 떠야 한다.
         _root.SetAsLastSibling();
@@ -244,7 +250,14 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
     {
         // ContentSizeFitter 결과를 이번 프레임에 반영한다. 안 하면 방금 켠 프레임에
         // 이전 내용의 크기로 자리를 잡아 창이 한 번 튄다.
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_root);
+        //
+        // 내용은 Show에서만 바뀌므로 그때 한 번만 다시 재면 된다. 매 프레임 부르면
+        // 커서를 따라다니는 내내 서브트리 전체를 다시 계산한다(자리 계산에는 크기만 필요하다).
+        if (_layoutDirty)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_root);
+            _layoutDirty = false;
+        }
 
         float scale = _canvas != null ? _canvas.scaleFactor : 1f;
         Vector2 size = _root.rect.size * scale;

@@ -50,6 +50,15 @@ public class SampleDeckListRowUI : MonoBehaviour
     /// <summary>[공략 더 보기]를 눌렀을 때.</summary>
     public event Action<SampleDeckListRowUI> DetailRequested;
 
+    /// <summary>
+    /// 이 줄의 유닛 칸에 커서가 들고 날 때. 설명창을 여는 쪽은 패널이라, 줄은 "몇 번 덱의
+    /// 어느 칸인지"만 알려준다 — 상세(2페이지)의 배치도와 같은 구조다.
+    /// </summary>
+    public event Action<SampleDeckListRowUI, SampleDeckUnitCardUI, bool> UnitHovered;
+
+    /// <summary>이 줄의 유닛 칸에 붙은 <b>아이템 아이콘</b>에 커서가 들고 날 때.</summary>
+    public event Action<SampleDeckListRowUI, SampleDeckUnitCardUI, SampleDeckItemSlotUI, bool> UnitItemHovered;
+
     private readonly List<SampleDeckSynergyBadgeUI> _synergyBadges = new();
     private readonly List<SampleDeckUnitCardUI> _unitCards = new();
 
@@ -119,8 +128,15 @@ public class SampleDeckListRowUI : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            SampleDeckUnitCardUI card =
-                SampleDeckPool.Take(_unitCards, _unitCardTemplate, _unitCardArea, i);
+            // 상세 페이지의 배치도와 같은 칸이므로 설명창도 같이 붙는다 — 목록에서만 조용히
+            // 반응이 없으면 "여긴 왜 안 뜨지" 하게 된다. 이벤트는 생성 시점에만 건다.
+            SampleDeckUnitCardUI card = SampleDeckPool.Take(
+                _unitCards, _unitCardTemplate, _unitCardArea, i,
+                created =>
+                {
+                    created.Hovered += HandleUnitHovered;
+                    created.ItemHovered += HandleUnitItemHovered;
+                });
 
             if (card == null) break;
 
@@ -129,4 +145,11 @@ public class SampleDeckListRowUI : MonoBehaviour
 
         SampleDeckPool.HideExtras(_unitCards, count);
     }
+
+    private void HandleUnitHovered(SampleDeckUnitCardUI card, bool entered)
+        => UnitHovered?.Invoke(this, card, entered);
+
+    private void HandleUnitItemHovered(
+        SampleDeckUnitCardUI card, SampleDeckItemSlotUI slot, bool entered)
+        => UnitItemHovered?.Invoke(this, card, slot, entered);
 }

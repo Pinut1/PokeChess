@@ -63,21 +63,44 @@ public static class SampleDeckHeroAugment
         return new Profile(role, RangeOf(role), true);
     }
 
-    /// <summary>덱 이름에 증강 이름이 들어 있으면 그 증강. 없으면 null(캐시에 null도 남긴다).</summary>
+    /// <summary>
+    /// 덱 이름에 증강 이름이 들어 있으면 그 증강. 없으면 null(캐시에 null도 남긴다).
+    ///
+    /// ⚠️ <b>부분 문자열 매칭이라 근본적으로 취약하다.</b> 시트의 덱 이름이 바뀌면 조용히 안 걸린다.
+    /// 제대로 고치려면 deck_data 시트에 증강 id 컬럼이 필요하다(기획 요청 대기).
+    /// 그때까지의 방어는 둘이다.
+    /// <list type="bullet">
+    /// <item>여러 증강이 걸리면 <b>가장 긴 이름</b>을 고른다 — 한 이름이 다른 이름을 품고 있어도
+    ///       (「나인이볼」 ⊂ 「나인이볼부스트」) 순회 순서에 결과가 좌우되지 않는다</item>
+    /// <item>둘 이상 걸리면 경고를 남긴다 — 조용한 오작동만은 막는다</item>
+    /// </list>
+    /// </summary>
     private static Augment AugmentOf(string deckName)
     {
         if (_byDeckName.TryGetValue(deckName, out Augment cached)) return cached;
 
-        Augment found = null;
+        AugmentData best = null;
+        int matches = 0;
 
         foreach (AugmentData data in AugmentCatalog.All)
         {
             if (data == null || string.IsNullOrWhiteSpace(data.augmentName)) continue;
             if (!deckName.Contains(data.augmentName)) continue;
 
-            found = AugmentFactory.Create(data);
-            break;
+            matches++;
+
+            if (best == null || data.augmentName.Length > best.augmentName.Length)
+                best = data;
         }
+
+        if (matches > 1)
+        {
+            UnityEngine.Debug.LogWarning(
+                $"[SampleDeckHeroAugment] 덱 이름 \"{deckName}\"에 증강 이름이 {matches}개 걸립니다 — " +
+                $"가장 긴 \"{best.augmentName}\"을 씁니다. 덱 이름이나 증강 이름을 손봐야 합니다.");
+        }
+
+        Augment found = best != null ? AugmentFactory.Create(best) : null;
 
         _byDeckName[deckName] = found;
         return found;
@@ -86,8 +109,11 @@ public static class SampleDeckHeroAugment
     /// <summary>
     /// 역할군에서 평타 사거리를 파생한다. 데이터 전수 확인 결과 예외가 없다 —
     /// 근접(Tanker·Warrior·Assassin) 80마리 전부 1, 원거리(Archer·Magician·Supporter) 60마리 전부 4.
+    ///
+    /// <b>이 판정의 단일 소스다.</b> <see cref="SampleDeckItemRules"/>도 여기를 부른다 —
+    /// 양쪽에 같은 표를 두면 역할이 늘 때 한쪽만 고쳐져 배치도와 아이템 그룹이 어긋난다.
     /// </summary>
-    private static int RangeOf(string role)
+    public static int RangeOf(string role)
     {
         if (string.IsNullOrWhiteSpace(role)) return RANGED_RANGE;
 
