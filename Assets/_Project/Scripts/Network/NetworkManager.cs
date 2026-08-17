@@ -1689,6 +1689,50 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 지금 유닛을 전송할 수 있는지. 보낼 수 없으면 <paramref name="reason"/>에 사유 문구가 담긴다.
+    ///
+    /// <see cref="SendTradeUnit"/>이 실제로 쓰는 검사와 <b>같은 코드</b>다 — 통신기 안내창이
+    /// "전송 준비 완료"라고 띄웠는데 막상 놓으면 거절되는 어긋남을 막으려고 한 곳에 모아 뒀다.
+    /// 상태를 바꾸지 않으므로 표시용으로 매 프레임 불러도 된다.
+    /// </summary>
+    public bool CanSendTradeUnit(out string reason)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom)
+        {
+            reason = "파트너 없음 — 전송 불가";
+            return false;
+        }
+
+        if (_lastKnownRound <= 0)
+        {
+            reason = "라운드 시작 전에는 전송할 수 없습니다.";
+            return false;
+        }
+
+        if (_lastTradeSentRound == _lastKnownRound)
+        {
+            reason = $"{_lastKnownRound}라운드 전송 횟수를 이미 사용했습니다.";
+            return false;
+        }
+
+        Player[] others = PhotonNetwork.PlayerListOthers;
+
+        if (others == null ||
+            others.Length == 0 ||
+            others[0].IsInactive)
+        {
+            reason = "파트너 연결 끊김 — 전송 불가";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    /// <summary>사유가 필요 없을 때(가능 여부만 보는 UI용).</summary>
+    public bool CanSendTradeUnit() => CanSendTradeUnit(out _);
+
+    /// <summary>
     /// 유닛을 파트너 통신기로 전송한다.
     ///
     /// 전송 시점에 유닛은 내 보드/벤치에서 제거하지만,
@@ -1702,37 +1746,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (unit == null || unit.data == null)
             return;
 
-        if (_soloMode || !PhotonNetwork.InRoom)
+        if (!CanSendTradeUnit(out string reason))
         {
-            Debug.LogWarning("[Trade] 파트너 없음 — 전송 불가");
-            GameEvents.TradeRejected();
-            return;
-        }
-
-        if (_lastKnownRound <= 0)
-        {
-            Debug.LogWarning("[Trade] 라운드 시작 전에는 전송할 수 없습니다.");
-            GameEvents.TradeRejected();
-            return;
-        }
-
-        if (_lastTradeSentRound == _lastKnownRound)
-        {
-            Debug.LogWarning(
-                $"[Trade] {_lastKnownRound}라운드 전송 횟수를 이미 사용했습니다."
-            );
-
-            GameEvents.TradeRejected();
-            return;
-        }
-
-        Player[] others = PhotonNetwork.PlayerListOthers;
-
-        if (others == null ||
-            others.Length == 0 ||
-            others[0].IsInactive)
-        {
-            Debug.LogWarning("[Trade] 파트너 연결 끊김 — 전송 불가");
+            Debug.LogWarning($"[Trade] {reason}");
             GameEvents.TradeRejected();
             return;
         }
@@ -3918,6 +3934,15 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
     public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
+
+    /// <summary>오프라인은 파트너가 없어 전송 자체가 성립하지 않는다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public bool CanSendTradeUnit(out string reason)
+    {
+        reason = "파트너 없음 — 전송 불가";
+        return false;
+    }
+
+    public bool CanSendTradeUnit() => CanSendTradeUnit(out _);
 
     /// <summary>오프라인은 파트너가 없어 골드 전송 불가.</summary>
     public void SendGoldToPartner(int amount)

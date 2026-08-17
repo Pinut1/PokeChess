@@ -137,8 +137,11 @@ public class UIManager : MonoBehaviour
     private int _buyXpAmount;
 
     // 통신기 골드 전송 UI 상태
-    private bool _isGoldTransferPending;
-    private string _goldTransferResult = "";
+    // ⛔ 기능 보류(2026-08-18) — 통신기는 유닛 교환만 담당한다. 아래 상태·구독·패널을 통째로 주석 처리해
+    //    송신 경로 자체를 없앴다. NetworkManager의 수신(RPC_GoldReceive)·환급 경로는 구버전 클라이언트
+    //    호환을 위해 그대로 남겨 뒀다 — 되살릴 때는 여기 주석 블록만 풀면 된다.
+    // private bool _isGoldTransferPending;
+    // private string _goldTransferResult = "";
 
     // 플러시와마이농 필드 폼 선택 UI 상태.
     // 신규 유틸 클래스를 만들지 않고 이 클래스 안에서만 쓴다.
@@ -186,9 +189,10 @@ public class UIManager : MonoBehaviour
         // 무료 리롤 자원이 늘면 골드가 그대로여도 리롤 버튼이 눌릴 수 있어야 한다.
         GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
 
-        GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
-        GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
-        GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
+        // 통신기 골드 전송 보류 — 구독 해제(위 상태 필드 주석 참고)
+        // GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
+        // GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
+        // GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
 
         GameEvents.OnUnitPlaced += HandleUnitPlacedForForm;
         GameEvents.OnUnitBenched += HandleUnitBenchedForForm;
@@ -210,9 +214,10 @@ public class UIManager : MonoBehaviour
         GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
 
-        GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
-        GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
-        GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
+        // 통신기 골드 전송 보류 — 구독 해제(위 상태 필드 주석 참고)
+        // GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
+        // GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
+        // GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
 
         GameEvents.OnUnitPlaced -= HandleUnitPlacedForForm;
         GameEvents.OnUnitBenched -= HandleUnitBenchedForForm;
@@ -220,7 +225,7 @@ public class UIManager : MonoBehaviour
 
         GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
 
-        _isGoldTransferPending = false;
+        // _isGoldTransferPending = false;
 
         // 매니저가 꺼지면 선택 UI도 닫아야 한다(패널만 남아 켜져 있으면 조작이 막힌 채 방치된다).
         CloseFormChoice();
@@ -733,25 +738,27 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
-    /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
-    private void HandleGoldTransferCompleted(int amount)
-    {
-        _isGoldTransferPending = false;
-        _goldTransferResult = $"전송 완료: {amount}G";
-    }
-
-    /// <summary>골드 전송 실패 시 대기 상태를 해제하고 실패 사유를 표시한다.</summary>
-    private void HandleGoldTransferRejected(string reason)
-    {
-        _isGoldTransferPending = false;
-        _goldTransferResult = $"전송 실패: {reason}";
-    }
-
-    /// <summary>파트너에게서 골드를 받은 경우 수령 문구를 표시한다.</summary>
-    private void HandlePartnerGoldReceived(int amount)
-    {
-        _goldTransferResult = $"파트너에게서 {amount}G 수령";
-    }
+    // 통신기 골드 전송 보류 — 결과 표시 핸들러 일체 주석 처리(위 상태 필드 주석 참고)
+    //
+    // /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
+    // private void HandleGoldTransferCompleted(int amount)
+    // {
+    //     _isGoldTransferPending = false;
+    //     _goldTransferResult = $"전송 완료: {amount}G";
+    // }
+    //
+    // /// <summary>골드 전송 실패 시 대기 상태를 해제하고 실패 사유를 표시한다.</summary>
+    // private void HandleGoldTransferRejected(string reason)
+    // {
+    //     _isGoldTransferPending = false;
+    //     _goldTransferResult = $"전송 실패: {reason}";
+    // }
+    //
+    // /// <summary>파트너에게서 골드를 받은 경우 수령 문구를 표시한다.</summary>
+    // private void HandlePartnerGoldReceived(int amount)
+    // {
+    //     _goldTransferResult = $"파트너에게서 {amount}G 수령";
+    // }
 
     private void OnGUI()
     {
@@ -763,7 +770,7 @@ public class UIManager : MonoBehaviour
         // IMGUI 진행 패널은 같은 값을 중복 표시하며 상점 카드 위를 덮으므로 호출하지 않는다.
         // 메서드는 Canvas 미배선 씬을 위한 폴백으로 남겨둔다.
 
-        DrawTradeGoldPanel();
+        // DrawTradeGoldPanel();   // 통신기 골드 전송 보류 — 송신 경로가 여기뿐이라 이 한 줄로 기능이 닫힌다
         DrawPlusleMinunFormChoicePanel();
 
         if (_showMatchHistory)
@@ -779,79 +786,84 @@ public class UIManager : MonoBehaviour
     public void CloseMatchHistoryWindow() => _showMatchHistory = false;
 
     // ──────────────────────────────────────────
-    // 통신기 골드 전송 UI
+    // 통신기 골드 전송 UI — ⛔ 기능 보류(2026-08-18)
+    //
+    // 통신기는 유닛 교환만 담당하기로 정리되면서 골드 전송 UI를 통째로 닫았다.
+    // GameEvents.RequestGoldTransfer를 발행하는 곳이 아래 패널뿐이라, 이 블록만 주석 처리하면
+    // 송신이 성립하지 않는다(NetworkManager.SendGoldToPartner는 호출되지 않는다).
+    // 되살릴 때는 이 블록과 위쪽 상태 필드·구독·핸들러 주석을 함께 풀 것.
     // ──────────────────────────────────────────
-    private void DrawTradeGoldPanel()
-    {
-        const float width = 250f;
-        const float height = 115f;
-
-        float x = 20f;
-        float y = Screen.height - 360f;
-
-        GUI.Box(
-            new Rect(x, y, width, height),
-            "통신기 골드 전송"
-        );
-
-        bool previousEnabled = GUI.enabled;
-
-        GUI.enabled =
-            !_isGoldTransferPending &&
-            _gold >= 1;
-
-        if (GUI.Button(
-                new Rect(x + 15f, y + 30f, 65f, 28f),
-                "1G"))
-        {
-            RequestGoldTransfer(1);
-        }
-
-        GUI.enabled =
-            !_isGoldTransferPending &&
-            _gold >= 5;
-
-        if (GUI.Button(
-                new Rect(x + 92f, y + 30f, 65f, 28f),
-                "5G"))
-        {
-            RequestGoldTransfer(5);
-        }
-
-        GUI.enabled =
-            !_isGoldTransferPending &&
-            _gold >= 10;
-
-        if (GUI.Button(
-                new Rect(x + 169f, y + 30f, 65f, 28f),
-                "10G"))
-        {
-            RequestGoldTransfer(10);
-        }
-
-        GUI.enabled = previousEnabled;
-
-        string statusText =
-            _isGoldTransferPending
-                ? "전송 처리 중..."
-                : _goldTransferResult;
-
-        GUI.Label(
-            new Rect(x + 15f, y + 68f, 220f, 22f),
-            statusText
-        );
-    }
-
-    private void RequestGoldTransfer(int amount)
-    {
-        if (_isGoldTransferPending)
-            return;
-
-        _isGoldTransferPending = true;
-        _goldTransferResult = "";
-
-        GameEvents.RequestGoldTransfer(amount);
-    }
+    // private void DrawTradeGoldPanel()
+    // {
+    //     const float width = 250f;
+    //     const float height = 115f;
+    //
+    //     float x = 20f;
+    //     float y = Screen.height - 360f;
+    //
+    //     GUI.Box(
+    //         new Rect(x, y, width, height),
+    //         "통신기 골드 전송"
+    //     );
+    //
+    //     bool previousEnabled = GUI.enabled;
+    //
+    //     GUI.enabled =
+    //         !_isGoldTransferPending &&
+    //         _gold >= 1;
+    //
+    //     if (GUI.Button(
+    //             new Rect(x + 15f, y + 30f, 65f, 28f),
+    //             "1G"))
+    //     {
+    //         RequestGoldTransfer(1);
+    //     }
+    //
+    //     GUI.enabled =
+    //         !_isGoldTransferPending &&
+    //         _gold >= 5;
+    //
+    //     if (GUI.Button(
+    //             new Rect(x + 92f, y + 30f, 65f, 28f),
+    //             "5G"))
+    //     {
+    //         RequestGoldTransfer(5);
+    //     }
+    //
+    //     GUI.enabled =
+    //         !_isGoldTransferPending &&
+    //         _gold >= 10;
+    //
+    //     if (GUI.Button(
+    //             new Rect(x + 169f, y + 30f, 65f, 28f),
+    //             "10G"))
+    //     {
+    //         RequestGoldTransfer(10);
+    //     }
+    //
+    //     GUI.enabled = previousEnabled;
+    //
+    //     string statusText =
+    //         _isGoldTransferPending
+    //             ? "전송 처리 중..."
+    //             : _goldTransferResult;
+    //
+    //     GUI.Label(
+    //         new Rect(x + 15f, y + 68f, 220f, 22f),
+    //         statusText
+    //     );
+    // }
+    //
+    // private void RequestGoldTransfer(int amount)
+    // {
+    //     if (_isGoldTransferPending)
+    //         return;
+    //
+    //     _isGoldTransferPending = true;
+    //     _goldTransferResult = "";
+    //
+    //     GameEvents.RequestGoldTransfer(amount);
+    // }
 
     // ──────────────────────────────────────────
     // 플러시와마이농 필드 폼 선택 UI
