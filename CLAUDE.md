@@ -73,7 +73,7 @@ Assets/_Project/Scripts/
 **🟡 타 담당 영역**
 - ✅ 상점 카드 UI(유닛 5칸/아이템 4칸) — `haein_UI` 병합으로 master 반영 완료(7/28, PR #57). 아이템 리롤은 **카드별 슬롯 1회·무료** 모델(`RerollItemSlot`). 구 모델(`RerollItemShop`·`AddItemShopReroll`·`OnItemShopRerollCountChanged`)은 제거됨
 - 레벨/확률/골드/쿠폰 텍스트 바인딩 + 유닛 드롭 판매 — PR #58 (씬 미변경). 판매 영역 시각 정렬은 `UnitDragController.Shop Sell Area` 인스펙터 지정으로 조정
-- ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=확정 2회 오픈, 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 자뭉열매는 7/17 완료. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — 나인이볼부스트(8종 소환+버프)·`SK_` 스킬행(전투 신규 메커니즘)
+- ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=1회만 오픈(8/15 정정, 장한나 — 기존 "확정 2회 오픈"은 오기), 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 자뭉열매는 7/17 완료. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — 나인이볼부스트(8종 소환+버프)·`SK_` 스킬행(전투 신규 메커니즘)
 - ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
 - ✅ `Managers/RewardManager` `AugmentChoice` 지급 — 연결 완료(7/16). preReward(StageData)와 RewardKind 두 경로 모두 지원
 
