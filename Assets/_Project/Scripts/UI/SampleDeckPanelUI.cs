@@ -354,6 +354,7 @@ public class SampleDeckPanelUI : MonoBehaviour
         {
             DeckUnitEntry entry = units[i];
             PokemonData pokemon = FindPokemonById(entry.pokemonId);
+            if (pokemon == null) continue;
 
             // 영웅증강 덱이면 바뀐 모습(탱커·근접)으로 세운다.
             var profile = SampleDeckHeroAugment.ProfileOf(deck, pokemon);
