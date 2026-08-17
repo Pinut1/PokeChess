@@ -55,7 +55,15 @@ public class SampleDeckListRowUI : MonoBehaviour
 
     private bool _listenerBound;
 
-    private void Awake() => BindListener();
+    private void Awake()
+    {
+        BindListener();
+
+        // 줄 안의 템플릿도 꺼둔다 — 프리팹을 손보다 켠 채 저장하면 덱마다 빈 뱃지·빈 유닛 칸이
+        // 하나씩 더 붙는다. 패널이 자기 템플릿을 끄는 것과 같은 보정이다.
+        SampleDeckPool.HideTemplate(_synergyBadgeTemplate);
+        SampleDeckPool.HideTemplate(_unitCardTemplate);
+    }
 
     /// <summary>꺼둔 템플릿을 복제해 만들기 때문에 Bind가 Awake보다 먼저 올 수 있다.</summary>
     private void BindListener()

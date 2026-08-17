@@ -62,8 +62,8 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
     [Tooltip("아이콘이 깔리는 부모. HorizontalLayoutGroup을 붙여둘 것.")]
     [SerializeField] private RectTransform _itemArea;
 
-    [Tooltip("복제할 아이템 아이콘 한 칸. 부모 아래 비활성으로 둘 것.")]
-    [SerializeField] private Image _itemIconTemplate;
+    [Tooltip("복제할 아이템 칸(배경 + 아이콘). 부모 아래 비활성으로 둘 것.")]
+    [SerializeField] private SampleDeckItemSlotUI _itemSlotTemplate;
 
     [Header("사거리 표시")]
     [Tooltip("사거리 칸의 총 개수. 가장 긴 사거리보다 크게 잡아둘 것.")]
@@ -79,7 +79,7 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
     [Tooltip("화면 가장자리에서 최소한 남길 여백(픽셀).")]
     [SerializeField] private float _screenMargin = 8f;
 
-    private readonly List<Image> _itemIcons = new();
+    private readonly List<SampleDeckItemSlotUI> _itemSlots = new();
     private readonly StringBuilder _rangeBuilder = new();
 
     private Canvas _canvas;
@@ -94,14 +94,17 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
         _canvas = GetComponentInParent<Canvas>();
         if (_canvas != null) _canvas = _canvas.rootCanvas;
 
-        SampleDeckPool.HideTemplate(_itemIconTemplate);
+        SampleDeckPool.HideTemplate(_itemSlotTemplate);
 
         // 씬에 켠 채 저장했더라도 시작은 닫힌 상태로 맞춘다.
         if (_root != null) _root.gameObject.SetActive(false);
     }
 
     /// <summary>커서가 유닛에 들어왔을 때. 표시할 게 없으면 열지 않는다.</summary>
-    public void Show(object owner, PokemonData data, IReadOnlyList<ItemData> recommendedItems)
+    /// <param name="role">표시할 역할군. 영웅증강 덱이면 <b>바뀐</b> 역할군이 들어온다.</param>
+    /// <param name="attackRange">표시할 평타 사거리. 역할군과 마찬가지로 증강이 반영된 값.</param>
+    public void Show(object owner, PokemonData data, string role, int attackRange,
+                     IReadOnlyList<ScriptableObject> recommendedItems)
     {
         if (_root == null || data == null)
         {
@@ -112,7 +115,7 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
         _owner = owner;
 
         _root.gameObject.SetActive(true);
-        Bind(data, recommendedItems);
+        Bind(data, role, attackRange, recommendedItems);
 
         // 배치도 위 어떤 칸보다도 앞에 떠야 한다.
         _root.SetAsLastSibling();
@@ -136,18 +139,21 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
         if (_root != null) _root.gameObject.SetActive(false);
     }
 
-    private void Bind(PokemonData data, IReadOnlyList<ItemData> recommendedItems)
+    private void Bind(PokemonData data, string role, int attackRange,
+                      IReadOnlyList<ScriptableObject> recommendedItems)
     {
         if (_nameText != null) _nameText.text = data.pokemonName;
         if (_costText != null) _costText.text = data.cost.ToString();
 
+        // 역할군·사거리는 원본이 아니라 넘겨받은 값을 쓴다 — 영웅증강 덱의 파치리스는
+        // 서포터가 아니라 탱커로, 사거리도 4가 아니라 1로 보여야 한다.
         if (_roleText != null)
-            _roleText.text = string.IsNullOrWhiteSpace(data.role) ? "-" : data.role;
+            _roleText.text = string.IsNullOrWhiteSpace(role) ? "-" : role;
 
         for (int i = 0; i < _synergyLines.Length; i++)
             BindSynergy(_synergyLines[i], data, i);
 
-        if (_rangeText != null) _rangeText.text = BuildRangeText(data.attackRange);
+        if (_rangeText != null) _rangeText.text = BuildRangeText(attackRange);
 
         BindItems(recommendedItems);
     }
@@ -199,7 +205,7 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
         return _rangeBuilder.ToString();
     }
 
-    private void BindItems(IReadOnlyList<ItemData> items)
+    private void BindItems(IReadOnlyList<ScriptableObject> items)
     {
         int count = 0;
 
@@ -209,16 +215,17 @@ public class SampleDeckUnitTooltipUI : MonoBehaviour
             {
                 if (items[i] == null) continue;
 
-                Image icon = SampleDeckPool.Take(_itemIcons, _itemIconTemplate, _itemArea, count);
-                if (icon == null) break;
+                SampleDeckItemSlotUI slot =
+                    SampleDeckPool.Take(_itemSlots, _itemSlotTemplate, _itemArea, count);
 
-                icon.sprite = items[i].icon;
-                icon.enabled = items[i].icon != null;
+                if (slot == null) break;
+
+                slot.Bind(items[i]);
                 count++;
             }
         }
 
-        SampleDeckPool.HideExtras(_itemIcons, count);
+        SampleDeckPool.HideExtras(_itemSlots, count);
 
         if (_itemGroup != null) _itemGroup.SetActive(count > 0);
     }

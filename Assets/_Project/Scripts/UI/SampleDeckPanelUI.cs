@@ -20,9 +20,10 @@ using UnityEngine.UI;
 /// 성급·활성 시너지·완성 비용만 있다. 아래 넷은 <b>시트에 컬럼이 생기기 전까지의 임시 규칙</b>이며,
 /// 확정되면 각각의 메서드 하나만 갈아끼우면 된다.
 /// <list type="bullet">
-/// <item><see cref="IsFrontLine"/> — 역할군으로 앞/뒷라인 추정(Tanker·Warrior가 앞)</item>
+/// <item><see cref="IsFrontLine"/> — 평타 사거리로 앞/뒷라인 추정(근접이면 앞)</item>
 /// <item><see cref="CoreUnitsOf"/> — 목표 성급 → 코스트 순 상위 <see cref="CORE_UNIT_COUNT"/>명을 핵심으로</item>
-/// <item><see cref="GetRecommendedItems"/> — ItemDatabase에서 무작위(덱+유닛 조합별로 캐시)</item>
+/// <item><see cref="GetRecommendedItems"/> — 역할군 그룹(<see cref="SampleDeckItemRules"/>)에서
+///       무작위 2개. 진화의 돌은 1번 칸 고정. 덱+유닛 조합별로 캐시해 고정된다</item>
 /// <item><see cref="CompletionLevelOf"/> — 유닛 수 = 완성 레벨(레벨당 배치 수가 1:1이라 성립)</item>
 /// </list>
 /// </summary>
@@ -46,6 +47,19 @@ public class SampleDeckPanelUI : MonoBehaviour
     [SerializeField] private Button _openButton;
 
     [SerializeField] private Button _closeButton;
+
+    [Header("머리말")]
+    [Tooltip("창 머리말 안내 문구. 두 페이지가 같은 줄을 쓰고 페이지에 따라 내용만 바뀐다. " +
+             "씬에 적어둔 문구는 실행 시 아래 두 값으로 덮어쓴다.")]
+    [SerializeField] private TMP_Text _subtitleText;
+
+    [Tooltip("덱 목록(1페이지)에서 보여줄 안내.")]
+    [SerializeField]
+    private string _listSubtitle = "덱을 고르고 [공략 더 보기]를 누르면 배치와 시너지를 볼 수 있습니다.";
+
+    [Tooltip("덱 상세(2페이지)에서 보여줄 안내. 돌아가는 방법을 알려준다.")]
+    [SerializeField]
+    private string _detailSubtitle = "[← 목록]을 누르면 덱 목록으로 돌아갑니다.";
 
     // ─────────────────────────────────────────
     // 인스펙터 — 1페이지: 목록
@@ -120,7 +134,7 @@ public class SampleDeckPanelUI : MonoBehaviour
 
     // 추천 아이템은 무작위 임시값이라 매번 다시 뽑으면 화면이 흔들린다.
     // "덱ID_포켓몬ID" 기준으로 한 번 뽑은 결과를 들고 있는다.
-    private readonly Dictionary<string, ItemData[]> _recommendedItems = new();
+    private readonly Dictionary<string, ScriptableObject[]> _recommendedItems = new();
 
     // 상세에 들어간 덱. 목록으로 나가면 -1.
     private int _detailDeckIndex = -1;
@@ -194,6 +208,8 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         if (_listPage != null) _listPage.SetActive(true);
         if (_detailPage != null) _detailPage.SetActive(false);
+
+        SetSubtitle(_listSubtitle);
     }
 
     /// <summary>2페이지(덱 상세)로. 범위를 벗어난 인덱스면 아무 일도 하지 않는다.</summary>
@@ -209,6 +225,19 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         if (_listPage != null) _listPage.SetActive(false);
         if (_detailPage != null) _detailPage.SetActive(true);
+
+        SetSubtitle(_detailSubtitle);
+    }
+
+    /// <summary>머리말 안내를 바꾼다. 문구가 비어 있으면 줄을 꺼서 빈 자리가 남지 않게 한다.</summary>
+    private void SetSubtitle(string text)
+    {
+        if (_subtitleText == null) return;
+
+        bool has = !string.IsNullOrWhiteSpace(text);
+
+        _subtitleText.gameObject.SetActive(has);
+        if (has) _subtitleText.text = text;
     }
 
     // ─────────────────────────────────────────
@@ -326,7 +355,9 @@ public class SampleDeckPanelUI : MonoBehaviour
             DeckUnitEntry entry = units[i];
             PokemonData pokemon = FindPokemonById(entry.pokemonId);
 
-            bool isFront = IsFrontLine(pokemon);
+            // 영웅증강 덱이면 바뀐 모습(탱커·근접)으로 세운다.
+            var profile = SampleDeckHeroAugment.ProfileOf(deck, pokemon);
+            bool isFront = IsFrontLine(profile);
 
             SampleDeckUnitCardUI card = SampleDeckPool.Take(
                 isFront ? _frontCards : _backCards,
@@ -341,10 +372,8 @@ public class SampleDeckPanelUI : MonoBehaviour
                 break;
             }
 
-            // 핵심 유닛에게만 아이템을 붙인다 — 나머지는 빈 줄이 아니라 아예 표시하지 않는다.
-            ItemData[] items = coreIds.Contains(entry.pokemonId)
-                ? GetRecommendedItems(deck.deckId, entry.pokemonId)
-                : null;
+            ScriptableObject[] items =
+                ItemsFor(deck, pokemon, coreIds.Contains(entry.pokemonId));
 
             card.Bind(pokemon, entry.starLevel, items);
 
@@ -368,15 +397,43 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         if (card.Data == null) return;
 
-        // 배치도에 아이템이 안 붙은 유닛도 설명창에서는 추천 아이템을 보여준다 —
-        // 핵심이 아니라고 해서 아이템을 안 끼우는 건 아니기 때문이다.
         DeckData deck = CurrentDeck;
+        var profile = SampleDeckHeroAugment.ProfileOf(deck, card.Data);
 
-        ItemData[] items = deck != null
-            ? GetRecommendedItems(deck.deckId, card.Data.id)
-            : null;
+        _unitTooltip.Show(card, card.Data, profile.role, profile.attackRange,
+                          TooltipItemsOf(deck, card.Data));
+    }
 
-        _unitTooltip.Show(card, card.Data, items);
+    /// <summary>
+    /// 설명창에 보여줄 아이템. 카드의 2칸과 달리 <b>역할군 그룹 전체</b>를 보여준다 —
+    /// 카드는 "이 중 아무거나" 예시 2개일 뿐이고, 실제로 낄 수 있는 선택지를 알려주는 건 설명창이다.
+    ///
+    /// 돌로 만들어지는 유닛은 그 돌을 맨 앞에 붙인다. 카드와 같은 규칙이라 눈이 헷갈리지 않는다.
+    /// </summary>
+    private static List<ScriptableObject> TooltipItemsOf(DeckData deck, PokemonData pokemon)
+    {
+        var result = new List<ScriptableObject>();
+
+        EvolutionStoneData stone = RequiredStoneOf(pokemon);
+        if (stone != null) result.Add(stone);
+
+        var profile = SampleDeckHeroAugment.ProfileOf(deck, pokemon);
+
+        // 고정 지정이 있으면 그것들이 맨 앞에 온다.
+        IReadOnlyList<ItemData> group = SampleDeckItemRules.OrderedGroupOf(
+            profile.role, profile.attackRange, pokemon, profile.augmented);
+
+        if (group != null)
+        {
+            for (int i = 0; i < group.Count; i++)
+                if (group[i] != null) result.Add(group[i]);
+        }
+
+        // 쓸 수 있는 진화의 돌은 맨 뒤 — 끼우는 순간 다른 유닛이 되므로 장비보다 뒤에 둔다.
+        foreach (EvolutionStoneData usable in UsableStonesOf(pokemon, profile.augmented))
+            result.Add(usable);
+
+        return result;
     }
 
     private DeckData CurrentDeck =>
@@ -417,9 +474,8 @@ public class SampleDeckPanelUI : MonoBehaviour
             PokemonData pokemon = FindPokemonById(entry.pokemonId);
             if (pokemon == null) continue;
 
-            ItemData[] items = coreIds.Contains(entry.pokemonId)
-                ? GetRecommendedItems(deck.deckId, entry.pokemonId)
-                : null;
+            ScriptableObject[] items =
+                ItemsFor(deck, pokemon, coreIds.Contains(entry.pokemonId));
 
             result.Add(new SampleDeckUnitView(pokemon, entry.starLevel, items));
         }
@@ -507,17 +563,23 @@ public class SampleDeckPanelUI : MonoBehaviour
     /// </summary>
     private static int CompletionLevelOf(DeckData deck) => deck.unitCount;
 
-    /// <summary>
-    /// 앞라인 판정. 견본덱 데이터에 좌표가 없어 <b>역할군으로 추정</b>한다 —
-    /// 탱커·전사는 앞, 나머지(원거리·마법사·서포터·암살자)는 뒤.
-    /// 역할군을 못 읽으면 뒤로 보낸다(앞라인이 비는 편이 눈에 잘 띄어 데이터 구멍을 알아채기 쉽다).
-    /// </summary>
-    private static bool IsFrontLine(PokemonData pokemon)
-    {
-        if (pokemon == null || string.IsNullOrWhiteSpace(pokemon.role)) return false;
+    /// <summary>근접으로 보는 평타 사거리 상한. 규약상 _S(근거리)=1, _L(원거리)=4다.</summary>
+    private const int MELEE_ATTACK_RANGE = 1;
 
-        return pokemon.role.Equals("Tanker", System.StringComparison.OrdinalIgnoreCase) ||
-               pokemon.role.Equals("Warrior", System.StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// 앞라인 판정. 견본덱 데이터에 좌표가 없어 파생시키되, <b>역할군 이름이 아니라 평타 사거리</b>로
+    /// 가른다 — 근접이면 앞, 원거리면 뒤.
+    ///
+    /// 역할군으로 추측하면 <b>암살자 26마리를 뒷라인으로 잘못 보낸다</b>. 이름과 달리 이 게임의
+    /// 암살자는 전부 근접(_S)이고, 기획 문서에서도 "전방 AP 딜러"로 분류돼 있다.
+    /// 실제 데이터도 근접/원거리가 역할군과 정확히 갈린다 —
+    /// 근접: Tanker·Warrior·Assassin / 원거리: Archer·Magician·Supporter.
+    ///
+    /// ⚠️ <see cref="PokemonData.range"/>는 사거리가 아니라 진화 단계다. 반드시 attackRange를 쓸 것.
+    /// </summary>
+    private static bool IsFrontLine(SampleDeckHeroAugment.Profile profile)
+    {
+        return profile.attackRange <= MELEE_ATTACK_RANGE;
     }
 
     /// <summary>
@@ -556,35 +618,118 @@ public class SampleDeckPanelUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 덱+포켓몬 조합별 추천 아이템. <b>아직 기획 미확정이라 ItemDatabase에서 무작위로 뽑는
-    /// 임시값이다</b> — 확정되면 이 메서드만 실제 배정 데이터로 갈아끼우면 된다.
-    /// 한 번 뽑은 결과는 캐시해 창을 다시 열기 전까지 같은 아이템이 나온다.
+    /// 이 유닛의 칸에 붙일 아이템.
+    ///
+    /// 핵심 유닛은 추천 2칸을 다 받고, <b>핵심이 아니어도 진화의 돌은 보여준다</b> —
+    /// 돌이 없으면 그 유닛을 애초에 만들 수 없으므로 "핵심이 아니니 생략"이 성립하지 않는다.
+    /// 돌도 없고 핵심도 아니면 아이템 줄이 통째로 꺼진다.
     /// </summary>
-    private ItemData[] GetRecommendedItems(int deckId, int pokemonId)
+    private ScriptableObject[] ItemsFor(DeckData deck, PokemonData pokemon, bool isCore)
     {
-        string key = $"{deckId}_{pokemonId}";
+        if (isCore) return GetRecommendedItems(deck, pokemon.id);
 
-        if (_recommendedItems.TryGetValue(key, out ItemData[] cached)) return cached;
+        EvolutionStoneData stone = RequiredStoneOf(pokemon);
+        return stone != null ? new ScriptableObject[] { stone } : null;
+    }
 
-        ItemDatabase db = ItemDatabase.Instance;
-        var result = new ItemData[ITEMS_PER_CORE_UNIT];
+    /// <summary>
+    /// 덱+포켓몬 조합별 추천 아이템. 한 번 뽑은 결과는 캐시해 창을 다시 열기 전까지 고정된다.
+    ///
+    /// <b>1순위 — 진화의 돌.</b> 돌로 진화하는 유닛(피카츄→라이츄 등)은 그 돌이 없으면 애초에
+    /// 만들 수 없으므로, 어떤 장비보다 먼저 보여준다.
+    ///
+    /// <b>2순위 — 아직 기획 미확정.</b> 지금은 ItemDatabase에서 무작위로 채운다.
+    /// 역할군·스킬 기반 규칙이 확정되면 <see cref="FillByRule"/>만 갈아끼우면 된다.
+    /// </summary>
+    private ScriptableObject[] GetRecommendedItems(DeckData deck, int pokemonId)
+    {
+        string key = $"{deck.deckId}_{pokemonId}";
 
-        if (db != null && db.all != null)
-        {
-            var available = new List<ItemData>();
+        if (_recommendedItems.TryGetValue(key, out ScriptableObject[] cached)) return cached;
 
-            for (int i = 0; i < db.all.Count; i++)
-                if (db.all[i] != null) available.Add(db.all[i]);
+        var result = new ScriptableObject[ITEMS_PER_CORE_UNIT];
+        PokemonData pokemon = FindPokemonById(pokemonId);
 
-            if (available.Count > 0)
-            {
-                for (int i = 0; i < result.Length; i++)
-                    result[i] = available[Random.Range(0, available.Count)];
-            }
-        }
+        int filled = 0;
+
+        // 1순위: 이 유닛이 되기 위해 필요한 진화의 돌
+        EvolutionStoneData stone = RequiredStoneOf(pokemon);
+        if (stone != null) result[filled++] = stone;
+
+        FillByRule(result, filled, SampleDeckHeroAugment.ProfileOf(deck, pokemon), pokemon);
 
         _recommendedItems[key] = result;
         return result;
+    }
+
+    /// <summary>
+    /// 이 포켓몬이 <b>진화의 돌로 만들어지는 진화체</b>라면 그 돌을 돌려준다. 아니면 null.
+    ///
+    /// EvolutionStoneData의 매핑은 "진화 전 → 진화 후"라서 <b>진화 후 이름으로 역방향 조회</b>한다.
+    /// 견본덱의 목표 유닛은 진화가 끝난 쪽이고, 플레이어가 알아야 하는 건 "그걸 만들려면 무슨 돌이
+    /// 필요한가"이기 때문이다.
+    ///
+    /// 진화 전 폼(이브이·풀꽃 등)에는 붙이지 않는다 — 같은 포켓몬이 여러 돌로 갈라지는 경우가 있어
+    /// (이브이 4종, 풀꽃 2종) 하나로 특정할 수 없다.
+    /// </summary>
+    /// <summary>
+    /// 이 포켓몬이 <b>지금 쓸 수 있는</b> 진화의 돌 전부. 돌을 끼우면 곧바로 진화체가 되므로
+    /// 추천 목록의 <b>맨 뒤</b>에 놓는다 — 이 유닛 자체를 강화하는 장비들보다 뒤라는 뜻이다.
+    ///
+    /// 여러 개일 수 있다(이브이 4종, 풀꽃 2종). 매핑의 <b>진화 전</b> 이름으로 정방향 조회한다 —
+    /// <see cref="RequiredStoneOf"/>가 진화 후 이름으로 역방향 조회하는 것과 반대다.
+    ///
+    /// <b>영웅증강을 받은 유닛은 제외한다.</b> 나인이볼부스트 이브이는 진화잠금이 걸려
+    /// (<c>HeroEeveeAugment</c>) 돌을 끼워도 진화하지 않으므로 추천하면 잘못된 안내가 된다.
+    /// </summary>
+    private static List<EvolutionStoneData> UsableStonesOf(PokemonData pokemon, bool augmented)
+    {
+        // 영웅증강을 받은 유닛은 제외한다 — 나인이볼부스트 이브이는 진화잠금이라
+        // (HeroEeveeAugment) 돌을 끼워도 진화하지 않는다. 추천하면 잘못된 안내가 된다.
+        if (augmented) return new List<EvolutionStoneData>();
+
+        return EvolutionStoneLookup.UsableBy(pokemon);
+    }
+
+    private static EvolutionStoneData RequiredStoneOf(PokemonData pokemon)
+        => EvolutionStoneLookup.RequiredFor(pokemon);
+
+    /// <summary>
+    /// 남은 칸을 <b>역할군 그룹에서 무작위로</b> 채운다(<see cref="SampleDeckItemRules"/>).
+    /// 같은 아이템이 두 칸에 겹치지 않게 뽑는다.
+    ///
+    /// 무작위인 이유 — 그룹 3~4종 중 무엇을 끼울지는 덱·상황마다 달라서 하나로 못 박기 어렵다.
+    /// 설명창에서는 그룹 전체를 보여주므로, 카드의 2칸은 "이 중 아무거나" 정도의 예시다.
+    /// 뽑은 결과는 호출부가 캐시하므로 창을 다시 열기 전까지 고정된다.
+    /// </summary>
+    private static void FillByRule(
+        ScriptableObject[] result, int startIndex,
+        SampleDeckHeroAugment.Profile profile, PokemonData pokemon)
+    {
+        // 고정 지정이 있으면 무작위를 건너뛰고 적힌 순서대로 넣는다(영웅증강 파치리스 등).
+        IReadOnlyList<ItemData> pinned = SampleDeckItemRules.PinnedOf(pokemon, profile.augmented);
+
+        int slot = startIndex;
+
+        for (int i = 0; i < pinned.Count && slot < result.Length; i++)
+            result[slot++] = pinned[i];
+
+        if (slot >= result.Length) return;
+
+        IReadOnlyList<ItemData> group = SampleDeckItemRules.GroupOf(profile.role, profile.attackRange);
+        if (group == null || group.Count == 0) return;
+
+        // 그룹을 복사해 뽑을 때마다 빼면 중복 없이 채워진다(고정으로 이미 들어간 것도 제외).
+        var pool = new List<ItemData>(group);
+
+        for (int i = 0; i < pinned.Count; i++) pool.Remove(pinned[i]);
+
+        for (; slot < result.Length && pool.Count > 0; slot++)
+        {
+            int pick = Random.Range(0, pool.Count);
+            result[slot] = pool[pick];
+            pool.RemoveAt(pick);
+        }
     }
 
     // ─────────────────────────────────────────

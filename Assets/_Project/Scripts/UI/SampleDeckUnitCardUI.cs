@@ -39,20 +39,20 @@ public class SampleDeckUnitCardUI : MonoBehaviour, IPointerEnterHandler, IPointe
     [Tooltip("아이템 아이콘이 깔리는 부모. 핵심 유닛이 아니면 오브젝트째 꺼진다.")]
     [SerializeField] private RectTransform _itemArea;
 
-    [Tooltip("복제할 아이템 아이콘 한 칸. 부모 아래 비활성으로 둘 것.")]
-    [SerializeField] private Image _itemIconTemplate;
+    [Tooltip("복제할 아이템 칸(배경 + 아이콘). 부모 아래 비활성으로 둘 것.")]
+    [SerializeField] private SampleDeckItemSlotUI _itemSlotTemplate;
 
     /// <summary>이 칸이 그리고 있는 포켓몬. 비었으면 null.</summary>
     public PokemonData Data { get; private set; }
 
     /// <summary>이 칸에 붙은 핵심 아이템. 핵심 유닛이 아니면 비어 있다.</summary>
-    public IReadOnlyList<ItemData> Items => _items;
+    public IReadOnlyList<ScriptableObject> Items => _items;
 
     /// <summary>커서가 들고 날 때(true=들어옴).</summary>
     public event Action<SampleDeckUnitCardUI, bool> Hovered;
 
-    private readonly List<Image> _itemIcons = new();
-    private readonly List<ItemData> _items = new();
+    private readonly List<SampleDeckItemSlotUI> _itemSlots = new();
+    private readonly List<ScriptableObject> _items = new();
 
     public void OnPointerEnter(PointerEventData eventData) => Hovered?.Invoke(this, true);
     public void OnPointerExit(PointerEventData eventData) => Hovered?.Invoke(this, false);
@@ -67,7 +67,7 @@ public class SampleDeckUnitCardUI : MonoBehaviour, IPointerEnterHandler, IPointe
     /// 칸 하나를 채운다. coreItems가 비어 있거나 null이면 아이템 줄이 통째로 꺼진다 —
     /// 핵심 유닛 2~3명만 아이템을 보여주는 규칙이 여기서 갈린다.
     /// </summary>
-    public void Bind(PokemonData pokemon, int starLevel, IReadOnlyList<ItemData> coreItems)
+    public void Bind(PokemonData pokemon, int starLevel, IReadOnlyList<ScriptableObject> coreItems)
     {
         Data = pokemon;
 
@@ -104,7 +104,7 @@ public class SampleDeckUnitCardUI : MonoBehaviour, IPointerEnterHandler, IPointe
         return index >= 0 && index < _starSprites.Length ? _starSprites[index] : null;
     }
 
-    private void BindItems(IReadOnlyList<ItemData> coreItems)
+    private void BindItems(IReadOnlyList<ScriptableObject> coreItems)
     {
         _items.Clear();
 
@@ -121,19 +121,20 @@ public class SampleDeckUnitCardUI : MonoBehaviour, IPointerEnterHandler, IPointe
 
         if (!hasItems)
         {
-            SampleDeckPool.HideExtras(_itemIcons, 0);
+            SampleDeckPool.HideExtras(_itemSlots, 0);
             return;
         }
 
         for (int i = 0; i < _items.Count; i++)
         {
-            Image icon = SampleDeckPool.Take(_itemIcons, _itemIconTemplate, _itemArea, i);
-            if (icon == null) break;
+            SampleDeckItemSlotUI slot =
+                SampleDeckPool.Take(_itemSlots, _itemSlotTemplate, _itemArea, i);
 
-            icon.sprite = _items[i].icon;
-            icon.enabled = _items[i].icon != null;
+            if (slot == null) break;
+
+            slot.Bind(_items[i]);
         }
 
-        SampleDeckPool.HideExtras(_itemIcons, _items.Count);
+        SampleDeckPool.HideExtras(_itemSlots, _items.Count);
     }
 }

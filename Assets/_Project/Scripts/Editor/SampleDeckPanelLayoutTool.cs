@@ -71,6 +71,12 @@ public static class SampleDeckPanelLayoutTool
     private static readonly Color ACCENT_COLOR = new Color32(255, 216, 120, 255);
     private static readonly Color TOOLTIP_COLOR = new Color32(14, 14, 18, 250);
 
+    /// <summary>아이템 칸 배경. 아트가 스프라이트를 물리기 전까지의 임시 색이다.</summary>
+    private static readonly Color ITEM_SLOT_BG_COLOR = new Color32(24, 24, 30, 235);
+
+    /// <summary>아이템 칸 배경과 아이콘 사이 여백. 배경 테두리가 보이는 폭이 된다.</summary>
+    private const float ITEM_SLOT_PADDING = 2f;
+
     // ── 창 ──
     private const float WINDOW_WIDTH = 1500f;
     private const float WINDOW_HEIGHT = 820f;
@@ -544,6 +550,37 @@ public static class SampleDeckPanelLayoutTool
     }
 
     /// <summary>
+    /// 아이템 칸 템플릿 — <b>루트가 배경 패널이고 아이콘이 자식</b>이다.
+    /// uGUI는 자식이 항상 부모 위에 그려지므로 아이콘 뒤에 판을 깔려면 이 순서여야 한다.
+    ///
+    /// 배경 스프라이트는 넣지 않고 색만 칠해 둔다 — 아트가 인스펙터에서 스프라이트를 물리면
+    /// 이 도구는 그걸 건드리지 않는다(EnsureImage는 색과 Raycast Target만 손댄다).
+    /// </summary>
+    private static SampleDeckItemSlotUI BuildItemSlotTemplate(RectTransform parent, float size)
+    {
+        RectTransform slot = EnsureChild(parent, "ItemSlot_Template");
+        SetRect(slot, Center, Center, Center, Vector2.zero, new Vector2(size, size));
+        EnsureImage(slot, ITEM_SLOT_BG_COLOR, false);
+        EnsureLayoutElementSize(slot, size, size);
+
+        RectTransform icon = EnsureChild(slot, "Icon");
+        SetStretch(icon, ITEM_SLOT_PADDING, ITEM_SLOT_PADDING, ITEM_SLOT_PADDING, ITEM_SLOT_PADDING);
+        Image iconImage = EnsureImage(icon, Color.white, false);
+        iconImage.preserveAspect = true;
+
+        var slotUI = EnsureComponent<SampleDeckItemSlotUI>(slot.gameObject);
+        var so = new SerializedObject(slotUI);
+
+        WireField(so, "_icon", iconImage);
+
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(slotUI);
+
+        SetActiveWithUndo(slot.gameObject, false);
+        return slotUI;
+    }
+
+    /// <summary>
     /// 목록 줄의 시너지 뱃지 템플릿 — 등급 프레임 + 심볼.
     /// 프레임 스프라이트·색은 <c>SynergyRow_Pf</c>의 <see cref="SynergyRowUI"/>에서 그대로 복사한다.
     /// 손으로 다시 물리면 시너지 패널과 목록이 서로 다른 프레임을 쓰게 되기 쉽다.
@@ -736,19 +773,14 @@ public static class SampleDeckPanelLayoutTool
             new Vector2(cardWidth, itemIconSize));
         EnsureHorizontal(itemArea, 2f, TextAnchor.UpperCenter);
 
-        RectTransform itemIcon = EnsureChild(itemArea, "ItemIcon_Template");
-        SetRect(itemIcon, Center, Center, Center, Vector2.zero,
-            new Vector2(itemIconSize, itemIconSize));
-        EnsureImage(itemIcon, Color.white, false).preserveAspect = true;
-        EnsureLayoutElementSize(itemIcon, itemIconSize, itemIconSize);
-        SetActiveWithUndo(itemIcon.gameObject, false);
+        SampleDeckItemSlotUI itemSlot = BuildItemSlotTemplate(itemArea, itemIconSize);
 
         var cardUI = EnsureComponent<SampleDeckUnitCardUI>(card.gameObject);
         var so = new SerializedObject(cardUI);
 
         WireField(so, "_slot", slot);
         WireField(so, "_itemArea", itemArea);
-        WireField(so, "_itemIconTemplate", itemIcon.GetComponent<Image>());
+        WireField(so, "_itemSlotTemplate", itemSlot);
 
         if (withStarAndName)
         {
@@ -834,12 +866,7 @@ public static class SampleDeckPanelLayoutTool
         SetTopStretch(itemArea, 0f, -20f, ITEM_ICON_SIZE);
         EnsureHorizontal(itemArea, 4f, TextAnchor.UpperLeft);
 
-        RectTransform itemIcon = EnsureChild(itemArea, "ItemIcon_Template");
-        SetRect(itemIcon, Center, Center, Center, Vector2.zero,
-            new Vector2(ITEM_ICON_SIZE, ITEM_ICON_SIZE));
-        EnsureImage(itemIcon, Color.white, false).preserveAspect = true;
-        EnsureLayoutElementSize(itemIcon, ITEM_ICON_SIZE, ITEM_ICON_SIZE);
-        SetActiveWithUndo(itemIcon.gameObject, false);
+        SampleDeckItemSlotUI itemSlot = BuildItemSlotTemplate(itemArea, ITEM_ICON_SIZE);
 
         var tooltipUI = EnsureComponent<SampleDeckUnitTooltipUI>(holder.gameObject);
         var so = new SerializedObject(tooltipUI);
@@ -852,7 +879,7 @@ public static class SampleDeckPanelLayoutTool
         WireField(so, "_rangeText", range.GetComponent<TMP_Text>());
         WireField(so, "_itemGroup", itemGroup.gameObject);
         WireField(so, "_itemArea", itemArea);
-        WireField(so, "_itemIconTemplate", itemIcon.GetComponent<Image>());
+        WireField(so, "_itemSlotTemplate", itemSlot);
 
         so.ApplyModifiedProperties();
         EditorUtility.SetDirty(tooltipUI);
@@ -934,6 +961,9 @@ public static class SampleDeckPanelLayoutTool
         WireField(so, "_panelRoot", panel.gameObject);
         WireField(so, "_openButton", openButton);
         WireField(so, "_closeButton", FindComponent<Button>(window, "CloseButton"));
+
+        // 머리말 문구는 페이지에 따라 런타임에 갈아끼운다 — 씬에 적힌 건 디자인용 견본이다.
+        WireField(so, "_subtitleText", FindComponent<TMP_Text>(window, "SubtitleText"));
 
         // 1페이지
         Transform listContent = listPage.Find("Scroll/Viewport/Content");
