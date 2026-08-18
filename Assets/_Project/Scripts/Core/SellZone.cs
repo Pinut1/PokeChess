@@ -8,7 +8,8 @@ using UnityEngine;
 /// HexTile / BenchTile과 동일한 IDropTarget 패턴을 사용한다.
 ///
 /// 표시는 세 갈래다.
-///   · 호버(드래그 중 / 그냥 커서를 올렸을 때) — 판매=빨강, 교환=하늘
+///   · 드래그 호버(유닛을 들고 올렸을 때) — 판매=빨강, 교환=하늘. "여기 놓으면 이렇게 된다"는 예고다
+///   · 커서 호버(그냥 올렸을 때) — 흰색. 놓을 게 없으니 예고가 아니라 "여기 뭔가 있다" 정도의 표시다
 ///   · 도착 대기(통신기 전용) — 파트너가 보낸 유닛이 대기 중인 동안 계속 켜둔다
 ///   · 설명 툴팁 — 커서를 올리면 "뭐 하는 물건인지"를 글로 띄운다
 /// 어느 색을 칠할지는 <see cref="RefreshHighlight"/> 한 곳에서만 정한다.
@@ -26,13 +27,20 @@ public class SellZone : MonoBehaviour, IDropTarget
     [SerializeField] private DropZoneType _zoneType = DropZoneType.Sell;
 
     [Header("호버 표시")]
+    [Tooltip("유닛을 드래그해 올렸을 때의 판매 존 색.")]
     [SerializeField]
     private Color _sellHoverColor =
         new Color(1f, 0.3f, 0.3f);
 
+    [Tooltip("유닛을 드래그해 올렸을 때의 통신기 색.")]
     [SerializeField]
     private Color _tradeHoverColor =
         new Color(0.3f, 0.9f, 1f);
+
+    [Tooltip("유닛을 들지 않고 커서만 올렸을 때의 색. 위의 드래그 색과 구분한다 — " +
+             "놓을 유닛이 없는데 같은 색을 쓰면 '지금 놓을 수 있다'는 신호가 흐려진다.")]
+    [SerializeField]
+    private Color _pointerHoverColor = Color.white;
 
     [Header("도착 알림 (통신기 전용)")]
     [Tooltip("파트너가 보낸 유닛이 대기 중인 동안 켜둘 색. 커서를 올리면 위의 교환 색이 잠시 덮는다.")]
@@ -45,7 +53,8 @@ public class SellZone : MonoBehaviour, IDropTarget
 
     [Header("설명 창")]
     [Tooltip("통신기 전용 안내창(TradeMachinePanel_Pf). 물려 두면 아래 글자 툴팁 대신 이쪽이 열린다 — " +
-             "전송 가능 여부·통신진화 목록·수령 버튼이 들어 있는 정식 창이다.")]
+             "전송 가능 여부·통신진화 목록·수령 버튼이 들어 있는 정식 창이다.\n" +
+             "창은 커서가 아니라 이 통신기 위에 고정되어 뜬다(높이 조절은 창 쪽 '자리' 항목).")]
     [SerializeField] private TradeMachinePanelUI _tradePanel;
 
     [Tooltip("전용 창이 없을 때 쓸 글자 툴팁 문구. 비워두면 존 종류에 맞는 기본 문구가 나온다.\n" +
@@ -85,7 +94,12 @@ public class SellZone : MonoBehaviour, IDropTarget
 
         // 전용 창은 스스로를 끄지 않는다(그러면 처음 열릴 때 자기를 다시 꺼버린다) — 켠 채로
         // 저장된 씬을 대비해 여기서 한 번 닫아준다.
-        if (_tradePanel != null) _tradePanel.CloseOnStartup();
+        if (_tradePanel != null)
+        {
+            // 창이 내 위에 붙어 뜬다. 창 쪽 인스펙터에 앵커를 직접 물렸으면 그쪽이 우선이다.
+            _tradePanel.SetOwnerAnchor(transform);
+            _tradePanel.CloseOnStartup();
+        }
 
         // 글자 툴팁이 필요한 존만 찾는다 — 전용 창이 물려 있으면 쓰지 않고, 설명창이 씬에 여럿이면
         // 경고가 뜨는데 툴팁을 안 쓰는 판매 존까지 매번 경고를 남길 이유가 없다.
@@ -128,7 +142,8 @@ public class SellZone : MonoBehaviour, IDropTarget
     }
 
     /// <summary>이 존의 강조 색(판매=빨강 / 교환=하늘).</summary>
-    private Color HoverColor =>
+    /// <summary>드래그로 유닛을 올렸을 때 칠할 색. 존 종류에 따라 다르다.</summary>
+    private Color DragHoverColor =>
         _zoneType == DropZoneType.Trade
             ? _tradeHoverColor
             : _sellHoverColor;
@@ -138,14 +153,21 @@ public class SellZone : MonoBehaviour, IDropTarget
     // ─────────────────────────────────────────
 
     /// <summary>
-    /// 지금 상태에 맞는 색을 칠한다. 우선순위는 호버 &gt; 도착 대기 &gt; 평소.
+    /// 지금 상태에 맞는 색을 칠한다. 우선순위는 드래그 호버 &gt; 커서 호버 &gt; 도착 대기 &gt; 평소.
     /// 켜고 끄는 판단을 여기 하나로 모아, 호버를 벗어났을 때 도착 알림이 그대로 되살아나게 한다.
     /// </summary>
     private void RefreshHighlight()
     {
-        if (IsHovered)
+        // 드래그가 먼저다 — 유닛을 들고 있을 때만 "놓으면 이렇게 된다"를 색으로 예고한다.
+        if (_dragHovered)
         {
-            ApplyColor(HoverColor);
+            ApplyColor(DragHoverColor);
+            return;
+        }
+
+        if (_pointerHovered)
+        {
+            ApplyColor(_pointerHoverColor);
             return;
         }
 
@@ -239,6 +261,8 @@ public class SellZone : MonoBehaviour, IDropTarget
         // 전용 창이 있으면 그쪽이 우선이다. 창은 스스로 상태를 읽어 그리므로 문구를 넘기지 않는다.
         if (_tradePanel != null)
         {
+            // 통신기가 둘 이상인 씬을 대비해 열 때마다 다시 넘긴다 — 지금 커서를 올린 쪽에 붙어야 한다.
+            _tradePanel.SetOwnerAnchor(transform);
             _tradePanel.SetOwnerHovered(true);
             return;
         }
@@ -276,7 +300,7 @@ public class SellZone : MonoBehaviour, IDropTarget
         if (_zoneType != DropZoneType.Trade) return text;
 
         return _pendingTradeCount > 0
-            ? $"{text}\n도착한 유닛 {_pendingTradeCount}마리 — 클릭해서 수령"
+            ? $"{text}\n도착한 유닛 {_pendingTradeCount}마리 (클릭해서 수령)"
             : $"{text}\n도착한 유닛 없음";
     }
 

@@ -1660,8 +1660,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>로컬 거래 번호 발급용 순번.</summary>
     private int _nextTradeSequence = 1;
 
-    /// <summary>마지막으로 유닛을 전송한 라운드.</summary>
-    private int _lastTradeSentRound = -1;
+    /// <summary>
+    /// 이번 라운드에 유닛을 전송했는지. 전송 기회는 라운드마다 새로 주어지며 쌓이지 않는다 —
+    /// 안 쓰고 넘어간 라운드를 기억할 필요가 없어 라운드가 시작될 때마다 그냥 false로 되돌린다.
+    /// </summary>
+    private bool _tradeSentThisRound;
 
     /// <summary>현재 내 통신기에 대기 중인 수신 유닛 수.</summary>
     public int PendingTradeUnitCount => _incomingTradeQueue.Count;
@@ -1699,19 +1702,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         if (_soloMode || !PhotonNetwork.InRoom)
         {
-            reason = "파트너 없음 — 전송 불가";
+            reason = "파트너 없음";
             return false;
         }
 
         if (_lastKnownRound <= 0)
         {
-            reason = "라운드 시작 전에는 전송할 수 없습니다.";
+            reason = "라운드 시작 전";
             return false;
         }
 
-        if (_lastTradeSentRound == _lastKnownRound)
+        if (_tradeSentThisRound)
         {
-            reason = $"{_lastKnownRound}라운드 전송 횟수를 이미 사용했습니다.";
+            reason = "이번 라운드 전송 완료";
             return false;
         }
 
@@ -1721,7 +1724,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             others.Length == 0 ||
             others[0].IsInactive)
         {
-            reason = "파트너 연결 끊김 — 전송 불가";
+            reason = "파트너 연결 끊김";
             return false;
         }
 
@@ -1748,7 +1751,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!CanSendTradeUnit(out string reason))
         {
-            Debug.LogWarning($"[Trade] {reason}");
+            Debug.LogWarning($"[Trade] 전송 불가: {reason}");
             GameEvents.TradeRejected();
             return;
         }
@@ -1838,8 +1841,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // GameObject를 제거하기 전에 복구 가능한 패킷을 저장한다.
         _pendingOutgoingTrades.Add(tradeId, pendingTrade);
 
-        // 전송 요청이 정상 등록된 시점에 이번 라운드 사용 횟수를 소모한다.
-        _lastTradeSentRound = _lastKnownRound;
+        // 전송 요청이 정상 등록된 시점에 이번 라운드 기회를 쓴 것으로 표시한다.
+        _tradeSentThisRound = true;
 
         Destroy(unit.gameObject);
 
@@ -2887,6 +2890,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastKnownRound = round;      // 재접속 라운드 복구 기준점
+        _tradeSentThisRound = false;  // 전송 기회는 라운드마다 새로 — 안 쓴 라운드는 이월되지 않는다
 
         if (round == 1)
         {
@@ -3747,7 +3751,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 통신교환 상태 초기화
         _pendingOutgoingTrades.Clear();
         _nextTradeSequence = 1;
-        _lastTradeSentRound = -1;
+        _tradeSentThisRound = false;
 
         _incomingTradeQueue.Clear();
         _pendingTradeEvolutions.Clear();
@@ -3938,7 +3942,7 @@ public class NetworkManager : MonoBehaviour
     /// <summary>오프라인은 파트너가 없어 전송 자체가 성립하지 않는다(실구현과 동일 공개 API 유지용 스텁).</summary>
     public bool CanSendTradeUnit(out string reason)
     {
-        reason = "파트너 없음 — 전송 불가";
+        reason = "파트너 없음";
         return false;
     }
 
