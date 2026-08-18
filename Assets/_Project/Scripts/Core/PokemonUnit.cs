@@ -2,6 +2,24 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
+/// PokemonUnit.CreatePhantom에 전달하는 override 값 모음. 실제 보드 유닛이 아니라 스탯 계산만
+/// 필요한 곳(미러 전투 기본 스탯 계산, 파트너 정보창 표시)에서 공통으로 쓴다.
+/// items는 optional이다 — 아이템 스탯을 이 phantom의 계산 경로로 반영해야 하는 호출측만 채운다
+/// (다른 경로로 이미 아이템 스탯을 적용하는 호출측에서 채우면 이중 적용된다 — 호출측 책임).
+/// </summary>
+public struct PhantomUnitConfig
+{
+    public PokemonData species;
+    public int starLevel;
+    public float heroStatMultiplier;
+    public bool isTradeEvolved;
+    public EvolutionStoneData equippedStone;
+    public string roleOverride;
+    public int attackRangeOverride;
+    public IEnumerable<ItemData> items;
+}
+
+/// <summary>
 /// 보드/벤치 위의 포켓몬 유닛 런타임 상태.
 /// 스탯 원본은 PokemonData(ScriptableObject)에 있고, 이 클래스는
 /// 별(star) 강화를 반영한 "유효 스탯"을 계산해 노출하며 전투 중 변하는 값만 들고 있음.
@@ -251,6 +269,33 @@ public class PokemonUnit : MonoBehaviour
             ref manaRegenBonus,
             ref skillDamageAmpPct,
             ref damageAmpPct);
+    }
+
+    /// <summary>
+    /// 임시(phantom) PokemonUnit을 만들어 override 값을 세팅해 반환한다. 보드/씬 어디에도 등록되지
+    /// 않는 계산 전용 인스턴스라, 호출측이 계산 프로퍼티(MaxHp/Attack/Range/Role/ComputeFinalStats 등)를
+    /// 읽은 뒤 Destroy(phantom.gameObject)로 직접 정리해야 한다 — 이 메서드는 생명주기를 관리하지 않는다.
+    /// override 필드는 계산 프로퍼티를 읽기 전에 먼저 설정돼야 하므로(StarMultiplier가
+    /// isTradeEvolved/equippedStone을 참조하는 등) 이 설정 순서를 바꾸지 않는다.
+    /// </summary>
+    public static PokemonUnit CreatePhantom(string goName, PhantomUnitConfig config)
+    {
+        var go = new GameObject(goName);
+        var phantom = go.AddComponent<PokemonUnit>();
+
+        phantom.data = config.species;
+        phantom.starLevel = config.starLevel;
+        phantom.roleOverride = config.roleOverride;
+        phantom.attackRangeOverride = config.attackRangeOverride;
+        phantom.heroStatMultiplier = config.heroStatMultiplier;
+        phantom.isTradeEvolved = config.isTradeEvolved;
+        phantom.equippedStone = config.equippedStone;
+
+        if (config.items != null)
+            foreach (ItemData item in config.items)
+                if (item != null) phantom.items.Add(item);
+
+        return phantom;
     }
 
     private void Start()

@@ -258,20 +258,20 @@ public class StatInfoPanelUI : MonoBehaviour
         _partnerView = view;
         gameObject.SetActive(true);
 
-        var phantomGO = new GameObject("PartnerStatPhantom");
-        var phantom = phantomGO.AddComponent<PokemonUnit>();
-        phantom.data = view.species;
-        phantom.starLevel = view.starLevel;
-        // ComputeFinalStats/Range/Role을 읽기 전에 반드시 먼저 설정해야 override가 반영된다
-        // (미러 전투 CreateMirrorBattleUnit과 동일한 순서 제약).
-        phantom.roleOverride = view.roleOverride;
-        phantom.attackRangeOverride = view.attackRangeOverride;
-        phantom.heroStatMultiplier = view.heroStatMultiplier;
-        phantom.isTradeEvolved = view.isTradeEvolved;
-        phantom.equippedStone = view.equippedStone;
-        if (view.items != null)
-            foreach (ItemData item in view.items)
-                if (item != null) phantom.items.Add(item);
+        // ComputeFinalStats/Range/Role을 읽기 전에 반드시 override가 반영돼야 한다 — CreatePhantom
+        // 내부 설정 순서가 이를 보장한다(미러 전투 CreateMirrorBattleUnit과 동일한 순서 제약).
+        // 파트너 정보창은 ComputeFinalStats로 장비 포함 최종 스탯을 계산하므로 items를 채운다.
+        var phantom = PokemonUnit.CreatePhantom("PartnerStatPhantom", new PhantomUnitConfig
+        {
+            species = view.species,
+            starLevel = view.starLevel,
+            roleOverride = view.roleOverride,
+            attackRangeOverride = view.attackRangeOverride,
+            heroStatMultiplier = view.heroStatMultiplier,
+            isTradeEvolved = view.isTradeEvolved,
+            equippedStone = view.equippedStone,
+            items = view.items,
+        });
 
         FillIdentity(view.species, view.starLevel, phantom.Role, sellSource: null, showSellPrice: false);
 
@@ -280,7 +280,7 @@ public class StatInfoPanelUI : MonoBehaviour
             out float finalAttack, out float finalSpellPower, out float finalAttackSpeed, out float finalDefense);
         int range = phantom.Range;
 
-        Destroy(phantomGO);
+        Destroy(phantom.gameObject);
 
         // HP 절대 수치 표시(hpText)에 쓸 값 — RefreshGauges가 매 프레임 새로 만들지 않도록 Bind
         // 시점에 한 번만 계산해 캐시한다. 실제 currentHp는 전송되지 않으므로(§ 클래스 doc) 항상 이
