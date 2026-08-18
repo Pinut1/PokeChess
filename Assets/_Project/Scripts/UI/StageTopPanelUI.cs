@@ -50,9 +50,6 @@ public class StageTopPanelUI : MonoBehaviour
     [Tooltip("전원 준비 완료 시 표시할 문구.")]
     [SerializeField] private string _allReadyLabel = "전투 시작";
 
-    [SerializeField] private Color _readyStatusNormalColor = Color.white;
-    [SerializeField] private Color _allReadyStatusColor = new Color(0.2f, 0.55f, 1f);
-
     [Tooltip("전원 준비 완료/전투 결과 문구가 뜬 뒤 텍스트를 비우기까지 대기시간(초). " +
              "Result 페이즈 길이(RoundPhaseManager._resultDuration, 기본 3초)를 넘기면 다음 라운드의 " +
              "\"전투 준비중\" 리셋이 먼저 텍스트를 덮어써버리니 그 값 이하로 맞출 것.")]
@@ -62,9 +59,6 @@ public class StageTopPanelUI : MonoBehaviour
              "증강 선택창 등에 가려서 놓치기 쉬워 라운드 번호를 같이 표기한다.")]
     [SerializeField] private string _victoryLabelFormat = "{0}라운드 승리";
     [SerializeField] private string _defeatLabelFormat = "{0}라운드 패배";
-
-    [SerializeField] private Color _victoryColor = Color.green;
-    [SerializeField] private Color _defeatColor = Color.red;
 
     [Header("스테이지 아이콘")]
     [Tooltip("좌→우 순서대로. 씬의 StageIRow_Icon (1)~(5)를 순서대로 넣을 것 — 이름이 복제형이라 자동 탐색은 순서를 보장하지 못한다.")]
@@ -338,7 +332,7 @@ public class StageTopPanelUI : MonoBehaviour
         string label = string.Format(isVictory ? _victoryLabelFormat : _defeatLabelFormat, round);
 
         _showingBattleResult = true;
-        ShowReadyStatusText(label, isVictory ? _victoryColor : _defeatColor, autoClear: true);
+        ShowReadyStatusText(label, autoClear: true);
     }
 
     /// <summary>
@@ -364,16 +358,16 @@ public class StageTopPanelUI : MonoBehaviour
     private void ApplyReadyCountDisplay(int ready, int total)
     {
         if (total > 0 && ready >= total)
-            ShowReadyStatusText(_allReadyLabel, _allReadyStatusColor, autoClear: true);
+            ShowReadyStatusText(_allReadyLabel, autoClear: true);
         else
-            ShowReadyStatusText(string.Format(_readyStatusFormat, ready, total), _readyStatusNormalColor, autoClear: false);
+            ShowReadyStatusText(string.Format(_readyStatusFormat, ready, total), autoClear: false);
     }
 
     /// <summary>
     /// 준비 상태 텍스트에 문구를 채운다. autoClear면 _readyStatusClearDelay 뒤 자동으로 비운다
     /// (전원 준비 완료/전투 결과처럼 잠깐만 보여줄 문구용).
     /// </summary>
-    private void ShowReadyStatusText(string text, Color color, bool autoClear)
+    private void ShowReadyStatusText(string text, bool autoClear)
     {
         if (_readyStatusText == null) return;
 
@@ -384,7 +378,6 @@ public class StageTopPanelUI : MonoBehaviour
         }
 
         _readyStatusText.text = text;
-        _readyStatusText.color = color;
 
         if (autoClear)
             _readyStatusClearCoroutine = StartCoroutine(ClearReadyStatusAfterDelay());
