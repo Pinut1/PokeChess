@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,7 +24,65 @@ public class SampleDeckItemSlotUI : MonoBehaviour
     /// <summary>이 칸이 그리고 있는 항목(ItemData·EvolutionStoneData·ConsumableData). 비었으면 null.</summary>
     public ScriptableObject CurrentData { get; private set; }
 
+    /// <summary>커서가 들고 날 때(true=들어옴). 설명창은 이 칸을 소유한 쪽이 연다.</summary>
+    public event Action<SampleDeckItemSlotUI, bool> Hovered;
+
     private Image _resolvedIcon;
+
+    // 커서 감지기. 인벤토리·상점 칸과 같은 컴포넌트를 런타임에 붙여 프리팹 배선을 늘리지 않는다
+    // (StatInfoPanelUI.SetupItemHovers와 같은 방식).
+    private ItemHoverTarget _hover;
+
+    // Graphic이 없어 감지기를 못 붙인 경우에도 한 번만 경고하도록 시도 여부를 따로 둔다.
+    private bool _hoverResolved;
+
+    /// <summary>
+    /// 이 칸이 커서를 받도록 켠다. <b>켠 칸만</b> <see cref="Hovered"/>를 발행한다.
+    ///
+    /// 기본이 꺼짐인 이유 — 설명창(<see cref="SampleDeckUnitTooltipUI"/>) 안에도 같은 칸이 쓰인다.
+    /// 설명창은 커서를 따라다니므로 거기까지 Raycast Target을 켜면 설명창이 자기 커서를 가로채
+    /// 열렸다 닫혔다를 반복할 수 있다. 실제로 손이 닿는 건 배치도·목록의 칸뿐이다.
+    /// </summary>
+    public void EnableHover()
+    {
+        EnsureHover();
+        if (_hover != null) _hover.SetData(CurrentData);
+    }
+
+    /// <summary>
+    /// 커서 감지기를 준비한다. 커서 이벤트가 오려면 <b>이 오브젝트에 Raycast Target이 켜진
+    /// Graphic</b>이 있어야 한다 — 배경 패널이 있으면 그게 받고, 없으면 아이콘 Image가 받는다.
+    /// 둘 다 없으면 감지기를 붙여봐야 아무 일도 일어나지 않으므로 알려준다.
+    /// </summary>
+    private void EnsureHover()
+    {
+        if (_hoverResolved) return;
+        _hoverResolved = true;
+
+        var graphic = GetComponent<Graphic>();
+
+        if (graphic == null)
+        {
+            Debug.LogWarning(
+                "[SampleDeckItemSlotUI] 이 칸에 Image가 없어 커서를 받을 수 없습니다 — " +
+                "아이템 설명창이 뜨지 않습니다. 배경 패널(Image)을 루트에 두세요.", this);
+            return;
+        }
+
+        graphic.raycastTarget = true;
+
+        _hover = GetComponent<ItemHoverTarget>();
+        if (_hover == null) _hover = gameObject.AddComponent<ItemHoverTarget>();
+
+        _hover.Hovered += HandleHovered;
+    }
+
+    private void HandleHovered(ItemHoverTarget target, bool entered) => Hovered?.Invoke(this, entered);
+
+    private void OnDestroy()
+    {
+        if (_hover != null) _hover.Hovered -= HandleHovered;
+    }
 
     private Image Icon
     {
@@ -39,6 +98,9 @@ public class SampleDeckItemSlotUI : MonoBehaviour
     public void Bind(ScriptableObject data)
     {
         CurrentData = data;
+
+        // 커서를 켜둔 칸만 감지기를 들고 있다(EnableHover). 안 켰으면 그냥 그림만 바꾼다.
+        if (_hover != null) _hover.SetData(data);
 
         Image icon = Icon;
         if (icon == null) return;

@@ -41,6 +41,34 @@ public class RoleTooltipController : MonoBehaviour
         _panel.gameObject.SetActive(false);
     }
 
+    /// <summary>
+    /// 인스펙터에 안 물렸을 때의 폴백 탐색. 씬에 설명창이 <b>여러 개일 수 있다</b> —
+    /// 상점 카드용(역할 이름만)과 스탯창용(추천 아이템까지)을 따로 두기 때문이다.
+    /// 어느 것을 잡을지 보장할 수 없으므로, 조용히 아무거나 쓰지 않고 경고를 남긴다.
+    ///
+    /// 폴백을 쓰는 쪽이 여럿이라(스탯창·안내 툴팁) 여기 한 곳에 모아 뒀다 —
+    /// 한쪽만 경고를 남기면 다른 쪽은 잘못 물린 줄도 모르고 지나간다.
+    /// </summary>
+    /// <param name="context">경고 로그를 클릭했을 때 선택될 오브젝트.</param>
+    public static RoleTooltipController FindInScene(Object context)
+    {
+        var found = FindObjectsByType<RoleTooltipController>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (found == null || found.Length == 0) return null;
+
+        if (found.Length > 1)
+        {
+            Debug.LogWarning(
+                $"[RoleTooltipController] 역할군 설명창이 씬에 {found.Length}개 있습니다 — " +
+                "어느 것을 쓸지 정할 수 없어 첫 번째를 씁니다. " +
+                "상점용(RoleTooltip_Pf)과 스탯창용(RoleItemTooltip_Pf)을 나눠 뒀다면 " +
+                "인스펙터에 직접 물려 주세요.", context);
+        }
+
+        return found[0];
+    }
+
     // ─────────────────────────────────────────
     // 호버 대상이 부르는 API
     // ─────────────────────────────────────────

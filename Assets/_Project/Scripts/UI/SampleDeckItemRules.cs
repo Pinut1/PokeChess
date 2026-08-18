@@ -119,24 +119,8 @@ public static class SampleDeckItemRules
     /// 데이터 전수 확인 결과 역할군이 근접/원거리를 이미 결정하므로 결과가 같다
     /// (근접: Tanker·Warrior·Assassin / 원거리: Archer·Magician·Supporter).
     /// </summary>
-    public static IReadOnlyList<ItemData> GroupOf(string role) => GroupOf(role, RangeOf(role));
-
-    /// <summary>역할군에서 평타 사거리를 파생한다. 규약상 근접=1, 원거리=4.</summary>
-    private static int RangeOf(string role)
-    {
-        if (string.IsNullOrWhiteSpace(role)) return 4;
-
-        switch (role.ToUpperInvariant())
-        {
-            case "TANKER":
-            case "WARRIOR":
-            case "ASSASSIN":
-                return 1;
-
-            default:
-                return 4;
-        }
-    }
+    public static IReadOnlyList<ItemData> GroupOf(string role)
+        => GroupOf(role, SampleDeckHeroAugment.RangeOf(role));
 
     /// <summary>이름 목록을 실제 ItemData로 바꾼다. 못 찾은 이름은 조용히 건너뛰고, 결과는 캐시한다.</summary>
     private static List<ItemData> Resolve(string cacheKey, string[] names)

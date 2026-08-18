@@ -117,6 +117,10 @@ public class SampleDeckPanelUI : MonoBehaviour
     [Tooltip("유닛 설명창. 창 루트 아래 항상 활성인 자리에 둘 것.")]
     [SerializeField] private SampleDeckUnitTooltipUI _unitTooltip;
 
+    [Tooltip("아이템 설명창. 인벤토리·상점이 쓰는 것과 같은 것을 쓴다 — " +
+             "비워두면 씬에서 찾는다(보통 비워둬도 된다).")]
+    [SerializeField] private ItemTooltipController _itemTooltip;
+
     [Header("연결")]
     [Tooltip("IMGUI 전적창을 닫는 데만 쓴다 — 견본덱을 열 때 두 창이 겹치지 않게. 비어도 동작한다.")]
     [SerializeField] private UIManager _uiManager;
@@ -139,6 +143,30 @@ public class SampleDeckPanelUI : MonoBehaviour
     // 상세에 들어간 덱. 목록으로 나가면 -1.
     private int _detailDeckIndex = -1;
 
+    // 아이템 설명창을 우리가 띄웠다면 그 칸. 공유 설명창이라 "내 것만" 닫으려고 들고 있는다.
+    private SampleDeckItemSlotUI _itemTooltipOwner;
+
+    // 목록의 스크롤. _listContent의 부모에서 찾는다 — 인스펙터 배선을 늘리지 않으려고
+    // 참조 대신 탐색을 쓴다. 없을 수도 있으므로(스크롤을 안 붙인 배치) 찾은 적 있는지를 따로 둔다.
+    private ScrollRect _listScroll;
+    private bool _listScrollResolved;
+
+    private ScrollRect ListScroll
+    {
+        get
+        {
+            if (!_listScrollResolved)
+            {
+                _listScrollResolved = true;
+
+                if (_listContent != null)
+                    _listScroll = _listContent.GetComponentInParent<ScrollRect>(includeInactive: true);
+            }
+
+            return _listScroll;
+        }
+    }
+
     /// <summary>지금 창이 열려 있는지.</summary>
     public bool IsOpen => _panelRoot != null && _panelRoot.activeSelf;
 
@@ -151,6 +179,10 @@ public class SampleDeckPanelUI : MonoBehaviour
         if (_openButton != null) _openButton.onClick.AddListener(Toggle);
         if (_closeButton != null) _closeButton.onClick.AddListener(Close);
         if (_backButton != null) _backButton.onClick.AddListener(ShowList);
+
+        // 아이템 설명창은 씬에 하나만 있고 인벤토리·상점이 이미 쓰고 있다 — 견본덱만 따로 두지 않는다.
+        if (_itemTooltip == null)
+            _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
 
         SampleDeckPool.HideTemplate(_listRowTemplate);
         SampleDeckPool.HideTemplate(_synergyRowTemplate);
@@ -196,7 +228,7 @@ public class SampleDeckPanelUI : MonoBehaviour
     public void Close()
     {
         if (_panelRoot != null) _panelRoot.SetActive(false);
-        if (_unitTooltip != null) _unitTooltip.HideAll();
+        HideTooltips();
     }
 
     /// <summary>1페이지(덱 목록)로.</summary>
@@ -204,12 +236,29 @@ public class SampleDeckPanelUI : MonoBehaviour
     {
         _detailDeckIndex = -1;
 
-        if (_unitTooltip != null) _unitTooltip.HideAll();
+        HideTooltips();
 
         if (_listPage != null) _listPage.SetActive(true);
         if (_detailPage != null) _detailPage.SetActive(false);
 
         SetSubtitle(_listSubtitle);
+        ResetListScroll();
+    }
+
+    /// <summary>
+    /// 목록을 맨 위로 되돌린다. 끝까지 내린 채 창을 닫으면 다음에 열 때도 그 자리에서 시작해,
+    /// 1번 덱이 안 보이는 상태로 창이 열린다.
+    /// </summary>
+    private void ResetListScroll()
+    {
+        ScrollRect scroll = ListScroll;
+        if (scroll == null) return;
+
+        // 관성으로 미끄러지던 중이면 위치만 바꿔도 다시 흘러내린다.
+        scroll.StopMovement();
+
+        if (scroll.vertical) scroll.verticalNormalizedPosition = 1f;    // 1 = 맨 위
+        if (scroll.horizontal) scroll.horizontalNormalizedPosition = 0f; // 0 = 맨 왼쪽
     }
 
     /// <summary>2페이지(덱 상세)로. 범위를 벗어난 인덱스면 아무 일도 하지 않는다.</summary>
@@ -219,7 +268,7 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         _detailDeckIndex = deckIndex;
 
-        if (_unitTooltip != null) _unitTooltip.HideAll();
+        HideTooltips();
 
         BuildDetail(_decks[deckIndex]);
 
@@ -227,6 +276,23 @@ public class SampleDeckPanelUI : MonoBehaviour
         if (_detailPage != null) _detailPage.SetActive(true);
 
         SetSubtitle(_detailSubtitle);
+    }
+
+    /// <summary>
+    /// 열려 있는 설명창을 전부 닫는다. 페이지를 넘기거나 창을 닫으면 커서가 칸 위를 벗어나는
+    /// 이벤트가 오지 않아 설명창만 화면에 남는다.
+    /// </summary>
+    private void HideTooltips()
+    {
+        if (_unitTooltip != null) _unitTooltip.HideAll();
+
+        // 아이템 설명창은 인벤토리·상점과 공유하므로 HideAll을 쓰면 남의 것까지 끈다.
+        // 우리가 띄운 것만 닫는다.
+        if (_itemTooltip != null && _itemTooltipOwner != null)
+        {
+            _itemTooltip.Hide(_itemTooltipOwner);
+            _itemTooltipOwner = null;
+        }
     }
 
     /// <summary>머리말 안내를 바꾼다. 문구가 비어 있으면 줄을 꺼서 빈 자리가 남지 않게 한다.</summary>
@@ -273,7 +339,12 @@ public class SampleDeckPanelUI : MonoBehaviour
 
             SampleDeckListRowUI row = SampleDeckPool.Take(
                 _listRows, _listRowTemplate, _listContent, i,
-                created => created.DetailRequested += HandleDetailRequested);
+                created =>
+                {
+                    created.DetailRequested += HandleDetailRequested;
+                    created.UnitHovered += HandleListUnitHovered;
+                    created.UnitItemHovered += HandleListItemHovered;
+                });
 
             if (row == null)
             {
@@ -365,7 +436,11 @@ public class SampleDeckPanelUI : MonoBehaviour
                 _unitCardTemplate,
                 isFront ? _frontLineArea : _backLineArea,
                 isFront ? front : back,
-                created => created.Hovered += HandleUnitHovered);
+                created =>
+                {
+                    created.Hovered += HandleUnitHovered;
+                    created.ItemHovered += HandleItemHovered;
+                });
 
             if (card == null)
             {
@@ -386,9 +461,31 @@ public class SampleDeckPanelUI : MonoBehaviour
         SampleDeckPool.HideExtras(_backCards, back);
     }
 
+    // ─────────────────────────────────────────
+    // 설명창 (유닛 / 아이템)
+    //
+    // 두 페이지가 같은 유닛 칸을 쓰므로 여닫기도 한 곳에서 처리한다. 다른 점은 "어느 덱이냐"
+    // 뿐이라, 목록은 줄의 번호로 덱을 찾아 넘기고 상세는 지금 열어둔 덱을 넘긴다.
+    // ─────────────────────────────────────────
+
     private void HandleUnitHovered(SampleDeckUnitCardUI card, bool entered)
+        => ShowUnitTooltip(CurrentDeck, card, entered);
+
+    private void HandleListUnitHovered(
+        SampleDeckListRowUI row, SampleDeckUnitCardUI card, bool entered)
+        => ShowUnitTooltip(DeckAt(row.Index), card, entered);
+
+    private void HandleItemHovered(
+        SampleDeckUnitCardUI card, SampleDeckItemSlotUI slot, bool entered)
+        => ShowItemTooltip(CurrentDeck, card, slot, entered);
+
+    private void HandleListItemHovered(
+        SampleDeckListRowUI row, SampleDeckUnitCardUI card, SampleDeckItemSlotUI slot, bool entered)
+        => ShowItemTooltip(DeckAt(row.Index), card, slot, entered);
+
+    private void ShowUnitTooltip(DeckData deck, SampleDeckUnitCardUI card, bool entered)
     {
-        if (_unitTooltip == null) return;
+        if (_unitTooltip == null || card == null) return;
 
         if (!entered)
         {
@@ -398,12 +495,44 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         if (card.Data == null) return;
 
-        DeckData deck = CurrentDeck;
         var profile = SampleDeckHeroAugment.ProfileOf(deck, card.Data);
 
         _unitTooltip.Show(card, card.Data, profile.role, profile.attackRange,
                           TooltipItemsOf(deck, card.Data));
     }
+
+    /// <summary>
+    /// 아이템 아이콘 위에서는 <b>아이템 설명창</b>을 띄운다(구 IMGUI 견본덱 창과 같다).
+    ///
+    /// 아이템 칸은 유닛 칸 <b>안에</b> 있어서 커서가 두 곳에 동시에 들어간 상태가 된다.
+    /// 두 설명창이 겹쳐 뜨면 서로를 가리므로, 아이템 쪽이 뜨는 동안 유닛 쪽은 접는다.
+    /// 아이템에서 빠졌는데 아직 유닛 칸 위라면 유닛 설명창을 되살린다.
+    /// </summary>
+    private void ShowItemTooltip(
+        DeckData deck, SampleDeckUnitCardUI card, SampleDeckItemSlotUI slot, bool entered)
+    {
+        if (_itemTooltip == null || slot == null) return;
+
+        if (!entered)
+        {
+            _itemTooltip.Hide(slot);
+            if (_itemTooltipOwner == slot) _itemTooltipOwner = null;
+
+            if (card != null && card.IsHovered) ShowUnitTooltip(deck, card, true);
+            return;
+        }
+
+        if (slot.CurrentData == null) return;
+
+        if (_unitTooltip != null && card != null) _unitTooltip.Hide(card);
+
+        _itemTooltip.Show(slot, slot.CurrentData);
+        _itemTooltipOwner = slot;
+    }
+
+    /// <summary>목록에서 index번째 덱. 범위를 벗어나면 null.</summary>
+    private DeckData DeckAt(int index)
+        => index >= 0 && index < _decks.Count ? _decks[index] : null;
 
     /// <summary>
     /// 설명창에 보여줄 아이템. 카드의 2칸과 달리 <b>역할군 그룹 전체</b>를 보여준다 —
@@ -714,6 +843,20 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         for (int i = 0; i < pinned.Count && slot < result.Length; i++)
             result[slot++] = pinned[i];
+
+        // 진화의 돌이 1칸을 먹은 상태에서 고정이 2개면 하나가 밀려난다. 지금은 그런 종이 없지만
+        // (파치리스·이브이 둘 다 돌이 필요 없다), 나중에 생기면 조용히 사라지는 대신 알린다.
+        int room = result.Length - startIndex;
+
+        if (pinned.Count > room)
+        {
+            string name = pokemon != null ? pokemon.pokemonName : "?";
+
+            Debug.LogWarning(
+                $"[SampleDeckPanelUI] {name}에 고정 아이템을 {pinned.Count}개 지정했는데 남은 칸이 " +
+                $"{room}개라 뒤쪽 고정이 빠집니다. " +
+                "칸 수(ITEMS_PER_CORE_UNIT)를 늘리거나 고정을 줄여야 합니다.");
+        }
 
         if (slot >= result.Length) return;
 

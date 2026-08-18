@@ -1333,12 +1333,6 @@ public class BattleManager : MonoBehaviour
 
     private const string SHIELD_STATE_VFX_ID = "VFX_Shield_State"; // Shield_gold.prefab, VfxDatabase 등록
 
-    // 기존 SHIELD 스킬 VFX 8종(_Shield/ 폴더)이 전부 루트 localScale 0.4로 통일돼 있고, world-space에
-    // 독립 생성돼(부모 없음) 종족 모델 scale을 전혀 상속하지 않는 것과 동일한 관례를 따른다 — 유닛
-    // 몸집별로 계산하지 않고 고정 절대값 하나만 쓴다. 실제 값은 Unity에서 Shield_gold를 눈으로 보고
-    // 확정 필요(임시 0.4).
-    private const float SHIELD_FIXED_SCALE = 0.4f;
-
     private static bool _shieldVfxMissingWarned;
 
     /// <summary>
@@ -1349,10 +1343,16 @@ public class BattleManager : MonoBehaviour
     ///
     /// 기존 SHIELD 스킬 8종(_Shield/ 폴더, BattleVfxPlayer.PlaySkill 경유)과 동일하게 world-space에
     /// 독립 생성한다(bu.visual의 자식이 아님) — 종족 모델 프리팹마다 제각각인 scale을 원천적으로
-    /// 상속하지 않는다. 위치만 매틱 bu.visual.transform.position으로 추적하고, scale은 고정값
-    /// (SHIELD_FIXED_SCALE)만 쓴다. BattleVfxPlayer는 생성 즉시 lifetime 뒤 자동 Destroy가 전제라
-    /// "출처가 남아있는 동안 계속 유지"라는 상태형 요구와 맞지 않아 쓰지 않는다 — VfxDatabase에서
-    /// 프리팹만 조회해 직접 Instantiate/Destroy한다.
+    /// 상속하지 않는다. 위치는 매틱 bu.visual.transform.position + entry.positionOffset으로 추적한다.
+    ///
+    /// <b>높이와 크기는 코드가 정하지 않는다</b> — 오프셋은 VfxDatabase 엔트리, 크기는 프리팹 루트
+    /// scale이 정한다. BattleVfxPlayer.Create와 같은 규칙이라 쉴드가 늘어나도 코드를 건드릴 일이 없고,
+    /// 아트가 프리팹만 보고 다른 쉴드와 중심을 맞출 수 있다(쉴드 중심 높이 = 루트 Y + 본체 로컬 Y ×
+    /// 루트 scale인데, 루트 Y는 아래 Instantiate가 덮어쓰므로 높이 보정은 positionOffset으로 준다).
+    ///
+    /// BattleVfxPlayer는 생성 즉시 lifetime 뒤 자동 Destroy가 전제라 "출처가 남아있는 동안 계속 유지"
+    /// 라는 상태형 요구와 맞지 않아 쓰지 않는다 — VfxDatabase에서 엔트리만 조회해 직접
+    /// Instantiate/Destroy한다.
     /// </summary>
     private void SyncShieldVfx(BattleUnit bu)
     {
@@ -1366,7 +1366,7 @@ public class BattleManager : MonoBehaviour
 
         if (hasActiveShieldSource && bu.shieldVfxInstance == null && bu.visual != null)
         {
-            var entry = VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(SHIELD_STATE_VFX_ID) : null;
+            var entry = ResolveShieldVfxEntry();
             if (entry == null || entry.prefab == null)
             {
                 if (!_shieldVfxMissingWarned)
@@ -1377,8 +1377,10 @@ public class BattleManager : MonoBehaviour
                 return;
             }
 
-            var go = Instantiate(entry.prefab, bu.visual.transform.position, Quaternion.identity);
-            go.transform.localScale = Vector3.one * SHIELD_FIXED_SCALE;
+            // 크기는 건드리지 않는다 — 프리팹 루트 scale이 그대로 최종 크기다(BattleVfxPlayer와 동일).
+            var go = Instantiate(entry.prefab,
+                                 bu.visual.transform.position + entry.positionOffset,
+                                 Quaternion.identity);
 
             int layer = ResolveVisualLayer();
             if (layer >= 0) SetDefaultLayerRecursive(go.transform, layer);
@@ -1392,9 +1394,20 @@ public class BattleManager : MonoBehaviour
         }
         else if (bu.shieldVfxInstance != null && bu.visual != null)
         {
-            bu.shieldVfxInstance.transform.position = bu.visual.transform.position; // 위치만 매틱 추적
+            // 위치만 매틱 추적. 생성 때와 같은 오프셋을 더해야 유닛이 움직여도 높이가 유지된다.
+            var entry = ResolveShieldVfxEntry();
+            Vector3 offset = entry != null ? entry.positionOffset : Vector3.zero;
+
+            bu.shieldVfxInstance.transform.position = bu.visual.transform.position + offset;
         }
     }
+
+    /// <summary>
+    /// 상태 쉴드 VFX 엔트리 조회. 생성과 매틱 추적 두 곳이 같은 positionOffset을 써야 해서 한 곳으로 모은다.
+    /// 캐싱하지 않는다 — 못 찾았을 때 캐시해 두면 나중에 등록해도 영영 안 잡힌다(Get은 딕셔너리 조회).
+    /// </summary>
+    private static VfxEntry ResolveShieldVfxEntry() =>
+        VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(SHIELD_STATE_VFX_ID) : null;
 
     private static bool HasActiveShieldSource(BattleUnit bu)
     {

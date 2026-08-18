@@ -1,56 +1,51 @@
 {
-  "_readme": "스테이지 클리어 보상표(1-5 슬라이스). 확정본=포켓체스_밸런스_기획서.md §7.3(황해인, v1.0). 모든 보상은 해당 라운드 '전투 시작 전 선지급'. 누적 골드 목표 200(2R40/3R70/5R200). 리롤=매라운드 10개(5R합산50). 아이템샵쿠폰=1/1/2/1/2, 아이템샵리롤=2 고정, Reforger=3·5R 각1. kind 매핑: gold/reroll/itemCoupon 구현됨. itemShopReroll=아이템샵 리롤 자원(ShopManager.AddItemShopReroll). reforger=재련기(아이템 미구현 → RewardManager TODO 스텁).",
+  "_readme": "스테이지 클리어 보상표(1-5 슬라이스). 출처=reward_table 시트(황해인). 모든 보상은 해당 라운드 '전투 시작 전 선지급'. 2026-08-18 골드 전 라운드 +10 증액(누적 200→250) — 근거는 Docs/BALANCE_2026-08-18_reward-gold-increase.md. 리롤=매 라운드 10개(5R 합산 50). 아이템샵쿠폰=1/1/2/1/2, Reforger=3·5R 각 1. 아이템샵리롤은 카드별 무료 리롤 모델로 바뀌며 폐기돼 시트에서 제외(RewardManager도 no-op). 시트의 minorDitto/ditto/majorDitto/anvil 컬럼은 RewardKind에 대응 멤버가 없어 미반영 — 값을 넣으려면 enum 맨 뒤에 멤버를 추가하고 ParseRewardKind 매핑을 먼저 넣을 것(폴백이 Gold라 조용히 골드로 둔갑함).",
   "tables": [
     {
       "rewardTableId": "RW001",
       "label": "1라운드(야생·잉어킹) 클리어 보상",
       "rewards": [
-        { "kind": "gold",           "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "gold",       "amount": 20,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",     "amount": 10,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1,   "refNameEn": "", "dropChance": 1.0 }
       ]
     },
     {
       "rewardTableId": "RW002",
       "label": "2라운드(관장·웅이) 클리어 보상",
       "rewards": [
-        { "kind": "gold",           "amount": 25, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "gold",       "amount": 35,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",     "amount": 10,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1,   "refNameEn": "", "dropChance": 1.0 }
       ]
     },
     {
       "rewardTableId": "RW003",
       "label": "3라운드(관장·이슬이) 클리어 보상",
       "rewards": [
-        { "kind": "gold",           "amount": 40, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemCoupon",     "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reforger",       "amount": 1,  "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "gold",       "amount": 50,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",     "amount": 10,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 2,   "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger",   "amount": 1,   "refNameEn": "", "dropChance": 1.0 }
       ]
     },
     {
       "rewardTableId": "RW004",
       "label": "4라운드(관장·목호) 클리어 보상",
       "rewards": [
-        { "kind": "gold",           "amount": 55, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemCoupon",     "amount": 1,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "gold",       "amount": 65,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",     "amount": 10,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 1,   "refNameEn": "", "dropChance": 1.0 }
       ]
     },
     {
       "rewardTableId": "RW005",
       "label": "5라운드(챔피언·그린 보스) 클리어 보상",
       "rewards": [
-        { "kind": "gold",           "amount": 70, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reroll",         "amount": 10, "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemCoupon",     "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "itemShopReroll", "amount": 2,  "refNameEn": "", "dropChance": 1.0 },
-        { "kind": "reforger",       "amount": 1,  "refNameEn": "", "dropChance": 1.0 }
+        { "kind": "gold",       "amount": 80,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reroll",     "amount": 10,  "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "itemCoupon", "amount": 2,   "refNameEn": "", "dropChance": 1.0 },
+        { "kind": "reforger",   "amount": 1,   "refNameEn": "", "dropChance": 1.0 }
       ]
     }
   ]

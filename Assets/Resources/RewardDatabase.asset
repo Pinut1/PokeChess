@@ -18,7 +18,7 @@ MonoBehaviour:
       \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 10
+      amount: 20
       refNameEn: 
       dropChance: 1
     - kind: 2
@@ -27,10 +27,6 @@ MonoBehaviour:
       dropChance: 1
     - kind: 1
       amount: 1
-      refNameEn: 
-      dropChance: 1
-    - kind: 8
-      amount: 2
       refNameEn: 
       dropChance: 1
   - rewardTableId: RW002
@@ -38,7 +34,7 @@ MonoBehaviour:
       \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 25
+      amount: 35
       refNameEn: 
       dropChance: 1
     - kind: 2
@@ -49,16 +45,12 @@ MonoBehaviour:
       amount: 1
       refNameEn: 
       dropChance: 1
-    - kind: 8
-      amount: 2
-      refNameEn: 
-      dropChance: 1
   - rewardTableId: RW003
     label: "3\uB77C\uC6B4\uB4DC(\uAD00\uC7A5\xB7\uC774\uC2AC\uC774) \uD074\uB9AC\uC5B4
       \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 40
+      amount: 50
       refNameEn: 
       dropChance: 1
     - kind: 2
@@ -66,10 +58,6 @@ MonoBehaviour:
       refNameEn: 
       dropChance: 1
     - kind: 1
-      amount: 2
-      refNameEn: 
-      dropChance: 1
-    - kind: 8
       amount: 2
       refNameEn: 
       dropChance: 1
@@ -82,7 +70,7 @@ MonoBehaviour:
       \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 55
+      amount: 65
       refNameEn: 
       dropChance: 1
     - kind: 2
@@ -93,16 +81,12 @@ MonoBehaviour:
       amount: 1
       refNameEn: 
       dropChance: 1
-    - kind: 8
-      amount: 2
-      refNameEn: 
-      dropChance: 1
   - rewardTableId: RW005
     label: "5\uB77C\uC6B4\uB4DC(\uCC54\uD53C\uC5B8\xB7\uADF8\uB9B0 \uBCF4\uC2A4)
       \uD074\uB9AC\uC5B4 \uBCF4\uC0C1"
     rewards:
     - kind: 0
-      amount: 70
+      amount: 80
       refNameEn: 
       dropChance: 1
     - kind: 2
@@ -110,10 +94,6 @@ MonoBehaviour:
       refNameEn: 
       dropChance: 1
     - kind: 1
-      amount: 2
-      refNameEn: 
-      dropChance: 1
-    - kind: 8
       amount: 2
       refNameEn: 
       dropChance: 1

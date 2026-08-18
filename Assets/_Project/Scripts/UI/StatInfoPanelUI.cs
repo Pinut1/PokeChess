@@ -151,6 +151,13 @@ public class StatInfoPanelUI : MonoBehaviour
     private string _currentRole;
     private PokemonData _currentData;
 
+    // 지금 보고 있는 대상이 진화 잠금인지(나인이볼부스트 이브이 등). 잠겨 있으면 돌을 추천하지 않는다.
+    //
+    // ⚠️ _unit을 직접 보면 안 된다 — Bind(BattleUnit)·Bind(PartnerBoardUnitView)는 _unit을 null로
+    // 두므로, 전투 중이나 파트너 보드에서는 잠긴 유닛도 "진화 가능"으로 잘못 나온다.
+    // 그래서 각 Bind가 자기 경로에 맞는 값을 여기 직접 채운다.
+    private bool _currentEvolutionLocked;
+
     public RectTransform Rect => _rect != null ? _rect : _rect = (RectTransform)transform;
 
     /// <summary>보드 유닛으로 열려 있으면 그 유닛. 아니면 null.</summary>
@@ -174,6 +181,7 @@ public class StatInfoPanelUI : MonoBehaviour
         _unit = unit;
         _battleUnit = null;
         _partnerView = null;
+        _currentEvolutionLocked = unit.evolutionLocked;
         gameObject.SetActive(true);
 
         FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
@@ -213,6 +221,9 @@ public class StatInfoPanelUI : MonoBehaviour
         _battleUnit = unit;
         _unit = null;
         _partnerView = null;
+        // 전투 인스턴스는 잠금 플래그를 들고 있지 않다. 내 보드의 원본이 있으면 거기서 읽고,
+        // 적처럼 원본이 없으면 알 수 없으니 잠기지 않은 것으로 둔다(돌 추천이 뜨는 쪽).
+        _currentEvolutionLocked = unit.source != null && unit.source.evolutionLocked;
         gameObject.SetActive(true);
 
         // 판매가는 내 보드의 원본이 있을 때만 의미가 있다(적은 팔 수 없다).
@@ -256,6 +267,10 @@ public class StatInfoPanelUI : MonoBehaviour
         _battleUnit = null;
         _unit = null;
         _partnerView = view;
+        // ⚠️ BoardSnapshot.Entry에는 evolutionLocked가 있지만 PartnerBoardUnitView가 그걸 나르지
+        // 않는다(Network/OpponentBoardView.cs). 파트너의 잠긴 이브이에는 돌 추천이 뜬다 —
+        // 고치려면 그 struct에 필드를 하나 더해야 해서 Network 담당(영욱)과 조율이 필요하다.
+        _currentEvolutionLocked = false;
         gameObject.SetActive(true);
 
         var phantomGO = new GameObject("PartnerStatPhantom");
@@ -297,6 +312,7 @@ public class StatInfoPanelUI : MonoBehaviour
         _unit = null;
         _battleUnit = null;
         _partnerView = null;
+        _currentEvolutionLocked = false;
         gameObject.SetActive(false);
     }
 
@@ -311,33 +327,10 @@ public class StatInfoPanelUI : MonoBehaviour
         if (_itemTooltip == null)
             _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
 
-        if (_roleTooltip == null) _roleTooltip = FindRoleTooltip();
+        if (_roleTooltip == null) _roleTooltip = RoleTooltipController.FindInScene(this);
 
         SetupItemHovers();
         SetupRoleHover();
-    }
-
-    /// <summary>
-    /// 인스펙터에 안 물렸을 때의 폴백. 씬에 역할군 설명창이 <b>여러 개일 수 있다</b> —
-    /// 상점 카드용(역할 이름만)과 스탯창용(추천 아이템까지)을 따로 두기 때문이다.
-    /// 그런 경우 어느 것을 잡을지 보장할 수 없으므로, 조용히 아무거나 쓰지 않고 경고를 남긴다.
-    /// </summary>
-    private RoleTooltipController FindRoleTooltip()
-    {
-        var found = FindObjectsByType<RoleTooltipController>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None);
-
-        if (found == null || found.Length == 0) return null;
-
-        if (found.Length > 1)
-        {
-            Debug.LogWarning(
-                $"[StatInfoPanelUI] 역할군 설명창이 씬에 {found.Length}개 있습니다 — " +
-                "어느 것을 쓸지 정할 수 없어 첫 번째를 씁니다. " +
-                "상점용과 스탯창용을 나눠 뒀다면 Role Tooltip을 인스펙터에 직접 물려 주세요.", this);
-        }
-
-        return found[0];
     }
 
     /// <summary>
@@ -372,7 +365,7 @@ public class StatInfoPanelUI : MonoBehaviour
         }
 
         // 보드 유닛으로 연 경우엔 진화잠금 여부까지 반영된다(나인이볼부스트 이브이 등).
-        _roleTooltip.Show(target, _currentRole, _currentData, _unit != null && _unit.evolutionLocked);
+        _roleTooltip.Show(target, _currentRole, _currentData, _currentEvolutionLocked);
     }
 
     /// <summary>
