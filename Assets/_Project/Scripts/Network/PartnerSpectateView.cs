@@ -33,9 +33,28 @@ public class PartnerSpectateView : MonoBehaviour
     [Tooltip("PartnerPipLabel — 미러 전투가 없을 때 \"준비 중\" 문구를 표시할 텍스트.")]
     [SerializeField] private TextMeshProUGUI _pipLabel;
 
-    [Tooltip("PartnerViewButton — 일반 플레이에서 파트너 전투 전체화면을 여닫는 버튼. 항상 활성 상태로 둔다. " +
-             "관전 열기/닫기는 이 버튼 하나로만 한다 — 전체화면 패널 자체를 클릭해도 닫히지 않는다.")]
+    [Tooltip("(구) PartnerViewButton — 누를 때마다 내 화면 ↔ 파트너 화면을 번갈아 연다.\n" +
+             "아래 프로필 버튼 두 개로 옮겨가는 중이라, 새 버튼을 물렸으면 이 칸은 비워 두면 된다.")]
     [SerializeField] private Button _externalViewButton;
+
+    [Header("프로필 버튼 (내 화면 / 파트너 화면)")]
+    [Tooltip("내 프로필 버튼. 누르면 항상 내 화면으로 돌아온다 — 이미 내 화면이면 아무 일도 하지 않는다.")]
+    [SerializeField] private Button _myViewButton;
+
+    [Tooltip("파트너 프로필 버튼. 누르면 항상 파트너 화면을 연다 — 이미 열려 있으면 아무 일도 하지 않는다.")]
+    [SerializeField] private Button _partnerViewButton;
+
+    [Tooltip("(선택) 내 프로필 버튼의 테두리 프레임. 지금 보고 있는 쪽만 아래 '활성 색'으로 칠한다.")]
+    [SerializeField] private Image _myViewFrame;
+
+    [Tooltip("(선택) 파트너 프로필 버튼의 테두리 프레임.")]
+    [SerializeField] private Image _partnerViewFrame;
+
+    [Tooltip("지금 보고 있는 쪽 테두리 색.")]
+    [SerializeField] private Color _activeFrameColor = new(1f, 0.85f, 0.3f);
+
+    [Tooltip("보고 있지 않은 쪽 테두리 색.")]
+    [SerializeField] private Color _inactiveFrameColor = new(1f, 1f, 1f, 0.35f);
 
     [Header("디버그")]
     [Tooltip("켜면 평상시에도 우측 상단에 작은 PIP 미리보기를 띄운다. 끄면(기본) 최종 플레이 화면처럼 " +
@@ -146,6 +165,7 @@ public class PartnerSpectateView : MonoBehaviour
         ApplyMainCameraCullingMask();
 
         UpdateViewButtonLabel();
+        UpdateViewFrames();
         UpdatePipContent();
         RefreshPanelVisibility();
     }
@@ -158,6 +178,10 @@ public class PartnerSpectateView : MonoBehaviour
         // ToggleExpanded가 호출돼 버린다(실측 확인된 버그) — 그래서 이 버튼은 더 이상 쓰지 않는다.
         if (_externalViewButton != null) _externalViewButton.onClick.AddListener(ToggleExpanded);
 
+        // 토글이 아니라 "그 화면으로 간다"다 — 이미 그 상태면 SetExpanded가 스스로 빠져나간다.
+        if (_myViewButton != null) _myViewButton.onClick.AddListener(ShowMyView);
+        if (_partnerViewButton != null) _partnerViewButton.onClick.AddListener(ShowPartnerView);
+
         GameEvents.OnStageEntered += HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged += HandlePartnerBattleSnapshotChanged;
         GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
@@ -167,6 +191,9 @@ public class PartnerSpectateView : MonoBehaviour
     private void OnDisable()
     {
         if (_externalViewButton != null) _externalViewButton.onClick.RemoveListener(ToggleExpanded);
+
+        if (_myViewButton != null) _myViewButton.onClick.RemoveListener(ShowMyView);
+        if (_partnerViewButton != null) _partnerViewButton.onClick.RemoveListener(ShowPartnerView);
 
         GameEvents.OnStageEntered -= HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged -= HandlePartnerBattleSnapshotChanged;
@@ -536,6 +563,22 @@ public class PartnerSpectateView : MonoBehaviour
     /// <summary>PartnerViewButton 클릭 핸들러 — 관전 열기/닫기는 이 경로 하나뿐이다.</summary>
     private void ToggleExpanded() => SetExpanded(!_isExpanded);
 
+    /// <summary>내 프로필 버튼 — 항상 내 화면으로. 이미 내 화면이면 SetExpanded가 그대로 빠져나간다.</summary>
+    private void ShowMyView() => SetExpanded(false);
+
+    /// <summary>파트너 프로필 버튼 — 항상 파트너 화면으로. 이미 열려 있으면 아무 일도 없다.</summary>
+    private void ShowPartnerView() => SetExpanded(true);
+
+    /// <summary>지금 보고 있는 쪽 프로필의 테두리만 활성 색으로 칠한다.</summary>
+    private void UpdateViewFrames()
+    {
+        if (_myViewFrame != null)
+            _myViewFrame.color = _isExpanded ? _inactiveFrameColor : _activeFrameColor;
+
+        if (_partnerViewFrame != null)
+            _partnerViewFrame.color = _isExpanded ? _activeFrameColor : _inactiveFrameColor;
+    }
+
     /// <summary>
     /// 전체화면 관전 상태를 바꾸는 단일 진입점. _isExpanded 대입과
     /// GameEvents.OnPartnerSpectateExpandedChanged 발행이 이 메서드 한 곳에만 있다 — 버튼 토글
@@ -573,6 +616,7 @@ public class PartnerSpectateView : MonoBehaviour
         RefreshPanelVisibility();
         UpdatePipContent();
         UpdateViewButtonLabel();
+        UpdateViewFrames();
 
         // PIP(축소) 상태는 포함하지 않는다 — 전체화면 진입/종료만 알린다(UIManager의 상점 HUD 숨김/복원용).
         GameEvents.PartnerSpectateExpandedChanged(_isExpanded);

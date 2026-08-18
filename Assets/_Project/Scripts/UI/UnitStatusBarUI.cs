@@ -12,6 +12,11 @@ public class UnitStatusBarUI : MonoBehaviour
     [Header("채우기")]
     [Tooltip("Image Type을 Filled(Horizontal)로 두면 fillAmount로 줄어든다.")]
     [SerializeField] private Image _hpFill;
+    [Tooltip("보호막을 HP 오른쪽 끝에 이어 붙이는 흰 바.\n" +
+             "⚠️ 계층에서 HP Fill보다 <b>위쪽 형제</b>여야 한다 — 뒤에 깔려야 HP가 덮고 남은 부분만 흰색으로 보인다.\n" +
+             "Image Type은 HP와 같이 Filled(Horizontal). 비워두면 보호막 표시 없이 동작한다.")]
+    [SerializeField] private Image _shieldFill;
+
     [Tooltip("마나가 없는 유닛(스킬 미보유)이면 자동으로 숨긴다.")]
     [SerializeField] private Image _manaFill;
     [SerializeField] private GameObject _manaRoot;
@@ -19,6 +24,9 @@ public class UnitStatusBarUI : MonoBehaviour
     [Header("색상")]
     [SerializeField] private Color _allyHpColor  = new(0.35f, 0.85f, 0.35f);
     [SerializeField] private Color _enemyHpColor = new(0.9f, 0.3f, 0.3f);
+    [Tooltip("보호막 색. 아군/적 구분 없이 흰색 계열을 쓴다.")]
+    [SerializeField] private Color _shieldColor  = new(0.95f, 0.95f, 0.95f);
+
     [Tooltip("마나는 아군/적 구분 없이 한 색을 쓴다. 스프라이트가 흰색이어야 이 색이 그대로 나온다.")]
     [SerializeField] private Color _manaColor    = new(0.3f, 0.6f, 1f);
 
@@ -57,13 +65,38 @@ public class UnitStatusBarUI : MonoBehaviour
     /// 표시값 갱신. 비율은 0~1로 클램프한다.
     /// manaRatio가 음수면 마나 바를 숨긴다(스킬이 없거나 마나 개념이 없는 상태).
     /// maxHp는 눈금 개수 계산에만 쓴다.
+    ///
+    /// <b>비율의 분모는 최대HP가 아니라 (최대HP + 보호막)</b>이다 — 바 전체가 그 총량을 나타낸다.
+    /// 보호막이 붙으면 HP가 차지하는 길이가 그만큼 줄고, 밀려난 오른쪽 끝이 보호막 자리가 된다.
+    /// 풀피에 보호막이 붙어도 보이게 하려면 이 방법뿐이다(HP를 1로 두면 덮을 자리가 없다).
+    ///
+    /// 그래서 <paramref name="maxHp"/>에도 <b>보호막을 더한 값</b>을 넘겨야 한다 — 눈금 하나가
+    /// 나타내는 HP를 그대로 유지한 채 눈금만 촘촘해져서, "총량이 늘었다"가 눈으로 읽힌다.
+    ///
+    /// 흰 바는 따로 그리지 않는다. HP 뒤에 (HP+보호막)까지 깔아 두고 HP가 그 위를 덮게 해서
+    /// 남는 오른쪽 끝만 흰색으로 보이게 한다 — 폭 계산이 필요 없다.
     /// </summary>
-    public void SetValues(float hpRatio, float manaRatio, bool isAlly, float maxHp)
+    public void SetValues(float hpRatio, float manaRatio, bool isAlly, float maxHp, float shieldRatio = 0f)
     {
         if (_hpFill != null)
         {
             _hpFill.fillAmount = Mathf.Clamp01(hpRatio);
             _hpFill.color = isAlly ? _allyHpColor : _enemyHpColor;
+        }
+
+        if (_shieldFill != null)
+        {
+            // 보호막이 없으면 아예 끈다 — 지속시간이 끝나면 흰 바가 통째로 사라져야 한다.
+            bool hasShield = shieldRatio > 0f;
+            _shieldFill.enabled = hasShield;
+
+            if (hasShield)
+            {
+                // HP + 보호막까지 채운다. 앞에 놓인 HP가 덮고 남은 구간이 곧 보호막이다.
+                // 바 폭을 넘는 보호막은 잘린다(고정 폭 바라 표시할 자리가 없다).
+                _shieldFill.fillAmount = Mathf.Clamp01(hpRatio + shieldRatio);
+                _shieldFill.color = _shieldColor;
+            }
         }
 
         bool showMana = manaRatio >= 0f;
