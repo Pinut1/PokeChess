@@ -103,6 +103,11 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
     [Tooltip("월드→화면 변환에 쓸 카메라. 비워두면 Camera.main.")]
     [SerializeField] private Camera _camera;
 
+    [Tooltip("상태(전송 가능 여부·대기 마릿수·벤치 여유)를 다시 읽는 간격(초).\n" +
+             "매 프레임 읽으면 Photon 파트너 목록과 벤치 스캔이 초당 60번 돌아 할 일 없이 쓰레기를 만든다. " +
+             "0 이하면 매 프레임 읽는다.")]
+    [SerializeField] private float _stateRefreshInterval = 0.2f;
+
     [Header("여닫기")]
     [Tooltip("통신기에서 커서가 빠진 뒤 창을 닫기까지 기다리는 시간(초).\n" +
              "창이 통신기와 떨어져 있으면 버튼을 누르러 가는 동안 빈 공간을 지나는데, " +
@@ -137,6 +142,9 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
 
     /// <summary>이 시각(unscaled)이 지나면 창을 닫는다. 커서가 돌아오면 취소된다.</summary>
     private float _closeAt = NO_CLOSE_PENDING;
+
+    /// <summary>다음으로 상태를 다시 읽을 시각(unscaled).</summary>
+    private float _nextStateRefreshAt;
 
     // 미리 깔아둔 칸 + 필요해서 만든 칸. 한 번 만들면 파괴하지 않고 재사용한다.
     private readonly List<SynergyTooltipUnitSlot> _slots = new();
@@ -224,7 +232,7 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
         }
 
         FillEvolveListOnce();
-        Refresh();
+        RefreshNow();
 
         // 창 높이는 ContentSizeFitter가 정하는데, 그 계산은 프레임 끝에 돈다.
         // 여는 순간 자리를 잡으려면 크기가 먼저 나와 있어야 해서(가장자리 보정이 높이를 쓴다)
@@ -284,8 +292,16 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
             return;
         }
 
-        Refresh();
+        if (Time.unscaledTime >= _nextStateRefreshAt) RefreshNow();
+
         FollowAnchor();
+    }
+
+    /// <summary>상태를 즉시 다시 읽고 다음 갱신 시각을 미룬다.</summary>
+    private void RefreshNow()
+    {
+        _nextStateRefreshAt = Time.unscaledTime + Mathf.Max(0f, _stateRefreshInterval);
+        Refresh();
     }
 
     // ─────────────────────────────────────────
@@ -395,6 +411,18 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
     /// string.Format이 아니라 치환을 쓴다 — 형식은 인스펙터에서 고칠 수 있는 값이라,
     /// 중괄호를 잘못 넣으면 string.Format은 실행 중에 예외를 낸다.
     /// </summary>
+    /// <summary>
+    /// 마릿수 문구를 만든다. <see cref="WrapReason"/>과 같은 이유로 string.Format을 쓰지 않는다 —
+    /// 인스펙터에서 고칠 수 있는 값이라 중괄호를 잘못 넣으면 매 갱신마다 예외가 난다.
+    /// </summary>
+    private static string FormatCount(string format, int count)
+    {
+        if (string.IsNullOrEmpty(format)) return count.ToString();
+        if (!format.Contains("{0}")) return format;
+
+        return format.Replace("{0}", count.ToString());
+    }
+
     private string WrapReason(string reason)
     {
         string format = _sendReasonFormat;
@@ -413,7 +441,7 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
         _lastBenchFull = benchFull;
 
         if (_receiveHeaderText != null)
-            _receiveHeaderText.text = string.Format(_receiveHeaderFormat, pending);
+            _receiveHeaderText.text = FormatCount(_receiveHeaderFormat, pending);
 
         // 받을 게 없으면 벤치가 차 있어도 "벤치가 가득 참"이라고 하지 않는다 — 지금 막힌 이유가 아니다.
         bool blockedByBench = pending > 0 && benchFull;
@@ -439,19 +467,15 @@ public class TradeMachinePanelUI : MonoBehaviour, IPointerEnterHandler, IPointer
 
         network.TryReceiveNextTradeUnit();
 
-        // 마릿수·버튼 상태를 즉시 반영한다(다음 LateUpdate를 기다리지 않게).
+        // 마릿수·버튼 상태를 즉시 반영한다(스로틀 간격을 기다리지 않게).
         _stateDirty = true;
-        Refresh();
+        RefreshNow();
     }
 
     // ─────────────────────────────────────────
     // 통신진화 아이콘 줄
     // ─────────────────────────────────────────
 
-    /// <summary>
-    /// 통신진화 대상(진화 <b>전</b> 종)을 코스트순으로 깐다.
-    /// 매핑은 임포터가 구운 데이터라 게임 중에 바뀌지 않으므로 한 번만 채운다.
-    /// </summary>
     /// <summary>
     /// 통신진화 목록을 채운다 — 위 줄은 진화 전, 아래 줄은 진화 후.
     ///

@@ -14,6 +14,30 @@ using UnityEngine.UI;
 /// </summary>
 public class ItemTooltipController : MonoBehaviour
 {
+    /// <summary>
+    /// 인스펙터에 안 물렸을 때의 폴백 탐색. 지금 씬에는 하나뿐이지만 늘어나면 어느 것을 잡을지
+    /// 보장할 수 없으므로, 조용히 아무거나 쓰지 않고 경고를 남긴다.
+    /// (<see cref="RoleTooltipController.FindInScene"/>과 같은 규약 — 폴백을 쓰는 쪽이 여럿이라
+    /// 한 곳에 모아 둔다. 한쪽만 경고를 남기면 다른 쪽은 잘못 물린 줄도 모르고 지나간다.)
+    /// </summary>
+    /// <param name="context">경고 로그를 클릭했을 때 선택될 오브젝트.</param>
+    public static ItemTooltipController FindInScene(Object context)
+    {
+        var found = FindObjectsByType<ItemTooltipController>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (found == null || found.Length == 0) return null;
+
+        if (found.Length > 1)
+        {
+            Debug.LogWarning(
+                $"[ItemTooltipController] 아이템 설명창이 씬에 {found.Length}개 있습니다 — " +
+                "어느 것을 쓸지 정할 수 없어 첫 번째를 씁니다. 인스펙터에 직접 물려 주세요.", context);
+        }
+
+        return found[0];
+    }
+
     [Header("툴팁")]
     [Tooltip("씬에 배치해둔 설명창(ItemTooltip_Pf). 씬에는 꺼둔 상태로 저장할 것.")]
     [SerializeField] private ItemTooltipUI _panel;

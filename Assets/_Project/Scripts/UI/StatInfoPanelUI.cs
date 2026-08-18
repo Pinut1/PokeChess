@@ -331,7 +331,7 @@ public class StatInfoPanelUI : MonoBehaviour
         // 씬 배치본이면 인스펙터에 꽂아둔 게 쓰이고, 프리팹에서 생성한 경우엔 여기서 찾는다
         // (프리팹은 씬 오브젝트를 참조할 수 없어 인스펙터에 꽂아둘 방법이 없다).
         if (_itemTooltip == null)
-            _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
+            _itemTooltip = ItemTooltipController.FindInScene(this);
 
         if (_roleTooltip == null) _roleTooltip = RoleTooltipController.FindInScene(this);
 

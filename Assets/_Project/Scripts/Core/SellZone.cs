@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// 유닛 드롭 영역.
@@ -248,6 +249,20 @@ public class SellZone : MonoBehaviour, IDropTarget
         ShowTooltip();
     }
 
+    /// <summary>
+    /// 관전이 걸려 있는 동안엔 OnMouseEnter가 상태를 세우지 않는다. 관전이 풀렸을 때 커서가 이미
+    /// 올라와 있으면 Unity는 Enter를 다시 보내지 않으므로(이미 '진입'으로 보고 있다) 여기서 따라잡는다.
+    /// 커서가 올라와 있는 동안만 도는 데다 대부분 bool 하나 보고 빠져나간다.
+    /// </summary>
+    private void OnMouseOver()
+    {
+        if (_pointerHovered || IsSpectateBlocking()) return;
+
+        _pointerHovered = true;
+        RefreshHighlight();
+        ShowTooltip();
+    }
+
     private void OnMouseExit()
     {
         _pointerHovered = false;
@@ -259,7 +274,9 @@ public class SellZone : MonoBehaviour, IDropTarget
     private void ShowTooltip()
     {
         // 전용 창이 있으면 그쪽이 우선이다. 창은 스스로 상태를 읽어 그리므로 문구를 넘기지 않는다.
-        if (_tradePanel != null)
+        // zoneType까지 보는 이유 — 판매존에 실수로 물려도 통신기 창이 뜨지 않게 한다(OnDropUnit·
+        // OnMouseDown과 같은 기준). 에디터 도구는 Trade존에만 배선하므로 수동 오배선 대비다.
+        if (_tradePanel != null && _zoneType == DropZoneType.Trade)
         {
             // 통신기가 둘 이상인 씬을 대비해 열 때마다 다시 넘긴다 — 지금 커서를 올린 쪽에 붙어야 한다.
             _tradePanel.SetOwnerAnchor(transform);
@@ -281,7 +298,7 @@ public class SellZone : MonoBehaviour, IDropTarget
     {
         // 커서가 통신기를 벗어났다고 바로 닫지 않는다 — 창 안 버튼을 누르러 가는 중일 수 있어
         // 실제로 닫을지는 창이 판단한다(창 위에 커서가 있으면 열어 둔다).
-        if (_tradePanel != null)
+        if (_tradePanel != null && _zoneType == DropZoneType.Trade)
         {
             _tradePanel.SetOwnerHovered(false);
             return;
@@ -378,6 +395,12 @@ public class SellZone : MonoBehaviour, IDropTarget
             return;
 
         if (IsSpectateBlocking())
+            return;
+
+        // 안내창이 통신기 위에 겹쳐 뜬다. OnMouseDown은 물리 레이캐스트라 UI에 가려도 그대로
+        // 들어오는데, 창의 [포켓몬 받기] 버튼과 이 클릭이 같은 TryReceiveNextTradeUnit을 부르므로
+        // 가드가 없으면 한 번 눌러 두 마리가 수령된다.
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
 
         NetworkManager network =

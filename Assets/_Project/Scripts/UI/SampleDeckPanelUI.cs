@@ -182,7 +182,7 @@ public class SampleDeckPanelUI : MonoBehaviour
 
         // 아이템 설명창은 씬에 하나만 있고 인벤토리·상점이 이미 쓰고 있다 — 견본덱만 따로 두지 않는다.
         if (_itemTooltip == null)
-            _itemTooltip = FindFirstObjectByType<ItemTooltipController>(FindObjectsInactive.Include);
+            _itemTooltip = ItemTooltipController.FindInScene(this);
 
         SampleDeckPool.HideTemplate(_listRowTemplate);
         SampleDeckPool.HideTemplate(_synergyRowTemplate);
