@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.UI;
 
 /// <summary>
 /// 3D 오브젝트를 클릭해 증강 확인창(AugmentInfoPanel)을 여닫는다.
@@ -57,6 +56,12 @@ public class AugmentInfoTrigger : MonoBehaviour
         _pointAction.Enable();
         _partnerClickAction.Enable();
         GameEvents.OnPartnerAugmentsChanged += HandlePartnerAugmentsChanged;
+
+        // OnPartnerAugmentsChanged는 파트너가 증강을 고른 그 순간에만 한 번 발행된다(한 판에 한 번뿐).
+        // 이 구독이 그 시점보다 늦게 시작되면(재접속이 아닌 컴포넌트 재활성화 등) 다시 맞춰줄 이벤트가
+        // 영영 안 와서 그 판 내내 "미선택"으로 고정된다 — 구독 직후 현재 값을 한 번 직접 당겨온다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null)
+            _partnerAugmentNamesEn = gm.Network.GetPartnerAugmentNamesNow();
     }
 
     private void OnDisable()
@@ -85,11 +90,7 @@ public class AugmentInfoTrigger : MonoBehaviour
         PartnerSpectateView spectateView = EnsurePartnerSpectateView();
         if (spectateView == null || !spectateView.IsExpanded) return;
 
-        Camera spectatorCamera = spectateView.SpectatorCamera;
-        RawImage pipImage = spectateView.PipRawImage;
-        if (spectatorCamera == null || pipImage == null) return;
-
-        if (!TryProjectToPartnerScreen(spectatorCamera, pipImage, transform.position, out Vector2 point)) return;
+        if (!spectateView.TryProjectWorldToScreen(transform.position, out Vector2 point)) return;
 
         Vector2 screenPos = _pointAction.ReadValue<Vector2>();
         if (Vector2.Distance(screenPos, point) > _partnerClickRadius) return;
@@ -124,22 +125,5 @@ public class AugmentInfoTrigger : MonoBehaviour
 
         Debug.LogWarning($"[AugmentInfoTrigger] 파트너 증강 '{nameEn}'을 AugmentCatalog에서 찾지 못함");
         return null;
-    }
-
-    /// <summary>월드 좌표를 관전 카메라 뷰포트 → PipRawImage 사각형으로 투영한다.
-    /// StatInfoController.TryProjectToPartnerScreen과 같은 계산(카메라 뒤(z&lt;=0)면 실패) —
-    /// 관전 화면에 실제로 보이는 자리를 그대로 쓴다.</summary>
-    private static bool TryProjectToPartnerScreen(Camera spectatorCamera, RawImage pipImage, Vector3 worldPos, out Vector2 screenPos)
-    {
-        Vector3 viewport = spectatorCamera.WorldToViewportPoint(worldPos);
-        if (viewport.z <= 0f) { screenPos = default; return false; }
-
-        Vector3[] corners = new Vector3[4];
-        pipImage.rectTransform.GetWorldCorners(corners);
-
-        screenPos = new Vector2(
-            Mathf.Lerp(corners[0].x, corners[2].x, viewport.x),
-            Mathf.Lerp(corners[0].y, corners[2].y, viewport.y));
-        return true;
     }
 }

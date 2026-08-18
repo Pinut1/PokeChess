@@ -81,6 +81,30 @@ public class PartnerSpectateView : MonoBehaviour
     /// <summary>미러 전투 컨트롤러. UnitStatusBarHud가 미러 BattleUnit 목록(MirrorUnits)을 읽을 때 쓴다.</summary>
     public PartnerBattleMirrorController MirrorController => _mirrorController;
 
+    // GetWorldCorners 호출마다 새 배열을 만들지 않으려고 재사용하는 버퍼(TryProjectWorldToScreen 전용).
+    private readonly Vector3[] _pipCornersBuffer = new Vector3[4];
+
+    /// <summary>
+    /// 월드 좌표를 관전 카메라 뷰포트 → PipRawImage 사각형으로 투영한다. 카메라 뒤(z&lt;=0)거나
+    /// 카메라/RawImage가 아직 준비 안 됐으면(첫 미러 전투 전 등) 실패. AugmentInfoTrigger/
+    /// StatInfoController/UnitStatusBarHud가 공용으로 쓴다 — 이 계산의 유일한 소스로 둬서 세 곳 중
+    /// 하나만 고치고 나머지를 놓치는 일을 막는다.
+    /// </summary>
+    public bool TryProjectWorldToScreen(Vector3 worldPos, out Vector2 screenPos)
+    {
+        if (_spectatorCamera == null || _pipRawImage == null) { screenPos = default; return false; }
+
+        Vector3 viewport = _spectatorCamera.WorldToViewportPoint(worldPos);
+        if (viewport.z <= 0f) { screenPos = default; return false; }
+
+        _pipRawImage.rectTransform.GetWorldCorners(_pipCornersBuffer);
+
+        screenPos = new Vector2(
+            Mathf.Lerp(_pipCornersBuffer[0].x, _pipCornersBuffer[2].x, viewport.x),
+            Mathf.Lerp(_pipCornersBuffer[0].y, _pipCornersBuffer[2].y, viewport.y));
+        return true;
+    }
+
     private Vector2 _originalAnchorMin;
     private Vector2 _originalAnchorMax;
     private Vector2 _originalPivot;

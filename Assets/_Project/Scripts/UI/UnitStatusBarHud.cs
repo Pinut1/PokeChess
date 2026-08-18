@@ -46,9 +46,6 @@ public class UnitStatusBarHud : MonoBehaviour
     // 자식) — DrawPartnerBars 참고.
     private readonly List<UnitStatusBarUI> _mirrorPool = new();
 
-    // GetWorldCorners 호출마다 새 배열을 만들지 않으려고 재사용하는 버퍼(PlaceMirror 전용).
-    private readonly Vector3[] _pipCornersBuffer = new Vector3[4];
-
     private void Awake()
     {
         if (_camera == null) _camera = Camera.main;
@@ -229,15 +226,14 @@ public class UnitStatusBarHud : MonoBehaviour
         if (_barPrefab == null || _partnerSpectateView == null) { HideMirrorFrom(0); return; }
         if (!_partnerSpectateView.IsShowingContent) { HideMirrorFrom(0); return; }
 
-        Camera spectatorCamera = _partnerSpectateView.SpectatorCamera;
         RawImage pipImage = _partnerSpectateView.PipRawImage;
         PartnerBattleMirrorController mirror = _partnerSpectateView.MirrorController;
 
-        if (spectatorCamera == null || pipImage == null || mirror == null) { HideMirrorFrom(0); return; }
+        if (pipImage == null || mirror == null) { HideMirrorFrom(0); return; }
 
         int used = mirror.IsRunning
-            ? DrawPartnerBattleBars(mirror, spectatorCamera, pipImage)
-            : DrawPartnerShopBars(mirror, spectatorCamera, pipImage);
+            ? DrawPartnerBattleBars(mirror, pipImage)
+            : DrawPartnerShopBars(mirror, pipImage);
 
         HideMirrorFrom(used);
     }
@@ -247,7 +243,7 @@ public class UnitStatusBarHud : MonoBehaviour
     /// 종료 전부 BattleManager.Cleanup에서 _units를 비움) 별도 이벤트 없이 다음 프레임에 0을
     /// 반환해 자동으로 사라진다.
     /// </summary>
-    private int DrawPartnerBattleBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
+    private int DrawPartnerBattleBars(PartnerBattleMirrorController mirror, RawImage pipImage)
     {
         IReadOnlyList<BattleUnit> units = mirror.MirrorUnits;
         if (units == null) return 0;
@@ -260,7 +256,7 @@ public class UnitStatusBarHud : MonoBehaviour
             float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
             float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
 
-            if (PlaceMirror(used, spectatorCamera, pipImage, bu.visual.transform.position, hp, mana,
+            if (PlaceMirror(used, pipImage, bu.visual.transform.position, hp, mana,
                             bu.team == BattleTeam.Ally, bu.maxHp, bu.displayItems, bu.displayStone))
                 used++;
         }
@@ -286,7 +282,7 @@ public class UnitStatusBarHud : MonoBehaviour
     /// 재현하지 않고(StatInfoPanelUI.Bind와 달리) 0을 넘겨 눈금만 끈다(HP 채움 비율 자체는 영향
     /// 없음, UnitStatusBarUI.ApplyTicks 참고).
     /// </summary>
-    private int DrawPartnerShopBars(PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage)
+    private int DrawPartnerShopBars(PartnerBattleMirrorController mirror, RawImage pipImage)
     {
         OpponentBoardView boardView = mirror.BoardView;
         if (boardView == null) return 0;
@@ -298,7 +294,7 @@ public class UnitStatusBarHud : MonoBehaviour
 
             float mana = view.effectiveManaCost > 0 ? 0f : -1f;
 
-            if (PlaceMirror(used, spectatorCamera, pipImage, view.visual.position, 1f, mana,
+            if (PlaceMirror(used, pipImage, view.visual.position, 1f, mana,
                             true, 0f, view.items, null))
                 used++;
         }
@@ -308,29 +304,18 @@ public class UnitStatusBarHud : MonoBehaviour
     /// <summary>
     /// index번째 미러 바를 관전 카메라 뷰포트 → PipRawImage 로컬 좌표로 변환해 배치한다.
     /// Place()와 값 갱신 로직(SetItems/아이템 리프트/SetValues)은 동일하게 따르되, 위치 계산과
-    /// 배치 대상(부모/좌표계)만 다르다.
+    /// 배치 대상(부모/좌표계)만 다르다. 좌표 변환 자체는 PartnerSpectateView.TryProjectWorldToScreen
+    /// 하나로 통일돼 있다(AugmentInfoTrigger/StatInfoController와 공용) — PipRawImage 사각형 매핑은
+    /// 그쪽이 실제로 화면에 그려주는 자리를 그대로 쓴다는 뜻과 같다.
     /// </summary>
-    private bool PlaceMirror(int index, Camera spectatorCamera, RawImage pipImage, Vector3 worldPos,
+    private bool PlaceMirror(int index, RawImage pipImage, Vector3 worldPos,
                              float hpRatio, float manaRatio, bool isAlly, float maxHp,
                              IReadOnlyList<ItemData> items, EvolutionStoneData stone)
     {
-        Vector3 viewport = spectatorCamera.WorldToViewportPoint(worldPos + Vector3.up * _heightOffset);
-        if (viewport.z <= 0f) return false; // 관전 카메라 뒤 — 그리지 않는다
+        if (!_partnerSpectateView.TryProjectWorldToScreen(worldPos + Vector3.up * _heightOffset, out Vector2 projected))
+            return false; // 관전 카메라 뒤 — 그리지 않는다
 
-        // PipRawImage가 지금 화면(스크린 스페이스)에서 차지하는 사각형의 네 모서리를 그대로 읽어
-        // viewport 비율(0~1)을 그 사각형 안의 스크린 좌표로 매핑한다. Place()가 WorldToScreenPoint
-        // 결과를 bar.Rect.position(월드=스크린 좌표, Overlay 캔버스 관례)에 그대로 대입하는 것과
-        // 같은 방식이라 bar 프리팹의 Anchor 설정에 대한 가정이 없다 — PIP든 전체화면이든
-        // PipRawImage의 현재 크기만 따라간다.
-        Vector3[] corners = _pipCornersBuffer;
-        pipImage.rectTransform.GetWorldCorners(corners);
-        Vector3 bottomLeft = corners[0];
-        Vector3 topRight = corners[2];
-
-        Vector3 screenPos = new Vector3(
-            Mathf.Lerp(bottomLeft.x, topRight.x, viewport.x),
-            Mathf.Lerp(bottomLeft.y, topRight.y, viewport.y),
-            0f);
+        Vector3 screenPos = new Vector3(projected.x, projected.y, 0f);
 
         var bar = GetMirrorBar(index, pipImage.transform);
         bar.SetVisible(true);
