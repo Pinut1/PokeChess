@@ -97,7 +97,44 @@ public class SynergyManager : MonoBehaviour
         foreach (var kv in ComputeSynergyStatuses(boardSpecies))
             _statuses[kv.Key] = kv.Value;
 
+        SuppressMutantIfHeroEevee();
+
         GameEvents.SynergyUpdated();
+    }
+
+    /// <summary>
+    /// 이브이 영웅증강(나인이볼부스트)을 골랐으면 돌연변이 시너지를 발동시키지 않는다
+    /// (기획 확정 2026-08-19). 증강이 이브이를 한 마리에 몰아주는 설계라, 진화체를 여러 종 모으는
+    /// 돌연변이와 애초에 양립하지 않는다.
+    ///
+    /// 진화의 돌 면역(PokemonUnit.TryEquipStone)만으로도 내 보드에서는 이브이 계열이 1종을 넘지
+    /// 못한다 — 샤미드·쥬피썬더·부스터·리피아는 돌 전용이라 원천 차단되고, 에브이·블래키·글레이시아·
+    /// 님피아는 돌연변이가 먼저 떠야 얻는 구조라 시작점이 없다(돌연변이 1티어 요구치는 2종).
+    /// 다만 파트너가 이미 진화시킨 개체를 통신교환으로 넘겨주는 경로가 남아 있어, 그 구멍까지
+    /// 막으려면 결과에서 직접 눌러야 한다.
+    ///
+    /// 항목을 지우지 않고 비활성으로만 만드는 이유 — 시너지 패널에서 줄이 통째로 사라지는 것보다
+    /// "0개 / 비활성"으로 남는 쪽이 덜 혼란스럽다.
+    ///
+    /// 파트너 보드 계산(SynergyPanelUI가 부르는 ComputeSynergyStatuses)은 건드리지 않는다 —
+    /// 파트너가 이 증강을 골랐는지는 여기서 알 수 없고, 내 증강으로 남의 시너지를 끄면 오표시가 된다.
+    /// </summary>
+    private void SuppressMutantIfHeroEevee()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Augment == null) return;
+        if (!gm.Augment.Owns(AugmentId.HeroEevee)) return;
+
+        foreach (var status in _statuses.Values)
+        {
+            if (status?.data == null) continue;
+
+            if (!string.Equals(status.data.synergyNameEn, "Mutant",
+                               System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            status.uniqueCount     = 0;
+            status.activeTierIndex = -1;
+        }
     }
 
     /// <summary>

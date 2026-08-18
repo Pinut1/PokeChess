@@ -34,6 +34,14 @@ public abstract class Augment
     /// <summary>수동 리롤 1회가 실제로 소모됨(무료/골드 무관) — 리롤 환급 증강용</summary>
     public virtual void OnRerollSpent() { }
 
+    /// <summary>
+    /// 인벤토리/장착 상태가 바뀜(GameEvents.OnInventoryChanged).
+    /// ItemManager는 "누가 바뀌었는지"를 알려주지 않으므로(유닛 단위 이벤트 없음) 이 훅을 받은 쪽이
+    /// 필요한 범위를 스스로 전수 재평가한다. 영웅증강의 "가장 강한 1마리" 재선정이 첫 사용처다 —
+    /// 아이템 갯수가 선정 기준이라 장착/해제 때마다 대상이 바뀔 수 있다.
+    /// </summary>
+    public virtual void OnInventoryChanged() { }
+
     // ── 표시용 조회 ────────────────────────────────────────────
 
     /// <summary>

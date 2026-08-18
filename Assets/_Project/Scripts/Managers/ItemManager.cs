@@ -463,6 +463,18 @@ public class ItemManager : MonoBehaviour
                 if (!_stones.Contains(stone))
                     return false;
 
+                // 진화 잠금(이브이 영웅증강) 유닛은 돌을 받지 않는다. 실제 차단은 TryEquipStone이
+                // 하지만 거기서는 조용히 false만 돌아와 플레이어가 이유를 알 수 없어, 여기서
+                // 먼저 걸러 안내 로그를 남긴다(다른 거절 사유와 같은 방식).
+                if (unit.evolutionLocked)
+                {
+                    Debug.Log(
+                        $"[아이템] 진화 잠금 유닛 " +
+                        $"'{unit.data?.pokemonName}'에게는 진화의 돌을 장착할 수 없습니다.");
+
+                    return false;
+                }
+
                 if (!unit.TryEquipStone(stone))
                     return false;
 

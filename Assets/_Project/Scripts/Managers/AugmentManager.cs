@@ -72,6 +72,7 @@ public class AugmentManager : MonoBehaviour
         GameEvents.OnUnitBenched     += HandleUnitBenched;
         GameEvents.OnUnitSold        += HandleUnitSold;
         GameEvents.OnRerollSpent     += HandleRerollSpent;
+        GameEvents.OnInventoryChanged += HandleInventoryChanged;
         GameEvents.OnAllPlayersReady += HandleAllPlayersReady;
     }
 
@@ -84,6 +85,7 @@ public class AugmentManager : MonoBehaviour
         GameEvents.OnUnitBenched     -= HandleUnitBenched;
         GameEvents.OnUnitSold        -= HandleUnitSold;
         GameEvents.OnRerollSpent     -= HandleRerollSpent;
+        GameEvents.OnInventoryChanged -= HandleInventoryChanged;
         GameEvents.OnAllPlayersReady -= HandleAllPlayersReady;
     }
 
@@ -218,7 +220,9 @@ public class AugmentManager : MonoBehaviour
         SelectAugment(picked);
     }
 
-    private bool Owns(AugmentId id)
+    /// <summary>이 증강을 이미 골랐는지. 증강 유무에 따라 동작이 갈리는 다른 시스템도 조회한다
+    /// (예: SynergyManager가 이브이 영웅증강 여부로 돌연변이 시너지를 누른다).</summary>
+    public bool Owns(AugmentId id)
         => _activeAugments.Exists(a => a.Data != null && a.Data.augmentId == id);
 
     // ─────────────────────────────────────────
@@ -253,6 +257,14 @@ public class AugmentManager : MonoBehaviour
 
     private void HandleRerollSpent()
         => _activeAugments.ForEach(a => a.OnRerollSpent());
+
+    /// <summary>
+    /// 아이템 장착/해제(GameEvents.OnInventoryChanged) 전파. ItemManager는 유닛 단위 이벤트를
+    /// 발행하지 않아(누가 바뀌었는지 모름) 증강 쪽이 필요한 범위를 스스로 재평가한다 —
+    /// 영웅증강의 "가장 강한 1마리" 재선정이 첫 사용처다.
+    /// </summary>
+    private void HandleInventoryChanged()
+        => _activeAugments.ForEach(a => a.OnInventoryChanged());
 
     /// <summary>
     /// 전원 준비 완료(전투 진입 직전) 시 미선택이면 랜덤 자동 선택 — 기획 "Ready 시 자동 선택".
