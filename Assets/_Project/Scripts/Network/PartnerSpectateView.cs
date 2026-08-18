@@ -50,6 +50,13 @@ public class PartnerSpectateView : MonoBehaviour
     private bool _wasMirrorRunning;
     private bool _isExpanded;
 
+    /// <summary>이번 라운드 팀 결과(GameEvents.OnTeamRoundResolved)가 이미 도착했는지. RoundPhaseManager의
+    /// 동명 필드(_teamRoundResolved)와 같은 의미를 이 클래스 안에서 독립적으로 추적한다 — 매니저를 직접
+    /// 참조하지 않고 이벤트만으로 판단하기 위함(CLAUDE.md 원칙). true면 이번 라운드 캐시 스냅샷으로
+    /// MirrorBattle을 재시작하지 않는다(TryStartMirrorBattleFromCache). 다음 라운드 진입 시
+    /// (HandleStageEntered) false로 리셋된다.</summary>
+    private bool _teamRoundResolved;
+
     /// <summary>지금 파트너 화면이 전체화면으로 열려 있는지(PIP 축소 상태는 포함하지 않음).
     /// UnitStatusBarHud 등 "지금 내 로컬 화면 전체가 파트너 관전으로 덮여 있는지"만 알면 되는
     /// 다른 컴포넌트가 참조한다 — 이 클래스가 그 UI들을 직접 켜고 끄지는 않는다.</summary>
@@ -130,6 +137,7 @@ public class PartnerSpectateView : MonoBehaviour
         GameEvents.OnStageEntered += HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged += HandlePartnerBattleSnapshotChanged;
         GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
+        GameEvents.OnTeamRoundResolved += HandleTeamRoundResolved;
     }
 
     private void OnDisable()
@@ -139,6 +147,7 @@ public class PartnerSpectateView : MonoBehaviour
         GameEvents.OnStageEntered -= HandleStageEntered;
         GameEvents.OnPartnerBattleSnapshotChanged -= HandlePartnerBattleSnapshotChanged;
         GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
+        GameEvents.OnTeamRoundResolved -= HandleTeamRoundResolved;
 
         // 방어 처리 — ToggleExpanded()를 거치지 않고(씬 전환 등으로) 이 컴포넌트가 켜진 채로
         // 비활성화/파괴되면 OnPartnerSpectateExpandedChanged(false)가 영영 발행되지 않아
@@ -160,12 +169,42 @@ public class PartnerSpectateView : MonoBehaviour
     }
 
     /// <summary>
+    /// 양쪽 플레이어의 실제 전투 결과가 모두 확정되는 순간(GameEvents.OnTeamRoundResolved) 발행되며,
+    /// 이번 라운드의 파트너 관전(MirrorBattle 재현)을 실제 라운드 진행보다 먼저 정리한다. MirrorBattle은
+    /// 실시간 중계가 아니라 로컬 재현이라 관전을 늦게 시작하면 실제 전투가 끝난 뒤에도 계속 재생될 수
+    /// 있는데, "양쪽 실제 전투 종료 확정" 자체는 이미 NetworkManager가 판정해 이 이벤트로 알려주므로
+    /// 그대로 신호로 재사용한다(새 판정 로직 없음).
+    ///
+    /// MirrorBattle 정지는 관전 패널이 닫혀 있어도(_isExpanded==false) 항상 수행한다 — 패널을 닫아도
+    /// 미러 전투 자체는 배경에서 계속 시뮬레이션될 수 있으므로(StartOrReplaceMirrorBattle 주석 참고),
+    /// 화면에 보이지 않아도 이제 의미가 없어진 재현을 정리한다. 화면 복귀(SetExpanded(false))는 실제로
+    /// 관전 중일 때만 실행한다 — 이미 꺼져 있으면 SetExpanded가 스스로 no-op 처리한다.
+    ///
+    /// 실제 BattleManager/라운드 진행/전투 결과 판정에는 전혀 관여하지 않는다 — 이 클래스는 그 결과를
+    /// 구독만 할 뿐 아무것도 발행하지 않는다.
+    /// </summary>
+    private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
+    {
+        _teamRoundResolved = true;
+
+        if (_mirrorController != null) _mirrorController.StopMirrorBattle();
+        if (_isExpanded) SetExpanded(false);
+    }
+
+    /// <summary>
     /// 관전 패널이 열려 있는 동안 라운드/스테이지가 바뀌면 파트너 적 프리뷰를 최신 스테이지로 다시
     /// 그린다. 닫혀 있으면 무시한다 — 다음에 열 때(ToggleExpanded) 항상 그 시점의 CurrentStage로
     /// 새로 그리므로 놓치지 않는다.
+    ///
+    /// RoundPhaseManager.HandleRoundChanged가 자신의 _teamRoundResolved를 리셋하는 것과 같은 타이밍에
+    /// (OnRoundChanged → ResolveCurrentStage → OnStageEntered, RoundPhaseManager.cs 참고) 이 클래스의
+    /// _teamRoundResolved도 함께 리셋한다 — 새 이벤트 구독을 추가하지 않고 이미 구독 중인 OnStageEntered를
+    /// 재사용한다. _isExpanded 여부와 무관하게 항상 리셋해야 다음 라운드에 정상적으로 재관전할 수 있다.
     /// </summary>
     private void HandleStageEntered(StageData stage)
     {
+        _teamRoundResolved = false;
+
         if (!_isExpanded) return;
         if (_mirrorController != null) _mirrorController.ShowPartnerEnemyPreview(stage);
     }
@@ -560,10 +599,17 @@ public class PartnerSpectateView : MonoBehaviour
     /// 전투가 계속 재생 가능했다. GamePhase.Battle만 허용하는 화이트리스트가 아니라 종료 상태
     /// 두 개만 거르는 blacklist다 — "내 Phase가 Shopping/Battle이고 파트너가 아직 전투 중"인
     /// 정상 케이스(위 문단)는 그대로 통과해야 하기 때문이다.
+    ///
+    /// 이번 라운드 팀 결과가 이미 확정됐으면(_teamRoundResolved) roundIndex가 CurrentRound와 같아도
+    /// 시작하지 않는다 — 양쪽 실제 전투가 이미 끝난 라운드의 캐시 스냅샷으로 끝난 MirrorBattle을
+    /// 다시 재생하는 것을 막기 위함(HandleTeamRoundResolved가 이미 한 번 정지시킨 라운드).
+    /// 패널 자체는 그대로 열리며(SetExpanded는 이 메서드 호출과 별개로 계속 진행), 남아 있는
+    /// BoardSnapshot 프리뷰가 있으면 UpdatePipContent가 그걸 대신 보여준다.
     /// </summary>
     private void TryStartMirrorBattleFromCache()
     {
         if (_mirrorController == null || _mirrorController.IsRunning) return;
+        if (_teamRoundResolved) return;
         if (!GameManager.TryGet(out var gm) || gm.Phase == null || gm.Network == null) return;
         if (IsMatchEnded(gm.Phase.CurrentPhase)) return;
         if (!gm.Network.HasPartnerBattleSnapshot) return;
