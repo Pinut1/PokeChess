@@ -70,6 +70,9 @@ MonoBehaviour:
   - RPC_PartnerGaveUpReconnect
   - RPC_RequestSharedShopRestore
   - RPC_OnBattleSnapshot
+  - RPC_RequestBoardSnapshot
+  - RPC_RequestSharedDebugUnitBySpecies
+  - RPC_ResolveSharedDebugUnitBySpecies
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0
