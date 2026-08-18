@@ -175,7 +175,7 @@ public class StatInfoController : MonoBehaviour
         // 문제가 있었다(2026-08 확인 — UnitStatusBarHud.DrawPartnerBars와 동일한 원인·동일한 기준으로 통일).
         if (mirror.IsRunning)
         {
-            BattleUnit picked = PickPartnerBattleUnit(mirror, spectatorCamera, pipImage, screenPos);
+            BattleUnit picked = PickPartnerBattleUnit(mirror.MirrorUnits, spectatorCamera, pipImage, screenPos, out _);
             if (picked != null)
             {
                 if (_panel != null && _panel.BattleUnit == picked) Close();
@@ -185,11 +185,23 @@ public class StatInfoController : MonoBehaviour
         }
         else
         {
-            OpponentBoardView.PartnerBoardUnitView? picked =
-                PickPartnerShopUnit(mirror, spectatorCamera, pipImage, screenPos);
-            if (picked.HasValue)
+            // 파트너 보드 유닛(OpponentBoardView)과 적 프리뷰(BattleManager.PreviewEnemies)를 각각
+            // 조회한 뒤, 화면상 클릭 지점에 더 가까운 쪽을 선택한다 — 두 프리뷰가 겹쳐 보여도
+            // PickPartnerBattleUnit/PickPartnerShopUnit 각각의 반경 판정(가까운 순)을 그대로 따른다.
+            OpponentBoardView.PartnerBoardUnitView? shopUnit =
+                PickPartnerShopUnit(mirror, spectatorCamera, pipImage, screenPos, out float shopDistance);
+            BattleUnit previewEnemy =
+                PickPartnerBattleUnit(mirror.PreviewEnemies, spectatorCamera, pipImage, screenPos, out float enemyDistance);
+
+            if (shopUnit.HasValue && (previewEnemy == null || shopDistance <= enemyDistance))
             {
-                Open(p => p.Bind(picked.Value));
+                Open(p => p.Bind(shopUnit.Value));
+                return true;
+            }
+            if (previewEnemy != null)
+            {
+                if (_panel != null && _panel.BattleUnit == previewEnemy) Close();
+                else Open(p => p.Bind(previewEnemy));
                 return true;
             }
         }
@@ -204,17 +216,18 @@ public class StatInfoController : MonoBehaviour
         return _partnerSpectateView;
     }
 
-    /// <summary>파트너 미러 전투 유닛 중 클릭 지점에 가장 가까운 것. PickBattleUnit(로컬)과 같은
-    /// 반경 기준의 화면 거리 판정이되, 위치를 관전 카메라+PipRawImage 사각형으로 투영한다
-    /// (UnitStatusBarHud.PlaceMirror와 동일한 좌표 변환 — 관전 화면이 실제로 보여주는 자리에 맞춘다).</summary>
-    private BattleUnit PickPartnerBattleUnit(PartnerBattleMirrorController mirror, Camera spectatorCamera,
-                                             RawImage pipImage, Vector2 screenPos)
+    /// <summary>주어진 파트너 관전용 BattleUnit 목록 중 클릭 지점에 가장 가까운 것. PickBattleUnit(로컬)과
+    /// 같은 반경 기준의 화면 거리 판정이되, 위치를 관전 카메라+PipRawImage 사각형으로 투영한다
+    /// (UnitStatusBarHud.PlaceMirror와 동일한 좌표 변환 — 관전 화면이 실제로 보여주는 자리에 맞춘다).
+    /// mirror.MirrorUnits(전투 중)와 mirror.PreviewEnemies(쇼핑/프리뷰 중 적) 양쪽 호출에서 공용으로 쓴다.
+    /// distance에는 찾은 거리(못 찾았으면 _battlePickRadius)를 반환해 호출부가 다른 후보와 비교할 수 있게 한다.</summary>
+    private BattleUnit PickPartnerBattleUnit(IReadOnlyList<BattleUnit> units, Camera spectatorCamera,
+                                             RawImage pipImage, Vector2 screenPos, out float distance)
     {
-        IReadOnlyList<BattleUnit> units = mirror.MirrorUnits;
+        distance = _battlePickRadius;
         if (units == null) return null;
 
         BattleUnit nearest = null;
-        float nearestDistance = _battlePickRadius;
 
         foreach (var bu in units)
         {
@@ -223,10 +236,10 @@ public class StatInfoController : MonoBehaviour
             Vector3 worldPos = bu.visual.transform.position + Vector3.up * _battlePickHeight;
             if (!TryProjectToPartnerScreen(spectatorCamera, pipImage, worldPos, out Vector2 point)) continue;
 
-            float distance = Vector2.Distance(screenPos, point);
-            if (distance > nearestDistance) continue;
+            float d = Vector2.Distance(screenPos, point);
+            if (d > distance) continue;
 
-            nearestDistance = distance;
+            distance = d;
             nearest = bu;
         }
 
@@ -234,15 +247,17 @@ public class StatInfoController : MonoBehaviour
     }
 
     /// <summary>쇼핑 중 파트너 보드 유닛 중 클릭 지점에 가장 가까운 것. 콜라이더가 없는 미러
-    /// 비주얼이라(OpponentBoardView가 전부 제거함) PickPartnerBattleUnit과 같은 화면 거리 판정을 쓴다.</summary>
+    /// 비주얼이라(OpponentBoardView가 전부 제거함) PickPartnerBattleUnit과 같은 화면 거리 판정을 쓴다.
+    /// distance에는 찾은 거리(못 찾았으면 _battlePickRadius)를 반환해 호출부가 다른 후보와 비교할 수 있게 한다.</summary>
     private OpponentBoardView.PartnerBoardUnitView? PickPartnerShopUnit(
-        PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage, Vector2 screenPos)
+        PartnerBattleMirrorController mirror, Camera spectatorCamera, RawImage pipImage, Vector2 screenPos, out float distance)
     {
+        distance = _battlePickRadius;
+
         OpponentBoardView boardView = mirror.BoardView;
         if (boardView == null) return null;
 
         OpponentBoardView.PartnerBoardUnitView? nearest = null;
-        float nearestDistance = _battlePickRadius;
 
         foreach (var view in boardView.ActiveUnitViews)
         {
@@ -251,10 +266,10 @@ public class StatInfoController : MonoBehaviour
             Vector3 worldPos = view.visual.position + Vector3.up * _battlePickHeight;
             if (!TryProjectToPartnerScreen(spectatorCamera, pipImage, worldPos, out Vector2 point)) continue;
 
-            float distance = Vector2.Distance(screenPos, point);
-            if (distance > nearestDistance) continue;
+            float d = Vector2.Distance(screenPos, point);
+            if (d > distance) continue;
 
-            nearestDistance = distance;
+            distance = d;
             nearest = view;
         }
 

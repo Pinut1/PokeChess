@@ -62,6 +62,11 @@ public class AugmentInfoPanel : MonoBehaviour
     private int _openedFrame = -1;
     private int _closedFrame = -1;
 
+    // 파트너 관전 중 열렸는지 — true면 Refresh()가 로컬 AugmentManager 대신 이 데이터를 보여준다.
+    // 실제 AugmentManager.ActiveAugments는 건드리지 않는 표시 전용 참조다.
+    private bool _showingPartner;
+    private AugmentData _partnerData;
+
     private void Awake()
     {
         if (_panelGroup == null)
@@ -77,12 +82,14 @@ public class AugmentInfoPanel : MonoBehaviour
 
         // 창을 열어둔 채로 증강을 새로 받는 경우(자동 선택 등)에도 표시가 최신이 되도록.
         GameEvents.OnAugmentSelected += HandleAugmentSelected;
+        GameEvents.OnPartnerSpectateExpandedChanged += HandlePartnerSpectateExpandedChanged;
     }
 
     private void OnDisable()
     {
         _dismissAction.Disable();
         GameEvents.OnAugmentSelected -= HandleAugmentSelected;
+        GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
     }
 
     private void Update()
@@ -99,6 +106,12 @@ public class AugmentInfoPanel : MonoBehaviour
     {
         if (IsOpen) Refresh();
     }
+
+    /// <summary>관전 진입/종료 어느 쪽이든 열려 있는 확인창을 닫는다 — StatInfoController.
+    /// HandlePartnerSpectateExpandedChanged와 같은 이유다(관전 종료 시 파트너 데이터가 더 이상
+    /// 유효하지 않고, 진입 시에도 내 화면이 파트너 화면으로 덮인다). Close()가 _showingPartner/
+    /// _partnerData를 함께 리셋하므로 내 화면으로 돌아온 뒤 잔상이 남지 않는다.</summary>
+    private void HandlePartnerSpectateExpandedChanged(bool expanded) => Close();
 
     // ─────────────────────────────────────────
     // 열기 / 닫기
@@ -118,16 +131,48 @@ public class AugmentInfoPanel : MonoBehaviour
         // "화면 클릭으로 닫힘"과 "트리거로 열림"이 한 프레임에 겹쳐 창이 안 닫히는 것처럼 보인다.
         if (Time.frameCount == _closedFrame) return;
 
+        _showingPartner = false;
+        _partnerData = null;
+
         Refresh(); // 켜기 전에 채워야 한 프레임 빈 창이 보이지 않는다
 
         _panelGroup.SetActive(true);
         _openedFrame = Time.frameCount;
     }
 
+    /// <summary>파트너 관전 중 파트너가 실제로 선택한 증강을 표시하며 연다. 로컬 AugmentManager.
+    /// ActiveAugments는 전혀 건드리지 않는다 — data를 그대로 Refresh()에 표시용으로만 넘긴다.</summary>
+    public void OpenPartner(AugmentData data)
+    {
+        if (_panelGroup == null) return;
+        if (Time.frameCount == _closedFrame) return;
+
+        _showingPartner = true;
+        _partnerData = data;
+
+        Refresh();
+
+        _panelGroup.SetActive(true);
+        _openedFrame = Time.frameCount;
+    }
+
+    /// <summary>OpenPartner의 토글 버전 — AugmentInfoTrigger의 _toggleOnClick 옵션을 파트너 관전
+    /// 경로에서도 동일하게 지원한다.</summary>
+    public void TogglePartner(AugmentData data)
+    {
+        if (IsOpen) Close();
+        else OpenPartner(data);
+    }
+
     public void Close()
     {
         if (_panelGroup != null) _panelGroup.SetActive(false);
         _closedFrame = Time.frameCount;
+
+        // 다음에 로컬 Open()이 아니라 다른 경로로 재사용될 일은 없지만, 파트너 AugmentData 참조가
+        // 닫힌 뒤에도 남아 있지 않도록 여기서도 정리한다.
+        _showingPartner = false;
+        _partnerData = null;
     }
 
     // ─────────────────────────────────────────
@@ -136,13 +181,23 @@ public class AugmentInfoPanel : MonoBehaviour
 
     private void Refresh()
     {
-        AugmentManager augment = Augment;
+        AugmentData data;
 
-        // 매니저가 없으면 "보유 없음"과 같게 취급한다 — 창이 깨진 채 뜨는 것보단 낫다.
-        var active = augment != null ? augment.ActiveAugments : null;
+        if (_showingPartner)
+        {
+            // 파트너 관전 중(AugmentInfoTrigger.OpenPartner) — 로컬 AugmentManager를 전혀 읽지 않는다.
+            data = _partnerData;
+        }
+        else
+        {
+            AugmentManager augment = Augment;
 
-        // 증강은 1개만 고르는 기획이라 첫 번째만 본다.
-        AugmentData data = active != null && active.Count > 0 ? active[0].Data : null;
+            // 매니저가 없으면 "보유 없음"과 같게 취급한다 — 창이 깨진 채 뜨는 것보단 낫다.
+            var active = augment != null ? augment.ActiveAugments : null;
+
+            // 증강은 1개만 고르는 기획이라 첫 번째만 본다.
+            data = active != null && active.Count > 0 ? active[0].Data : null;
+        }
 
         if (Icon_Panel != null)
         {
