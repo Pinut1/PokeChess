@@ -1331,15 +1331,16 @@ public class BattleManager : MonoBehaviour
 
     // ── 아이템 고유효과 VFX(2026-08, 기존 VFX 재사용만) ──
 
-    private const string SHIELD_STATE_VFX_ID = "VFX_Shield_State"; // Shield_gold.prefab, VfxDatabase 등록
+    private const string ITEM_SHIELD_STATE_VFX_ID = "VFX_Item_Shield_State"; // VFX_Item_White_SHIELD.prefab, VfxDatabase 등록
 
     private static bool _shieldVfxMissingWarned;
 
     /// <summary>
-    /// 추적 보호막 출처(스킬 SHIELD/Apicot/Shell Bell/Micle) 기준 상태 VFX. BattleUnit.shieldSources에
-    /// remainingAmount>0인 출처가 하나라도 있으면 유지, 전부 0이면 제거 — WATER 시너지 등 미추적
-    /// 보호막은 shieldSources에 아예 들어가지 않으므로 이 판정에 절대 영향을 주지 않는다(WATER만
-    /// 남아있으면 Shield_gold는 뜨지 않음).
+    /// 장비 보호막 출처(Apicot/Shell Bell/Micle) 기준 상태 VFX. 스킬 SHIELD는 제외한다 — 스킬은 시전
+    /// 순간 _Shield/ 8종 캐스트 VFX가 따로 재생되므로 이 상태 VFX와 겹쳐 띄우지 않는다(2026-08,
+    /// VFX_Item_White_SHIELD 정식 아트 적용). BattleUnit.shieldSources에 remainingAmount>0인 장비
+    /// 출처가 하나라도 있으면 유지, 전부 0이면 제거 — WATER 시너지 등 미추적 보호막은 shieldSources에
+    /// 아예 들어가지 않으므로 이 판정에 절대 영향을 주지 않는다(WATER만 남아있으면 이 VFX는 안 뜸).
     ///
     /// 기존 SHIELD 스킬 8종(_Shield/ 폴더, BattleVfxPlayer.PlaySkill 경유)과 동일하게 world-space에
     /// 독립 생성한다(bu.visual의 자식이 아님) — 종족 모델 프리팹마다 제각각인 scale을 원천적으로
@@ -1362,16 +1363,16 @@ public class BattleManager : MonoBehaviour
 
         if (!_playBattleVfx) return;
 
-        bool hasActiveShieldSource = HasActiveShieldSource(bu);
+        bool hasItemShield = HasActiveItemShield(bu);
 
-        if (hasActiveShieldSource && bu.shieldVfxInstance == null && bu.visual != null)
+        if (hasItemShield && bu.shieldVfxInstance == null && bu.visual != null)
         {
             var entry = ResolveShieldVfxEntry();
             if (entry == null || entry.prefab == null)
             {
                 if (!_shieldVfxMissingWarned)
                 {
-                    Debug.LogWarning($"[Vfx] '{SHIELD_STATE_VFX_ID}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.");
+                    Debug.LogWarning($"[Vfx] '{ITEM_SHIELD_STATE_VFX_ID}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.");
                     _shieldVfxMissingWarned = true;
                 }
                 return;
@@ -1387,7 +1388,7 @@ public class BattleManager : MonoBehaviour
 
             bu.shieldVfxInstance = go;
         }
-        else if (!hasActiveShieldSource && bu.shieldVfxInstance != null)
+        else if (!hasItemShield && bu.shieldVfxInstance != null)
         {
             Destroy(bu.shieldVfxInstance);
             bu.shieldVfxInstance = null;
@@ -1407,12 +1408,20 @@ public class BattleManager : MonoBehaviour
     /// 캐싱하지 않는다 — 못 찾았을 때 캐시해 두면 나중에 등록해도 영영 안 잡힌다(Get은 딕셔너리 조회).
     /// </summary>
     private static VfxEntry ResolveShieldVfxEntry() =>
-        VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(SHIELD_STATE_VFX_ID) : null;
+        VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(ITEM_SHIELD_STATE_VFX_ID) : null;
 
-    private static bool HasActiveShieldSource(BattleUnit bu)
+    /// <summary>
+    /// 장비로 얻은 보호막이 살아 있는지. 스킬 SHIELD는 일부러 제외한다 —
+    /// 스킬은 시전 순간 _Shield/ 8종 캐스트 VFX가 따로 재생되므로 상태 VFX를 겹쳐 띄우지 않는다.
+    /// </summary>
+    private static bool HasActiveItemShield(BattleUnit bu)
     {
         foreach (var source in bu.shieldSources)
-            if (source.remainingAmount > 0f) return true;
+        {
+            if (source.remainingAmount <= 0f) continue;
+            if (source.type != ShieldSourceType.Skill) return true;
+        }
+
         return false;
     }
 

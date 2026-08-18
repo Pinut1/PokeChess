@@ -958,10 +958,10 @@ MonoBehaviour:
     beamGrowDuration: 0
     forwardOffset: 0
     rotationCorrection: {x: 0, y: 0, z: 0}
-  - vfxId: VFX_Shield_State
-    prefab: {fileID: 4631137236932131032, guid: fc9d2d55dc8168c48b7c5483555d92f9, type: 3}
+  - vfxId: VFX_Item_Shield_State
+    prefab: {fileID: 4631137236932131032, guid: 25e59ef4aaf536245b38550efc7e8473, type: 3}
     lifetime: 0
-    positionOffset: {x: 0, y: 0, z: 0}
+    positionOffset: {x: 0, y: -0.097, z: 0}
     spawnMode: 0
     aimMode: 0
     fitLifetimeToDistance: 1

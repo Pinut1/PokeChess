@@ -136,6 +136,15 @@ public class UIManager : MonoBehaviour
     private int _buyXpCostGold;
     private int _buyXpAmount;
 
+    // ──────────────────────────────────────────
+    // 안내 메시지(토스트) 상태
+    // ──────────────────────────────────────────
+
+    private string _toastMessage = "";
+    private float _toastHideTime;
+
+    private const float ToastDuration = 2.5f;
+
     // 통신기 골드 전송 UI 상태
     //
     // ⛔ 기능 보류 — 되살릴 때는 [GOLD_TRANSFER_HOLD]로 전체 검색해 7군데를 모두 풀 것.
@@ -195,6 +204,8 @@ public class UIManager : MonoBehaviour
         // 무료 리롤 자원이 늘면 골드가 그대로여도 리롤 버튼이 눌릴 수 있어야 한다.
         GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
 
+        GameEvents.OnUnitPlacementRejected += HandleUnitPlacementRejected;
+
         // [GOLD_TRANSFER_HOLD] ② 구독 — 위 상태 필드 주석 참고
         // GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
         // GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
@@ -219,6 +230,8 @@ public class UIManager : MonoBehaviour
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
         GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
+
+        GameEvents.OnUnitPlacementRejected -= HandleUnitPlacementRejected;
 
         // [GOLD_TRANSFER_HOLD] ③ 구독 해제 — 위 상태 필드 주석 참고
         // GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
@@ -745,6 +758,19 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
+    /// <summary>
+    /// 유닛 배치가 거부됐을 때 전달받은 사유를
+    /// 화면 중앙에 일정 시간 표시한다.
+    /// </summary>
+    private void HandleUnitPlacementRejected(string reason)
+    {
+        _toastMessage = string.IsNullOrWhiteSpace(reason)
+            ? "유닛을 배치할 수 없습니다."
+            : reason;
+
+        _toastHideTime = Time.unscaledTime + ToastDuration;
+    }
+
     // [GOLD_TRANSFER_HOLD] ⑤ 결과 표시 핸들러 일체 — 위 상태 필드 주석 참고
     //
     // /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
@@ -785,6 +811,47 @@ public class UIManager : MonoBehaviour
             DrawMatchHistoryWindow();
 
         // 견본덱 창은 uGUI로 옮겼다 — SampleDeckPanelUI(Canvas)가 그린다.
+
+        DrawToastMessage();
+    }
+
+    /// <summary>
+    /// 배치 실패 등의 안내 메시지를 화면 상단 중앙에 잠시 표시한다.
+    /// </summary>
+    private void DrawToastMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_toastMessage))
+            return;
+
+        if (Time.unscaledTime >= _toastHideTime)
+        {
+            _toastMessage = "";
+            return;
+        }
+
+        const float width = 420f;
+        const float height = 48f;
+
+        float x = (Screen.width - width) * 0.5f;
+        float y = 80f;
+
+        GUI.Box(
+            new Rect(x, y, width, height),
+            GUIContent.none
+        );
+
+        GUIStyle toastStyle = new GUIStyle(_labelStyle)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 16,
+            fontStyle = FontStyle.Bold
+        };
+
+        GUI.Label(
+            new Rect(x + 10f, y + 6f, width - 20f, height - 12f),
+            _toastMessage,
+            toastStyle
+        );
     }
 
     /// <summary>
