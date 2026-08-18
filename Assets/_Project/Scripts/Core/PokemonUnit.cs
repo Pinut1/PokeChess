@@ -6,16 +6,23 @@ using UnityEngine;
 /// 필요한 곳(미러 전투 기본 스탯 계산, 파트너 정보창 표시)에서 공통으로 쓴다.
 /// items는 optional이다 — 아이템 스탯을 이 phantom의 계산 경로로 반영해야 하는 호출측만 채운다
 /// (다른 경로로 이미 아이템 스탯을 적용하는 호출측에서 채우면 이중 적용된다 — 호출측 책임).
+///
+/// struct가 아니라 class다 — struct면 명시하지 않은 필드가 C# 타입 기본값(0/false/null)으로
+/// 조용히 채워지는데, heroStatMultiplier=0은 스탯이 전부 0으로 계산되고 attackRangeOverride=0은
+/// "오버라이드 있음"으로 오판(0 != NoRangeOverride)돼 Range가 0이 된다 — 새 호출부가 필드 하나를
+/// 빠뜨려도 컴파일 에러 없이 조용히 잘못된 유닛이 나오는 함정이었다(PR #102 리뷰 지적).
+/// class 필드 초기값(C# 1.0부터 지원, LangVersion 9.0 제약 없음)으로 PokemonUnit 클래스 필드와
+/// 같은 안전한 기본값을 준다.
 /// </summary>
-public struct PhantomUnitConfig
+public class PhantomUnitConfig
 {
     public PokemonData species;
-    public int starLevel;
-    public float heroStatMultiplier;
+    public int starLevel = 1;
+    public float heroStatMultiplier = 1f;
     public bool isTradeEvolved;
     public EvolutionStoneData equippedStone;
     public string roleOverride;
-    public int attackRangeOverride;
+    public int attackRangeOverride = PokemonUnit.NoRangeOverride;
     public IEnumerable<ItemData> items;
 }
 
