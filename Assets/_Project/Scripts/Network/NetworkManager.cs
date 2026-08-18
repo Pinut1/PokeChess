@@ -1728,6 +1728,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return false;
         }
 
+        // SendTradeUnit이 유닛을 보드에서 빼낼 때 BoardManager가 필요하다. 여기서 같이 보지 않으면
+        // 안내창은 "전송 준비 완료"로 떠 있는데 막상 놓으면 거절되는 어긋남이 남는다
+        // — 이 함수를 뽑아낸 이유가 바로 그 어긋남을 없애는 것이었다.
+        if (!GameManager.TryGet(out var gm) || gm.Board == null)
+        {
+            reason = "보드 준비 중";
+            return false;
+        }
+
         reason = null;
         return true;
     }
@@ -1756,8 +1765,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        // CanSendTradeUnit이 이미 걸러내지만 참조를 여기서 다시 얻어야 하므로 방어를 남긴다
+        // (여기까지 왔는데 null이면 그 사이에 매니저가 사라진 것이라 로그를 남길 값어치가 있다).
         BoardManager board =
-            GameManager.TryGet(out var gm) ? gm.Board : null;
+            GameManager.TryGet(out var boardOwner) ? boardOwner.Board : null;
 
         if (board == null)
         {

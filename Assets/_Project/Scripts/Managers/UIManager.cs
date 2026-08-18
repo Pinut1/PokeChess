@@ -137,6 +137,12 @@ public class UIManager : MonoBehaviour
     private int _buyXpAmount;
 
     // 통신기 골드 전송 UI 상태
+    //
+    // ⛔ 기능 보류 — 되살릴 때는 [GOLD_TRANSFER_HOLD]로 전체 검색해 7군데를 모두 풀 것.
+    //    일부만 풀면 컴파일은 되는데 구독만 살고 그리기는 죽는 식으로 절반만 동작한다
+    //    (컴파일 에러로 안 잡히는 종류의 실수라 태그로 묶어 둔다).
+    //    ① 상태 필드 ② OnEnable 구독 ③ OnDisable 해제 ④ OnDisable 상태 초기화
+    //    ⑤ 결과 핸들러 3개 ⑥ OnGUI 호출 ⑦ 패널 본체(DrawTradeGoldPanel/RequestGoldTransfer)
     // ⛔ 기능 보류(2026-08-18) — 통신기는 유닛 교환만 담당한다. 아래 상태·구독·패널을 통째로 주석 처리해
     //    송신 경로 자체를 없앴다. NetworkManager의 수신(RPC_GoldReceive)·환급 경로는 구버전 클라이언트
     //    호환을 위해 그대로 남겨 뒀다 — 되살릴 때는 여기 주석 블록만 풀면 된다.
@@ -189,7 +195,7 @@ public class UIManager : MonoBehaviour
         // 무료 리롤 자원이 늘면 골드가 그대로여도 리롤 버튼이 눌릴 수 있어야 한다.
         GameEvents.OnRerollCountChanged += HandleRerollCountChanged;
 
-        // 통신기 골드 전송 보류 — 구독 해제(위 상태 필드 주석 참고)
+        // [GOLD_TRANSFER_HOLD] ② 구독 — 위 상태 필드 주석 참고
         // GameEvents.OnGoldTransferCompleted += HandleGoldTransferCompleted;
         // GameEvents.OnGoldTransferRejected += HandleGoldTransferRejected;
         // GameEvents.OnPartnerGoldReceived += HandlePartnerGoldReceived;
@@ -214,7 +220,7 @@ public class UIManager : MonoBehaviour
         GameEvents.OnRerollCountChanged -= HandleRerollCountChanged;
         GameEvents.OnItemCouponChanged -= HandleItemCouponChanged;
 
-        // 통신기 골드 전송 보류 — 구독 해제(위 상태 필드 주석 참고)
+        // [GOLD_TRANSFER_HOLD] ③ 구독 해제 — 위 상태 필드 주석 참고
         // GameEvents.OnGoldTransferCompleted -= HandleGoldTransferCompleted;
         // GameEvents.OnGoldTransferRejected -= HandleGoldTransferRejected;
         // GameEvents.OnPartnerGoldReceived -= HandlePartnerGoldReceived;
@@ -225,6 +231,7 @@ public class UIManager : MonoBehaviour
 
         GameEvents.OnPartnerSpectateExpandedChanged -= HandlePartnerSpectateExpandedChanged;
 
+        // [GOLD_TRANSFER_HOLD] ④
         // _isGoldTransferPending = false;
 
         // 매니저가 꺼지면 선택 UI도 닫아야 한다(패널만 남아 켜져 있으면 조작이 막힌 채 방치된다).
@@ -738,7 +745,7 @@ public class UIManager : MonoBehaviour
         _unitCap = unitCap;
     }
 
-    // 통신기 골드 전송 보류 — 결과 표시 핸들러 일체 주석 처리(위 상태 필드 주석 참고)
+    // [GOLD_TRANSFER_HOLD] ⑤ 결과 표시 핸들러 일체 — 위 상태 필드 주석 참고
     //
     // /// <summary>골드 전송 성공 시 대기 상태를 해제하고 결과 문구를 갱신한다.</summary>
     // private void HandleGoldTransferCompleted(int amount)
@@ -770,7 +777,8 @@ public class UIManager : MonoBehaviour
         // IMGUI 진행 패널은 같은 값을 중복 표시하며 상점 카드 위를 덮으므로 호출하지 않는다.
         // 메서드는 Canvas 미배선 씬을 위한 폴백으로 남겨둔다.
 
-        // DrawTradeGoldPanel();   // 통신기 골드 전송 보류 — 송신 경로가 여기뿐이라 이 한 줄로 기능이 닫힌다
+        // [GOLD_TRANSFER_HOLD] ⑥ — 송신 경로가 여기뿐이라 이 한 줄로 기능이 닫힌다
+        // DrawTradeGoldPanel();
         DrawPlusleMinunFormChoicePanel();
 
         if (_showMatchHistory)
@@ -786,7 +794,7 @@ public class UIManager : MonoBehaviour
     public void CloseMatchHistoryWindow() => _showMatchHistory = false;
 
     // ──────────────────────────────────────────
-    // 통신기 골드 전송 UI — ⛔ 기능 보류(2026-08-18)
+    // [GOLD_TRANSFER_HOLD] ⑦ 패널 본체 — ⛔ 기능 보류(2026-08-18)
     //
     // 통신기는 유닛 교환만 담당하기로 정리되면서 골드 전송 UI를 통째로 닫았다.
     // GameEvents.RequestGoldTransfer를 발행하는 곳이 아래 패널뿐이라, 이 블록만 주석 처리하면

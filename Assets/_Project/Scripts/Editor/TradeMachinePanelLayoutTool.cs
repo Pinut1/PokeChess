@@ -236,6 +236,8 @@ public static class TradeMachinePanelLayoutTool
     private static TradeMachinePanelUI BuildPanel(Transform canvas)
     {
         RectTransform panel = EnsureChild(canvas, PANEL_NAME);
+        if (panel == null) return null;   // 같은 이름의 비UI 오브젝트가 있다(EnsureChild가 경고를 남긴다)
+
         panel.SetAsLastSibling();
 
         // 씬 뷰에서 보이는 자리. 실제 자리는 TradeMachinePanelUI가 통신기 위로 잡아주므로
@@ -289,7 +291,7 @@ public static class TradeMachinePanelLayoutTool
         Button receiveButton = BuildButton(panel, "Receive_Button", RECEIVE_LABEL);
 
         // 사유 줄은 평소 접어 둔다 — 보낼 수 있을 때는 표시할 내용이 없다.
-        SetActiveWithUndo(sendReason.gameObject, false);
+        if (sendReason != null) SetActiveWithUndo(sendReason.gameObject, false);
 
         ApplyFontToAllTMP(panel, FindKoreanFontAsset());
 
@@ -300,7 +302,8 @@ public static class TradeMachinePanelLayoutTool
         WireField(so, "_sendReasonText", sendReason);
         WireField(so, "_receiveHeaderText", receiveHeader);
         WireField(so, "_receiveButton", receiveButton);
-        WireField(so, "_receiveButtonLabel", receiveButton.GetComponentInChildren<TMP_Text>(true));
+        WireField(so, "_receiveButtonLabel",
+                  receiveButton != null ? receiveButton.GetComponentInChildren<TMP_Text>(true) : null);
         WireField(so, "_evolveSlotRoot", slotRoot);
         WireField(so, "_evolveArrow", arrow);
         WireField(so, "_evolveResultSlotRoot", resultRoot);
@@ -426,10 +429,15 @@ public static class TradeMachinePanelLayoutTool
     // 공용 헬퍼
     // ─────────────────────────────────────────
 
+    /// <summary>
+    /// 글자 한 줄. 같은 이름의 비UI 오브젝트가 이미 있으면 EnsureChild가 null을 주므로 그때는 건너뛴다
+    /// (경고는 EnsureChild가 남긴다).
+    /// </summary>
     private static TMP_Text BuildText(
         RectTransform parent, string name, string content, float fontSize, Color color)
     {
         RectTransform rect = EnsureChild(parent, name);
+        if (rect == null) return null;
 
         TMP_Text text = rect.GetComponent<TMP_Text>();
         if (text == null) text = AddComponentTracked<TextMeshProUGUI>(rect.gameObject);
@@ -451,6 +459,7 @@ public static class TradeMachinePanelLayoutTool
     private static Button BuildButton(RectTransform parent, string name, string label)
     {
         RectTransform rect = EnsureChild(parent, name);
+        if (rect == null) return null;
 
         EnsureImage(rect, BUTTON_COLOR, true);
         var button = EnsureComponent<Button>(rect.gameObject);
@@ -472,6 +481,8 @@ public static class TradeMachinePanelLayoutTool
     private static void EnsureDivider(RectTransform parent, string name)
     {
         RectTransform line = EnsureChild(parent, name);
+        if (line == null) return;
+
         EnsureImage(line, DIVIDER_COLOR, false);
 
         var element = EnsureComponent<LayoutElement>(line.gameObject);
