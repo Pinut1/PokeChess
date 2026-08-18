@@ -298,6 +298,14 @@ public class BattleManager : MonoBehaviour
             ? Mathf.Max(1, Mathf.RoundToInt(_overtimeSpeedMultiplier))
             : 1;
 
+        // 배속(simTicksPerWait > 1)일 때 SimulateTick() 여러 번을 한 프레임에 몰아 처리하면 렌더가
+        // 버벅인다. 그렇다고 사이사이 yield return null(프레임 단위 대기)을 넣으면 프레임레이트에
+        // 따라 실제 걸리는 시간이 늘어나 버려 오버타임 총 길이(_overtimeDuration)가 깨진다.
+        // 대신 TICK_INTERVAL을 simTicksPerWait로 쪼개 WaitForSeconds로 나눠 기다리면, 프레임레이트와
+        // 무관하게 realTick 한 구간의 실시간 길이가 정확히 TICK_INTERVAL로 유지되면서도
+        // SimulateTick() 호출이 서로 다른 프레임에 분산된다.
+        float subInterval = TICK_INTERVAL / simTicksPerWait;
+
         for (int realTick = 0; realTick < realTicks; realTick++)
         {
             for (int i = 0; i < simTicksPerWait; i++)
@@ -315,9 +323,9 @@ public class BattleManager : MonoBehaviour
                     result.overtimeAllyWon = allyAlive; // 둘 다 전멸하면 false(패배 처리) — 기존 동시 전멸 규칙 유지
                     yield break;
                 }
-            }
 
-            yield return new WaitForSeconds(TICK_INTERVAL);
+                yield return new WaitForSeconds(subInterval);
+            }
         }
 
         // 오버타임 실제 시간 종료 — 적이 한 마리라도 살아있으면 무조건 패배(기획 확정). 아군 생존 수/HP 무관.

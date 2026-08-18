@@ -75,6 +75,12 @@ public static class GameEvents
     /// <summary>RoundPhaseManager approves a ready request during Shopping.</summary>
     public static event Action OnPlayerReadyApproved;
 
+    /// <summary>
+    /// 준비 완료 인원 집계 변경. 인자 = (준비 완료 인원, 총 인원). NetworkManager가 Player
+    /// CustomProperties(Ready) 변경 시마다 발행 — UI(StageTopPanelUI)의 "전투 준비중...(n/총)" 표시용.
+    /// </summary>
+    public static event Action<int, int> OnReadyCountChanged;
+
     // ──────────────────────────────────────────
     // 골드 / 레벨
     // ──────────────────────────────────────────
@@ -348,6 +354,7 @@ public static class GameEvents
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();
     public static void ApprovePlayerReady()    => OnPlayerReadyApproved?.Invoke();
+    public static void ReadyCountChanged(int ready, int total) => OnReadyCountChanged?.Invoke(ready, total);
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void XpChanged(int current, int required) => OnXpChanged?.Invoke(current, required);

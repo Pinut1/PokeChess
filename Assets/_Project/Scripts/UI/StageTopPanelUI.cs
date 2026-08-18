@@ -40,6 +40,26 @@ public class StageTopPanelUI : MonoBehaviour
     [Tooltip("오버타임 중 타이머 텍스트가 깜박이는 간격(초). 작을수록 빨리 깜박인다. 0 이하면 깜박이지 않는다(텍스트는 항상 표시).")]
     [SerializeField] private float _overtimeBlinkInterval = 0.4f;
 
+    [Header("준비 상태 텍스트")]
+    [Tooltip("\"전투 준비중...(n/총)\" → 전원 준비 시 \"전투 시작\"으로 바뀌는 상태 텍스트. 비워두면 표시하지 않는다.")]
+    [SerializeField] private TextMeshProUGUI _readyStatusText;
+
+    [Tooltip("준비 인원 표기 포맷. {0}=준비 인원, {1}=총 인원.")]
+    [SerializeField] private string _readyStatusFormat = "전투 준비중...({0}/{1})";
+
+    [Tooltip("전원 준비 완료 시 표시할 문구.")]
+    [SerializeField] private string _allReadyLabel = "전투 시작";
+
+    [Tooltip("전원 준비 완료/전투 결과 문구가 뜬 뒤 텍스트를 비우기까지 대기시간(초). " +
+             "Result 페이즈 길이(RoundPhaseManager._resultDuration, 기본 3초)를 넘기면 다음 라운드의 " +
+             "\"전투 준비중\" 리셋이 먼저 텍스트를 덮어써버리니 그 값 이하로 맞출 것.")]
+    [SerializeField] private float _readyStatusClearDelay = 3f;
+
+    [Tooltip("전투 종료 시 같은 텍스트에 잠깐 표시할 결과 문구. {0}=라운드 번호. " +
+             "증강 선택창 등에 가려서 놓치기 쉬워 라운드 번호를 같이 표기한다.")]
+    [SerializeField] private string _victoryLabelFormat = "{0}라운드 승리";
+    [SerializeField] private string _defeatLabelFormat = "{0}라운드 패배";
+
     [Header("스테이지 아이콘")]
     [Tooltip("좌→우 순서대로. 씬의 StageIRow_Icon (1)~(5)를 순서대로 넣을 것 — 이름이 복제형이라 자동 탐색은 순서를 보장하지 못한다.")]
     [SerializeField] private StageIconSlot[] _stageIcons;
@@ -90,12 +110,27 @@ public class StageTopPanelUI : MonoBehaviour
     // 오버타임 안내용 깜박임 코루틴. null이면 실행 중이 아님(=오버타임 아님).
     private Coroutine _overtimeBlinkCoroutine;
 
+    // 전원 준비 완료 문구를 잠시 보여준 뒤 비우는 코루틴. null이면 실행 중이 아님.
+    private Coroutine _readyStatusClearCoroutine;
+
+    // 전투 결과("n라운드 승리/패배")가 떠 있는 동안 true. 파트너를 기다리느라 Result 페이즈가
+    // _readyStatusClearDelay보다 짧게 끝나는 플레이어의 경우, 다음 라운드의 Ready 리셋(0/총)이
+    // 결과 문구를 다 보여주기도 전에 덮어쓰는 걸 막는 가드.
+    private bool _showingBattleResult;
+
+    // _showingBattleResult 동안 들어온 준비 인원 갱신을 버리지 않고 기억해둔다 — 가드가 풀리면
+    // 그 사이 놓친 최신 값(예: 파트너가 그새 먼저 준비를 누른 것)으로 바로 갱신한다.
+    private bool _hasPendingReadyCount;
+    private int _pendingReadyCount;
+    private int _pendingReadyTotal;
+
     private void OnEnable()
     {
         GameEvents.OnStageEntered    += HandleStageEntered;
         GameEvents.OnPhaseChanged    += HandlePhaseChanged;
         GameEvents.OnBattleEnd       += HandleBattleEnd;
         GameEvents.OnOvertimeStarted += HandleOvertimeStarted;
+        GameEvents.OnReadyCountChanged += HandleReadyCountChanged;
     }
 
     private void OnDisable()
@@ -104,10 +139,20 @@ public class StageTopPanelUI : MonoBehaviour
         GameEvents.OnPhaseChanged    -= HandlePhaseChanged;
         GameEvents.OnBattleEnd       -= HandleBattleEnd;
         GameEvents.OnOvertimeStarted -= HandleOvertimeStarted;
+        GameEvents.OnReadyCountChanged -= HandleReadyCountChanged;
 
         // 컴포넌트가 꺼지는 시점에 깜박임이 돌고 있었다면(오버타임 도중 비활성화 등) 텍스트가
         // 꺼진 상태로 남지 않도록 복구한다.
         StopOvertimeBlink();
+
+        if (_readyStatusClearCoroutine != null)
+        {
+            StopCoroutine(_readyStatusClearCoroutine);
+            _readyStatusClearCoroutine = null;
+        }
+
+        _showingBattleResult = false;
+        _hasPendingReadyCount = false;
     }
 
     private void Start()
@@ -118,6 +163,8 @@ public class StageTopPanelUI : MonoBehaviour
         RefreshTimeText();
 
         SyncToCurrentStage();
+
+        if (_readyStatusText != null) _readyStatusText.text = "";
     }
 
     /// <summary>
@@ -271,11 +318,87 @@ public class StageTopPanelUI : MonoBehaviour
         RefreshTimeText();
     }
 
-    /// <summary>전투가 끝나면(조기 종료/오버타임 판정 모두) 즉시 정지(Result 진입이 곧 이어진다).</summary>
+    /// <summary>
+    /// 전투가 끝나면(조기 종료/오버타임 판정 모두) 즉시 정지(Result 진입이 곧 이어진다)하고,
+    /// 같은 준비 상태 텍스트에 결과("승리"/"패배")를 잠깐 띄운다.
+    /// </summary>
     private void HandleBattleEnd(BattleEndReason reason)
     {
         _counting = false;
         StopOvertimeBlink();
+
+        bool isVictory = reason == BattleEndReason.Victory || reason == BattleEndReason.DecisionVictory;
+        int round = GameManager.TryGet(out var gm) && gm.Phase != null ? gm.Phase.CurrentRound : 0;
+        string label = string.Format(isVictory ? _victoryLabelFormat : _defeatLabelFormat, round);
+
+        _showingBattleResult = true;
+        ShowReadyStatusText(label, autoClear: true);
+    }
+
+    /// <summary>
+    /// 준비 인원 집계 변경 → "전투 준비중...(n/총)" 갱신, 전원 준비되면 파란색 "전투 시작"으로
+    /// 바뀐 뒤 일정 시간 후 텍스트를 비운다.
+    /// </summary>
+    private void HandleReadyCountChanged(int ready, int total)
+    {
+        // 전투 결과 문구가 아직 노출 중이면 다음 라운드의 Ready 리셋(0/총)이 그걸 잘라먹지 않게 막는다.
+        // 대신 최신 값을 기억해뒀다가 결과 문구가 스스로 지워질 때(ClearReadyStatusAfterDelay) 반영한다
+        // — 그냥 버리면 그 사이 파트너가 먼저 준비를 눌러도 화면이 빈 채로 남는다.
+        if (_showingBattleResult)
+        {
+            _hasPendingReadyCount = true;
+            _pendingReadyCount = ready;
+            _pendingReadyTotal = total;
+            return;
+        }
+
+        ApplyReadyCountDisplay(ready, total);
+    }
+
+    private void ApplyReadyCountDisplay(int ready, int total)
+    {
+        if (total > 0 && ready >= total)
+            ShowReadyStatusText(_allReadyLabel, autoClear: true);
+        else
+            ShowReadyStatusText(string.Format(_readyStatusFormat, ready, total), autoClear: false);
+    }
+
+    /// <summary>
+    /// 준비 상태 텍스트에 문구를 채운다. autoClear면 _readyStatusClearDelay 뒤 자동으로 비운다
+    /// (전원 준비 완료/전투 결과처럼 잠깐만 보여줄 문구용).
+    /// </summary>
+    private void ShowReadyStatusText(string text, bool autoClear)
+    {
+        if (_readyStatusText == null) return;
+
+        if (_readyStatusClearCoroutine != null)
+        {
+            StopCoroutine(_readyStatusClearCoroutine);
+            _readyStatusClearCoroutine = null;
+        }
+
+        _readyStatusText.text = text;
+
+        if (autoClear)
+            _readyStatusClearCoroutine = StartCoroutine(ClearReadyStatusAfterDelay());
+    }
+
+    private IEnumerator ClearReadyStatusAfterDelay()
+    {
+        yield return new WaitForSeconds(_readyStatusClearDelay);
+
+        _readyStatusClearCoroutine = null;
+        _showingBattleResult = false;
+
+        if (_hasPendingReadyCount)
+        {
+            _hasPendingReadyCount = false;
+            ApplyReadyCountDisplay(_pendingReadyCount, _pendingReadyTotal);
+        }
+        else if (_readyStatusText != null)
+        {
+            _readyStatusText.text = "";
+        }
     }
 
     /// <summary>

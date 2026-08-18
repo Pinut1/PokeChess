@@ -926,7 +926,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     public void BroadcastPlayerReady()
     {
         // 솔로 모드: 1인 = 전원 준비 완료
-        if (_soloMode) { GameEvents.AllPlayersReady(); return; }
+        if (_soloMode) { GameEvents.ReadyCountChanged(1, 1); GameEvents.AllPlayersReady(); return; }
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
         var props = new Hashtable { { READY_PROP_KEY, true } };
@@ -3286,6 +3286,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             GameEvents.PartnerAugmentsChanged(augmentNames);
         }
 
+        // 준비 인원 집계 UI 갱신: 누구의 Ready든 바뀌면 전 클라에서 (준비 인원/총 인원)을 다시 센다.
+        // 전투 시작 판정(AllPlayersHaveFlag)과 달리 이건 표시 전용이라 MasterClient 여부와 무관하게 발행.
+        if (changedProps.ContainsKey(READY_PROP_KEY))
+            GameEvents.ReadyCountChanged(CountReadyPlayers(), PlayerCount);
+
         // 이하 집계는 MasterClient만.
         if (!IsMasterClient) return;
 
@@ -3358,6 +3363,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             if (!on) return false;
         }
         return true;
+    }
+
+    /// <summary>READY_PROP_KEY가 true인 플레이어 수. 준비 인원 표시(n/총) 집계용.</summary>
+    private int CountReadyPlayers()
+    {
+        int count = 0;
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player.CustomProperties.TryGetValue(READY_PROP_KEY, out object v) && (bool)v)
+                count++;
+        }
+        return count;
     }
 
     /// <summary>팀 공통 HP(Room 속성) 변경 수신 → 모든 클라가 UI 갱신, 0 이하면 세션 종료.</summary>
@@ -3851,7 +3868,11 @@ public class NetworkManager : MonoBehaviour
     public void BroadcastGameCleared()         => GameEvents.GameCleared();
 
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
-    public void BroadcastPlayerReady()         => GameEvents.AllPlayersReady();
+    public void BroadcastPlayerReady()
+    {
+        GameEvents.ReadyCountChanged(1, 1);
+        GameEvents.AllPlayersReady();
+    }
 
     // 상태 동기화 — 오프라인은 파트너가 없으므로 보드 미러/골드는 no-op, 팀 HP만 로컬 처리.
     public void BroadcastBoardSnapshot(int[] _) { }
