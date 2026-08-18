@@ -2519,15 +2519,17 @@ public class BattleManager : MonoBehaviour
             }
         }
 
-        var phantomGO = new GameObject("MirrorStatPhantom");
-        var phantom = phantomGO.AddComponent<PokemonUnit>();
-        phantom.data = species;
-        phantom.starLevel = Mathf.Clamp(entry.starLevel, 1, 3);
-        phantom.heroStatMultiplier = entry.heroStatMultiplier;
-        phantom.isTradeEvolved = entry.isTradeEvolved;
-        phantom.equippedStone = stone;
-        phantom.roleOverride = entry.roleOverride;
-        phantom.attackRangeOverride = entry.attackRangeOverride;
+        // MirrorBattle 장비 스탯은 이후 ItemStatEffect에서 적용하므로 phantom에는 items를 넣지 않는다.
+        var phantom = PokemonUnit.CreatePhantom("MirrorStatPhantom", new PhantomUnitConfig
+        {
+            species = species,
+            starLevel = Mathf.Clamp(entry.starLevel, 1, 3),
+            heroStatMultiplier = entry.heroStatMultiplier,
+            isTradeEvolved = entry.isTradeEvolved,
+            equippedStone = stone,
+            roleOverride = entry.roleOverride,
+            attackRangeOverride = entry.attackRangeOverride,
+        });
 
         float maxHp = phantom.MaxHp;
         float attack = phantom.Attack;
@@ -2537,7 +2539,7 @@ public class BattleManager : MonoBehaviour
         int range = phantom.Range;
         string role = phantom.Role;
 
-        Destroy(phantomGO);
+        Destroy(phantom.gameObject);
 
         var bu = new BattleUnit
         {
