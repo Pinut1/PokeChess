@@ -17554,13 +17554,9 @@ MonoBehaviour:
   _readyStatusText: {fileID: 94978784}
   _readyStatusFormat: "\uC804\uD22C \uC900\uBE44\uC911...({0}/{1})"
   _allReadyLabel: "\uC804\uD22C \uC2DC\uC791"
-  _readyStatusNormalColor: {r: 1, g: 1, b: 1, a: 1}
-  _allReadyStatusColor: {r: 0, g: 0.020130634, b: 1, a: 1}
   _readyStatusClearDelay: 3
   _victoryLabelFormat: "{0}\uB77C\uC6B4\uB4DC \uC2B9\uB9AC"
   _defeatLabelFormat: "{0}\uB77C\uC6B4\uB4DC \uD328\uBC30"
-  _victoryColor: {r: 0, g: 1, b: 0, a: 1}
-  _defeatColor: {r: 1, g: 0, b: 0, a: 1}
   _stageIcons:
   - icon: {fileID: 1317263890}
     highlighted: {fileID: -466162482, guid: fa8dcbe1bf3b9b44c95938f193ec942f, type: 3}
