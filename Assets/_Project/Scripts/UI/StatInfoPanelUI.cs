@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 using TMPro;
 
 /// <summary>
@@ -64,9 +65,15 @@ public class StatInfoPanelUI : MonoBehaviour
         new() { role = "Supporter", korean = "서포터" },
     };
 
-    [Tooltip("판매가. ShopManager.SellValue()를 그대로 쓰므로 실제 지급액과 항상 일치한다.")]
-    [SerializeField] private TextMeshProUGUI _sellPriceText;
-    [SerializeField] private string _sellPriceFormat = "판매가: {0}골드";
+    [Tooltip("코스트(구매가, PokemonData.cost). 상점 카드(ShopCardUI._priceText)와 같은 원본을 그대로 " +
+             "표시한다 — 아군/적/프리뷰/미러전투/파트너 유닛 전부 동일하게 이 값을 쓴다. " +
+             "옛 이름은 _sellPriceText(판매가)였으나 원래 의미(코스트)로 되돌렸다 — FormerlySerializedAs로 " +
+             "기존 프리팹 배선(Price_Panel/PriceText)을 그대로 승계한다.")]
+    [FormerlySerializedAs("_sellPriceText")]
+    [SerializeField] private TextMeshProUGUI _costText;
+
+    [FormerlySerializedAs("_sellPriceFormat")]
+    [SerializeField] private string _costFormat = "{0}";
 
     [Tooltip("성급 아이콘. 성급에 따라 스프라이트만 갈아끼운다.")]
     [SerializeField] private Image _starImage;
@@ -184,7 +191,7 @@ public class StatInfoPanelUI : MonoBehaviour
         _currentEvolutionLocked = unit.evolutionLocked;
         gameObject.SetActive(true);
 
-        FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
+        FillIdentity(unit.data, unit.starLevel, unit.Role);
         RefreshUnitStatsAndItems();
         RefreshGauges(); // 켜는 프레임에 빈 게이지가 보이지 않게
     }
@@ -226,15 +233,15 @@ public class StatInfoPanelUI : MonoBehaviour
         _currentEvolutionLocked = unit.source != null && unit.source.evolutionLocked;
         gameObject.SetActive(true);
 
-        // 판매가는 내 보드의 원본이 있을 때만 의미가 있다(적은 팔 수 없다).
-        bool sellable = unit.team == BattleTeam.Ally && unit.source != null;
+        // 아군이고 보드 위 원본 참조가 있으면(전투 전용 인스턴스가 아니라 실제 내 유닛) 그 Role을
+        // 우선한다 — 영웅증강으로 바뀐 역할이 거기 남아 있다. 적/미러전투는 원본이 없다(source==null).
+        bool hasSource = unit.team == BattleTeam.Ally && unit.source != null;
 
-        // 아군은 원본의 Role을 우선한다 — 영웅증강으로 바뀐 역할이 거기 남아 있다.
-        string role = sellable ? unit.source.Role
+        string role = hasSource ? unit.source.Role
                     : !string.IsNullOrEmpty(unit.role) ? unit.role
                     : unit.data.role;
 
-        FillIdentity(unit.data, unit.starLevel, role, unit.source, showSellPrice: sellable);
+        FillIdentity(unit.data, unit.starLevel, role);
         FillStats(unit.range, unit.defense, unit.attack, unit.attackSpeed, unit.spellPower);
         FillItems(unit.displayItems, unit.displayStone);
         RefreshGauges();
@@ -246,7 +253,6 @@ public class StatInfoPanelUI : MonoBehaviour
     /// 온 species/starLevel/items/roleOverride/attackRangeOverride/heroStatMultiplier만으로 채울 수
     /// 있는 항목만 정확히 표시한다.
     ///
-    /// 판매가는 항상 0/숨김 — 파트너 유닛은 팔 수 없고 실제 투자 이력(합성 패널티 등)도 알 수 없다.
     /// 역할/사거리/스탯 배수는 영웅증강 등으로 바뀐 런타임 값(BoardSnapshot.Entry.roleOverride 등,
     /// 2026-08 확장)을 phantom에 그대로 옮겨 PokemonUnit의 기존 계산 프로퍼티(Role/Range/
     /// ComputeFinalStats)를 그대로 재사용한다 — 파치리스/이브이 같은 특정 증강을 이 UI가 직접
@@ -288,7 +294,7 @@ public class StatInfoPanelUI : MonoBehaviour
             items = view.items,
         });
 
-        FillIdentity(view.species, view.starLevel, phantom.Role, sellSource: null, showSellPrice: false);
+        FillIdentity(view.species, view.starLevel, phantom.Role);
 
         phantom.ComputeFinalStats(
             out float finalMaxHp, out _,
@@ -450,7 +456,7 @@ public class StatInfoPanelUI : MonoBehaviour
     {
         if (_unit == null || _unit != unit) return;
 
-        FillIdentity(unit.data, unit.starLevel, unit.Role, unit, showSellPrice: true);
+        FillIdentity(unit.data, unit.starLevel, unit.Role);
         RefreshUnitStatsAndItems();
     }
 
@@ -505,11 +511,10 @@ public class StatInfoPanelUI : MonoBehaviour
     // ─────────────────────────────────────────
 
     /// <summary>
-    /// 보드 유닛·전투 유닛 공용. 판매가는 항상 표시하되, 팔 수 없는 대상(적·야생)은 0으로 나온다
-    /// (칸이 비어 보이면 값이 안 들어온 건지 0인 건지 구분이 안 된다).
+    /// 보드 유닛·전투 유닛·파트너 유닛 공용. 코스트(PokemonData.cost, 상점 카드와 같은 원본)는
+    /// 대상과 무관하게 항상 그대로 표시한다 — 아군/적/프리뷰/미러전투/파트너 유닛 모두 동일.
     /// </summary>
-    private void FillIdentity(PokemonData data, int starLevel, string role,
-                              PokemonUnit sellSource, bool showSellPrice)
+    private void FillIdentity(PokemonData data, int starLevel, string role)
     {
         if (_illustration != null)
         {
@@ -527,10 +532,8 @@ public class StatInfoPanelUI : MonoBehaviour
 
         FillSynergies(data);
 
-        // showSellPrice가 false면 SellValueOf가 0을 돌려준다(sellSource가 null이므로).
-        if (_sellPriceText != null)
-            _sellPriceText.text = string.Format(_sellPriceFormat,
-                                                showSellPrice ? SellValueOf(sellSource) : 0);
+        if (_costText != null)
+            _costText.text = string.Format(_costFormat, data.cost);
     }
 
     /// <summary>"Archer" → "Archer(원거리딜러)". 대응표에 없으면 영문만 그대로 쓴다.</summary>
@@ -552,19 +555,6 @@ public class StatInfoPanelUI : MonoBehaviour
         }
 
         return string.IsNullOrEmpty(korean) ? role : string.Format(_roleFormat, role, korean);
-    }
-
-    /// <summary>
-    /// 판매가. ShopManager.SellValue()가 단일 소스라 이 표시와 실제 지급액이 자동으로 일치한다.
-    /// (합성 패널티·진화 원본 가격 환산이 전부 그쪽에 들어 있다)
-    /// </summary>
-    private static int SellValueOf(PokemonUnit unit)
-    {
-        if (unit == null) return 0;
-        if (!GameManager.TryGet(out var gm)) return 0;
-
-        var shop = gm.Shop;
-        return shop != null ? shop.SellValue(unit) : 0;
     }
 
     /// <summary>성급에 맞는 스프라이트로 갈아끼운다. 해당 성급 스프라이트가 없으면 아이콘을 숨긴다.</summary>

@@ -231,11 +231,17 @@ public class RoomListUI :
         bool inProgress = room.CustomProperties.ContainsKey(NetworkManager.MATCH_GUID_ROOM_KEY);
         bool full = room.PlayerCount >= room.MaxPlayers;
 
+        // 표시 전용 보정 — 내 방 행에서만, 로컬 Photon 상태가 아직 나 자신을 반영하기 전이라
+        // room.PlayerCount가 일시적으로 0으로 읽히는 경우 화면에 0/2로 보이는 것을 막는다.
+        // room.PlayerCount(실제 Photon 값)나 다른 방 행은 전혀 건드리지 않는다 — 이 지역 변수는
+        // count 문자열 표시에만 쓰인다(joinable/full/inProgress 판정은 실제 값을 그대로 쓴다).
+        int displayCount = mine && room.PlayerCount < 1 ? 1 : room.PlayerCount;
+
         return new RoomRow
         {
             name = room.Name,
             host = HostLabelOf(room),
-            count = $"{room.PlayerCount}/{room.MaxPlayers}",
+            count = $"{displayCount}/{room.MaxPlayers}",
             state = mine ? "참여 중" : inProgress ? "진행 중" : full ? "가득 참" : "",
 
             // 이미 들어가 있는 방은 고를 이유가 없다 — 선택해도 [선택 방 입장]이 같은 방을 다시 부를 뿐이다.

@@ -41,6 +41,12 @@ public class PartnerBattleMirrorController : MonoBehaviour
     public System.Collections.Generic.IReadOnlyList<BattleUnit> MirrorUnits =>
         _mirrorBattleManager != null ? _mirrorBattleManager.Units : null;
 
+    /// <summary>쇼핑/프리뷰 상태의 파트너 적 프리뷰 목록(읽기 전용). BattleManager.PreviewEnemies를
+    /// 그대로 전달한다 — 유닛 정보 우클릭 조회(StatInfoController)가 이 목록도 검사할 수 있도록
+    /// 노출한다. 미러 BattleManager가 아직 없으면 null.</summary>
+    public System.Collections.Generic.IReadOnlyList<BattleUnit> PreviewEnemies =>
+        _mirrorBattleManager != null ? _mirrorBattleManager.PreviewEnemies : null;
+
     /// <summary>파트너 관전 카메라 등 외부에서도 같은 파트너 보드 오프셋을 쓰도록 공개.</summary>
     public Vector3 BoardOffset => FindBoardOffset();
 

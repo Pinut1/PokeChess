@@ -3520,6 +3520,27 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 파트너가 지금까지 선택한 증강(영문명). GameEvents.OnPartnerAugmentsChanged는 변경된 순간에만
+    /// 한 번 발행되므로, 그 이벤트가 이미 지나간 뒤에 구독을 시작한 late-subscriber(예: 재접속이
+    /// 아닌 컴포넌트 재활성화)는 값을 영영 못 받는다 — 그런 곳에서 구독 직후 현재 값을 직접
+    /// 당겨오는 용도.
+    /// </summary>
+    public string[] GetPartnerAugmentNamesNow()
+    {
+        if (!PhotonNetwork.InRoom) return System.Array.Empty<string>();
+
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player == PhotonNetwork.LocalPlayer) continue;
+            if (player.CustomProperties.TryGetValue(AUGMENTS_PROP_KEY, out object augments) &&
+                augments is string[] augmentNames)
+                return augmentNames;
+        }
+
+        return System.Array.Empty<string>();
+    }
+
+    /// <summary>
     /// 재접속 2단계 — 서버에 이미 저장돼 있는 내 Gold/Augments/레벨·XP/무료 리롤/아이템 상점 Player
     /// CustomProperties를 읽어 기존 시스템에 반영한다. GOLD_PROP_KEY/AUGMENTS_PROP_KEY/UNITS_PROP_KEY/
     /// LEVEL_PROP_KEY/XP_PROP_KEY에 이어 REROLL_COUNT_PROP_KEY/ITEM_SHOP_STATE_PROP_KEY를 추가로 읽는다.
@@ -3828,6 +3849,7 @@ public class NetworkManager : MonoBehaviour
     public string LocalNickname   => "OfflinePlayer";
     public string PartnerNickname => "";
     public string MatchGuid       => ""; // 오프라인은 GUID 미발급 — MatchRecorder가 구형 방식으로 폴백
+    public string[] GetPartnerAugmentNamesNow() => System.Array.Empty<string>(); // 오프라인은 파트너 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
 
     private int _teamHp = -1;
     public int  TeamHealth     => _teamHp;
