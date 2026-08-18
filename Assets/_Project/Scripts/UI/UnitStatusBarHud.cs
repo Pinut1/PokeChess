@@ -20,6 +20,10 @@ public class UnitStatusBarHud : MonoBehaviour
     [Tooltip("바가 담길 부모. 보통 최상위 Canvas 아래의 빈 오브젝트.")]
     [SerializeField] private RectTransform _barRoot;
 
+    [Tooltip("바끼리 겹칠 때 화면 아래쪽(카메라에 가까운 벤치 쪽) 바를 앞에 그린다.\n" +
+             "끄면 그린 순서(보드 → 벤치)대로 겹친다.")]
+    [SerializeField] private bool _sortNearestToFront = true;
+
     [Header("배치")]
     [Tooltip("비우면 Camera.main을 쓴다.")]
     [SerializeField] private Camera _camera;
@@ -62,6 +66,9 @@ public class UnitStatusBarHud : MonoBehaviour
 
     /// <summary>내 로컬 유닛(실전투 또는 상점/보드 단계) 바를 그린다. 기존 LateUpdate 로직 그대로,
     /// 미러 바 추가를 위해 이름만 붙여 분리했다.</summary>
+    // 이번 프레임에 그린 바와 그 화면 높이. 매 프레임 지우고 다시 채운다(할당 없음).
+    private readonly List<(UnitStatusBarUI bar, float screenY)> _depthOrder = new();
+
     private void DrawLocalBars()
     {
         if (_barRoot == null || _camera == null) return;
@@ -72,11 +79,37 @@ public class UnitStatusBarHud : MonoBehaviour
 
         if (!GameManager.TryGet(out var gm)) { HideFrom(0); return; }
 
+        _depthOrder.Clear();
+
         int used = gm.Phase != null && gm.Phase.CurrentPhase == GamePhase.Battle
             ? DrawBattleBars(gm)
             : DrawBoardBars(gm);
 
         HideFrom(used);
+        ApplyDepthOrder();
+    }
+
+    /// <summary>
+    /// 겹친 바의 앞뒤를 화면 높이로 정한다 — <b>아래쪽(=카메라에 가까운 벤치 쪽)일수록 앞</b>.
+    ///
+    /// 풀 인덱스 순서(보드 먼저, 벤치 나중)로 두면 뒷줄 유닛의 바가 앞줄 바를 덮는 일이 생긴다.
+    /// UGUI는 형제 순서가 곧 그리는 순서(나중 형제가 위)라, 정렬 결과대로 형제 index만 다시 매긴다.
+    ///
+    /// 순서가 그대로면 SetSiblingIndex를 부르지 않는다 — 이 호출은 부모 캔버스를 더럽혀서
+    /// 매 프레임 무조건 부르면 바 개수만큼 리빌드가 걸린다.
+    /// </summary>
+    private void ApplyDepthOrder()
+    {
+        if (!_sortNearestToFront || _depthOrder.Count < 2) return;
+
+        // 화면 위(y 큼)가 뒤로 가야 하므로 내림차순 — 정렬 뒤 index 0이 가장 뒤.
+        _depthOrder.Sort(static (a, b) => b.screenY.CompareTo(a.screenY));
+
+        for (int i = 0; i < _depthOrder.Count; i++)
+        {
+            RectTransform rect = _depthOrder[i].bar.Rect;
+            if (rect.GetSiblingIndex() != i) rect.SetSiblingIndex(i);
+        }
     }
 
     /// <summary>전투 중 — 살아있는 BattleUnit 전부(아군/적). HP가 실제로 깎이는 값이 여기 있다.</summary>
@@ -91,11 +124,20 @@ public class UnitStatusBarHud : MonoBehaviour
             if (bu == null || !bu.IsAlive || bu.visual == null) continue;
 
             float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
-            float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
+
+            // 바 전체가 나타내는 값 = 최대HP + 보호막. 보호막이 붙으면 HP 길이가 그만큼 줄고
+            // 밀려난 오른쪽 끝이 보호막 자리가 된다(풀피에 보호막이 붙어도 보이게 하려면 이 방법뿐).
+            // 눈금도 이 총량으로 계산해 "눈금 1칸 = 같은 HP"를 유지한다 — 촘촘해지는 것이 총량 증가 신호다.
+            //
+            // 출처는 가리지 않는다 — 스킬·장비뿐 아니라 WATER 시너지처럼 shieldSources에 안 들어가는
+            // 미추적 보호막도 실제로 피해를 막으므로 바에는 보여야 한다.
+            float barTotal = bu.maxHp + bu.shield;
+            float hp = barTotal > 0f ? bu.currentHp / barTotal : 0f;
+            float shield = barTotal > 0f ? bu.shield / barTotal : 0f;
 
             // 전투 중에는 원본 PokemonUnit이 아니라 스냅샷을 그리므로 displayItems/displayStone을 쓴다(적도 동일).
-            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally, bu.maxHp,
-                      bu.displayItems, bu.displayStone))
+            if (Place(used, bu.visual.transform.position, hp, mana, bu.team == BattleTeam.Ally, barTotal,
+                      bu.displayItems, bu.displayStone, shield))
                 used++;
         }
 
@@ -142,7 +184,7 @@ public class UnitStatusBarHud : MonoBehaviour
 
     /// <summary>index번째 바를 월드 위치 위에 배치. 카메라 뒤면 건너뛴다(false 반환).</summary>
     private bool Place(int index, Vector3 worldPos, float hpRatio, float manaRatio, bool isAlly, float maxHp,
-                       IReadOnlyList<ItemData> items, EvolutionStoneData stone)
+                       IReadOnlyList<ItemData> items, EvolutionStoneData stone, float shieldRatio = 0f)
     {
         Vector3 screenPos = _camera.WorldToScreenPoint(worldPos + Vector3.up * _heightOffset);
         if (screenPos.z <= 0f) return false; // 카메라 뒤 — 화면 반대편에 그려지는 것을 막는다
@@ -161,7 +203,9 @@ public class UnitStatusBarHud : MonoBehaviour
         screenPos.y = Mathf.Round(screenPos.y);
 
         bar.Rect.position = screenPos;
-        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
+        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp, shieldRatio);
+
+        _depthOrder.Add((bar, screenPos.y));
         return true;
     }
 
@@ -254,10 +298,16 @@ public class UnitStatusBarHud : MonoBehaviour
             if (bu == null || !bu.IsAlive || bu.visual == null) continue;
 
             float mana = bu.HasSkill && bu.maxMana > 0f ? bu.currentMana / bu.maxMana : -1f;
-            float hp = bu.maxHp > 0f ? bu.currentHp / bu.maxHp : 0f;
+
+            // 실전투 바와 같은 척도(최대HP + 보호막). 위 DrawBattleBars 주석 참고.
+            // ⚠️ 미러 유닛의 shield는 아직 항상 0이다 — BattleSnapshot이 보호막을 나르지 않는다.
+            // 미리 읽어 두면 스냅샷에 필드가 추가되는 날 이 줄을 고치지 않아도 켜진다.
+            float barTotal = bu.maxHp + bu.shield;
+            float hp = barTotal > 0f ? bu.currentHp / barTotal : 0f;
+            float shield = barTotal > 0f ? bu.shield / barTotal : 0f;
 
             if (PlaceMirror(used, pipImage, bu.visual.transform.position, hp, mana,
-                            bu.team == BattleTeam.Ally, bu.maxHp, bu.displayItems, bu.displayStone))
+                            bu.team == BattleTeam.Ally, barTotal, bu.displayItems, bu.displayStone, shield))
                 used++;
         }
         return used;
@@ -310,7 +360,7 @@ public class UnitStatusBarHud : MonoBehaviour
     /// </summary>
     private bool PlaceMirror(int index, RawImage pipImage, Vector3 worldPos,
                              float hpRatio, float manaRatio, bool isAlly, float maxHp,
-                             IReadOnlyList<ItemData> items, EvolutionStoneData stone)
+                             IReadOnlyList<ItemData> items, EvolutionStoneData stone, float shieldRatio = 0f)
     {
         if (!_partnerSpectateView.TryProjectWorldToScreen(worldPos + Vector3.up * _heightOffset, out Vector2 projected))
             return false; // 관전 카메라 뒤 — 그리지 않는다
@@ -327,7 +377,7 @@ public class UnitStatusBarHud : MonoBehaviour
         screenPos.y = Mathf.Round(screenPos.y);
 
         bar.Rect.position = screenPos;
-        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
+        bar.SetValues(hpRatio, manaRatio, isAlly, maxHp, shieldRatio);
         return true;
     }
 
