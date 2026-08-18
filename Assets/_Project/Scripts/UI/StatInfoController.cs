@@ -173,37 +173,31 @@ public class StatInfoController : MonoBehaviour
         // 모일 때까지 다음 라운드로 넘어가지 않음), 내 GamePhase를 기준으로 삼으면 그 사이 BoardSnapshot
         // 정적 프리뷰로 잘못 전환돼 영웅증강 override(roleOverride 등)가 반영 안 된 원본값이 뜨는
         // 문제가 있었다(2026-08 확인 — UnitStatusBarHud.DrawPartnerBars와 동일한 원인·동일한 기준으로 통일).
-        if (mirror.IsRunning)
-        {
-            BattleUnit picked = PickPartnerBattleUnit(mirror.MirrorUnits, spectatorCamera, pipImage, screenPos, out _);
-            if (picked != null)
-            {
-                if (_panel != null && _panel.BattleUnit == picked) Close();
-                else Open(p => p.Bind(picked));
-                return true;
-            }
-        }
-        else
-        {
-            // 파트너 보드 유닛(OpponentBoardView)과 적 프리뷰(BattleManager.PreviewEnemies)를 각각
-            // 조회한 뒤, 화면상 클릭 지점에 더 가까운 쪽을 선택한다 — 두 프리뷰가 겹쳐 보여도
-            // PickPartnerBattleUnit/PickPartnerShopUnit 각각의 반경 판정(가까운 순)을 그대로 따른다.
-            OpponentBoardView.PartnerBoardUnitView? shopUnit =
-                PickPartnerShopUnit(mirror, spectatorCamera, pipImage, screenPos, out float shopDistance);
-            BattleUnit previewEnemy =
-                PickPartnerBattleUnit(mirror.PreviewEnemies, spectatorCamera, pipImage, screenPos, out float enemyDistance);
+        //
+        // 벤치(OpponentBoardView.ActiveUnitViews)는 미러 전투 중에도 BoardSnapshot으로 계속 표시되므로
+        // (OpponentBoardView.Render가 필드만 억제하고 벤치는 그대로 둠 — SetSuppressed 주석 참고) 전투
+        // 여부와 무관하게 항상 후보로 조회한다. 전투 중이면 미러 전투 유닛(파트너 필드+적)을, 아니면
+        // 쇼핑 중 적 프리뷰를 조회한다 — 이 둘은 mirror.IsRunning으로 서로 배타적이라 한 번만 조회한다.
+        OpponentBoardView.PartnerBoardUnitView? shopUnit =
+            PickPartnerShopUnit(mirror, spectatorCamera, pipImage, screenPos, out float shopDistance);
 
-            if (shopUnit.HasValue && (previewEnemy == null || shopDistance <= enemyDistance))
-            {
-                Open(p => p.Bind(shopUnit.Value));
-                return true;
-            }
-            if (previewEnemy != null)
-            {
-                if (_panel != null && _panel.BattleUnit == previewEnemy) Close();
-                else Open(p => p.Bind(previewEnemy));
-                return true;
-            }
+        float battleDistance;
+        BattleUnit battleCandidate = mirror.IsRunning
+            ? PickPartnerBattleUnit(mirror.MirrorUnits, spectatorCamera, pipImage, screenPos, out battleDistance)
+            : PickPartnerBattleUnit(mirror.PreviewEnemies, spectatorCamera, pipImage, screenPos, out battleDistance);
+
+        // 두 후보가 화면상 가까이 있어도 클릭 지점에 더 가까운 쪽을 선택한다(PickPartnerBattleUnit/
+        // PickPartnerShopUnit 각각의 반경 판정을 그대로 따름 — 먼저 찾은 쪽을 무조건 우선하지 않는다).
+        if (shopUnit.HasValue && (battleCandidate == null || shopDistance <= battleDistance))
+        {
+            Open(p => p.Bind(shopUnit.Value));
+            return true;
+        }
+        if (battleCandidate != null)
+        {
+            if (_panel != null && _panel.BattleUnit == battleCandidate) Close();
+            else Open(p => p.Bind(battleCandidate));
+            return true;
         }
 
         Close();
