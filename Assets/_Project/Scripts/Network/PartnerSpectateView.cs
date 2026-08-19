@@ -75,6 +75,9 @@ public class PartnerSpectateView : MonoBehaviour
     // null = 아직 한 번도 확인 안 함(첫 프레임에 무조건 칠한다).
     private ProfileRole? _lastKnownRole;
 
+    // 마지막으로 확인한 파트너 유무. 입장/퇴장 때 흐리기가 바뀌므로 같이 감시한다.
+    private bool _lastKnownHasPartner;
+
     // 마지막으로 RenderTexture 크기를 맞춘 화면 해상도. 바뀌면 RefreshTextureOnScreenChange가 다시 만든다.
     private int _lastScreenWidth;
     private int _lastScreenHeight;
@@ -323,16 +326,21 @@ public class PartnerSpectateView : MonoBehaviour
     }
 
     /// <summary>
-    /// 역할이 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
+    /// 역할이나 파트너 유무가 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
     /// 불리는데, 그 시점엔 대개 아직 방 밖(Offline=회색)이라 입장 후 한 번은 다시 칠해야 한다.
     /// 호스트 마이그레이션이나 방 퇴장(다시 회색)도 같은 경로로 따라간다.
     /// </summary>
     private void RefreshFramesOnRoleChange()
     {
         ProfileRole role = ResolveLocalRole();
-        if (_lastKnownRole.HasValue && _lastKnownRole.Value == role) return;
+        bool hasPartner = HasPartner();
+
+        if (_lastKnownRole.HasValue && _lastKnownRole.Value == role &&
+            _lastKnownHasPartner == hasPartner)
+            return;
 
         _lastKnownRole = role;
+        _lastKnownHasPartner = hasPartner;
         UpdateViewFrames();
     }
 
@@ -658,13 +666,25 @@ public class PartnerSpectateView : MonoBehaviour
         Color myColor      = ColorFor(localRole);
         Color partnerColor = ColorFor(partnerRole);
 
+        // 파트너가 아직 없으면 파트너 쪽을 흐리게 하지 않는다. 흐리기는 "지금 어느 화면을 보는
+        // 중인지"를 뜻하는데, 파트너가 없으면 볼 화면 자체가 없어 흐릴 이유가 없다. 그대로 두면
+        // 혼자 있을 때 두 프로필의 밝기가 달라져 파트너 쪽만 꺼진 것처럼 보인다.
+        bool hasPartner = HasPartner();
+
         // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
             _myViewFrame.color = _isExpanded ? Dim(myColor) : myColor;
 
         if (_partnerViewFrame != null)
-            _partnerViewFrame.color = _isExpanded ? partnerColor : Dim(partnerColor);
+            _partnerViewFrame.color = (_isExpanded || !hasPartner) ? partnerColor : Dim(partnerColor);
     }
+
+    /// <summary>
+    /// 방에 파트너가 실제로 들어와 있는지. 2인 협동이라 PlayerCount가 2 이상이면 파트너가 있다.
+    /// 네트워크가 없거나 솔로모드면 PlayerCount가 1이라 자연스럽게 false가 된다.
+    /// </summary>
+    private static bool HasPartner()
+        => GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.PlayerCount >= 2;
 
     /// <summary>
     /// 보고 있지 않은 쪽 표현. <b>밝기만</b> 낮추고 알파는 원본 그대로 둔다.
