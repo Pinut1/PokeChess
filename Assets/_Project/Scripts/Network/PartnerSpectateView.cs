@@ -654,22 +654,26 @@ public class PartnerSpectateView : MonoBehaviour
     {
         ProfileRole localRole = ResolveLocalRole();
 
-        // 2인 협동이라 내가 방장이면 파트너는 참가자, 그 반대도 마찬가지다.
-        // 방에 안 들어간 상태면 누가 누구인지 정해지지 않아 양쪽 다 회색이다.
-        ProfileRole partnerRole = localRole switch
-        {
-            ProfileRole.Host  => ProfileRole.Guest,
-            ProfileRole.Guest => ProfileRole.Host,
-            _                 => ProfileRole.Offline
-        };
+        // 파트너가 실제로 들어와 있을 때만 색이 정해진다. 아직 안 들어왔거나 도중에 나갔으면
+        // 회색이다 — 없는 사람 자리에 파랑/보라를 칠하면 있는 것처럼 보인다.
+        // 2인 협동이라 파트너가 있으면 내 역할의 반대가 곧 파트너 역할이다.
+        bool hasPartner = HasPartner();
+
+        ProfileRole partnerRole = hasPartner
+            ? localRole switch
+              {
+                  ProfileRole.Host  => ProfileRole.Guest,
+                  ProfileRole.Guest => ProfileRole.Host,
+                  _                 => ProfileRole.Offline
+              }
+            : ProfileRole.Offline;
 
         Color myColor      = ColorFor(localRole);
         Color partnerColor = ColorFor(partnerRole);
 
-        // 파트너가 아직 없으면 파트너 쪽을 흐리게 하지 않는다. 흐리기는 "지금 어느 화면을 보는
+        // 파트너가 없으면 파트너 쪽을 흐리게 하지 않는다. 흐리기는 "지금 어느 화면을 보는
         // 중인지"를 뜻하는데, 파트너가 없으면 볼 화면 자체가 없어 흐릴 이유가 없다. 그대로 두면
         // 혼자 있을 때 두 프로필의 밝기가 달라져 파트너 쪽만 꺼진 것처럼 보인다.
-        bool hasPartner = HasPartner();
 
         // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
