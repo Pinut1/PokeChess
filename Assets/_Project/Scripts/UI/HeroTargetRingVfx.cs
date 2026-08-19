@@ -30,7 +30,15 @@ public class HeroTargetRingVfx : MonoBehaviour
     // 매 프레임 새 List를 만들지 않기 위한 재사용 버퍼(정리 대상 수집용).
     private readonly List<HeroAugment> _stale = new();
 
-    private bool _missingEntryWarned;
+    // VfxDatabase 조회 결과 캐시. _vfxId는 런타임에 바뀌지 않으므로 한 번 찾으면 끝이다.
+    // 매 프레임 다시 찾으면 안 되는 이유 — 에셋이 없을 때 ScriptableDatabase.Instance 게터가
+    // 접근할 때마다 Resources.Load를 재시도하고 Debug.LogError를 찍는다(_instance가 계속 null이라
+    // 캐싱이 안 됨). LateUpdate에서 부르는 경로라 그대로 두면 초당 수십~수백 건의 에러 로그가 쌓인다.
+    private VfxEntry _entry;
+
+    // 한 번 실패하면 더 찾지 않는다. Resources 에셋이 플레이 도중에 생겨나는 일은 없어서,
+    // 재시도해봐야 위와 같은 로그 폭주만 만든다.
+    private bool _entryLookupFailed;
 
     // 유닛이 이동한 뒤(전투 틱/보드 재배치) 위치를 읽어야 링이 한 프레임 밀리지 않는다.
     private void LateUpdate()
@@ -112,16 +120,8 @@ public class HeroTargetRingVfx : MonoBehaviour
 
     private void PlaceRing(HeroAugment hero, Vector3 position)
     {
-        VfxEntry entry = VfxDatabase.Instance != null ? VfxDatabase.Instance.Get(_vfxId) : null;
-        if (entry == null || entry.prefab == null)
-        {
-            if (!_missingEntryWarned)
-            {
-                Debug.LogWarning($"[Vfx] '{_vfxId}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.", this);
-                _missingEntryWarned = true;
-            }
-            return;
-        }
+        VfxEntry entry = ResolveEntry();
+        if (entry == null) return;
 
         Vector3 finalPosition = position + entry.positionOffset + _extraOffset;
 
@@ -141,6 +141,29 @@ public class HeroTargetRingVfx : MonoBehaviour
         if (layer >= 0) SetLayerRecursive(created.transform, layer);
 
         _rings[hero] = created;
+    }
+
+    /// <summary>
+    /// 표식 링 엔트리를 한 번만 찾아 캐시한다. 실패하면 경고를 1회 남기고 이후로는 조회 자체를 하지 않는다
+    /// (이유는 <see cref="_entry"/> 주석 참고 — LateUpdate 경로라 재조회 비용이 그대로 매 프레임 비용이 된다).
+    /// </summary>
+    private VfxEntry ResolveEntry()
+    {
+        if (_entry != null) return _entry;
+        if (_entryLookupFailed) return null;
+
+        VfxDatabase db = VfxDatabase.Instance;
+        VfxEntry found = db != null ? db.Get(_vfxId) : null;
+
+        if (found == null || found.prefab == null)
+        {
+            Debug.LogWarning($"[Vfx] '{_vfxId}' 미등록 또는 prefab 비어있음 — VfxDatabase.asset에 등록하세요.", this);
+            _entryLookupFailed = true;
+            return null;
+        }
+
+        _entry = found;
+        return _entry;
     }
 
     private void RemoveRing(HeroAugment hero)

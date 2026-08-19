@@ -642,6 +642,11 @@ public class BattleManager : MonoBehaviour
         caster.heroEeveeSummonIndex = index + 1;
         ApplyEeveeBoost(caster, entry);
 
+        // 마지막 1종까지 부른 순간 원래 스킬(이브이는 Celebrate)로 돌아간다 — 마나 코스트도 같이
+        // 원복해야 폴백한 스킬이 나인이볼부스트용 싼 코스트로 계속 나가지 않는다.
+        if (caster.heroEeveeSummonIndex >= HeroEeveeBoostTable.Count)
+            caster.maxMana = caster.heroEeveeBaseMaxMana;
+
         Debug.Log($"[Augment] 나인이볼부스트 {index + 1}/{HeroEeveeBoostTable.Count} — " +
                   $"{entry.speciesNameEn} 소환 + 이브이 {entry.label} 버프");
         return true;
@@ -2961,6 +2966,9 @@ public class BattleManager : MonoBehaviour
     private static void MarkAsHeroEeveeSummoner(BattleUnit bu)
     {
         bu.heroEeveeSummonIndex = 0;
+
+        // 8종을 다 부르고 나면 원래 스킬로 되돌아가므로, 그때 쓸 원본 코스트를 보관해 둔다.
+        bu.heroEeveeBaseMaxMana = bu.maxMana;
         bu.maxMana = HeroEeveeBoostTable.SkillManaCost(bu.starLevel);
 
         // 이미 찬 마나가 새 상한을 넘으면 첫 시전이 즉발이 된다 — 전투 시작 직후라 0이지만

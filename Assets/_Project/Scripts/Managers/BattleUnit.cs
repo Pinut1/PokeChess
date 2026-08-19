@@ -162,6 +162,11 @@ public class BattleUnit
     // 통해서는 판정할 수 없다. darkFirstSkillPending과 같은 패턴이다.
     public int heroEeveeSummonIndex = -1;
 
+    // 나인이볼부스트가 maxMana를 성급별 값으로 덮어쓰기 <b>전</b>의 원래 코스트(EffectiveManaCost).
+    // 8종을 다 소환하고 나면 원래 스킬로 되돌아가므로 마나 코스트도 같이 원복해야 한다 —
+    // 안 그러면 폴백한 원래 스킬이 설계보다 싼 값으로 계속 나간다.
+    public float heroEeveeBaseMaxMana;
+
     // ── 지원 스킬 버프(AsBuff) — CC와 동일한 패턴(1=무효과, 시간 지나면 복원) ──
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.
