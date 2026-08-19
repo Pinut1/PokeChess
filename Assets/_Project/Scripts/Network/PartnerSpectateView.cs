@@ -50,11 +50,18 @@ public class PartnerSpectateView : MonoBehaviour
     [Tooltip("(선택) 파트너 프로필 버튼의 테두리 프레임.")]
     [SerializeField] private Image _partnerViewFrame;
 
-    [Tooltip("지금 보고 있는 쪽 테두리 색.")]
-    [SerializeField] private Color _activeFrameColor = new(1f, 0.85f, 0.3f);
+    [Tooltip("방을 만든 사람(방장)의 프로필 색.")]
+    [SerializeField] private Color _hostColor = new(0.62f, 0.40f, 0.90f);   // 보라
 
-    [Tooltip("보고 있지 않은 쪽 테두리 색.")]
-    [SerializeField] private Color _inactiveFrameColor = new(1f, 1f, 1f, 0.35f);
+    [Tooltip("방에 들어온 사람(참가자)의 프로필 색.")]
+    [SerializeField] private Color _guestColor = new(0.30f, 0.60f, 0.95f);  // 파랑
+
+    [Tooltip("방에 들어가기 전(로비·솔로·오프라인)의 프로필 색. 누가 방장인지 아직 정해지지 않은 상태다.")]
+    [SerializeField] private Color _offlineColor = new(0.55f, 0.55f, 0.58f);  // 회색
+
+    [Tooltip("보고 있지 않은 쪽을 얼마나 어둡게 할지. 1이면 구분 없음, 낮출수록 어두워진다(0.3 아래로 내리면 색이 거의 검게 보인다). 알파는 건드리지 않아 항상 불투명하다. 색(보라/파랑/회색)은 누구인지를, 밝기는 지금 어느 화면을 보고 있는지를 나타낸다.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _inactiveDim = 0.6f;
 
     [Header("디버그")]
     [Tooltip("켜면 평상시에도 우측 상단에 작은 PIP 미리보기를 띄운다. 끄면(기본) 최종 플레이 화면처럼 " +
@@ -63,6 +70,18 @@ public class PartnerSpectateView : MonoBehaviour
 
     private Camera _spectatorCamera;
     private RenderTexture _spectatorTexture;
+
+    // 마지막으로 확인한 역할. 바뀌면 RefreshFramesOnRoleChange가 프로필 색을 다시 칠한다.
+    // null = 아직 한 번도 확인 안 함(첫 프레임에 무조건 칠한다).
+    private ProfileRole? _lastKnownRole;
+
+    // 마지막으로 확인한 파트너 유무. 입장/퇴장 때 흐리기가 바뀌므로 같이 감시한다.
+    private bool _lastKnownHasPartner;
+
+    // 마지막으로 RenderTexture 크기를 맞춘 Main Camera 렌더 크기. 화면(Screen) 크기가 아니다 —
+    // 이유는 RefreshTextureOnScreenChange 참고. 바뀌면 텍스처를 다시 만든다.
+    private int _lastViewWidth;
+    private int _lastViewHeight;
     private PartnerBattleMirrorController _mirrorController;
     private TextMeshProUGUI _externalViewButtonLabel;
 
@@ -310,6 +329,63 @@ public class PartnerSpectateView : MonoBehaviour
         if (running && !_wasMirrorRunning) HandleMirrorStarted();
         else if (!running && _wasMirrorRunning) HandleMirrorEnded();
         _wasMirrorRunning = running;
+
+        RefreshTextureOnScreenChange();
+        RefreshFramesOnRoleChange();
+    }
+
+    /// <summary>
+    /// 역할이나 파트너 유무가 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
+    /// 불리는데, 그 시점엔 대개 아직 방 밖(Offline=회색)이라 입장 후 한 번은 다시 칠해야 한다.
+    /// 호스트 마이그레이션이나 방 퇴장(다시 회색)도 같은 경로로 따라간다.
+    /// </summary>
+    private void RefreshFramesOnRoleChange()
+    {
+        ProfileRole role = ResolveLocalRole();
+        bool hasPartner = HasPartner();
+
+        if (_lastKnownRole.HasValue && _lastKnownRole.Value == role &&
+            _lastKnownHasPartner == hasPartner)
+            return;
+
+        _lastKnownRole = role;
+        _lastKnownHasPartner = hasPartner;
+        UpdateViewFrames();
+    }
+
+    /// <summary>
+    /// 그리는 크기가 바뀌면 RenderTexture를 다시 만든다. EnsureSpectatorTexture는 미러 전투 시작과
+    /// 관전 열기/닫기에서만 불리므로, 관전 중에 옵션창에서 해상도를 바꾸면 종횡비가 안 맞는
+    /// 텍스처가 그대로 남아 화면이 늘어나 보인다(레터박스가 붙으면서 더 눈에 띈다).
+    /// 텍스처가 아직 없으면(관전을 한 번도 안 열었으면) 아무 것도 하지 않는다 — 필요할 때 만들어진다.
+    /// </summary>
+    private void RefreshTextureOnScreenChange()
+    {
+        if (_spectatorTexture == null) return;
+
+        // 감시 대상은 화면(Screen)이 아니라 Main Camera가 실제로 그리는 크기다 —
+        // ComputeDesiredRenderTextureSize가 쓰는 값이 바로 그것이기 때문이다.
+        //
+        // Screen을 기준으로 삼으면 안 되는 이유: CameraLetterbox는 LateUpdate에서 rect를 고치는데
+        // 이 메서드는 Update에서 돈다. 해상도가 바뀐 그 프레임에는 Screen만 새 값이고 rect는 아직
+        // 옛 값이라, 틀린 종횡비로 텍스처를 만든다. 그리고 다음 프레임엔 Screen 크기가 그대로라
+        // 조건에 걸리지 않아 영영 다시 만들 기회가 오지 않는다.
+        // 렌더 크기를 보면 rect가 고쳐진 다음 프레임에 자연히 잡힌다(1프레임 지연은 체감되지 않는다).
+        //
+        // Main Camera가 없는 프레임(씬 전환 중 한두 프레임)에는 그냥 건너뛴다. Screen 크기로
+        // 폴백하면 레터박스가 빠진 종횡비로 텍스처를 한 번 만들고, 다음 프레임에 카메라가 잡히면서
+        // 또 만든다 — 화면에 보이지도 않을 결과를 위해 RenderTexture를 두 번 재할당하는 셈이다.
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null) return;
+
+        int viewWidth  = mainCamera.pixelWidth;
+        int viewHeight = mainCamera.pixelHeight;
+
+        if (viewWidth == _lastViewWidth && viewHeight == _lastViewHeight) return;
+
+        _lastViewWidth = viewWidth;
+        _lastViewHeight = viewHeight;
+        EnsureSpectatorTexture(); // 크기가 같으면 내부에서 그대로 빠져나간다
     }
 
     private void CacheOriginalLayout()
@@ -453,7 +529,12 @@ public class PartnerSpectateView : MonoBehaviour
             _spectatorCamera.focalLength = mainCamera.focalLength;
             _spectatorCamera.gateFit = mainCamera.gateFit;
             _spectatorCamera.allowDynamicResolution = mainCamera.allowDynamicResolution;
-            _spectatorCamera.rect = mainCamera.rect;
+            // rect는 복사하지 않는다. Main Camera는 CameraLetterbox 때문에 화면 가운데 16:9만
+            // 그리지만, 관전 카메라는 이미 16:9로 만들어진 RenderTexture 전체에 그린다
+            // (EnsureSpectatorTexture). 여기에 레터박스 rect까지 복사하면 RT 안에 검은 띠가 한 번 더
+            // 구워져 이중 레터박스가 된다. 투영 일치는 rect가 아니라 "같은 종횡비"로 보장된다 —
+            // RT를 16:9로 만들었으므로 관전 카메라의 aspect가 레터박스된 Main Camera와 같아진다.
+            _spectatorCamera.rect = new Rect(0f, 0f, 1f, 1f);
             _spectatorCamera.targetDisplay = mainCamera.targetDisplay;
             // depth는 복사하지 않는다 — Spectator Camera는 항상 targetTexture(RenderTexture)로만
             // 그리고 Main Camera는 백버퍼에 직접 그려 같은 렌더 타깃을 공유하지 않으므로, 두 카메라의
@@ -524,11 +605,22 @@ public class PartnerSpectateView : MonoBehaviour
     /// 사용처라 숨겨진 PartnerPipRawImage의 작은 RectTransform 크기를 기준으로 삼지 않는다).
     /// [1280x720, 1920x1080] 박스 안에서 화면 비율을 유지해 맞춘다.
     /// </summary>
+    /// <summary>
+    /// RenderTexture 크기. 종횡비는 <b>화면이 아니라 Main Camera가 실제로 그리는 영역</b>을 따른다 —
+    /// CameraLetterbox가 뷰포트를 16:9로 줄여 놓으면 화면이 16:10이어도 실제 그림은 16:9다.
+    /// 화면 비율로 만들면 16:9 그림이 16:10 텍스처에 담겨 RawImage에서 늘어난다.
+    /// 레터박스가 없는 구성에서는 pixelRect가 곧 화면 크기라 종전과 같은 값이 나온다.
+    /// </summary>
     private static (int width, int height) ComputeDesiredRenderTextureSize()
     {
         float screenW = Mathf.Max(Screen.width, 1);
         float screenH = Mathf.Max(Screen.height, 1);
-        float aspect = screenW / screenH;
+
+        Camera mainCamera = Camera.main;
+        float viewW = mainCamera != null ? Mathf.Max(mainCamera.pixelWidth, 1) : screenW;
+        float viewH = mainCamera != null ? Mathf.Max(mainCamera.pixelHeight, 1) : screenH;
+
+        float aspect = viewW / viewH;
 
         float width = Mathf.Clamp(screenW, MIN_RENDER_TEXTURE_WIDTH, MAX_RENDER_TEXTURE_WIDTH);
         float height = width / aspect;
@@ -577,14 +669,89 @@ public class PartnerSpectateView : MonoBehaviour
     /// <summary>파트너 프로필 버튼 — 항상 파트너 화면으로. 이미 열려 있으면 아무 일도 없다.</summary>
     private void ShowPartnerView() => SetExpanded(true);
 
-    /// <summary>지금 보고 있는 쪽 프로필의 테두리만 활성 색으로 칠한다.</summary>
+    /// <summary>
+    /// 프로필 색을 칠한다. 두 가지 정보를 한 번에 담는다 —
+    ///   <b>색상</b>   누구인지: 방장=보라(_hostColor), 참가자=파랑(_guestColor)
+    ///   <b>진하기</b> 지금 어느 화면을 보고 있는지: 보고 있는 쪽은 그대로, 아닌 쪽은 _inactiveDim만큼 흐리게
+    ///
+    /// 두 신호를 한 메서드에서 합치는 이유 — _myViewFrame/_partnerViewFrame은 프로필 버튼의
+    /// Profile_Image 그 자체다. 다른 컴포넌트가 같은 Image의 color를 따로 칠하면 서로 덮어써서
+    /// 어느 쪽이 이겼는지에 따라 색이 깜빡인다. 색을 쓰는 곳은 여기 하나로 유지한다.
+    /// </summary>
     private void UpdateViewFrames()
     {
+        ProfileRole localRole = ResolveLocalRole();
+
+        // 파트너가 실제로 들어와 있을 때만 색이 정해진다. 아직 안 들어왔거나 도중에 나갔으면
+        // 회색이다 — 없는 사람 자리에 파랑/보라를 칠하면 있는 것처럼 보인다.
+        // 2인 협동이라 파트너가 있으면 내 역할의 반대가 곧 파트너 역할이다.
+        bool hasPartner = HasPartner();
+
+        ProfileRole partnerRole = hasPartner
+            ? localRole switch
+              {
+                  ProfileRole.Host  => ProfileRole.Guest,
+                  ProfileRole.Guest => ProfileRole.Host,
+                  _                 => ProfileRole.Offline
+              }
+            : ProfileRole.Offline;
+
+        Color myColor      = ColorFor(localRole);
+        Color partnerColor = ColorFor(partnerRole);
+
+        // 흐리기는 파트너 유무와 무관하게 "지금 보고 있지 않은 쪽"에 항상 들어간다.
+        // (혼자 있을 때 파트너 프로필이 사라져 보이던 문제는 Dim이 알파를 낮추던 것이 원인이었고,
+        //  그건 Dim에서 알파를 빼는 것으로 해결됐다 — 여기서 Dim 자체를 건너뛸 이유는 없다.)
+
+        // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
-            _myViewFrame.color = _isExpanded ? _inactiveFrameColor : _activeFrameColor;
+            _myViewFrame.color = _isExpanded ? Dim(myColor) : myColor;
 
         if (_partnerViewFrame != null)
-            _partnerViewFrame.color = _isExpanded ? _activeFrameColor : _inactiveFrameColor;
+            _partnerViewFrame.color = _isExpanded ? partnerColor : Dim(partnerColor);
+    }
+
+    /// <summary>
+    /// 방에 파트너가 실제로 들어와 있는지. 2인 협동이라 PlayerCount가 2 이상이면 파트너가 있다.
+    /// 네트워크가 없거나 솔로모드면 PlayerCount가 1이라 자연스럽게 false가 된다.
+    /// </summary>
+    private static bool HasPartner()
+        => GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.PlayerCount >= 2;
+
+    /// <summary>
+    /// 보고 있지 않은 쪽 표현. <b>밝기만</b> 낮추고 알파는 원본 그대로 둔다.
+    ///
+    /// 알파를 같이 낮추면 프로필이 반투명해져 뒤가 비치는데, 그러면 "흐린 회색"이 아니라
+    /// "색이 빠진 것"처럼 보인다. 특히 혼자 있을 때(파트너 슬롯이 회색 + 비활성) 두 효과가 겹쳐
+    /// 이미지가 거의 사라진 것처럼 보였다. 색이 무엇인지는 언제나 또렷해야 하므로 불투명을 유지한다.
+    /// </summary>
+    private Color Dim(Color color)
+        => new(color.r * _inactiveDim, color.g * _inactiveDim, color.b * _inactiveDim, color.a);
+
+    /// <summary>프로필 색이 나타내는 역할. Offline은 "아직 방에 안 들어가 정해지지 않음"이다.</summary>
+    private enum ProfileRole { Offline, Host, Guest }
+
+    private Color ColorFor(ProfileRole role) => role switch
+    {
+        ProfileRole.Host  => _hostColor,
+        ProfileRole.Guest => _guestColor,
+        _                 => _offlineColor
+    };
+
+    /// <summary>
+    /// 이 클라이언트의 역할. <b>방에 들어가 있을 때만</b> 방장/참가자가 정해진다 —
+    /// 로비·솔로모드·오프라인 스텁은 전부 Offline(회색)이다.
+    ///
+    /// IsMasterClient만 보면 안 되는 이유: 방 밖에서도 true를 돌려주는 경로가 있어
+    /// (오프라인 스텁은 항상 true, 솔로모드도 true) 접속 전부터 방장 색이 칠해진다.
+    /// IsInRoom을 먼저 확인해야 "아직 모른다"와 "내가 방장이다"가 구분된다.
+    /// </summary>
+    private static ProfileRole ResolveLocalRole()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Network == null) return ProfileRole.Offline;
+        if (!gm.Network.IsInRoom) return ProfileRole.Offline;
+
+        return gm.Network.IsMasterClient ? ProfileRole.Host : ProfileRole.Guest;
     }
 
     /// <summary>
