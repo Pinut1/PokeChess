@@ -113,10 +113,11 @@ public class BattleManager : MonoBehaviour
     // 직접 계산해 채운다. 전투 시작(SetupUnits/SetupMirrorUnits)마다 새로 채우고 Cleanup()에서 비운다.
     private readonly HashSet<HexCoords> _validCoords = new();
 
-    // 전투 중 소환(나인이볼부스트)의 대기열. 행동 루프가 _units를 foreach로 도는 도중에는 Add할 수
-    // 없어(컬렉션 변경 예외) 여기 담아뒀다가 루프 직후 FlushPendingSpawns()가 _units로 옮긴다.
-    // 시각화도 옮길 때 함께 만든다 — Cleanup()이 _units만 훑기 때문.
-    private readonly List<BattleUnit> _pendingSpawns = new();
+    // 전투 중 소환(나인이볼부스트)의 대기열 — 담는 것은 <b>종 데이터뿐이고 좌표는 없다</b>.
+    // 행동 루프가 _units를 foreach로 도는 도중에는 Add할 수 없어(컬렉션 변경 예외) 여기 담아뒀다가
+    // 루프 직후 FlushPendingSpawns()가 자리를 골라 _units로 옮긴다. 자리를 예약 시점이 아니라
+    // 편입 시점에 고르는 것이 핵심이다 — 그래야 같은 틱에 다른 유닛이 그 칸으로 이동해도 겹치지 않는다.
+    private readonly List<PokemonData> _pendingSpawns = new();
 
     // FindNextStep의 동일 areaDist(개선 없는) fallback 후보군에서만 참조하는 "직전에 있던 칸"
     // 1개 기억(경로 캐시 아님 — 오직 A↔B 두 칸짜리 완전 대칭 막다른 자리에서 그 자리로 되돌아가는
@@ -634,9 +635,9 @@ public class BattleManager : MonoBehaviour
 
         var entry = HeroEeveeBoostTable.Entries[index];
 
-        // 빈 타일이 없으면 이번 시전은 소환에 실패한 것으로 보고 인덱스를 소비하지 않는다 —
-        // 자리가 빌 때(적이 죽어 아군이 전진하거나 봇이 쓰러졌을 때) 다시 시도하게 둔다.
-        if (!SpawnHeroEeveeBot(entry.speciesNameEn)) return false;
+        // 종이 DB에 없을 때만 실패로 본다(인덱스 미소비). 자리가 없는 경우는 실패가 아니라
+        // FlushPendingSpawns가 다음 틱에 다시 시도하므로, 시전은 정상적으로 소모된 것으로 친다.
+        if (!QueueHeroEeveeBot(entry.speciesNameEn)) return false;
 
         caster.heroEeveeSummonIndex = index + 1;
         ApplyEeveeBoost(caster, entry);
@@ -647,20 +648,19 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 진화체 1기를 아군 빈 타일에 봇으로 <b>예약</b>한다. 돌연변이 봇과 완전히 같은 형식이라
-    /// (source=null 전투 전용) 전투가 끝나면 Cleanup()에서 통째로 사라진다.
-    /// 빈 타일이 없으면 false.
+    /// 진화체 1기의 소환을 <b>예약</b>한다. 종만 담아두고 <b>자리는 정하지 않는다</b>.
+    /// 돌연변이 봇과 완전히 같은 형식(source=null 전투 전용)이라 전투가 끝나면 Cleanup()에서 사라진다.
     ///
-    /// ⚠️ 여기서 <c>_units</c>에 바로 넣지 않는다 — 이 메서드는 전투 행동 루프
-    /// (<c>foreach (var bu in _units)</c>) 안쪽의 CastSkill에서 호출되므로 그 자리에서 Add하면
-    /// 컬렉션 변경 예외가 난다. <see cref="_pendingSpawns"/>에 담아두고 루프가 끝난 뒤
-    /// <see cref="FlushPendingSpawns"/>가 편입한다.
+    /// ⚠️ 여기서 좌표를 미리 고르면 안 된다 — 이 메서드는 전투 행동 루프
+    /// (<c>foreach (var bu in _units)</c>) 안쪽의 CastSkill에서 호출되므로, 이 시점에 고른 빈 칸은
+    /// 같은 틱의 <b>나머지 유닛이 아직 움직이기 전</b> 기준이다. 그 뒤에 다른 유닛이 그 칸으로
+    /// 이동해버리면 두 유닛이 같은 헥스에 겹친다(IsOccupied는 아직 _units에 없는 예약분을 못 본다).
+    /// 그래서 자리 선정은 이동이 전부 끝난 <see cref="FlushPendingSpawns"/>로 미룬다.
     /// </summary>
-    private bool SpawnHeroEeveeBot(string speciesNameEn)
+    private bool QueueHeroEeveeBot(string speciesNameEn)
     {
         var db = PokemonDatabase.Instance;
-        var board = GameManager.Instance.Board;
-        if (db == null || board == null) return false;
+        if (db == null) return false;
 
         var data = db.GetByNameEn(speciesNameEn);
         if (data == null)
@@ -669,18 +669,58 @@ public class BattleManager : MonoBehaviour
             return false;
         }
 
-        // 전투 중이라 유닛이 이미 움직였다 — 설계 시점 좌표(GetBoardSnapshot의 value)가 아니라
-        // 살아있는 유닛의 '현재' 좌표를 점유로 봐야 한다. 죽은 유닛의 자리는 다시 쓸 수 있다.
-        //
-        // 아군만 세면 안 된다 — 적이 전진해 아군 진영 칸까지 밀고 들어와 있을 수 있고, 그 칸에
-        // 봇을 놓으면 두 유닛이 같은 헥스에 겹친다. 팀과 무관하게 살아있으면 점유로 본다.
-        // 아직 편입 전인 예약분도 마찬가지다(한 틱에 두 번 소환되는 경우 방어).
+        _pendingSpawns.Add(data);
+        return true;
+    }
+
+    /// <summary>
+    /// 예약된 소환을 실제 전투에 편입한다. 행동 루프가 끝난 뒤에만 호출되므로 이 시점의 좌표는
+    /// <b>이번 틱의 이동이 전부 반영된 확정 값</b>이다 — 여기서 자리를 골라야 겹침이 생기지 않는다.
+    ///
+    /// 자리가 없으면 버리지 않고 큐에 남겨 다음 틱에 다시 시도한다(적이 죽거나 아군이 전진하면
+    /// 자리가 난다). 큐 길이는 최대 8(HeroEeveeBoostTable.Count)이라 무한히 쌓이지 않는다.
+    /// 시각화도 여기서 함께 만든다 — _units에 넣기 전에 visual을 만들면 그 사이 전투가 끝났을 때
+    /// Cleanup()이 찾지 못해 남는다.
+    /// </summary>
+    private void FlushPendingSpawns()
+    {
+        if (_pendingSpawns.Count == 0) return;
+
+        var board = GameManager.Instance.Board;
+        if (board == null) return;
+
+        // 예약 순서(FIFO)대로 처리한다 — 소환 순서가 곧 기획이 정한 진화체 등장 순서다.
+        while (_pendingSpawns.Count > 0)
+        {
+            if (!TryFindEmptyBoardTile(board, out HexCoords coords))
+            {
+                Debug.LogWarning($"[Augment] 나인이볼부스트 — 빈 타일 없음, " +
+                                 $"'{_pendingSpawns[0].pokemonNameEn}' 소환을 다음 틱으로 미룸");
+                return;
+            }
+
+            var bot = CreateBotUnit(_pendingSpawns[0], coords);
+            _pendingSpawns.RemoveAt(0);
+
+            // 여기서 바로 _units에 넣어야 다음 반복이 이 봇의 칸을 점유로 인식한다.
+            _units.Add(bot);
+            SpawnVisual(bot);
+        }
+    }
+
+    /// <summary>
+    /// 아군 보드에서 비어 있는 칸 하나(좌표 정렬 기준 첫 칸). 없으면 false.
+    ///
+    /// 점유 판정은 <b>팀과 무관하게</b> 살아있는 유닛 전부를 본다 — 적이 전진해 아군 진영까지
+    /// 밀고 들어와 있을 수 있고, 그 칸에 봇을 놓으면 두 유닛이 겹친다. 죽은 유닛의 자리는 다시 쓴다.
+    /// 정렬(CompareCoords)은 클라이언트 간 배치 순서를 고정하기 위한 것으로, 기존 봇 소환과 같은 규칙이다.
+    /// </summary>
+    private bool TryFindEmptyBoardTile(BoardManager board, out HexCoords result)
+    {
         var occupied = new HashSet<HexCoords>();
         foreach (var bu in _units)
             if (bu.IsAlive)
                 occupied.Add(bu.coords);
-        foreach (var bu in _pendingSpawns)
-            occupied.Add(bu.coords);
 
         var empty = new List<HexCoords>();
         foreach (var coords in board.GetBoardSnapshot().Keys)
@@ -688,30 +728,13 @@ public class BattleManager : MonoBehaviour
 
         if (empty.Count == 0)
         {
-            Debug.LogWarning($"[Augment] 나인이볼부스트 — 빈 타일 없음, '{speciesNameEn}' 소환 보류");
+            result = default;
             return false;
         }
 
-        empty.Sort(CompareCoords); // 클라이언트 간 배치 순서 고정(기존 봇 소환과 동일 규칙)
-
-        _pendingSpawns.Add(CreateBotUnit(data, empty[0]));
+        empty.Sort(CompareCoords);
+        result = empty[0];
         return true;
-    }
-
-    /// <summary>
-    /// 예약된 소환을 전투에 편입한다(행동 루프 바깥에서만 호출). 시각화도 여기서 함께 만든다 —
-    /// _units에 들어가기 전에 visual을 만들면 그 사이 전투가 끝났을 때 Cleanup()이 찾지 못해 남는다.
-    /// </summary>
-    private void FlushPendingSpawns()
-    {
-        if (_pendingSpawns.Count == 0) return;
-
-        foreach (var bot in _pendingSpawns)
-        {
-            _units.Add(bot);
-            SpawnVisual(bot);
-        }
-        _pendingSpawns.Clear();
     }
 
     /// <summary>
