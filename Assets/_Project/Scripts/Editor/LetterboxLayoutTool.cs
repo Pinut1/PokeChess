@@ -117,14 +117,20 @@ public static class LetterboxLayoutTool
         RectTransform safeArea = FindOrCreateSafeArea(canvasRect);
 
         // 기존 자식을 SafeArea 안으로 이동. 뒤에서부터 도는 이유는 SetParent가 컬렉션을 흔들기 때문이다.
-        // worldPositionStays=false로 옮겨야 앵커 기준 로컬 배치가 그대로 유지된다.
+        //
+        // 🚨 세 번째 인자 false(worldPositionStays)를 절대 빼지 말 것 — 인자를 뺀 3인자 오버로드는
+        // 이 값이 true로 고정된다. true는 "화면에서 안 움직이게" 좌표를 다시 계산해 덮어쓰는데,
+        // 부모가 캔버스에서 SafeArea로 바뀌면 기준선이 달라지므로 그 보정값이 씬에 영구 저장된다.
+        // 예: Game 뷰 1920x1200에서 캔버스 위 모서리 -50px에 있던 UI는 SafeArea 기준으로 +10px이
+        // 되어 저장되고, 정작 16:9로 실행하면 화면 위로 잘려 나간다. false면 좌표를 건드리지 않아
+        // "SafeArea 기준 -50px"이 그대로 남고, 툴을 어떤 Game 뷰 비율에서 돌리든 결과가 같아진다.
         int moved = 0;
         for (int i = canvasRect.childCount - 1; i >= 0; i--)
         {
             Transform child = canvasRect.GetChild(i);
             if (child == safeArea) continue;
 
-            Undo.SetTransformParent(child, safeArea, UNDO_NAME);
+            Undo.SetTransformParent(child, safeArea, false, UNDO_NAME);
             child.SetAsFirstSibling(); // 검은 띠보다 아래로 — 띠가 항상 맨 위에 그려지게 한다
             moved++;
         }
