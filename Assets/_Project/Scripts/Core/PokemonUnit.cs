@@ -182,8 +182,9 @@ public class PokemonUnit : MonoBehaviour
     //   이동층 — 보드에서 가장 강한 1마리에만 붙고, 대상이 바뀌면 이전 개체에서 걷어낸다.
     // 아래 두 메서드가 그 "걷어내기"다. evolutionLocked는 고정층이라 <b>건드리지 않는다</b> —
     // 잠금이 대상을 따라 움직이면 "이브이인 채로 3성이 된 개체의 잠금이 풀리는" 상태가 생기고,
-    // 그건 정상 경로로 만들 수 없는 상태다(같은 기획 문서). BattleManager.HasHeroEeveeThreeStar의
-    // 판정 기준(evolutionLocked && 3성 && Eevee)도 그 전제 위에 서 있다.
+    // 그건 정상 경로로 만들 수 없는 상태다(같은 기획 문서). 나인이볼부스트의 소환 주체 판정
+    // (BattleManager.MarkHeroEeveeSummoner = evolutionLocked && heroStatMultiplier>1 && Eevee)도
+    // 그 전제 위에 서 있다 — 잠금은 여러 마리가 갖지만 배수는 "가장 강한 1마리"만 갖는다.
 
     /// <summary>
     /// 이브이 영웅증강의 <b>이동 효과</b>만 해제한다(스탯 배수·역할). 진화잠금은 고정층이라 유지된다.
