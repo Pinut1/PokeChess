@@ -1383,6 +1383,34 @@ public class OptionsPanelUI : MonoBehaviour
             SceneManager.LoadScene(_titleSceneName);
     }
 
+    // ── 해상도 목록 필터(기획 확정 2026-08-19) ────────────────────────────
+    // Screen.resolutions는 모니터가 보고하는 모드를 전부 준다 — 800x600·1024x768·1280x1024 같은
+    // 4:3/5:4 레거시까지 섞여 들어온다. 그런데 CanvasScaler Reference가 1920x1080(16:9)이라
+    // 비율이 다른 해상도에서는 논리 캔버스 크기가 달라져 UI가 어긋난다. 안 쓰는 비율은 아예
+    // 고르지 못하게 막는 편이 확실하다.
+    //
+    // 남기는 비율: 16:9(1.778)와 16:10(1.600). 둘 다 Screen Match Mode = Expand와 함께면
+    // 논리 크기가 Reference 이상으로 보장돼 잘리지 않는다.
+    // 허용 오차가 필요한 이유: 1366x768은 정확히 16:9가 아니라 1.7786이다.
+    private const float ASPECT_16_9  = 16f / 9f;
+    private const float ASPECT_16_10 = 16f / 10f;
+    private const float ASPECT_TOLERANCE = 0.02f;
+
+    // 최소 지원 해상도 = HD. 이보다 작으면 UI 요소가 물리적으로 너무 작아져 읽기 어렵다.
+    private const int MIN_RESOLUTION_WIDTH  = 1280;
+    private const int MIN_RESOLUTION_HEIGHT = 720;
+
+    /// <summary>드롭다운에 노출할 해상도인지. 비율(16:9·16:10)과 최소 크기(HD) 둘 다 만족해야 한다.</summary>
+    private static bool IsSupportedResolution(int width, int height)
+    {
+        if (width < MIN_RESOLUTION_WIDTH || height < MIN_RESOLUTION_HEIGHT) return false;
+        if (height <= 0) return false;
+
+        float aspect = (float)width / height;
+        return Mathf.Abs(aspect - ASPECT_16_9)  <= ASPECT_TOLERANCE ||
+               Mathf.Abs(aspect - ASPECT_16_10) <= ASPECT_TOLERANCE;
+    }
+
     private void BuildResolutionList()
     {
         Resolution[] rawResolutions = Screen.resolutions;
@@ -1394,6 +1422,8 @@ public class OptionsPanelUI : MonoBehaviour
         for (int i = 0; i < rawResolutions.Length; i++)
         {
             Resolution candidate = rawResolutions[i];
+
+            if (!IsSupportedResolution(candidate.width, candidate.height)) continue;
 
             int existingIndex = -1;
             for (int j = 0; j < widths.Count; j++)
@@ -1414,6 +1444,41 @@ public class OptionsPanelUI : MonoBehaviour
             else if (candidate.refreshRateRatio.value > refreshRates[existingIndex].value)
             {
                 refreshRates[existingIndex] = candidate.refreshRateRatio;
+            }
+        }
+
+        // 필터가 전부 걸러냈으면(비표준 비율만 지원하는 모니터 등) 목록이 비어 드롭다운이 먹통이 된다.
+        // 그럴 땐 필터를 포기하고 원본 목록을 그대로 쓴다 — 깨질지언정 고를 수는 있어야 한다.
+        if (widths.Count == 0 && rawResolutions.Length > 0)
+        {
+            Debug.LogWarning("[Options] 지원 비율(16:9·16:10) + 최소 " +
+                             $"{MIN_RESOLUTION_WIDTH}x{MIN_RESOLUTION_HEIGHT} 조건에 맞는 해상도가 없어 " +
+                             "필터 없이 전체 목록을 사용합니다.");
+
+            for (int i = 0; i < rawResolutions.Length; i++)
+            {
+                Resolution candidate = rawResolutions[i];
+
+                int existingIndex = -1;
+                for (int j = 0; j < widths.Count; j++)
+                {
+                    if (widths[j] == candidate.width && heights[j] == candidate.height)
+                    {
+                        existingIndex = j;
+                        break;
+                    }
+                }
+
+                if (existingIndex < 0)
+                {
+                    widths.Add(candidate.width);
+                    heights.Add(candidate.height);
+                    refreshRates.Add(candidate.refreshRateRatio);
+                }
+                else if (candidate.refreshRateRatio.value > refreshRates[existingIndex].value)
+                {
+                    refreshRates[existingIndex] = candidate.refreshRateRatio;
+                }
             }
         }
 
