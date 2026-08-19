@@ -59,9 +59,9 @@ public class PartnerSpectateView : MonoBehaviour
     [Tooltip("방에 들어가기 전(로비·솔로·오프라인)의 프로필 색. 누가 방장인지 아직 정해지지 않은 상태다.")]
     [SerializeField] private Color _offlineColor = new(0.55f, 0.55f, 0.58f);  // 회색
 
-    [Tooltip("보고 있지 않은 쪽을 얼마나 흐리게 할지. 1이면 구분 없음, 0.35면 꽤 흐려진다. 색(보라/파랑)은 누구인지를, 진하기는 지금 어느 화면을 보고 있는지를 나타낸다.")]
+    [Tooltip("보고 있지 않은 쪽을 얼마나 어둡게 할지. 1이면 구분 없음, 낮출수록 어두워진다(0.3 아래로 내리면 색이 거의 검게 보인다). 알파는 건드리지 않아 항상 불투명하다. 색(보라/파랑/회색)은 누구인지를, 밝기는 지금 어느 화면을 보고 있는지를 나타낸다.")]
     [Range(0f, 1f)]
-    [SerializeField] private float _inactiveDim = 0.35f;
+    [SerializeField] private float _inactiveDim = 0.6f;
 
     [Header("디버그")]
     [Tooltip("켜면 평상시에도 우측 상단에 작은 PIP 미리보기를 띄운다. 끄면(기본) 최종 플레이 화면처럼 " +
@@ -666,10 +666,15 @@ public class PartnerSpectateView : MonoBehaviour
             _partnerViewFrame.color = _isExpanded ? partnerColor : Dim(partnerColor);
     }
 
-    /// <summary>보고 있지 않은 쪽 표현. 색조(누구인지)는 남기고 밝기와 불투명도만 낮춘다.</summary>
+    /// <summary>
+    /// 보고 있지 않은 쪽 표현. <b>밝기만</b> 낮추고 알파는 원본 그대로 둔다.
+    ///
+    /// 알파를 같이 낮추면 프로필이 반투명해져 뒤가 비치는데, 그러면 "흐린 회색"이 아니라
+    /// "색이 빠진 것"처럼 보인다. 특히 혼자 있을 때(파트너 슬롯이 회색 + 비활성) 두 효과가 겹쳐
+    /// 이미지가 거의 사라진 것처럼 보였다. 색이 무엇인지는 언제나 또렷해야 하므로 불투명을 유지한다.
+    /// </summary>
     private Color Dim(Color color)
-        => new(color.r * _inactiveDim, color.g * _inactiveDim, color.b * _inactiveDim,
-               color.a * Mathf.Lerp(1f, _inactiveDim, 0.5f));
+        => new(color.r * _inactiveDim, color.g * _inactiveDim, color.b * _inactiveDim, color.a);
 
     /// <summary>프로필 색이 나타내는 역할. Offline은 "아직 방에 안 들어가 정해지지 않음"이다.</summary>
     private enum ProfileRole { Offline, Host, Guest }
