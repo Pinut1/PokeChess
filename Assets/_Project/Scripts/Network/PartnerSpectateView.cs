@@ -78,9 +78,10 @@ public class PartnerSpectateView : MonoBehaviour
     // 마지막으로 확인한 파트너 유무. 입장/퇴장 때 흐리기가 바뀌므로 같이 감시한다.
     private bool _lastKnownHasPartner;
 
-    // 마지막으로 RenderTexture 크기를 맞춘 화면 해상도. 바뀌면 RefreshTextureOnScreenChange가 다시 만든다.
-    private int _lastScreenWidth;
-    private int _lastScreenHeight;
+    // 마지막으로 RenderTexture 크기를 맞춘 Main Camera 렌더 크기. 화면(Screen) 크기가 아니다 —
+    // 이유는 RefreshTextureOnScreenChange 참고. 바뀌면 텍스처를 다시 만든다.
+    private int _lastViewWidth;
+    private int _lastViewHeight;
     private PartnerBattleMirrorController _mirrorController;
     private TextMeshProUGUI _externalViewButtonLabel;
 
@@ -345,7 +346,7 @@ public class PartnerSpectateView : MonoBehaviour
     }
 
     /// <summary>
-    /// 해상도가 바뀌면 RenderTexture를 다시 만든다. EnsureSpectatorTexture는 미러 전투 시작과
+    /// 그리는 크기가 바뀌면 RenderTexture를 다시 만든다. EnsureSpectatorTexture는 미러 전투 시작과
     /// 관전 열기/닫기에서만 불리므로, 관전 중에 옵션창에서 해상도를 바꾸면 종횡비가 안 맞는
     /// 텍스처가 그대로 남아 화면이 늘어나 보인다(레터박스가 붙으면서 더 눈에 띈다).
     /// 텍스처가 아직 없으면(관전을 한 번도 안 열었으면) 아무 것도 하지 않는다 — 필요할 때 만들어진다.
@@ -353,10 +354,23 @@ public class PartnerSpectateView : MonoBehaviour
     private void RefreshTextureOnScreenChange()
     {
         if (_spectatorTexture == null) return;
-        if (Screen.width == _lastScreenWidth && Screen.height == _lastScreenHeight) return;
 
-        _lastScreenWidth = Screen.width;
-        _lastScreenHeight = Screen.height;
+        // 감시 대상은 화면(Screen)이 아니라 Main Camera가 실제로 그리는 크기다 —
+        // ComputeDesiredRenderTextureSize가 쓰는 값이 바로 그것이기 때문이다.
+        //
+        // Screen을 기준으로 삼으면 안 되는 이유: CameraLetterbox는 LateUpdate에서 rect를 고치는데
+        // 이 메서드는 Update에서 돈다. 해상도가 바뀐 그 프레임에는 Screen만 새 값이고 rect는 아직
+        // 옛 값이라, 틀린 종횡비로 텍스처를 만든다. 그리고 다음 프레임엔 Screen 크기가 그대로라
+        // 조건에 걸리지 않아 영영 다시 만들 기회가 오지 않는다.
+        // 렌더 크기를 보면 rect가 고쳐진 다음 프레임에 자연히 잡힌다(1프레임 지연은 체감되지 않는다).
+        Camera mainCamera = Camera.main;
+        int viewWidth  = mainCamera != null ? mainCamera.pixelWidth  : Screen.width;
+        int viewHeight = mainCamera != null ? mainCamera.pixelHeight : Screen.height;
+
+        if (viewWidth == _lastViewWidth && viewHeight == _lastViewHeight) return;
+
+        _lastViewWidth = viewWidth;
+        _lastViewHeight = viewHeight;
         EnsureSpectatorTexture(); // 크기가 같으면 내부에서 그대로 빠져나간다
     }
 
