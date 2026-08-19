@@ -178,6 +178,7 @@ public class UIManager : MonoBehaviour
     private GUIStyle _titleStyle;
     private GUIStyle _sectionTitleStyle;
     private GUIStyle _labelStyle;
+    private GUIStyle _toastStyle;
     private GUIStyle _smallStyle;
     private GUIStyle _mutedStyle;
     private GUIStyle _winStyle;
@@ -840,17 +841,10 @@ public class UIManager : MonoBehaviour
             GUIContent.none
         );
 
-        GUIStyle toastStyle = new GUIStyle(_labelStyle)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 16,
-            fontStyle = FontStyle.Bold
-        };
-
         GUI.Label(
             new Rect(x + 10f, y + 6f, width - 20f, height - 12f),
             _toastMessage,
-            toastStyle
+            _toastStyle
         );
     }
 
@@ -1795,6 +1789,13 @@ public class UIManager : MonoBehaviour
         {
             fontSize = 16,
             normal = { textColor = Color.white }
+        };
+
+        _toastStyle = new GUIStyle(_labelStyle)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 16,
+            fontStyle = FontStyle.Bold
         };
 
         _smallStyle = new GUIStyle(GUI.skin.label)
