@@ -72,6 +72,7 @@ public class AugmentManager : MonoBehaviour
         GameEvents.OnUnitBenched     += HandleUnitBenched;
         GameEvents.OnUnitSold        += HandleUnitSold;
         GameEvents.OnRerollSpent     += HandleRerollSpent;
+        GameEvents.OnInventoryChanged += HandleInventoryChanged;
         GameEvents.OnAllPlayersReady += HandleAllPlayersReady;
     }
 
@@ -84,6 +85,7 @@ public class AugmentManager : MonoBehaviour
         GameEvents.OnUnitBenched     -= HandleUnitBenched;
         GameEvents.OnUnitSold        -= HandleUnitSold;
         GameEvents.OnRerollSpent     -= HandleRerollSpent;
+        GameEvents.OnInventoryChanged -= HandleInventoryChanged;
         GameEvents.OnAllPlayersReady -= HandleAllPlayersReady;
     }
 
@@ -116,10 +118,10 @@ public class AugmentManager : MonoBehaviour
             return;
         }
 
-        // 풀 = 전체 6종 − 이미 보유한 증강
+        // 풀 = 전체 6종 − 이미 보유한 증강 − 지금 제시하면 안 되는 증강(Augment.CanBeOffered)
         var pool = new List<AugmentData>();
         foreach (var data in AugmentCatalog.All)
-            if (data != null && !Owns(data.augmentId))
+            if (data != null && !Owns(data.augmentId) && IsOfferable(data))
                 pool.Add(data);
 
         if (pool.Count == 0)
@@ -218,7 +220,29 @@ public class AugmentManager : MonoBehaviour
         SelectAugment(picked);
     }
 
-    private bool Owns(AugmentId id)
+    /// <summary>
+    /// 이 증강이 지금 오퍼에 뜰 수 있는지(<see cref="Augment.CanBeOffered"/>).
+    /// 판정에는 인스턴스가 필요한데 오퍼 단계에는 아직 없으므로, 임시 인스턴스를 만들어 물어본다 —
+    /// <see cref="AugmentFactory.Create"/>는 new + Initialize뿐이라 부작용이 없다(Apply는 선택 시에만 호출).
+    ///
+    /// 팩토리에 케이스가 없는 증강은 "제시 가능"으로 둔다 — 여기서 걸러 조용히 사라지면 미구현
+    /// 증강이 오퍼에서 실종된 이유를 추적하기 어렵다. 기존처럼 선택 시점에 예외로 드러나게 둔다.
+    /// </summary>
+    private static bool IsOfferable(AugmentData data)
+    {
+        try
+        {
+            return AugmentFactory.Create(data).CanBeOffered();
+        }
+        catch (System.NotImplementedException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>이 증강을 이미 골랐는지. 증강 유무에 따라 동작이 갈리는 다른 시스템도 조회한다
+    /// (예: SynergyManager가 이브이 영웅증강 여부로 돌연변이 시너지를 누른다).</summary>
+    public bool Owns(AugmentId id)
         => _activeAugments.Exists(a => a.Data != null && a.Data.augmentId == id);
 
     // ─────────────────────────────────────────
@@ -253,6 +277,14 @@ public class AugmentManager : MonoBehaviour
 
     private void HandleRerollSpent()
         => _activeAugments.ForEach(a => a.OnRerollSpent());
+
+    /// <summary>
+    /// 아이템 장착/해제(GameEvents.OnInventoryChanged) 전파. ItemManager는 유닛 단위 이벤트를
+    /// 발행하지 않아(누가 바뀌었는지 모름) 증강 쪽이 필요한 범위를 스스로 재평가한다 —
+    /// 영웅증강의 "가장 강한 1마리" 재선정이 첫 사용처다.
+    /// </summary>
+    private void HandleInventoryChanged()
+        => _activeAugments.ForEach(a => a.OnInventoryChanged());
 
     /// <summary>
     /// 전원 준비 완료(전투 진입 직전) 시 미선택이면 랜덤 자동 선택 — 기획 "Ready 시 자동 선택".

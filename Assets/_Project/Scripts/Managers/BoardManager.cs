@@ -495,6 +495,20 @@ public class BoardManager : MonoBehaviour
     /// 현재 보드 위에 배치된 유닛 목록을 반환합니다.
     /// SynergyManager 등이 OnUnitPlaced/OnUnitBenched/OnUnitSold 트리거 수신 시 이 API로 직접 조회(pull)합니다.
     /// </summary>
+    // 보드 진입 순번 채번기(PokemonUnit.boardEntrySeq). 0이 "아직 올라온 적 없음"이라 1부터 센다.
+    // 한 판 안에서 순서 비교에만 쓰는 값이라 저장하지도, 네트워크로 보내지도 않는다.
+    private int _boardEntrySeqCounter;
+
+    /// <summary>
+    /// 보드에 <b>새로</b> 올라온 유닛에 진입 순번을 찍는다. 보드 → 보드 이동에서는 부르지 않는다 —
+    /// 자리만 옮겼는데 영웅증강 버프 대상이 바뀌면 조작이 불안정해진다(기획 확정 2026-08-18).
+    /// </summary>
+    private void StampBoardEntry(PokemonUnit unit)
+    {
+        if (unit == null) return;
+        unit.boardEntrySeq = ++_boardEntrySeqCounter;
+    }
+
     public List<PokemonUnit> GetUnitsOnBoard()
     {
         List<PokemonUnit> units = new List<PokemonUnit>();
@@ -685,6 +699,10 @@ public class BoardManager : MonoBehaviour
             placed = SwapBenchIntoBoard(unit, targetCoords, occupant);
 
         if (!placed) return false;
+
+        // 벤치(또는 신규)에서 보드로 올라온 경우에만 진입 순번을 새로 찍는다 —
+        // 보드 안에서 자리를 옮긴 것(fromBoard)은 순서를 바꾸지 않는다.
+        if (!fromBoard) StampBoardEntry(unit);
 
         AutoConvertPlusleMinunOnPlace(unit);
 
@@ -1489,31 +1507,17 @@ public class BoardManager : MonoBehaviour
             if (unit.isTradeEvolved)
                 resultTradeEvolved = true;
 
-            // 영웅증강 상태도 합체 결과가 잃지 않도록 유지한다.
+            // 영웅증강 진화잠금은 합체 결과가 잃지 않도록 유지한다 — 이건 "고정 효과"라서
+            // 대상 선정과 무관하게 보유한 모든 대상 종에 계속 붙어 있어야 한다(기획 확정 2026-08-18).
             if (unit.evolutionLocked)
                 resultEvolutionLocked = true;
 
-            if (unit.heroStatMultiplier > resultHeroStatMultiplier)
-                resultHeroStatMultiplier = unit.heroStatMultiplier;
-
-            if (!string.IsNullOrEmpty(unit.roleOverride))
-                resultRoleOverride = unit.roleOverride;
-
-            if (unit.grantedSkill != null)
-            {
-                resultGrantedSkill = unit.grantedSkill;
-                resultGrantedSkillManaCost =
-                    unit.grantedSkillManaCost;
-            }
-
-            if (unit.hasHeroBerry)
-                resultHasHeroBerry = true;
-
-            if (!string.IsNullOrEmpty(unit.attackVfxIdOverride))
-                resultAttackVfxIdOverride = unit.attackVfxIdOverride;
-
-            if (unit.attackRangeOverride != PokemonUnit.NoRangeOverride)
-                resultAttackRangeOverride = unit.attackRangeOverride;
+            // ⚠️ 나머지 영웅증강 상태(스탯 배수·역할·주입 스킬·자뭉열매·평타 VFX·사거리)는
+            // 여기서 승계하지 않는다. 전부 "이동 효과"라 보드에서 가장 강한 1마리에만 붙는데,
+            // 합체 직후 HeroAugment의 재선정이 어차피 정답을 다시 쓴다. 승계와 재선정이 둘 다
+            // 값을 쓰면 어느 쪽이 이겼는지 추적할 수 없어 재선정을 단일 소스로 둔다.
+            // (합체 결과는 Instantiate 복제라 원본 값이 딸려올 수 있는데, 아래에서 result* 기본값을
+            //  그대로 대입하므로 같이 지워진다.)
         }
 
         // 신규 생성 전에 기존 3마리의 논리 위치를 전부 비운다.
@@ -1793,7 +1797,12 @@ public class BoardManager : MonoBehaviour
 
         // 이벤트 발화(시너지 재계산 + BoardView 위치 재배치. 모델 교체는 위 RefreshVisual에서 이미 처리)
         if (evolvedUnit.isOnBoard)
+        {
+            // evolvedUnit은 Instantiate 복제라 원본의 boardEntrySeq가 딸려온다. 방금 보드에 생긴
+            // 개체이므로 새 번호로 덮어 "가장 마지막에 올라온 개체"가 되게 한다(stale 값 방지).
+            StampBoardEntry(evolvedUnit);
             GameEvents.UnitPlaced(evolvedUnit);
+        }
         else
             GameEvents.UnitBenched(evolvedUnit);
 

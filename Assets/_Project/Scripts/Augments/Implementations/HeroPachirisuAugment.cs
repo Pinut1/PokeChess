@@ -1,9 +1,11 @@
 /// <summary>
-/// HERO_PACHIRISU "기술머신:날따름": 모든 파치리스를 탱커로 전환 + 날따름(도발) 부여 + 스탯 ×1.4(v2 확정).
+/// HERO_PACHIRISU "기술머신:날따름": 보드에서 <b>가장 강한 파치리스 1마리</b>를 탱커로 전환 +
+/// 날따름(도발) 부여 + 스탯 ×1.4(v2 확정). 파치리스는 고정 효과가 없어 전부 이동 효과이며,
+/// 선정·재선정 규칙은 <see cref="HeroAugment"/> 주석 참고(기획 확정 2026-08-18).
 /// 도발 로직(시전자 중심 r4, 지속 1.0×1.4×성급)은 BattleManager/BattleUnit에 구현 완료 — 여기선 주입만.
 /// 자뭉열매(v2)도 구현 완료: ApplyParichisuHeroAugment가 hasHeroBerry 설정 → BattleUnit이 전투당 1회
 ///   HP 45% 미만 시 언타겟+행동불능 + 매초 maxHP 15% 회복, 완전 회복/아군 전멸 시 복귀(기획 확정 7/17, TFT 블리츠크랭크식).
-/// TODO(별도 티켓): 투사체 끌어당김(수치 미확정), SK_PACHIRISU_HERO 스킬행(시트), "가장 강한 파치리스 1마리" 대상 선정.
+/// TODO(별도 티켓): 투사체 끌어당김(수치 미확정), SK_PACHIRISU_HERO 스킬행(시트).
 /// </summary>
 public class HeroPachirisuAugment : HeroAugment
 {
@@ -25,12 +27,13 @@ public class HeroPachirisuAugment : HeroAugment
     protected override string SpeciesNameEn => "Pachirisu";
     protected override string OverriddenRole => PokemonRole.Tanker;
 
-    protected override void Tag(PokemonUnit unit)
-    {
-        if (unit.HasGrantedSkill) return; // 이미 적용됨
-        unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), TAUNT_MANA_COST,
-                                       STAT_MULTIPLIER, TANKER_ATTACK_VFX_ID, TANKER_ATTACK_RANGE);
-    }
+    // 파치리스는 고정 효과가 없다 — 잠금도 시너지 간섭도 없어 전부 이동 효과다(ApplyFixed 미오버라이드).
+
+    protected override void ApplyMobile(PokemonUnit unit)
+        => unit.ApplyParichisuHeroAugment(PokemonRole.Tanker, CreateTauntSkill(), TAUNT_MANA_COST,
+                                          STAT_MULTIPLIER, TANKER_ATTACK_VFX_ID, TANKER_ATTACK_RANGE);
+
+    protected override void RemoveMobile(PokemonUnit unit) => unit.RemoveParichisuHeroAugment();
 
     /// <summary>날따름 스킬 정의(기획 확정 2026-07-10: ENEMY_AREA r4, 시전자 중심 타겟팅은 BattleManager 전용 처리).</summary>
     public static PokemonSkillData CreateTauntSkill() => new PokemonSkillData

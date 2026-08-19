@@ -744,10 +744,18 @@ public class StatInfoPanelUI : MonoBehaviour
         if (_statusBar != null)
         {
             // 머리 위 바와 같은 규약 — 마나 비율이 음수면 마나 바를 숨긴다. maxHp는 눈금 계산용.
-            float hpRatio   = maxHp > 0f ? hp / maxHp : 0f;
+            // 보호막은 전투 인스턴스에만 존재한다. 보드/벤치 유닛과 파트너 보드 뷰는 전투 밖이라
+            // 항상 0이고(ResetForBattle로 매 라운드 초기화된다), 그때는 흰 바가 뜨지 않는다.
+            float shield = _battleUnit != null ? _battleUnit.shield : 0f;
+
+            // 머리 위 바와 같은 척도 — 바 전체가 (최대HP + 보호막)을 나타낸다(UnitStatusBarHud 참고).
+            // 아래 SetGaugeText에 넘기는 maxHp는 원래 값 그대로다(숫자 표시는 보호막과 무관).
+            float barTotal  = maxHp + shield;
+            float hpRatio   = barTotal > 0f ? hp / barTotal : 0f;
+            float shieldRatio = barTotal > 0f ? shield / barTotal : 0f;
             float manaRatio = hasSkill ? mana / maxMana : -1f;
 
-            _statusBar.SetValues(hpRatio, manaRatio, isAlly, maxHp);
+            _statusBar.SetValues(hpRatio, manaRatio, isAlly, barTotal, shieldRatio);
         }
 
         SetGaugeText(_hpText, hp, maxHp);

@@ -153,6 +153,20 @@ public class BattleUnit
     // ── 악(DARK) 시너지 — 첫 스킬 시전 시 대상 스턴(1회 소비) ──
     public bool darkFirstSkillPending;    // true면 다음 스킬 시전 시 대상에 스턴 부여 후 false로 소비.
 
+    // ── 이브이 영웅증강 v2 "나인이볼부스트" — 스킬 1회당 진화체 1종 소환 + 자기 버프 ──
+    // 이 값이 곧 "다음에 소환할 HeroEeveeBoostTable.Entries의 인덱스"다.
+    //   -1        = 이 유닛은 소환 주체가 아님(대부분의 유닛).
+    //   0 ~ 7     = 다음 스킬 시전 때 그 인덱스의 종을 소환하고 값이 1 올라간다.
+    //   Count(8)  = 8종을 다 소환함 — 이후 스킬은 원래 스킬 효과로 되돌아간다.
+    // BattleUnit에 두는 이유: 미러 전투의 아군은 source가 null이라(스냅샷 복원) PokemonUnit을
+    // 통해서는 판정할 수 없다. darkFirstSkillPending과 같은 패턴이다.
+    public int heroEeveeSummonIndex = -1;
+
+    // 나인이볼부스트가 maxMana를 성급별 값으로 덮어쓰기 <b>전</b>의 원래 코스트(EffectiveManaCost).
+    // 8종을 다 소환하고 나면 원래 스킬로 되돌아가므로 마나 코스트도 같이 원복해야 한다 —
+    // 안 그러면 폴백한 원래 스킬이 설계보다 싼 값으로 계속 나간다.
+    public float heroEeveeBaseMaxMana;
+
     // ── 지원 스킬 버프(AsBuff) — CC와 동일한 패턴(1=무효과, 시간 지나면 복원) ──
     public float asBuffMultiplier = 1f;   // 1=정상, 1.5=공속 50% 증가.
     public float asBuffRemaining;         // 버프 잔여 시간. 0 도달 시 asBuffMultiplier 1로 복원.

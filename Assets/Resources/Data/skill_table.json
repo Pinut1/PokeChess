@@ -221,11 +221,11 @@
       "skillName": "볼부비부비",
       "skillType": "Electric",
       "role": "Supporter",
-      "effectType": "MANA_REGEN",
+      "effectType": "AS_BUFF",
       "targetType": "ALLY_AREA",
       "areaRadius": 2,
       "lineLength": 4,
-      "vfxId": "VFX_Electric_Supporter_MANA_REGEN",
+      "vfxId": "VFX_Electric_Supporter_AS_BUFF",
       "description": "주변 아군 공속 증가 / 파치리스"
     },
     {

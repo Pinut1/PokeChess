@@ -2976,7 +2976,7 @@
       "spellPower": 205.0,
       "manaCost": 45,
       "skillId": "Coaching",
-      "attackVfxId": "Cheer_L",
+      "attackVfxId": "Electric_L",
       "synergies": [
         "Cheer",
         "Electric"
@@ -2998,7 +2998,7 @@
       "spellPower": 205.0,
       "manaCost": 45,
       "skillId": "Charge",
-      "attackVfxId": "Cheer_L",
+      "attackVfxId": "Electric_L",
       "synergies": [
         "Cheer",
         "Electric"

@@ -32,11 +32,11 @@ MonoBehaviour:
     skillId: Nuzzle
     skillName: "\uBCFC\uBD80\uBE44\uBD80\uBE44"
     description: "\uC8FC\uBCC0 \uC544\uAD70 \uACF5\uC18D \uC99D\uAC00 / \uD30C\uCE58\uB9AC\uC2A4"
-    effectType: 4
+    effectType: 5
     targetType: 2
     areaRadius: 2
     lineLength: 4
-    vfxId: VFX_Electric_Supporter_MANA_REGEN
+    vfxId: VFX_Electric_Supporter_AS_BUFF
   attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 1

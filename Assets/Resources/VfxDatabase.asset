@@ -24,10 +24,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Cheer_Supporter_AS_BUFF
     prefab: {fileID: 3064130016728173062, guid: 5799627160eebf64880578903f5ef05d, type: 3}
     lifetime: 0
@@ -39,10 +38,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_Supporter_AS_BUFF
     prefab: {fileID: 7862494725291899278, guid: 12d54bd8b506b6244930aa83bf00e379, type: 3}
     lifetime: 0
@@ -54,10 +52,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Bug_L
     prefab: {fileID: 816935066798950324, guid: 78f7a3ad3139ae142b0784b56273a027, type: 3}
     lifetime: 0
@@ -69,10 +66,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Cheer_L
     prefab: {fileID: 816935066798950324, guid: cebeabe9ee2fcff41b4d7856f8e70e39, type: 3}
     lifetime: 0
@@ -84,10 +80,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dark_L
     prefab: {fileID: 816935066798950324, guid: 573b41c01409d844a8e51647a8d82199, type: 3}
     lifetime: 0
@@ -99,10 +94,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dragon_L
     prefab: {fileID: 816935066798950324, guid: 4c8d19510957d634cab0ce12016fe7e3, type: 3}
     lifetime: 0
@@ -114,10 +108,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_L
     prefab: {fileID: 816935066798950324, guid: cebeabe9ee2fcff41b4d7856f8e70e39, type: 3}
     lifetime: 0
@@ -129,10 +122,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_L
     prefab: {fileID: 816935066798950324, guid: a91e7c0cc46fdb64597e578d11c8a1a1, type: 3}
     lifetime: 0
@@ -144,10 +136,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Fire_L
     prefab: {fileID: 816935066798950324, guid: 8fda8a585627b5543bf47f5aacd9d437, type: 3}
     lifetime: 0
@@ -159,10 +150,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_L
     prefab: {fileID: 816935066798950324, guid: d029429506392ec4ca0f110e6f007ba3, type: 3}
     lifetime: 0
@@ -174,10 +164,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_L
     prefab: {fileID: 816935066798950324, guid: 91034a524ccfaeb46a44a9635704b39e, type: 3}
     lifetime: 0
@@ -189,10 +178,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Poison_L
     prefab: {fileID: 816935066798950324, guid: b8552948ef404234c97468f0528623cc, type: 3}
     lifetime: 0
@@ -204,10 +192,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_L
     prefab: {fileID: 816935066798950324, guid: 170ed7033113e6242b7868c0424426a4, type: 3}
     lifetime: 0
@@ -219,10 +206,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Breaker_S
     prefab: {fileID: 1588835693990072458, guid: 261cde05eeaad9e44a1ae671b1ae73da, type: 3}
     lifetime: 0
@@ -234,10 +220,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Bug_S
     prefab: {fileID: 1588835693990072458, guid: 4dbdd690a09b2604a8c94b9d9d4c4bc6, type: 3}
     lifetime: 0
@@ -249,10 +234,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dark_S
     prefab: {fileID: 1588835693990072458, guid: d71d1b8e1c8d32840ae389f119894784, type: 3}
     lifetime: 0
@@ -264,10 +248,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dragon_S
     prefab: {fileID: 1588835693990072458, guid: a96da6f9e79baa74ba65240c8a8e01a8, type: 3}
     lifetime: 0
@@ -279,10 +262,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_S
     prefab: {fileID: 1588835693990072458, guid: 6764b652d465d694199d1084c7db5ef5, type: 3}
     lifetime: 0
@@ -294,10 +276,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_S
     prefab: {fileID: 1588835693990072458, guid: acc1ad5daa4aa4b408646568e347fc91, type: 3}
     lifetime: 0
@@ -309,10 +290,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Fire_S
     prefab: {fileID: 1588835693990072458, guid: d4f9e7cfb894ebe47bc0a1a8319d0b3f, type: 3}
     lifetime: 0
@@ -324,10 +304,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_S
     prefab: {fileID: 1588835693990072458, guid: c5be3d22e3fc47c45b9c5f0838e85211, type: 3}
     lifetime: 0
@@ -339,10 +318,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ground_S
     prefab: {fileID: 1588835693990072458, guid: 2b4b16a8494c28441ac0d36862c2f863, type: 3}
     lifetime: 0
@@ -354,10 +332,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ice_S
     prefab: {fileID: 1588835693990072458, guid: 93712f1d0eccbc84f80449ec3fec37d1, type: 3}
     lifetime: 0
@@ -369,10 +346,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_S
     prefab: {fileID: 1588835693990072458, guid: 9b4f7ed4e15a04741a97859b0097645b, type: 3}
     lifetime: 0
@@ -384,10 +360,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Poison_S
     prefab: {fileID: 1588835693990072458, guid: 92067b38b3f241b4c9bce65252fc0b32, type: 3}
     lifetime: 0
@@ -399,10 +374,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_S
     prefab: {fileID: 1588835693990072458, guid: 24e04db3efb00004a8fa69139f498af0, type: 3}
     lifetime: 0
@@ -414,10 +388,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_Supporter_HP_REGEN
     prefab: {fileID: 6653963781809536970, guid: 6402af93552bd32438904c94925c4151, type: 3}
     lifetime: 0
@@ -429,10 +402,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_Tanker_HP_REGEN
     prefab: {fileID: 8798207347961105648, guid: d778ccb2d17b1fc4db3d9e0117044e73, type: 3}
     lifetime: 0
@@ -444,10 +416,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ground_Tanker_HP_REGEN
     prefab: {fileID: 1948089231559134301, guid: 3851d9ec59f759d41b553c42e5e72c8f, type: 3}
     lifetime: 0
@@ -459,10 +430,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_Supporter_HP_REGEN
     prefab: {fileID: 6890664481219543831, guid: 054477b9ba0c73b438412174294a9619, type: 3}
     lifetime: 0
@@ -474,10 +444,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_Tanker_HP_REGEN
     prefab: {fileID: 3569383667345425864, guid: fcd35fb2849e9144a90db488e5c67503, type: 3}
     lifetime: 0
@@ -489,10 +458,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Poison_Tanker_HP_REGEN
     prefab: {fileID: 7151619947934484777, guid: a560c32c78e43ac499b4f28439f757c6, type: 3}
     lifetime: 0
@@ -504,10 +472,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_Tanker_HP_REGEN
     prefab: {fileID: 1495268487176748248, guid: 9f5efe95737ebe5458290a44db186e5d, type: 3}
     lifetime: 0
@@ -519,11 +486,10 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
-  - vfxId: VFX_Electric_Supporter_MANA_REGEN
+  - vfxId: VFX_Electric_Supporter_AS_BUFF
     prefab: {fileID: 3669679753147777540, guid: 4938722fbe4d9a9408d0c90663b8da22, type: 3}
     lifetime: 0
     positionOffset: {x: 0, y: 0, z: 0}
@@ -534,10 +500,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Cheer_Supporter_MANA_REGEN
     prefab: {fileID: 3669679753147777540, guid: 70d21874a2346694ba963088b7b5b641, type: 3}
     lifetime: 0
@@ -549,10 +514,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Breaker_Tanker_SHIELD
     prefab: {fileID: 8421373142227382933, guid: 1d84fc002b985354688990a4c07418f5, type: 3}
     lifetime: 0
@@ -564,10 +528,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ground_Tanker_SHIELD
     prefab: {fileID: 2802477081634496137, guid: 0ee96e4a40db6a5479431a23591501a2, type: 3}
     lifetime: 0
@@ -579,10 +542,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ice_Tanker_SHIELD
     prefab: {fileID: 8957942043877105041, guid: 1d92f5c689d386d4d8b94761743aefb0, type: 3}
     lifetime: 0
@@ -594,10 +556,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Poison_Tanker_SHIELD
     prefab: {fileID: 6832421264105975527, guid: 001394cdebdab7940a4fbc5ad618c5cb, type: 3}
     lifetime: 0
@@ -609,10 +570,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_Tanker_SHIELD
     prefab: {fileID: 6888812772013094456, guid: b0fd752c752b12a468a94c3ab57752d5, type: 3}
     lifetime: 0
@@ -624,10 +584,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_Supporter_SHIELD
     prefab: {fileID: 6888812772013094456, guid: 44c2efdaa9e618e489b9762ac17aa0e8, type: 3}
     lifetime: 0
@@ -639,10 +598,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_Supporter_SHIELD
     prefab: {fileID: 26889370854904654, guid: fefc672253ead9f44bd8a089ef03fc2b, type: 3}
     lifetime: 0
@@ -654,10 +612,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_Tanker_SHIELD
     prefab: {fileID: 26889370854904654, guid: 9338e4520b9e4f34daf4782de6315ac0, type: 3}
     lifetime: 0
@@ -669,10 +626,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Bug_Assassin_SPELL
     prefab: {fileID: 1108044971488840409, guid: 7936640d7a85dc1499bc182d70b5813f, type: 3}
     lifetime: 0
@@ -684,10 +640,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Bug_Magician_SPELL
     prefab: {fileID: 8024707040602984699, guid: 7a18785a68d6afb4592ccdf1a0619f8c, type: 3}
     lifetime: 0
@@ -699,10 +654,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dragon_Assassin_SPELL
     prefab: {fileID: 6131479023744729671, guid: 1e6ad51b7ca3a9f45963a01e213a3199, type: 3}
     lifetime: 0
@@ -714,10 +668,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Dragon_Magician_SPELL
     prefab: {fileID: 8292448183889763549, guid: c2b41e023b7f482488bced5040d3d1ca, type: 3}
     lifetime: 0.67
@@ -732,7 +685,6 @@ MonoBehaviour:
     travelPastTarget: 1
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_Assassin_SPELL
     prefab: {fileID: 8355305743698979582, guid: 334e4d19e3b976a4e94bd3add58aacd7, type: 3}
     lifetime: 0
@@ -744,10 +696,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_Magician_SPELL
     prefab: {fileID: 1888346606341600929, guid: e3944a8f96e857d4ab64db27adfcf50a, type: 3}
     lifetime: 0
@@ -759,10 +710,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_Assassin_SPELL
     prefab: {fileID: 7127013594644512403, guid: c476394cb44d76e4088eff982d343b7d, type: 3}
     lifetime: 0
@@ -774,10 +724,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Ethereal_Magician_SPELL
     prefab: {fileID: 1703144855743664732, guid: 21fd899aa9d3fea47a7ab960ae8f18f2, type: 3}
     lifetime: 0
@@ -789,10 +738,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Fire_Magician_SPELL
     prefab: {fileID: 2412186094425116576, guid: e523db57a0f880f4b8d79add02acd0f1, type: 3}
     lifetime: 0
@@ -804,10 +752,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_Assassin_SPELL
     prefab: {fileID: 5063548042073759156, guid: 2d7c075b2c0227247bb5113be3534538, type: 3}
     lifetime: 0
@@ -819,10 +766,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Grass_Magician_SPELL
     prefab: {fileID: 754961913873147221, guid: ff9a5e41d768b8242b4c266572146afa, type: 3}
     lifetime: 2
@@ -834,10 +780,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0.15
     forwardOffset: 0.3
-    rotationCorrection: {x: -2.79, y: -14.13, z: 151.1}
   - vfxId: VFX_Ice_Assassin_SPELL
     prefab: {fileID: 965481250081788449, guid: bb79c73fc70a708489ea29cb5ec49388, type: 3}
     lifetime: 0
@@ -849,10 +794,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_Assassin_SPELL
     prefab: {fileID: 1078441588453676757, guid: 0688d7ccf97cc544ebc535e609753ee1, type: 3}
     lifetime: 0
@@ -864,10 +808,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Normal_Magician_SPELL
     prefab: {fileID: 6273293505857411528, guid: 872360fa68544194ba154ae51b9981a4, type: 3}
     lifetime: 0
@@ -879,10 +822,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Poison_Magician_SPELL
     prefab: {fileID: 6799414252309051290, guid: 7c3c89c890c2c324bbc374a263139dfe, type: 3}
     lifetime: 0
@@ -894,10 +836,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Water_Magician_SPELL
     prefab: {fileID: 930871465850678006, guid: 0bc0a66ace513c44d9aecb05a719263a, type: 3}
     lifetime: 0
@@ -909,10 +850,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_Tanker_TAUNT
     prefab: {fileID: 3153356435855344799, guid: 2ddd5e2464d5de24dbfddc34b177e15f, type: 3}
     lifetime: 2
@@ -924,10 +864,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Electric_Taunt_Hit
     prefab: {fileID: 2777178767914836096, guid: 6a4e3e2564a481c46b173c91108802d8, type: 3}
     lifetime: 2
@@ -939,10 +878,9 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
-    rotationCorrection: {x: 0, y: 0, z: 0}
   - vfxId: VFX_Evolve
     prefab: {fileID: 1948089231559134301, guid: 3fa54182cfbad2843815635a8ffb30c9, type: 3}
     lifetime: 2
@@ -954,7 +892,7 @@ MonoBehaviour:
     referenceDistance: 1
     scaleWithRadius: 0
     travelDuration: 0.12
-    arrivalHoldDuration: 0.15
+    travelPastTarget: 0
     beamGrowDuration: 0
     forwardOffset: 0
     rotationCorrection: {x: 0, y: 0, z: 0}
@@ -962,6 +900,20 @@ MonoBehaviour:
     prefab: {fileID: 4631137236932131032, guid: 25e59ef4aaf536245b38550efc7e8473, type: 3}
     lifetime: 0
     positionOffset: {x: 0, y: -0.097, z: 0}
+    spawnMode: 0
+    aimMode: 0
+    fitLifetimeToDistance: 1
+    stretchToDistance: 0
+    referenceDistance: 1
+    scaleWithRadius: 0
+    travelDuration: 0.12
+    travelPastTarget: 0
+    beamGrowDuration: 0
+    forwardOffset: 0
+  - vfxId: VFX_HeroTarget_Ring
+    prefab: {fileID: 1948089231559134301, guid: 5860a934dd92fff42aa5d280201c10d1, type: 3}
+    lifetime: 0
+    positionOffset: {x: 0, y: 0, z: 0}
     spawnMode: 0
     aimMode: 0
     fitLifetimeToDistance: 1

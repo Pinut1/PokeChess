@@ -68,6 +68,21 @@ public class PokemonUnit : MonoBehaviour
     /// <summary>통신교환으로 진화체를 받았는지(NetworkManager.RPC_TradeReceive가 매핑 적중 시 설정). 베이스 핸드오버면 false.</summary>
     public bool isTradeEvolved;
 
+    /// <summary>
+    /// 이 유닛이 보드에 <b>마지막으로 올라온</b> 순번. 벤치에서 보드로 올릴 때마다
+    /// <see cref="BoardManager"/>가 새 번호를 찍는다(0 = 아직 보드에 올라온 적 없음).
+    ///
+    /// 영웅증강 "가장 강한 1마리" 선정의 마지막 동률 처리에 쓴다 — 성급·아이템 수가 모두 같으면
+    /// 가장 마지막에 올린 개체가 대상이 된다(기획 확정 2026-08-18).
+    ///
+    /// ⚠️ <b>보드 안에서 자리를 옮기는 것은 번호를 바꾸지 않는다.</b> 한 칸 옮겼다고 버프 대상이
+    /// 바뀌면 조작이 불안정해진다(같은 기획 문서).
+    ///
+    /// ⚠️ public 필드라 Unity가 직렬화한다 = 합체(Instantiate 복제) 시 원본 번호가 복제본에
+    /// 딸려온다. BoardManager가 합체 결과를 보드에 올릴 때 다시 찍어주므로 stale 값이 남지 않는다.
+    /// </summary>
+    public int boardEntrySeq;
+
     // ──────────────────────────────────────────
     // 영웅 증강 런타임 변형 (증강 시스템=해인이 선택 시 설정하는 seam)
     // ──────────────────────────────────────────
@@ -125,12 +140,25 @@ public class PokemonUnit : MonoBehaviour
                                                   : (data != null ? data.attackVfxId : "");
 
     /// <summary>
-    /// 이브이 영웅증강 적용(진화잠금 + 스탯 배수 + 역할 전환). Augment Table v2: ×1.4, 역할 → 마법사.
+    /// 이브이 영웅증강의 <b>고정 효과</b> — 진화잠금만. 보유한 모든 이브이(보드+벤치)에 붙고
+    /// 되돌리지 않는다(기획 확정 2026-08-18). 잠금이 버프 대상을 따라 움직이면 "이브이인 채로
+    /// 3성이 된 개체의 잠금이 풀리는" 상태가 생기는데, 그건 정상 경로로 만들 수 없는 상태다.
+    /// </summary>
+    public void ApplyEeveeHeroLock()
+    {
+        if (evolutionLocked) return;
+        evolutionLocked = true;
+        GameEvents.UnitChanged(this);
+    }
+
+    /// <summary>
+    /// 이브이 영웅증강의 <b>이동 효과</b>(스탯 배수 + 역할 전환). Augment Table v2: ×1.4, 역할 → 마법사.
+    /// 보드에서 가장 강한 이브이 1마리에만 붙는다 — 진화잠금은 여기서 건드리지 않는다
+    /// (<see cref="ApplyEeveeHeroLock"/>이 따로 담당). 되돌리기는 <see cref="RemoveEeveeHeroAugment"/>.
     /// 역할 변경은 타겟 우선순위 태그만 바뀌고 스탯은 종 원본 × 배수 유지(역할별 스탯 재계산 없음 — 해인님 회신 2026-07-16).
     /// </summary>
     public void ApplyEeveeHeroAugment(float statMultiplier = 1.4f, string newRole = null)
     {
-        evolutionLocked    = true;
         heroStatMultiplier = statMultiplier;
         if (!string.IsNullOrEmpty(newRole)) roleOverride = newRole;
         currentHp          = Mathf.Min(currentHp, MaxHp);
@@ -150,6 +178,51 @@ public class PokemonUnit : MonoBehaviour
         if (!string.IsNullOrEmpty(attackVfxId)) attackVfxIdOverride = attackVfxId;
         if (attackRange != NoRangeOverride) attackRangeOverride = attackRange;
         currentHp             = Mathf.Min(currentHp, MaxHp);
+        GameEvents.UnitChanged(this);
+    }
+
+    // ──────────────────────────────────────────
+    // 영웅 증강 해제 — "가장 강한 1마리" 모델의 이동 효과 되돌리기
+    // ──────────────────────────────────────────
+    // 기획 확정(2026-08-18): 영웅증강 효과는 두 층으로 나뉜다.
+    //   고정층 — 보유한 대상 종 전부(보드+벤치)에 붙고 되돌리지 않는다(이브이 진화잠금).
+    //   이동층 — 보드에서 가장 강한 1마리에만 붙고, 대상이 바뀌면 이전 개체에서 걷어낸다.
+    // 아래 두 메서드가 그 "걷어내기"다. evolutionLocked는 고정층이라 <b>건드리지 않는다</b> —
+    // 잠금이 대상을 따라 움직이면 "이브이인 채로 3성이 된 개체의 잠금이 풀리는" 상태가 생기고,
+    // 그건 정상 경로로 만들 수 없는 상태다(같은 기획 문서). 나인이볼부스트의 소환 주체 판정
+    // (BattleManager.MarkHeroEeveeSummoner = evolutionLocked && heroStatMultiplier>1 && Eevee)도
+    // 그 전제 위에 서 있다 — 잠금은 여러 마리가 갖지만 배수는 "가장 강한 1마리"만 갖는다.
+
+    /// <summary>
+    /// 이브이 영웅증강의 <b>이동 효과</b>만 해제한다(스탯 배수·역할). 진화잠금은 고정층이라 유지된다.
+    /// 배수가 1로 돌아가면 MaxHp가 줄어들 수 있어 currentHp를 다시 가둔다.
+    /// </summary>
+    public void RemoveEeveeHeroAugment()
+    {
+        heroStatMultiplier = 1f;
+        roleOverride       = null;
+        currentHp          = Mathf.Min(currentHp, MaxHp);
+        GameEvents.UnitChanged(this);
+    }
+
+    /// <summary>
+    /// 파치리스 영웅증강 해제. 파치리스는 잠금도 시너지 간섭도 없어 <b>전부 이동 효과</b>라
+    /// 붙였던 것을 모두 걷어낸다.
+    ///
+    /// 평타 VFX와 사거리는 원본을 따로 보관해두지 않아도 된다 — <see cref="EffectiveAttackVfxId"/>는
+    /// 오버라이드가 비면 data.attackVfxId로, <see cref="Range"/>는 <see cref="NoRangeOverride"/>면
+    /// data.attackRange로 각각 폴백하므로 비우는 것만으로 원복된다.
+    /// </summary>
+    public void RemoveParichisuHeroAugment()
+    {
+        roleOverride         = null;
+        grantedSkill         = null;
+        grantedSkillManaCost = 0;
+        heroStatMultiplier   = 1f;
+        hasHeroBerry         = false;
+        attackVfxIdOverride  = null;
+        attackRangeOverride  = NoRangeOverride;
+        currentHp            = Mathf.Min(currentHp, MaxHp);
         GameEvents.UnitChanged(this);
     }
 
@@ -464,6 +537,13 @@ public class PokemonUnit : MonoBehaviour
     public bool TryEquipStone(EvolutionStoneData stone)
     {
         if (stone == null || data == null) return false;
+
+        // 이브이 영웅증강(나인이볼부스트)이 걸린 유닛은 진화의 돌을 받지 않는다 — "진화의 돌 면역"
+        // (기획 확정 2026-08-19). 잠금은 합체로 종이 바뀌는 것만 막을 뿐이라, 이 가드가 없으면
+        // 돌로 샤미드·쥬피썬더가 되어 증강이 통째로 무의미해지고 돌연변이 시너지도 그대로 쌓인다.
+        // 모든 장착 경로가 이 메서드를 지나므로 여기 한 곳에서 막는다.
+        if (evolutionLocked) return false;
+
         if (equippedStone != null) return false;        // 유닛당 돌 1개
         if (!HasFreeSlot) return false;                 // 슬롯 부족
 

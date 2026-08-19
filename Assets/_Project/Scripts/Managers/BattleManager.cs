@@ -33,11 +33,31 @@ public class BattleManager : MonoBehaviour
     private const float TAUNT_HERO_STAT_MULT = 1.4f;
     private static readonly float[] TAUNT_STAR_MULT = { 1.0f, 1.0f, 1.8f, 2.8f }; // starLevel(1~3) 인덱스
 
-    // 지원 스킬 위력 — 기획 확정(2026-07-10): spellPower × 0.5 (임시 계수, 밸런스 후 조정).
-    // AsBuff = (spellPower×계수)%p 공속 증가, ManaRegen = 즉시 마나 (spellPower×계수) 회복으로 해석.
-    // (※ "증가량/회복량" 해석은 해인님 재확인 예정)
-    private const float SUPPORT_SPELLPOWER_COEF = 0.5f;
-    private const float AS_BUFF_DURATION = 3f;  // 지속시간은 언급 없음 — PLACEHOLDER 유지
+    /// <summary>
+    /// 지원 버프(AsBuff·ManaRegen) 공용 계수 — 기획 확정 2026-08-19.
+    ///   ManaRegen : 즉시 회복 마나 = spellPower × 이 값
+    ///   AsBuff    : 공속 증가량   = (spellPower × 이 값)%p
+    ///
+    /// <b>0.5에서 0.05로 내렸다.</b> 주문력이 세 자리(30~205)라 0.5를 그대로 쓰면 단위가 무너졌다 —
+    /// 공속은 1성 +60%p에서 3성 +287%p(플러시)까지 튀어 비행 시너지 최고티어(+35%)를 압도했고,
+    /// 마나는 마이농이 자기 코스트(45)의 2~6배를 돌려받아 시전 즉시 마나바가 다시 찼다.
+    ///
+    /// 두 효과를 같은 값으로 두는 이유 — 둘 다 "서포터가 areaRadius 안의 아군에게 거는 지원"이라 같은 급이어야
+    /// 하고, 손잡이가 하나면 밸런스 조정이 한 줄로 끝난다. 단위가 달라 계수를 나눠야 했던 시기가
+    /// 있었지만(마나=절대값, 공속=%p) 0.05에서는 양쪽 다 적정 구간에 들어온다:
+    ///   공속  플러시 1성 +10%p → 3성 +29%p / 이브이 3성 +20%p / 파치리스 3성 +17%p
+    ///   마나  마이농 1성 10 → 3성 29 (패시브 충전 초당 10 기준 "3초를 벌어주는" 값)
+    ///
+    /// <b>자가 순환은 구조적으로 막혀 있다</b> — 지원 버프는 시전자 자신을 대상에서 제외한다
+    /// (<see cref="GetAllyTargets"/>). 따라서 이 계수를 올려도 "자기가 자기 마나를 채워 무한 시전"은
+    /// 나오지 않는다. 다만 마이농을 2마리 놓으면 서로를 채워줄 수는 있으므로,
+    /// <b>회복량 &lt; 자기 마나코스트</b>는 지키는 게 안전하다. 마이농 기준 상한은
+    /// 205 × 2.8(3성) × 계수 × 1.3(치어리더 마나 선택지 — <see cref="GainMana"/>가 받는 쪽
+    /// manaGainMultiplier를 한 번 더 곱한다) &lt; 45 → 약 0.060이고, 0.05는 그 아래다.
+    /// </summary>
+    private const float SUPPORT_BUFF_SPELLPOWER_COEF = 0.05f;
+
+    private const float AS_BUFF_DURATION = 3f;  // 기획 확정(2026-08-19, 해인) — 더 이상 PLACEHOLDER 아님
 
     // role 기반 타겟 우선순위(기둥C) — PLACEHOLDER(기획확정 전): 낮을수록 먼저 타겟팅.
     private static readonly Dictionary<string, int> ROLE_TARGET_PRIORITY = new()
@@ -92,6 +112,12 @@ public class BattleManager : MonoBehaviour
     // 있어 이동 판정에 쓰면 안 된다 — BuildValidCoords()가 BoardManager.GetEnemyBattleCoords()로
     // 직접 계산해 채운다. 전투 시작(SetupUnits/SetupMirrorUnits)마다 새로 채우고 Cleanup()에서 비운다.
     private readonly HashSet<HexCoords> _validCoords = new();
+
+    // 전투 중 소환(나인이볼부스트)의 대기열 — 담는 것은 <b>종 데이터뿐이고 좌표는 없다</b>.
+    // 행동 루프가 _units를 foreach로 도는 도중에는 Add할 수 없어(컬렉션 변경 예외) 여기 담아뒀다가
+    // 루프 직후 FlushPendingSpawns()가 자리를 골라 _units로 옮긴다. 자리를 예약 시점이 아니라
+    // 편입 시점에 고르는 것이 핵심이다 — 그래야 같은 틱에 다른 유닛이 그 칸으로 이동해도 겹치지 않는다.
+    private readonly List<PokemonData> _pendingSpawns = new();
 
     // FindNextStep의 동일 areaDist(개선 없는) fallback 후보군에서만 참조하는 "직전에 있던 칸"
     // 1개 기억(경로 캐시 아님 — 오직 A↔B 두 칸짜리 완전 대칭 막다른 자리에서 그 자리로 되돌아가는
@@ -423,12 +449,10 @@ public class BattleManager : MonoBehaviour
         if (GetActiveSynergy("Cheerleader") != null)
             ApplyCheerleaderChoice();
 
-        // 돌연변이 봇 소환. 이브이 영웅증강(진화잠금 이브이 3성)이 보드에 있으면 봇 전원(4마리) 즉시 소환 —
-        // 이 경우 이브이 단독이라 일반 돌연변이 시너지 카운트로는 티어가 안 오르므로 전용 경로로 처리.
-        // 없으면 일반 돌연변이 시너지 활성 티어 수만큼 소환.
-        if (HasHeroEeveeThreeStar())
-            SpawnMutantBots(MutantBots.Length);
-        else
+        // 이브이 영웅증강 v2: 전투 시작 시 즉시 소환하지 않고 "소환 주체"만 지정한다 —
+        // 실제 소환은 그 이브이가 스킬을 시전할 때마다 1종씩(CastSkill → TryCastHeroEeveeBoost).
+        // 이 경로가 잡히면 일반 돌연변이 시너지는 타지 않는다(애초에 SynergyManager가 눌러둔다).
+        if (!MarkHeroEeveeSummoner())
         {
             var mutant = GetActiveSynergy("Mutant");
             if (mutant != null)
@@ -466,18 +490,40 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 이브이 영웅증강(진화잠금) 이브이가 3성으로 아군 보드에 있는지. 봇 전원소환 트리거.
-    /// evolutionLocked는 이브이 영웅증강만 세우는 플래그라 종·성만 추가 확인하면 충분.
+    /// 나인이볼부스트를 발동할 최소 성급. 1 = 성급 제한 없음(현재 값).
+    ///
+    /// 구 버전(봇 4마리 즉시소환)은 3성을 요구했지만, v2는 스킬을 시전해야 1종씩 나오는 누적형이라
+    /// 3성까지 아무 것도 안 나오면 증강을 고른 보람이 한참 뒤에야 생긴다. 그래서 성급 제한을 풀었다.
+    /// 밸런스상 다시 조이고 싶으면 이 값만 3으로 올리면 된다 — 판정은 아래 한 곳뿐이다.
     /// </summary>
-    private bool HasHeroEeveeThreeStar()
+    private const int HERO_EEVEE_MIN_STAR = 1;
+
+
+    /// <summary>
+    /// 나인이볼부스트의 <b>소환 주체</b>(= 이동 효과를 받고 있는 "가장 강한 이브이") 1기를 찾아
+    /// 소환 카운터를 0으로 세운다. 찾았으면 true.
+    ///
+    /// 판정 기준이 <c>heroStatMultiplier &gt; 1</c>인 이유 — 진화잠금(evolutionLocked)은 보유한 모든
+    /// 이브이에 붙는 <b>고정 효과</b>라 그것만으로는 여러 마리가 걸린다. 배수는 <b>이동 효과</b>라
+    /// HeroAugment.Reselect()가 딱 한 마리에만 쓰므로, 그 한 마리가 곧 "가장 강한 이브이"다.
+    /// (선정 규칙을 여기서 다시 구현하지 않는다 — 재선정을 단일 소스로 두는 원칙 그대로.)
+    /// </summary>
+    private bool MarkHeroEeveeSummoner()
     {
         foreach (var bu in _units)
         {
             var src = bu.source;
             if (bu.team != BattleTeam.Ally || src == null || src.data == null) continue;
-            if (src.evolutionLocked && src.starLevel >= 3 &&
-                string.Equals(src.data.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
-                return true;
+
+            if (!src.evolutionLocked || src.heroStatMultiplier <= 1f) continue;
+            if (src.starLevel < HERO_EEVEE_MIN_STAR) continue;
+            if (!string.Equals(src.data.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            MarkAsHeroEeveeSummoner(bu);
+            Debug.Log($"[Augment] 나인이볼부스트 소환 주체 지정 — 이브이 {src.starLevel}성 " +
+                      $"(마나 {bu.maxMana:0} → 이 성급의 도달 한계 안에서 최대 {HeroEeveeBoostTable.Count}종)");
+            return true;
         }
         return false;
     }
@@ -568,6 +614,186 @@ public class BattleManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────
+    // 이브이 영웅증강 v2 "나인이볼부스트" — 스킬 1회당 진화체 1종 소환 + 자기 버프
+    // ─────────────────────────────────────────
+    // 수치·순서는 전부 HeroEeveeBoostTable에 있다(밸런스 조정은 그 표만 수정).
+    // 실전투/미러전투가 같은 CastSkill을 타므로 이 경로 하나로 양쪽이 동일하게 동작한다.
+    // 결정론 주의: 종 순서는 고정 배열, 빈 타일은 CompareCoords로 정렬해서 고르고, 난수는 쓰지 않는다
+    // — 2인이 각자 시뮬레이션해도 같은 결과가 나와야 하기 때문(기존 봇 소환과 같은 규칙).
+
+    /// <summary>
+    /// 소환 주체가 시전했다면 진화체 1종을 소환하고 대응 버프를 <b>시전자 자신</b>에게 건다.
+    /// 소환이 실제로 일어났으면 true(= 이번 시전은 원래 스킬 효과를 내지 않는다).
+    ///
+    /// 버프가 봇이 아니라 이브이에게 가는 것이 이 증강의 핵심이다(기획 확정 2026-08-19) —
+    /// 샤미드가 나오면 샤미드가 아니라 이브이가 보호막을 얻는다. 봇은 소환 그 자체가 값어치다.
+    /// </summary>
+    private bool TryCastHeroEeveeBoost(BattleUnit caster)
+    {
+        int index = caster.heroEeveeSummonIndex;
+        if (index < 0 || index >= HeroEeveeBoostTable.Count) return false;
+
+        var entry = HeroEeveeBoostTable.Entries[index];
+
+        // 종이 DB에 없을 때만 실패로 본다(인덱스 미소비). 자리가 없는 경우는 실패가 아니라
+        // FlushPendingSpawns가 다음 틱에 다시 시도하므로, 시전은 정상적으로 소모된 것으로 친다.
+        if (!QueueHeroEeveeBot(entry.speciesNameEn)) return false;
+
+        caster.heroEeveeSummonIndex = index + 1;
+        ApplyEeveeBoost(caster, entry);
+
+        // 마지막 1종까지 부른 순간 원래 스킬(이브이는 Celebrate)로 돌아간다 — 마나 코스트도 같이
+        // 원복해야 폴백한 스킬이 나인이볼부스트용 싼 코스트로 계속 나가지 않는다.
+        if (caster.heroEeveeSummonIndex >= HeroEeveeBoostTable.Count)
+            caster.maxMana = caster.heroEeveeBaseMaxMana;
+
+        Debug.Log($"[Augment] 나인이볼부스트 {index + 1}/{HeroEeveeBoostTable.Count} — " +
+                  $"{entry.speciesNameEn} 소환 + 이브이 {entry.label} 버프");
+        return true;
+    }
+
+    /// <summary>
+    /// 진화체 1기의 소환을 <b>예약</b>한다. 종만 담아두고 <b>자리는 정하지 않는다</b>.
+    /// 돌연변이 봇과 완전히 같은 형식(source=null 전투 전용)이라 전투가 끝나면 Cleanup()에서 사라진다.
+    ///
+    /// ⚠️ 여기서 좌표를 미리 고르면 안 된다 — 이 메서드는 전투 행동 루프
+    /// (<c>foreach (var bu in _units)</c>) 안쪽의 CastSkill에서 호출되므로, 이 시점에 고른 빈 칸은
+    /// 같은 틱의 <b>나머지 유닛이 아직 움직이기 전</b> 기준이다. 그 뒤에 다른 유닛이 그 칸으로
+    /// 이동해버리면 두 유닛이 같은 헥스에 겹친다(IsOccupied는 아직 _units에 없는 예약분을 못 본다).
+    /// 그래서 자리 선정은 이동이 전부 끝난 <see cref="FlushPendingSpawns"/>로 미룬다.
+    /// </summary>
+    private bool QueueHeroEeveeBot(string speciesNameEn)
+    {
+        var db = PokemonDatabase.Instance;
+        if (db == null) return false;
+
+        var data = db.GetByNameEn(speciesNameEn);
+        if (data == null)
+        {
+            Debug.LogWarning($"[Augment] 나인이볼부스트 '{speciesNameEn}' DB에 없음 — 스킵");
+            return false;
+        }
+
+        _pendingSpawns.Add(data);
+        return true;
+    }
+
+    /// <summary>
+    /// 예약된 소환을 실제 전투에 편입한다. 행동 루프가 끝난 뒤에만 호출되므로 이 시점의 좌표는
+    /// <b>이번 틱의 이동이 전부 반영된 확정 값</b>이다 — 여기서 자리를 골라야 겹침이 생기지 않는다.
+    ///
+    /// 자리가 없으면 버리지 않고 큐에 남겨 다음 틱에 다시 시도한다(적이 죽거나 아군이 전진하면
+    /// 자리가 난다). 큐 길이는 최대 8(HeroEeveeBoostTable.Count)이라 무한히 쌓이지 않는다.
+    /// 시각화도 여기서 함께 만든다 — _units에 넣기 전에 visual을 만들면 그 사이 전투가 끝났을 때
+    /// Cleanup()이 찾지 못해 남는다.
+    /// </summary>
+    private void FlushPendingSpawns()
+    {
+        if (_pendingSpawns.Count == 0) return;
+
+        var board = GameManager.Instance.Board;
+        if (board == null) return;
+
+        // 예약 순서(FIFO)대로 처리한다 — 소환 순서가 곧 기획이 정한 진화체 등장 순서다.
+        while (_pendingSpawns.Count > 0)
+        {
+            if (!TryFindEmptyBoardTile(board, out HexCoords coords))
+            {
+                Debug.LogWarning($"[Augment] 나인이볼부스트 — 빈 타일 없음, " +
+                                 $"'{_pendingSpawns[0].pokemonNameEn}' 소환을 다음 틱으로 미룸");
+                return;
+            }
+
+            var bot = CreateBotUnit(_pendingSpawns[0], coords);
+            _pendingSpawns.RemoveAt(0);
+
+            // 여기서 바로 _units에 넣어야 다음 반복이 이 봇의 칸을 점유로 인식한다.
+            _units.Add(bot);
+            SpawnVisual(bot);
+        }
+    }
+
+    /// <summary>
+    /// 아군 보드에서 비어 있는 칸 하나(좌표 정렬 기준 첫 칸). 없으면 false.
+    ///
+    /// 점유 판정은 <b>팀과 무관하게</b> 살아있는 유닛 전부를 본다 — 적이 전진해 아군 진영까지
+    /// 밀고 들어와 있을 수 있고, 그 칸에 봇을 놓으면 두 유닛이 겹친다. 죽은 유닛의 자리는 다시 쓴다.
+    /// 정렬(CompareCoords)은 클라이언트 간 배치 순서를 고정하기 위한 것으로, 기존 봇 소환과 같은 규칙이다.
+    /// </summary>
+    private bool TryFindEmptyBoardTile(BoardManager board, out HexCoords result)
+    {
+        var occupied = new HashSet<HexCoords>();
+        foreach (var bu in _units)
+            if (bu.IsAlive)
+                occupied.Add(bu.coords);
+
+        var empty = new List<HexCoords>();
+        foreach (var coords in board.GetBoardSnapshot().Keys)
+            if (!occupied.Contains(coords)) empty.Add(coords);
+
+        if (empty.Count == 0)
+        {
+            result = default;
+            return false;
+        }
+
+        empty.Sort(CompareCoords);
+        result = empty[0];
+        return true;
+    }
+
+    /// <summary>
+    /// 종별 버프를 영웅 이브이에게 적용. 값의 의미는 HeroEeveeBoostTable.Stat 주석 참고.
+    /// 전투 중에 거는 버프라 최대체력 증가는 늘어난 만큼 즉시 회복시킨다 — 그러지 않으면
+    /// 체력 버프가 "빈 체력칸만 늘리는" 효과가 되어 사실상 무의미해진다(GROUND 시너지와 동일 처리).
+    /// </summary>
+    private static void ApplyEeveeBoost(BattleUnit target, HeroEeveeBoostTable.Entry entry)
+    {
+        float v = entry.value;
+
+        switch (entry.stat)
+        {
+            // WATER 시너지와 같은 공식·같은 취급의 '미추적' 보호막 — shield 필드에만 더한다
+            // (shieldSources는 스킬/아이템 보호막 전용. BattleUnit 주석의 2026-08 확정 규칙).
+            case HeroEeveeBoostTable.Stat.Shield:
+                target.shield += target.spellPower * v;
+                break;
+
+            case HeroEeveeBoostTable.Stat.AttackSpeed:
+                target.attackSpeed *= 1f + v;
+                break;
+
+            case HeroEeveeBoostTable.Stat.Defense:
+                target.defense *= 1f + v;
+                break;
+
+            case HeroEeveeBoostTable.Stat.Attack:
+                target.attack *= 1f + v;
+                break;
+
+            case HeroEeveeBoostTable.Stat.CritChance:
+                target.critChance = Mathf.Min(1f, target.critChance + v);
+                break;
+
+            case HeroEeveeBoostTable.Stat.MaxHp:
+            {
+                float add = target.maxHp * v;
+                target.maxHp     += add;
+                target.currentHp += add;
+                break;
+            }
+
+            case HeroEeveeBoostTable.Stat.ManaRegen:
+                target.manaGainMultiplier += v;
+                break;
+
+            case HeroEeveeBoostTable.Stat.SpellPower:
+                target.spellPower *= 1f + v;
+                break;
+        }
+    }
+
+    // ─────────────────────────────────────────
     // 셋업
     // ─────────────────────────────────────────
 
@@ -575,6 +801,7 @@ public class BattleManager : MonoBehaviour
     {
         _units.Clear();
         _previousCoords.Clear();
+        _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         var board = GameManager.Instance.Board;
         BuildValidCoords(board);
@@ -1309,6 +1536,11 @@ public class BattleManager : MonoBehaviour
             }
         }
 
+        // 이번 틱에 예약된 소환(나인이볼부스트)을 실제로 전투에 편입한다. 위 행동 루프가 _units를
+        // foreach로 돌고 있어 그 안에서 Add하면 InvalidOperationException이 난다 — 루프가 끝난
+        // 여기서 한 번에 옮긴다.
+        FlushPendingSpawns();
+
         // 죽은 유닛 시각화 제거
         foreach (var bu in _units)
         {
@@ -1527,6 +1759,16 @@ public class BattleManager : MonoBehaviour
                 primaryTarget.ApplyStun(SynergyConstants.DarkFirstSkillStunSeconds);
         }
 
+        // [이브이 영웅증강 v2] 나인이볼부스트 — 이 시전이 소환에 쓰였으면 원래 스킬 효과는 내지 않는다.
+        // 스킬 자체가 "진화체를 부르는 것"으로 대체되기 때문이다(기획 확정 2026-08-19: 별도 VFX 없이
+        // 소환되는 진화체가 곧 연출). 8종을 다 부른 뒤에는 false가 돌아와 원래 스킬로 되돌아간다.
+        if (TryCastHeroEeveeBoost(caster))
+        {
+            foreach (var effect in caster.effects)
+                effect.OnSkillCast(caster);
+            return;
+        }
+
         // 데미지 스킬만 처리. 지원(HP_REGEN/SHIELD/AS_BUFF/MANA_REGEN)은 Phase2, CC(SLOW/STUN/TAUNT)는 기둥C에서 구현.
         bool isDamage = caster.skillEffectType == SkillEffectType.Attack ||
                         caster.skillEffectType == SkillEffectType.Spell;
@@ -1636,11 +1878,11 @@ public class BattleManager : MonoBehaviour
                         t.shieldSources.Add(skillSource);
                     }
                     break;
-                case SkillEffectType.ManaRegen: // 기획 확정: 회복량 = spellPower × 0.5 (즉시 지급)
-                    GainMana(t, caster.spellPower * SUPPORT_SPELLPOWER_COEF);
+                case SkillEffectType.ManaRegen: // 회복량 = spellPower × 계수 (즉시 지급, 본인 제외 반경 내 아군)
+                    GainMana(t, caster.spellPower * SUPPORT_BUFF_SPELLPOWER_COEF);
                     break;
-                case SkillEffectType.AsBuff:    // 기획 확정: 증가량 = spellPower × 0.5 (%p로 해석)
-                    t.ApplyAsBuff(1f + caster.spellPower * SUPPORT_SPELLPOWER_COEF / 100f, AS_BUFF_DURATION);
+                case SkillEffectType.AsBuff:    // 증가량 = (spellPower × 계수)%p (본인 제외 반경 내 아군)
+                    t.ApplyAsBuff(1f + caster.spellPower * SUPPORT_BUFF_SPELLPOWER_COEF / 100f, AS_BUFF_DURATION);
                     break;
             }
         }
@@ -1669,11 +1911,33 @@ public class BattleManager : MonoBehaviour
                 break;
 
             case SkillTargetType.AllyArea:
+            {
+                // 지원 버프(공속 증가·마나 회복)는 <b>시전자 본인을 뺀</b> 반경 내 아군이다
+                // (기획 확정 2026-08-19). 반경 판정은 다른 ALLY_AREA 스킬과 똑같이 적용되고,
+                // 본인을 빼는 것만이 이 두 효과의 차이다.
+                //
+                // 판정을 role이 아니라 effectType으로 하는 이유: BattleUnit.role은 영웅증강이
+                // 덮어쓸 수 있어(roleOverride) 전투 중에 바뀔 수 있는 값이다. 반면 이 두 효과를
+                // ALLY_AREA로 쓰는 스킬은 데이터상 전부 서포터 스킬(Nuzzle/Coaching/Celebrate/Charge)이라
+                // 결과가 같으면서 흔들리지 않는다.
+                //
+                // ⚠️ 본인 제외는 이 두 효과에만 붙는다. 같은 ALLY_AREA라도 HP_REGEN(GrassWhistle)·
+                //    SHIELD(SparklingAria/MagicCoat)는 <b>본인을 포함</b>해야 한다 — 자기 회복·자기 보호막이
+                //    빠지면 안 되기 때문. ALLY_SELF(SelfASBuff 47마리 등)는 애초에 이 분기로 오지도 않지만,
+                //    혹시라도 같이 묶으면 대상이 0명이 되어 스킬이 통째로 무효가 된다.
+                bool excludeSelf = caster.skillEffectType == SkillEffectType.AsBuff ||
+                                   caster.skillEffectType == SkillEffectType.ManaRegen;
+
                 foreach (var u in _units)
-                    if (u.team == caster.team && u.IsAlive && !u.IsUntargetable &&
-                        caster.coords.DistanceTo(u.coords) <= caster.skillAreaRadius)
-                        result.Add(u);
+                {
+                    if (u.team != caster.team || !u.IsAlive || u.IsUntargetable) continue;
+                    if (excludeSelf && u == caster) continue;
+                    if (caster.coords.DistanceTo(u.coords) > caster.skillAreaRadius) continue;
+
+                    result.Add(u);
+                }
                 break;
+            }
 
             // AllySingle: 데이터 설계 의도(PokemonSkillData 주석) = HpRegen→최저HP, Shield→탱커.
             case SkillTargetType.AllySingle when caster.skillEffectType == SkillEffectType.Shield:
@@ -2145,6 +2409,9 @@ public class BattleManager : MonoBehaviour
 
         _units.Clear();
 
+        // 편입 전에 전투가 끝난 예약분은 그냥 버린다(아직 visual이 없어 정리할 것도 없다).
+        _pendingSpawns.Clear();
+
         foreach (var tile in _mirrorTiles)
             Destroy(tile);
 
@@ -2410,6 +2677,7 @@ public class BattleManager : MonoBehaviour
         failReason = null;
         _units.Clear();
         _previousCoords.Clear();
+        _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
         {
@@ -2640,11 +2908,9 @@ public class BattleManager : MonoBehaviour
         if (SnapshotActiveTier(snapshot, "Cheerleader").HasValue)
             ApplyCheerleaderChoice(snapshot.cheerleaderChoice);
 
-        if (SnapshotHasHeroEeveeThreeStar(snapshot))
-        {
-            SpawnMirrorMutantBots(MutantBots.Length);
-        }
-        else
+        // 실전투와 같다 — 즉시 소환이 아니라 소환 주체만 지정하고, 실제 소환은 그 이브이가
+        // 스킬을 시전할 때마다 1종씩 일어난다(CastSkill은 실전투/미러가 공용).
+        if (!MarkMirrorHeroEeveeSummoner(snapshot))
         {
             int? mutantTier = SnapshotActiveTier(snapshot, "Mutant");
             if (mutantTier.HasValue)
@@ -2656,7 +2922,7 @@ public class BattleManager : MonoBehaviour
             MarkMirrorDarkFirstSkillStun(dark);
     }
 
-    /// <summary>MarkDarkFirstSkillStun의 스냅샷 버전 — bu.data.synergies 기준(HasHeroEeveeThreeStar와 같은 이유).</summary>
+    /// <summary>MarkDarkFirstSkillStun의 스냅샷 버전 — bu.data.synergies 기준(미러 아군은 source가 null이라 종 데이터로 판정).</summary>
     private void MarkMirrorDarkFirstSkillStun(SynergyData dark)
     {
         foreach (var bu in _units)
@@ -2667,22 +2933,56 @@ public class BattleManager : MonoBehaviour
         }
     }
 
-    /// <summary>HasHeroEeveeThreeStar의 스냅샷 버전 — snapshot.units(evolutionLocked)를 직접 본다.</summary>
-    private static bool SnapshotHasHeroEeveeThreeStar(BattleSnapshot snapshot)
+    /// <summary>
+    /// MarkHeroEeveeSummoner의 스냅샷 버전 — 판정 기준은 실전투와 같다
+    /// (evolutionLocked = 고정 효과라 여러 마리, heroStatMultiplier &gt; 1 = 이동 효과라 딱 한 마리).
+    ///
+    /// 미러 전투의 아군 BattleUnit은 source가 null이라 PokemonUnit을 볼 수 없어, 스냅샷 엔트리와
+    /// 좌표(q,r)로 짝을 맞춘다 — SetupMirrorUnits가 coords를 엔트리 값 그대로 넣으므로 1:1이다.
+    /// </summary>
+    private bool MarkMirrorHeroEeveeSummoner(BattleSnapshot snapshot)
     {
         PokemonDatabase db = PokemonDatabase.Instance;
         if (db == null) return false;
 
         foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
         {
-            if (!entry.evolutionLocked || entry.starLevel < 3) continue;
+            if (!entry.evolutionLocked || entry.heroStatMultiplier <= 1f) continue;
+            if (entry.starLevel < HERO_EEVEE_MIN_STAR) continue;
 
             PokemonData species = db.GetById(entry.speciesId);
-            if (species != null &&
-                string.Equals(species.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
+            if (species == null ||
+                !string.Equals(species.pokemonNameEn, "Eevee", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var coords = new HexCoords(entry.q, entry.r);
+            foreach (var bu in _units)
+            {
+                if (bu.team != BattleTeam.Ally || !bu.coords.Equals(coords)) continue;
+
+                MarkAsHeroEeveeSummoner(bu);
                 return true;
+            }
         }
         return false;
+    }
+
+    /// <summary>
+    /// 소환 카운터를 켜고 스킬 마나코스트를 <b>성급별</b> 나인이볼부스트 값으로 갈아끼운다
+    /// (실전투/미러 공용). 종 원본(Celebrate 60)은 쓰지 않는다 — 1성·2성은 8종에 못 닿고 3성만
+    /// 닿게 하는 계단이 목적이라, 근거와 수치는 <see cref="HeroEeveeBoostTable.SkillManaCost"/> 주석 참고.
+    /// </summary>
+    private static void MarkAsHeroEeveeSummoner(BattleUnit bu)
+    {
+        bu.heroEeveeSummonIndex = 0;
+
+        // 8종을 다 부르고 나면 원래 스킬로 되돌아가므로, 그때 쓸 원본 코스트를 보관해 둔다.
+        bu.heroEeveeBaseMaxMana = bu.maxMana;
+        bu.maxMana = HeroEeveeBoostTable.SkillManaCost(bu.starLevel);
+
+        // 이미 찬 마나가 새 상한을 넘으면 첫 시전이 즉발이 된다 — 전투 시작 직후라 0이지만
+        // 호출 순서가 바뀌어도 안전하도록 가둬둔다.
+        bu.currentMana = Mathf.Min(bu.currentMana, bu.maxMana);
     }
 
     /// <summary>

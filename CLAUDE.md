@@ -61,7 +61,7 @@ Assets/_Project/Scripts/
 **🔴 기획 수치 확정 대기 (메커니즘 구현됨, 값만 PLACEHOLDER)**
 - ~~마나 충전 모델~~ ✅ 확정(7/10): 초당 10 고정만(`MANA_PER_SECOND`). 평타/피격비례 제거됨
 - ~~TAUNT~~ ✅ 날따름 확정(7/10): 시전자 중심 반경, 지속 1.0×1.4×성급(1/1.8/2.8), 원래 타겟 스냅샷→복귀
-- ~~지원스킬 위력~~ ✅ 확정(7/10): spellPower×0.5(`SUPPORT_SPELLPOWER_COEF`, 임시 계수). 단 AsBuff "증가량"·ManaRegen "회복량" 해석(%(p) vs 즉시 마나)은 해인님 재확인 대기, `AS_BUFF_DURATION`은 여전히 PLACEHOLDER
+- ~~지원스킬 위력~~ ✅ 확정(8/19, 해인): **AsBuff·ManaRegen = 서포터가 "본인을 뺀 areaRadius 내 아군"에게 거는 지원**으로 통일 — 반경은 시트 `areaRadius`가 그대로 결정하고(코드에 상수로 박지 말 것), 코드 규칙은 **본인 제외 한 줄뿐**. 계수는 공용 `SUPPORT_BUFF_SPELLPOWER_COEF=0.05` 하나(AsBuff=(spellPower×0.05)%p 공속, ManaRegen=spellPower×0.05 즉시 마나), `AS_BUFF_DURATION`=3초. 0.5였을 땐 공속이 3성 +287%p(플러시)까지 튀고 마이농이 자기 코스트(45)의 6배를 자기에게 돌려줘 마나 자가 순환이 났다. **본인 제외는 `GetAllyTargets`의 ALLY_AREA 분기에서 effectType으로 판정**한다 — role은 영웅증강이 덮어써서(roleOverride) 전투 중 바뀔 수 있어 기준으로 못 쓴다. 🚨 **`ALLY_SELF`(SelfASBuff, 47마리)에는 본인 제외를 절대 적용하지 말 것** — 자기에게 거는 스킬이라 빼면 효과가 통째로 사라진다. HP_REGEN·SHIELD의 ALLY_AREA는 기존 반경 판정 그대로다.
 - 스킬용 STUN: 스코프 아웃(7/10, 증강 6종에 없음 — 메커니즘만 유지), SLOW: 보류(유닛/아이템 미구현)
 - `BattleManager` role 타겟 우선순위(`ROLE_TARGET_PRIORITY`)
 - `Combat/ItemConditionalEffect` 화상 딜/틱/반경(`BURN_*`), 이속 누적
@@ -73,7 +73,7 @@ Assets/_Project/Scripts/
 **🟡 타 담당 영역**
 - ✅ 상점 카드 UI(유닛 5칸/아이템 4칸) — `haein_UI` 병합으로 master 반영 완료(7/28, PR #57). 아이템 리롤은 **카드별 슬롯 1회·무료** 모델(`RerollItemSlot`). 구 모델(`RerollItemShop`·`AddItemShopReroll`·`OnItemShopRerollCountChanged`)은 제거됨
 - 레벨/확률/골드/쿠폰 텍스트 바인딩 + 유닛 드롭 판매 — PR #58 (씬 미변경). 판매 영역 시각 정렬은 `UnitDragController.Shop Sell Area` 인스펙터 지정으로 조정
-- ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=1회만 오픈(8/15 정정, 장한나 — 기존 "확정 2회 오픈"은 오기), 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 자뭉열매는 7/17 완료. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — 나인이볼부스트(8종 소환+버프)·`SK_` 스킬행(전투 신규 메커니즘)
+- ✅ 증강 시스템 — **Augment Table v2 확정 6종**(7/16 해인 회신 반영: 레벨할인 삭제, 구독서비스=1회만 오픈(8/15 정정, 장한나 — 기존 "확정 2회 오픈"은 오기), 전 영웅 ×1.4, 이브이→마법사, 전용리롤 아님) + 3택1 오퍼 + 블로킹 UX(모달·내려두기·1분/Ready 자동선택) 구현(영욱 대행). 상세: `Assets/_Project/Docs/AugmentSystem.md`. 자뭉열매는 7/17 완료. 나인이볼부스트(8종 소환+버프)는 8/19 완료. 남은 것: 선택 UI 정식화+배치입력 `IsChoiceBlocking` 배선(태욱), **별도 티켓** — `SK_` 스킬행(시트 미작성)
 - ✅ `ShopManager` XP 이벤트화 + `UIManager` 진행 HUD/XP 구매 UI — 완료(PR #39, 태욱). `UIManager`가 Gold/Level/Xp/UnitCap 이벤트 구독, `PrototypeHud`의 XP 폴링·중복 제거
 - ✅ `Managers/RewardManager` `AugmentChoice` 지급 — 연결 완료(7/16). preReward(StageData)와 RewardKind 두 경로 모두 지원
 
@@ -81,7 +81,7 @@ Assets/_Project/Scripts/
 - ✅ 악(DARK) 시너지 첫 스킬 스턴 — 구현 완료(`BattleManager.MarkDarkFirstSkillStun`/`CastSkill`)
 - ✅ 전적 기록 시스템 — 전 구간 완료(7/10): 로컬 jsonl(`MatchRecorder`→`MatchHistoryStore`) + 전적창 UI(태욱, `UIManager`) + 닉네임 입력(`TrySetLocalNickname`) + **Supabase 서버 업로드**(`Network/SupabaseMatchUploader` — 익명 세션+profiles 닉네임+matches 업로드, 스키마 `Docs/SCHEMA_2026-07-10_supabase-matches.sql`) + matchId Room 속성 GUID 배포(`NetworkManager.MatchGuid`) + **전적창 서버 조회 로컬/서버 탭**(Phase 3, PR #45, 7/20 병합). 전 구간 완료.
 - `RoundPhaseManager` preReward 훅(`OnStageEntered` 구독) — 기획/담당 분배 후 연결
-- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. **나인이볼부스트 증강(HERO_EEVEE)은 구현·동작 중**(간이 봇소환) — 미구현은 v2 풀 연출(진화체 8종 순차 소환+종별 버프)뿐. `SK_` 영웅스킬은 skill_table에 행 0건(기획 미작성)이라 코드로만 동작. 보스 전용 기믹은 **스코프 아웃**(7/21 확인, 근거: 기획 역기획서 `SCHEMA_2026-06-19_stage-data-v2.md`에 보스=statMul/hpMul+q,r 포메이션만, 패턴/페이즈 컬럼 자체가 없음 — 스탯 배수가 최종 스펙. 현 데이터는 1-5 슬라이스 한정)
+- 일반 스킬의 CC/지원/타겟팅 메커니즘은 완료. ✅ **나인이볼부스트(HERO_EEVEE) v2 완료(8/19)** — 영웅 이브이가 스킬 1회 시전마다 진화체 1종을 순서대로 봇 소환하고, 그 종의 버프를 **봇이 아니라 이브이 자신에게** 건다. 순서·수치는 `Data/HeroEeveeBoostTable.cs` 한 곳(밸런스 조정 = 이 표만 수정), 전투 로직은 `BattleManager.TryCastHeroEeveeBoost`. 전용 VFX 없음(소환되는 진화체가 곧 연출). `SK_` 영웅스킬은 skill_table에 행 0건(기획 미작성)이라 코드로만 동작. 보스 전용 기믹은 **스코프 아웃**(7/21 확인, 근거: 기획 역기획서 `SCHEMA_2026-06-19_stage-data-v2.md`에 보스=statMul/hpMul+q,r 포메이션만, 패턴/페이즈 컬럼 자체가 없음 — 스탯 배수가 최종 스펙. 현 데이터는 1-5 슬라이스 한정)
 - 🔺 **자동 테스트가 핵심 로직에 못 붙는 구조 (7/21 확인, 미해결)**
   - 문제: `BattleManager`·`ShopManager`·`NetworkManager` 등 런타임 코드가 전부 **predefined assembly(`Assembly-CSharp`)** 에 있는데, **asmdef 기반 테스트 어셈블리는 predefined assembly를 참조할 수 없다**(Unity 제약). 그래서 `PokeChess.EditorTests`에서 이 타입들이 아예 안 보인다. 기존 `SceneStabilityTests`가 도는 건 UnityEditor API만 쓰기 때문.
   - 정공법: `Assets/_Project/Scripts/`에 런타임 asmdef, `Scripts/Editor/`에 에디터 asmdef를 만들어 predefined assembly에서 탈출. `_Project/Scripts` 밖의 `.cs`는 서드파티 데모뿐이라 충돌 위험은 낮음.
