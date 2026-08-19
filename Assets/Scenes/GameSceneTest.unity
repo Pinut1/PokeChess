@@ -31281,7 +31281,7 @@ MonoBehaviour:
   _hostColor: {r: 0.7209258, g: 0.4575472, b: 1, a: 1}
   _guestColor: {r: 0.4481132, g: 0.74738085, b: 1, a: 1}
   _offlineColor: {r: 0.55, g: 0.55, b: 0.58, a: 1}
-  _inactiveDim: 0.35
+  _inactiveDim: 0.5
   _debugShowPip: 0
 --- !u!114 &1915979507
 MonoBehaviour:
