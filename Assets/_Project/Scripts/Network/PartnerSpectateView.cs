@@ -76,6 +76,13 @@ public class PartnerSpectateView : MonoBehaviour
     /// (HandleStageEntered) false로 리셋된다.</summary>
     private bool _teamRoundResolved;
 
+    /// <summary>파트너 MirrorBattle이 끝까지 정상 재생 완료된 라운드 번호(BattleSnapshot.roundIndex).
+    /// null이면 이번 라운드는 아직 완료된 적 없음. StartOrReplaceMirrorBattle의 onComplete(정상 종료)에서만
+    /// 세팅되고, 실패/중단(onFailed, AbortMirrorBattle)에서는 세팅되지 않는다 — 실패한 재생을 "완료"로
+    /// 취급해 재관전을 막아버리는 것을 방지하기 위함. _teamRoundResolved와 같은 시점(HandleStageEntered)에
+    /// 함께 리셋된다.</summary>
+    private int? _completedMirrorRoundIndex;
+
     /// <summary>지금 파트너 화면이 전체화면으로 열려 있는지(PIP 축소 상태는 포함하지 않음).
     /// UnitStatusBarHud 등 "지금 내 로컬 화면 전체가 파트너 관전으로 덮여 있는지"만 알면 되는
     /// 다른 컴포넌트가 참조한다 — 이 클래스가 그 UI들을 직접 켜고 끄지는 않는다.</summary>
@@ -255,6 +262,7 @@ public class PartnerSpectateView : MonoBehaviour
     private void HandleStageEntered(StageData stage)
     {
         _teamRoundResolved = false;
+        _completedMirrorRoundIndex = null;
 
         if (!_isExpanded) return;
         if (_mirrorController != null) _mirrorController.ShowPartnerEnemyPreview(stage);
@@ -671,6 +679,13 @@ public class PartnerSpectateView : MonoBehaviour
     /// 이번 라운드 팀 결과가 이미 확정됐으면(_teamRoundResolved) roundIndex가 CurrentRound와 같아도
     /// 시작하지 않는다 — 양쪽 실제 전투가 이미 끝난 라운드의 캐시 스냅샷으로 끝난 MirrorBattle을
     /// 다시 재생하는 것을 막기 위함(HandleTeamRoundResolved가 이미 한 번 정지시킨 라운드).
+    ///
+    /// _teamRoundResolved는 "양쪽 다 끝남" 기준이라, 파트너 개인 전투만 먼저 끝나고 내 쪽(팀 결과)은
+    /// 아직인 상태에서는 여전히 false다 — 이 구간에서 관전을 닫았다 다시 열면 이 가드를 그냥 통과해
+    /// 이미 끝까지 재생된 MirrorBattle이 tick 0부터 다시 재생되는 문제가 있었다(2026-08 QA).
+    /// _completedMirrorRoundIndex(이 라운드의 MirrorBattle을 이미 끝까지 재생했는지, roundIndex 기준)로
+    /// 별도 차단한다 — StartOrReplaceMirrorBattle의 onComplete(정상 종료)에서만 세팅되므로 아직 진행
+    /// 중이거나(그 전에 IsRunning 가드로 이미 걸러짐) 실패/중단된 경우는 여기 걸리지 않는다.
     /// 패널 자체는 그대로 열리며(SetExpanded는 이 메서드 호출과 별개로 계속 진행), 남아 있는
     /// BoardSnapshot 프리뷰가 있으면 UpdatePipContent가 그걸 대신 보여준다.
     /// </summary>
@@ -681,9 +696,12 @@ public class PartnerSpectateView : MonoBehaviour
         if (!GameManager.TryGet(out var gm) || gm.Phase == null || gm.Network == null) return;
         if (IsMatchEnded(gm.Phase.CurrentPhase)) return;
         if (!gm.Network.HasPartnerBattleSnapshot) return;
-        if (gm.Network.PartnerBattleSnapshot.roundIndex != gm.Phase.CurrentRound) return;
 
-        StartOrReplaceMirrorBattle(gm.Network.PartnerBattleSnapshot);
+        BattleSnapshot snapshot = gm.Network.PartnerBattleSnapshot;
+        if (snapshot.roundIndex != gm.Phase.CurrentRound) return;
+        if (_completedMirrorRoundIndex == snapshot.roundIndex) return;
+
+        StartOrReplaceMirrorBattle(snapshot);
     }
 
     /// <summary>매치가 완전히 끝난 상태인지 — TryStartMirrorBattleFromCache/HandlePartnerBattleSnapshotChanged
@@ -701,6 +719,11 @@ public class PartnerSpectateView : MonoBehaviour
     /// (StopMirrorBattle은 실행 중이 아니면 아무 일도 하지 않아 중복 호출에 안전하다). 종료/실패
     /// 콜백에서는 그 시점에도 관전이 열려 있을 때만(_isExpanded) 쇼핑 적 프리뷰로 되돌린다 — 관전을
     /// 닫고 내 화면으로 돌아간 뒤에 뒤늦게 콜백이 와서 프리뷰를 다시 만드는 것을 막기 위함이다.
+    ///
+    /// 정상 종료(onComplete)에서만 _completedMirrorRoundIndex를 이 snapshot.roundIndex로 세팅한다 —
+    /// TryStartMirrorBattleFromCache가 같은 라운드에서 재관전할 때 이 MirrorBattle을 다시 시작하지
+    /// 않도록 막는 유일한 기록 지점. 실패(onFailed)나 StopMirrorBattle에 의한 중단은 콜백 자체가
+    /// onComplete를 타지 않으므로(AbortMirrorBattle은 콜백 없음) 자동으로 "완료" 처리되지 않는다.
     /// </summary>
     private void StartOrReplaceMirrorBattle(BattleSnapshot snapshot)
     {
@@ -711,7 +734,11 @@ public class PartnerSpectateView : MonoBehaviour
 
         _mirrorController.StartMirrorBattle(
             snapshot,
-            result => { if (_isExpanded) RefreshPartnerEnemyPreview(); },
+            result =>
+            {
+                _completedMirrorRoundIndex = snapshot.roundIndex;
+                if (_isExpanded) RefreshPartnerEnemyPreview();
+            },
             error => { if (_isExpanded) RefreshPartnerEnemyPreview(); });
     }
 
