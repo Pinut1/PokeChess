@@ -671,16 +671,16 @@ public class PartnerSpectateView : MonoBehaviour
         Color myColor      = ColorFor(localRole);
         Color partnerColor = ColorFor(partnerRole);
 
-        // 파트너가 없으면 파트너 쪽을 흐리게 하지 않는다. 흐리기는 "지금 어느 화면을 보는
-        // 중인지"를 뜻하는데, 파트너가 없으면 볼 화면 자체가 없어 흐릴 이유가 없다. 그대로 두면
-        // 혼자 있을 때 두 프로필의 밝기가 달라져 파트너 쪽만 꺼진 것처럼 보인다.
+        // 흐리기는 파트너 유무와 무관하게 "지금 보고 있지 않은 쪽"에 항상 들어간다.
+        // (혼자 있을 때 파트너 프로필이 사라져 보이던 문제는 Dim이 알파를 낮추던 것이 원인이었고,
+        //  그건 Dim에서 알파를 빼는 것으로 해결됐다 — 여기서 Dim 자체를 건너뛸 이유는 없다.)
 
         // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
             _myViewFrame.color = _isExpanded ? Dim(myColor) : myColor;
 
         if (_partnerViewFrame != null)
-            _partnerViewFrame.color = (_isExpanded || !hasPartner) ? partnerColor : Dim(partnerColor);
+            _partnerViewFrame.color = _isExpanded ? partnerColor : Dim(partnerColor);
     }
 
     /// <summary>
