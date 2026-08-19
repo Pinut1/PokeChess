@@ -39,7 +39,7 @@ MonoBehaviour:
     areaRadius: 2
     lineLength: 4
     vfxId: VFX_Cheer_Supporter_MANA_REGEN
-  attackVfxId: Cheer_L
+  attackVfxId: Electric_L
   evolvesIntoEn: 
   shopBuyable: 0
   obtainBy: synergy

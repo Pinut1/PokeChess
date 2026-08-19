@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 8508630326693611479}
   - component: {fileID: 44893837957128737}
   m_Layer: 0
-  m_Name: VFX_Electric_Supporter_MANA_REGEN
+  m_Name: VFX_Electric_Supporter_AS_Buff
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
