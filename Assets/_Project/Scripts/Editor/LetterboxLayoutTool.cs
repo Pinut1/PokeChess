@@ -65,12 +65,46 @@ public static class LetterboxLayoutTool
             if (ApplyToCanvas(canvas)) applied++;
         }
 
-        if (applied > 0)
+        int cameras = ApplyToCameras();
+
+        if (applied > 0 || cameras > 0)
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
         Undo.CollapseUndoOperations(undoGroup);
-        Debug.Log($"[LetterboxLayoutTool] Canvas {applied}개에 16:9 레터박스 적용 완료. " +
+        Debug.Log($"[LetterboxLayoutTool] Canvas {applied}개 + 카메라 {cameras}개에 16:9 레터박스 적용 완료. " +
                   "CanvasScaler의 Screen Match Mode가 Expand인지 확인하세요.");
+    }
+
+    /// <summary>
+    /// 화면에 직접 그리는 카메라에 <see cref="CameraLetterbox"/>를 붙인다. UI만 16:9로 가두면
+    /// 3D 보드는 여전히 화면 전체를 채워 검은 띠 뒤로 잘려 들어가므로, 카메라 뷰포트도 같은
+    /// 영역으로 맞춰야 한다.
+    ///
+    /// RenderTexture로 그리는 카메라는 건너뛴다 — 관전용 카메라(PartnerSpectateView)가 그렇고,
+    /// 이미 16:9로 보여지는 RT 안에 또 띠를 넣으면 이중 레터박스가 된다.
+    /// </summary>
+    private static int ApplyToCameras()
+    {
+        Camera[] cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        int applied = 0;
+
+        foreach (Camera cam in cameras)
+        {
+            if (cam.targetTexture != null) continue;
+
+            if (cam.GetComponent<CameraLetterbox>() == null)
+            {
+                Undo.AddComponent<CameraLetterbox>(cam.gameObject);
+                Debug.Log($"[LetterboxLayoutTool] '{cam.name}'에 CameraLetterbox 부착.", cam);
+            }
+
+            applied++;
+        }
+
+        if (applied == 0)
+            Debug.LogWarning("[LetterboxLayoutTool] 화면에 직접 그리는 카메라를 찾지 못해 3D 쪽은 건너뜁니다.");
+
+        return applied;
     }
 
     private static bool ApplyToCanvas(Canvas canvas)
