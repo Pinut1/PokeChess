@@ -50,11 +50,15 @@ public class PartnerSpectateView : MonoBehaviour
     [Tooltip("(선택) 파트너 프로필 버튼의 테두리 프레임.")]
     [SerializeField] private Image _partnerViewFrame;
 
-    [Tooltip("지금 보고 있는 쪽 테두리 색.")]
-    [SerializeField] private Color _activeFrameColor = new(1f, 0.85f, 0.3f);
+    [Tooltip("방을 만든 사람(방장)의 프로필 색.")]
+    [SerializeField] private Color _hostColor = new(0.62f, 0.40f, 0.90f);   // 보라
 
-    [Tooltip("보고 있지 않은 쪽 테두리 색.")]
-    [SerializeField] private Color _inactiveFrameColor = new(1f, 1f, 1f, 0.35f);
+    [Tooltip("방에 들어온 사람(참가자)의 프로필 색.")]
+    [SerializeField] private Color _guestColor = new(0.30f, 0.60f, 0.95f);  // 파랑
+
+    [Tooltip("보고 있지 않은 쪽을 얼마나 흐리게 할지. 1이면 구분 없음, 0.35면 꽤 흐려진다. 색(보라/파랑)은 누구인지를, 진하기는 지금 어느 화면을 보고 있는지를 나타낸다.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _inactiveDim = 0.35f;
 
     [Header("디버그")]
     [Tooltip("켜면 평상시에도 우측 상단에 작은 PIP 미리보기를 띄운다. 끄면(기본) 최종 플레이 화면처럼 " +
@@ -63,6 +67,10 @@ public class PartnerSpectateView : MonoBehaviour
 
     private Camera _spectatorCamera;
     private RenderTexture _spectatorTexture;
+
+    // 마지막으로 확인한 방장 여부. 바뀌면 RefreshFramesOnHostChange가 프로필 색을 다시 칠한다.
+    // null = 아직 한 번도 확인 안 함(첫 프레임에 무조건 칠한다).
+    private bool? _lastKnownHost;
 
     // 마지막으로 RenderTexture 크기를 맞춘 화면 해상도. 바뀌면 RefreshTextureOnScreenChange가 다시 만든다.
     private int _lastScreenWidth;
@@ -308,6 +316,21 @@ public class PartnerSpectateView : MonoBehaviour
         _wasMirrorRunning = running;
 
         RefreshTextureOnScreenChange();
+        RefreshFramesOnHostChange();
+    }
+
+    /// <summary>
+    /// 방장 여부가 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
+    /// 불리는데, 그 시점엔 아직 방에 들어가기 전이라 IsMasterClient가 확정되지 않았을 수 있다
+    /// (호스트 마이그레이션으로 도중에 바뀌는 경우도 같은 경로로 따라간다).
+    /// </summary>
+    private void RefreshFramesOnHostChange()
+    {
+        bool isHost = IsLocalHost();
+        if (_lastKnownHost.HasValue && _lastKnownHost.Value == isHost) return;
+
+        _lastKnownHost = isHost;
+        UpdateViewFrames();
     }
 
     /// <summary>
@@ -607,15 +630,42 @@ public class PartnerSpectateView : MonoBehaviour
     /// <summary>파트너 프로필 버튼 — 항상 파트너 화면으로. 이미 열려 있으면 아무 일도 없다.</summary>
     private void ShowPartnerView() => SetExpanded(true);
 
-    /// <summary>지금 보고 있는 쪽 프로필의 테두리만 활성 색으로 칠한다.</summary>
+    /// <summary>
+    /// 프로필 색을 칠한다. 두 가지 정보를 한 번에 담는다 —
+    ///   <b>색상</b>   누구인지: 방장=보라(_hostColor), 참가자=파랑(_guestColor)
+    ///   <b>진하기</b> 지금 어느 화면을 보고 있는지: 보고 있는 쪽은 그대로, 아닌 쪽은 _inactiveDim만큼 흐리게
+    ///
+    /// 두 신호를 한 메서드에서 합치는 이유 — _myViewFrame/_partnerViewFrame은 프로필 버튼의
+    /// Profile_Image 그 자체다. 다른 컴포넌트가 같은 Image의 color를 따로 칠하면 서로 덮어써서
+    /// 어느 쪽이 이겼는지에 따라 색이 깜빡인다. 색을 쓰는 곳은 여기 하나로 유지한다.
+    /// </summary>
     private void UpdateViewFrames()
     {
+        bool localIsHost = IsLocalHost();
+
+        // 2인 협동이라 내가 방장이면 파트너는 참가자, 그 반대도 마찬가지다.
+        Color myColor      = localIsHost ? _hostColor  : _guestColor;
+        Color partnerColor = localIsHost ? _guestColor : _hostColor;
+
+        // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
-            _myViewFrame.color = _isExpanded ? _inactiveFrameColor : _activeFrameColor;
+            _myViewFrame.color = _isExpanded ? Dim(myColor) : myColor;
 
         if (_partnerViewFrame != null)
-            _partnerViewFrame.color = _isExpanded ? _activeFrameColor : _inactiveFrameColor;
+            _partnerViewFrame.color = _isExpanded ? partnerColor : Dim(partnerColor);
     }
+
+    /// <summary>보고 있지 않은 쪽 표현. 색조(누구인지)는 남기고 밝기와 불투명도만 낮춘다.</summary>
+    private Color Dim(Color color)
+        => new(color.r * _inactiveDim, color.g * _inactiveDim, color.b * _inactiveDim,
+               color.a * Mathf.Lerp(1f, _inactiveDim, 0.5f));
+
+    /// <summary>
+    /// 이 클라이언트가 방을 만든 쪽인지. 네트워크가 아직 없거나 솔로면 true(방장)로 본다 —
+    /// 혼자일 때는 어차피 비교 대상이 없어 어느 색이든 무방하고, 색이 안 칠해지는 것보다 낫다.
+    /// </summary>
+    private static bool IsLocalHost()
+        => !GameManager.TryGet(out var gm) || gm.Network == null || gm.Network.IsMasterClient;
 
     /// <summary>
     /// 전체화면 관전 상태를 바꾸는 단일 진입점. _isExpanded 대입과
