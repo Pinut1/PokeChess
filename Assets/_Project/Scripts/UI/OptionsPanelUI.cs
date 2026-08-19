@@ -132,7 +132,11 @@ public class OptionsPanelUI : MonoBehaviour
     private const string PREF_SFX_VOLUME = "SfxVolume";
 
     private const string PREF_FULLSCREEN = "FullScreen";
-    private const string PREF_RESOLUTION_INDEX = "ResolutionIndex";
+    // 해상도는 목록에서의 순번이 아니라 값 자체로 저장한다 — 순번을 저장하면 지원 해상도 목록을
+    // 손볼 때(추가·삭제) 같은 순번이 다른 해상도를 가리켜 플레이어 설정이 조용히 바뀐다.
+    // 구 키 "ResolutionIndex"는 더 이상 읽지도 쓰지도 않는다(남아 있어도 무시된다).
+    private const string PREF_RESOLUTION_WIDTH  = "ResolutionWidth";
+    private const string PREF_RESOLUTION_HEIGHT = "ResolutionHeight";
 
     // ── 게임이 제공하는 기본값 ([기본값 복원]의 기준이자, 저장된 값이 없을 때의 초기값) ──
     // 저장값이 없을 때의 폴백도 반드시 이 상수를 쓴다. 폴백을 "씬에 찍혀 있던 값"으로 두면
@@ -351,16 +355,14 @@ public class OptionsPanelUI : MonoBehaviour
             currentFullScreen ? 1 : 0) == 1;
 
         BuildResolutionList();
-        int currentResolutionIndex = FindCurrentResolutionIndex();
-        _appliedResolutionIndex = Mathf.Clamp(
-            PlayerPrefs.GetInt(PREF_RESOLUTION_INDEX, currentResolutionIndex),
-            0,
-            _resolutionLabels.Length - 1);
+        _appliedResolutionIndex = ResolveStartupResolutionIndex();
 
         if (_appliedFullScreen != currentFullScreen)
             ApplyScreenMode();
 
-        if (_appliedResolutionIndex != currentResolutionIndex)
+        // 실제 창 크기와 다를 때만 적용한다 — 같은 값을 다시 넣으면 창이 한 번 깜빡인다.
+        Resolution startupResolution = _resolutions[_appliedResolutionIndex];
+        if (startupResolution.width != Screen.width || startupResolution.height != Screen.height)
             ApplyResolution();
 
         _pendingFullScreen = _appliedFullScreen;
@@ -1117,8 +1119,8 @@ public class OptionsPanelUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 실제 Screen.resolutions 기준으로 Dropdown 옵션을 다시 채운다(ClearOptions → AddOptions).
-    /// 중복 해상도/주사율 병합 정책은 BuildResolutionList(기존 로직)를 그대로 재사용한다.
+    /// 지원 해상도 목록으로 Dropdown 옵션을 다시 채운다(ClearOptions → AddOptions).
+    /// 목록을 만드는 규칙은 BuildResolutionList 한 곳에만 둔다.
     /// </summary>
     private void RefreshResolutionDropdownOptions()
     {
@@ -1138,7 +1140,8 @@ public class OptionsPanelUI : MonoBehaviour
         ApplyResolution();
 
         PlayerPrefs.SetInt(PREF_FULLSCREEN, _appliedFullScreen ? 1 : 0);
-        PlayerPrefs.SetInt(PREF_RESOLUTION_INDEX, _appliedResolutionIndex);
+        PlayerPrefs.SetInt(PREF_RESOLUTION_WIDTH,  _resolutions[_appliedResolutionIndex].width);
+        PlayerPrefs.SetInt(PREF_RESOLUTION_HEIGHT, _resolutions[_appliedResolutionIndex].height);
         PlayerPrefs.Save();
     }
 
@@ -1214,31 +1217,17 @@ public class OptionsPanelUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 기본 해상도 = 지원 목록 중 가장 큰 것.
+    /// 기본 해상도 = 지원 목록에서 가장 큰 것. [기본값 복원]의 기준이자, 저장된 설정이 없거나
+    /// 그 해상도가 목록에서 빠졌을 때의 폴백이다(<see cref="ResolveStartupResolutionIndex"/>).
     /// <para>
     /// Screen.currentResolution을 쓰면 안 된다 — Awake의 LoadAndApplyDisplaySettings()가 저장된
     /// 해상도를 이미 적용한 뒤라, 그 시점에 읽으면 "기본값"이 아니라 "직전에 쓰던 값"이 나온다.
-    /// _resolutions는 Screen.resolutions에서 만든 목록이라 모니터가 실제로 지원하는 값이 보장된다.
+    /// BuildResolutionList가 이미 모니터에 들어가는 것만 작은 순으로 남겨 놓으므로, 목록의 마지막이
+    /// 곧 "화면보다 크지 않은 것 중 가장 큰 값"이다.
     /// </para>
     /// </summary>
     private int FindDefaultResolutionIndex()
-    {
-        if (_resolutions == null || _resolutions.Length == 0) return 0;
-
-        int bestIndex = 0;
-        long bestPixels = 0;
-
-        for (int i = 0; i < _resolutions.Length; i++)
-        {
-            long pixels = (long)_resolutions[i].width * _resolutions[i].height;
-            if (pixels <= bestPixels) continue;
-
-            bestPixels = pixels;
-            bestIndex = i;
-        }
-
-        return bestIndex;
-    }
+        => _resolutions == null || _resolutions.Length == 0 ? 0 : _resolutions.Length - 1;
 
     /// <summary>옵션 취소 — Close/Cancel/ESC가 공유하는 CloseOptionsPanel()을 그대로 호출한다.</summary>
     private void HandleCancelOptionsButtonClicked()
@@ -1383,141 +1372,141 @@ public class OptionsPanelUI : MonoBehaviour
             SceneManager.LoadScene(_titleSceneName);
     }
 
-    // ── 해상도 목록 필터(기획 확정 2026-08-19) ────────────────────────────
-    // Screen.resolutions는 모니터가 보고하는 모드를 전부 준다 — 800x600·1024x768·1280x1024 같은
-    // 4:3/5:4 레거시까지 섞여 들어온다. 그런데 CanvasScaler Reference가 1920x1080(16:9)이라
-    // 비율이 다른 해상도에서는 논리 캔버스 크기가 달라져 UI가 어긋난다. 안 쓰는 비율은 아예
-    // 고르지 못하게 막는 편이 확실하다.
+    // ── 지원 해상도 목록(기획 확정 2026-08-19) ──────────────────────────────
+    // Screen.resolutions를 그대로 쓰지 않고 아래 고정 목록에서 고른다.
     //
-    // 남기는 비율: 16:9(1.778)와 16:10(1.600). 둘 다 Screen Match Mode = Expand와 함께면
-    // 논리 크기가 Reference 이상으로 보장돼 잘리지 않는다.
-    // 허용 오차가 필요한 이유: 1366x768은 정확히 16:9가 아니라 1.7786이다.
-    private const float ASPECT_16_9  = 16f / 9f;
-    private const float ASPECT_16_10 = 16f / 10f;
-    private const float ASPECT_TOLERANCE = 0.02f;
-
-    // 최소 지원 해상도 = HD. 이보다 작으면 UI 요소가 물리적으로 너무 작아져 읽기 어렵다.
-    private const int MIN_RESOLUTION_WIDTH  = 1280;
-    private const int MIN_RESOLUTION_HEIGHT = 720;
-
-    /// <summary>드롭다운에 노출할 해상도인지. 비율(16:9·16:10)과 최소 크기(HD) 둘 다 만족해야 한다.</summary>
-    private static bool IsSupportedResolution(int width, int height)
+    // 왜 고정 목록인가 — Screen.resolutions는 모니터가 보고하는 모드를 전부 준다(800x600·
+    // 1024x768·1280x1024 같은 4:3/5:4 레거시 포함). CanvasScaler Reference가 1920x1080(16:9)이라
+    // 다른 비율에서는 논리 캔버스 크기가 달라져 UI가 어긋나고, 목록이 길수록 고르기도 나쁘다.
+    // 실제로 쓸 몇 개만 노출하는 편이 확실하다.
+    //
+    // 모니터가 보고하지 않는 값을 넣어도 되는 이유 — 전체화면이 FullScreenWindow(테두리 없는 창)라
+    // 여기 값은 "모니터 모드"가 아니라 "렌더 해상도"로 쓰인다. 다만 모니터보다 큰 값은 창 모드에서
+    // 화면 밖으로 넘치므로 BuildResolutionList가 걸러낸다.
+    //
+    // 정렬은 작은 것부터 — 드롭다운에 이 순서대로 나가고, FindDefaultResolutionIndex가
+    // "마지막 = 가장 큰 것"이라는 이 정렬에 기댄다.
+    private static readonly Vector2Int[] SupportedResolutions =
     {
-        if (width < MIN_RESOLUTION_WIDTH || height < MIN_RESOLUTION_HEIGHT) return false;
-        if (height <= 0) return false;
+        new(1280,  720),   // 16:9   HD
+        new(1280,  800),   // 16:10
+        new(1600,  900),   // 16:9
+        new(1680, 1050),   // 16:10
+        new(1920, 1080),   // 16:9   FHD
+        new(1920, 1200),   // 16:10
+    };
 
-        float aspect = (float)width / height;
-        return Mathf.Abs(aspect - ASPECT_16_9)  <= ASPECT_TOLERANCE ||
-               Mathf.Abs(aspect - ASPECT_16_10) <= ASPECT_TOLERANCE;
-    }
-
+    /// <summary>
+    /// 드롭다운 목록을 만든다. <see cref="SupportedResolutions"/> 중 <b>모니터에 들어가는 것</b>만 남긴다.
+    /// 전부 걸러지면(목록 최소보다 작은 화면) 가장 작은 것 하나는 남긴다 — 드롭다운이 비면
+    /// 아무것도 고를 수 없다.
+    /// </summary>
     private void BuildResolutionList()
     {
-        Resolution[] rawResolutions = Screen.resolutions;
+        (int maxWidth, int maxHeight) = GetDisplayMaxSize();
 
-        var widths = new List<int>();
-        var heights = new List<int>();
-        var refreshRates = new List<RefreshRate>();
-
-        for (int i = 0; i < rawResolutions.Length; i++)
+        var picked = new List<Vector2Int>();
+        foreach (Vector2Int candidate in SupportedResolutions)
         {
-            Resolution candidate = rawResolutions[i];
-
-            if (!IsSupportedResolution(candidate.width, candidate.height)) continue;
-
-            int existingIndex = -1;
-            for (int j = 0; j < widths.Count; j++)
-            {
-                if (widths[j] == candidate.width && heights[j] == candidate.height)
-                {
-                    existingIndex = j;
-                    break;
-                }
-            }
-
-            if (existingIndex < 0)
-            {
-                widths.Add(candidate.width);
-                heights.Add(candidate.height);
-                refreshRates.Add(candidate.refreshRateRatio);
-            }
-            else if (candidate.refreshRateRatio.value > refreshRates[existingIndex].value)
-            {
-                refreshRates[existingIndex] = candidate.refreshRateRatio;
-            }
+            if (candidate.x <= maxWidth && candidate.y <= maxHeight) picked.Add(candidate);
         }
 
-        // 필터가 전부 걸러냈으면(비표준 비율만 지원하는 모니터 등) 목록이 비어 드롭다운이 먹통이 된다.
-        // 그럴 땐 필터를 포기하고 원본 목록을 그대로 쓴다 — 깨질지언정 고를 수는 있어야 한다.
-        if (widths.Count == 0 && rawResolutions.Length > 0)
+        if (picked.Count == 0) picked.Add(SupportedResolutions[0]);
+
+        _resolutions = new Resolution[picked.Count];
+        _resolutionLabels = new string[picked.Count];
+
+        for (int i = 0; i < picked.Count; i++)
         {
-            Debug.LogWarning("[Options] 지원 비율(16:9·16:10) + 최소 " +
-                             $"{MIN_RESOLUTION_WIDTH}x{MIN_RESOLUTION_HEIGHT} 조건에 맞는 해상도가 없어 " +
-                             "필터 없이 전체 목록을 사용합니다.");
+            RefreshRate refreshRate = ResolveRefreshRate(picked[i].x, picked[i].y);
 
-            for (int i = 0; i < rawResolutions.Length; i++)
-            {
-                Resolution candidate = rawResolutions[i];
-
-                int existingIndex = -1;
-                for (int j = 0; j < widths.Count; j++)
-                {
-                    if (widths[j] == candidate.width && heights[j] == candidate.height)
-                    {
-                        existingIndex = j;
-                        break;
-                    }
-                }
-
-                if (existingIndex < 0)
-                {
-                    widths.Add(candidate.width);
-                    heights.Add(candidate.height);
-                    refreshRates.Add(candidate.refreshRateRatio);
-                }
-                else if (candidate.refreshRateRatio.value > refreshRates[existingIndex].value)
-                {
-                    refreshRates[existingIndex] = candidate.refreshRateRatio;
-                }
-            }
-        }
-
-        if (widths.Count == 0)
-        {
-            widths.Add(Screen.currentResolution.width);
-            heights.Add(Screen.currentResolution.height);
-            refreshRates.Add(Screen.currentResolution.refreshRateRatio);
-        }
-
-        _resolutions = new Resolution[widths.Count];
-        _resolutionLabels = new string[widths.Count];
-
-        for (int i = 0; i < widths.Count; i++)
-        {
             _resolutions[i] = new Resolution
             {
-                width = widths[i],
-                height = heights[i],
-                refreshRateRatio = refreshRates[i]
+                width = picked[i].x,
+                height = picked[i].y,
+                refreshRateRatio = refreshRate
             };
 
-            _resolutionLabels[i] =
-                $"{widths[i]}x{heights[i]} @{refreshRates[i].value:0}Hz";
+            _resolutionLabels[i] = $"{picked[i].x}x{picked[i].y} @{refreshRate.value:0}Hz";
         }
     }
 
-    private int FindCurrentResolutionIndex()
+    /// <summary>
+    /// 모니터가 지원하는 최대 크기. Screen.resolutions가 보고하는 모드들의 최대 폭·높이로 판단한다 —
+    /// Screen.currentResolution은 우리가 SetResolution으로 바꿔 놓은 값일 수 있어 기준이 못 된다.
+    /// 모드 목록이 비는 환경(일부 에디터·헤드리스)에서는 현재 해상도로 대신한다.
+    /// </summary>
+    private static (int width, int height) GetDisplayMaxSize()
     {
-        for (int i = 0; i < _resolutions.Length; i++)
+        Resolution[] modes = Screen.resolutions;
+        if (modes.Length == 0)
+            return (Screen.currentResolution.width, Screen.currentResolution.height);
+
+        int maxWidth = 0;
+        int maxHeight = 0;
+
+        for (int i = 0; i < modes.Length; i++)
         {
-            if (_resolutions[i].width == Screen.currentResolution.width &&
-                _resolutions[i].height == Screen.currentResolution.height)
-            {
-                return i;
-            }
+            if (modes[i].width  > maxWidth)  maxWidth  = modes[i].width;
+            if (modes[i].height > maxHeight) maxHeight = modes[i].height;
         }
 
-        return 0;
+        return (maxWidth, maxHeight);
+    }
+
+    /// <summary>
+    /// 고정 목록의 해상도에 붙일 주사율. 모니터가 그 해상도를 모드로 보고하면 그중 가장 높은 것을,
+    /// 보고하지 않으면(FullScreenWindow라 모드가 없어도 되므로 정상 상황) 현재 주사율을 쓴다.
+    /// </summary>
+    private static RefreshRate ResolveRefreshRate(int width, int height)
+    {
+        RefreshRate best = default;
+        bool found = false;
+
+        Resolution[] modes = Screen.resolutions;
+        for (int i = 0; i < modes.Length; i++)
+        {
+            if (modes[i].width != width || modes[i].height != height) continue;
+            if (found && modes[i].refreshRateRatio.value <= best.value) continue;
+
+            best = modes[i].refreshRateRatio;
+            found = true;
+        }
+
+        return found ? best : Screen.currentResolution.refreshRateRatio;
+    }
+
+    /// <summary>
+    /// 시작할 때 쓸 해상도의 인덱스. 저장된 값을 <b>순번이 아니라 해상도(width/height)</b>로 읽는다 —
+    /// 순번으로 저장하면 지원 목록을 손볼 때 같은 순번이 다른 해상도를 가리켜 설정이 조용히 바뀐다.
+    /// 저장된 값이 없거나(첫 실행) 그 해상도가 목록에서 빠졌으면 FindDefaultResolutionIndex로
+    /// 떨어진다 — 목록 안의 값이므로 드롭다운 표시와 실제 해상도가 어긋난 채 시작하지 않는다.
+    /// </summary>
+    private int ResolveStartupResolutionIndex()
+    {
+        int savedWidth  = PlayerPrefs.GetInt(PREF_RESOLUTION_WIDTH,  0);
+        int savedHeight = PlayerPrefs.GetInt(PREF_RESOLUTION_HEIGHT, 0);
+
+        if (savedWidth > 0 && savedHeight > 0)
+        {
+            int savedIndex = FindResolutionIndex(savedWidth, savedHeight);
+            if (savedIndex >= 0) return savedIndex;
+        }
+
+        return FindDefaultResolutionIndex();
+    }
+
+    /// <summary>저장된 해상도가 목록의 몇 번째인지. 목록에 없으면 -1.</summary>
+    private int FindResolutionIndex(int width, int height)
+    {
+        if (_resolutions == null) return -1;
+
+        for (int i = 0; i < _resolutions.Length; i++)
+        {
+            if (_resolutions[i].width == width && _resolutions[i].height == height) return i;
+        }
+
+        return -1;
     }
 
     private void ApplyScreenMode()
