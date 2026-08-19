@@ -56,6 +56,9 @@ public class PartnerSpectateView : MonoBehaviour
     [Tooltip("방에 들어온 사람(참가자)의 프로필 색.")]
     [SerializeField] private Color _guestColor = new(0.30f, 0.60f, 0.95f);  // 파랑
 
+    [Tooltip("방에 들어가기 전(로비·솔로·오프라인)의 프로필 색. 누가 방장인지 아직 정해지지 않은 상태다.")]
+    [SerializeField] private Color _offlineColor = new(0.55f, 0.55f, 0.58f);  // 회색
+
     [Tooltip("보고 있지 않은 쪽을 얼마나 흐리게 할지. 1이면 구분 없음, 0.35면 꽤 흐려진다. 색(보라/파랑)은 누구인지를, 진하기는 지금 어느 화면을 보고 있는지를 나타낸다.")]
     [Range(0f, 1f)]
     [SerializeField] private float _inactiveDim = 0.35f;
@@ -68,9 +71,9 @@ public class PartnerSpectateView : MonoBehaviour
     private Camera _spectatorCamera;
     private RenderTexture _spectatorTexture;
 
-    // 마지막으로 확인한 방장 여부. 바뀌면 RefreshFramesOnHostChange가 프로필 색을 다시 칠한다.
+    // 마지막으로 확인한 역할. 바뀌면 RefreshFramesOnRoleChange가 프로필 색을 다시 칠한다.
     // null = 아직 한 번도 확인 안 함(첫 프레임에 무조건 칠한다).
-    private bool? _lastKnownHost;
+    private ProfileRole? _lastKnownRole;
 
     // 마지막으로 RenderTexture 크기를 맞춘 화면 해상도. 바뀌면 RefreshTextureOnScreenChange가 다시 만든다.
     private int _lastScreenWidth;
@@ -316,20 +319,20 @@ public class PartnerSpectateView : MonoBehaviour
         _wasMirrorRunning = running;
 
         RefreshTextureOnScreenChange();
-        RefreshFramesOnHostChange();
+        RefreshFramesOnRoleChange();
     }
 
     /// <summary>
-    /// 방장 여부가 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
-    /// 불리는데, 그 시점엔 아직 방에 들어가기 전이라 IsMasterClient가 확정되지 않았을 수 있다
-    /// (호스트 마이그레이션으로 도중에 바뀌는 경우도 같은 경로로 따라간다).
+    /// 역할이 바뀌면 프로필 색을 다시 칠한다. UpdateViewFrames는 시작 시점과 화면 전환에서만
+    /// 불리는데, 그 시점엔 대개 아직 방 밖(Offline=회색)이라 입장 후 한 번은 다시 칠해야 한다.
+    /// 호스트 마이그레이션이나 방 퇴장(다시 회색)도 같은 경로로 따라간다.
     /// </summary>
-    private void RefreshFramesOnHostChange()
+    private void RefreshFramesOnRoleChange()
     {
-        bool isHost = IsLocalHost();
-        if (_lastKnownHost.HasValue && _lastKnownHost.Value == isHost) return;
+        ProfileRole role = ResolveLocalRole();
+        if (_lastKnownRole.HasValue && _lastKnownRole.Value == role) return;
 
-        _lastKnownHost = isHost;
+        _lastKnownRole = role;
         UpdateViewFrames();
     }
 
@@ -641,11 +644,19 @@ public class PartnerSpectateView : MonoBehaviour
     /// </summary>
     private void UpdateViewFrames()
     {
-        bool localIsHost = IsLocalHost();
+        ProfileRole localRole = ResolveLocalRole();
 
         // 2인 협동이라 내가 방장이면 파트너는 참가자, 그 반대도 마찬가지다.
-        Color myColor      = localIsHost ? _hostColor  : _guestColor;
-        Color partnerColor = localIsHost ? _guestColor : _hostColor;
+        // 방에 안 들어간 상태면 누가 누구인지 정해지지 않아 양쪽 다 회색이다.
+        ProfileRole partnerRole = localRole switch
+        {
+            ProfileRole.Host  => ProfileRole.Guest,
+            ProfileRole.Guest => ProfileRole.Host,
+            _                 => ProfileRole.Offline
+        };
+
+        Color myColor      = ColorFor(localRole);
+        Color partnerColor = ColorFor(partnerRole);
 
         // _isExpanded == 파트너 화면을 보는 중.
         if (_myViewFrame != null)
@@ -660,12 +671,31 @@ public class PartnerSpectateView : MonoBehaviour
         => new(color.r * _inactiveDim, color.g * _inactiveDim, color.b * _inactiveDim,
                color.a * Mathf.Lerp(1f, _inactiveDim, 0.5f));
 
+    /// <summary>프로필 색이 나타내는 역할. Offline은 "아직 방에 안 들어가 정해지지 않음"이다.</summary>
+    private enum ProfileRole { Offline, Host, Guest }
+
+    private Color ColorFor(ProfileRole role) => role switch
+    {
+        ProfileRole.Host  => _hostColor,
+        ProfileRole.Guest => _guestColor,
+        _                 => _offlineColor
+    };
+
     /// <summary>
-    /// 이 클라이언트가 방을 만든 쪽인지. 네트워크가 아직 없거나 솔로면 true(방장)로 본다 —
-    /// 혼자일 때는 어차피 비교 대상이 없어 어느 색이든 무방하고, 색이 안 칠해지는 것보다 낫다.
+    /// 이 클라이언트의 역할. <b>방에 들어가 있을 때만</b> 방장/참가자가 정해진다 —
+    /// 로비·솔로모드·오프라인 스텁은 전부 Offline(회색)이다.
+    ///
+    /// IsMasterClient만 보면 안 되는 이유: 방 밖에서도 true를 돌려주는 경로가 있어
+    /// (오프라인 스텁은 항상 true, 솔로모드도 true) 접속 전부터 방장 색이 칠해진다.
+    /// IsInRoom을 먼저 확인해야 "아직 모른다"와 "내가 방장이다"가 구분된다.
     /// </summary>
-    private static bool IsLocalHost()
-        => !GameManager.TryGet(out var gm) || gm.Network == null || gm.Network.IsMasterClient;
+    private static ProfileRole ResolveLocalRole()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Network == null) return ProfileRole.Offline;
+        if (!gm.Network.IsInRoom) return ProfileRole.Offline;
+
+        return gm.Network.IsMasterClient ? ProfileRole.Host : ProfileRole.Guest;
+    }
 
     /// <summary>
     /// 전체화면 관전 상태를 바꾸는 단일 진입점. _isExpanded 대입과
