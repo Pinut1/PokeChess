@@ -62,19 +62,30 @@ public class SynergyManager : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnUnitPlaced  += HandleBoardChanged;
-        GameEvents.OnUnitBenched += HandleBoardChanged;
-        GameEvents.OnUnitSold    += HandleBoardChanged;
+        GameEvents.OnUnitPlaced     += HandleBoardChanged;
+        GameEvents.OnUnitBenched    += HandleBoardChanged;
+        GameEvents.OnUnitSold       += HandleBoardChanged;
+        GameEvents.OnAugmentSelected += HandleAugmentSelected;
     }
 
     private void OnDisable()
     {
-        GameEvents.OnUnitPlaced  -= HandleBoardChanged;
-        GameEvents.OnUnitBenched -= HandleBoardChanged;
-        GameEvents.OnUnitSold    -= HandleBoardChanged;
+        GameEvents.OnUnitPlaced     -= HandleBoardChanged;
+        GameEvents.OnUnitBenched    -= HandleBoardChanged;
+        GameEvents.OnUnitSold       -= HandleBoardChanged;
+        GameEvents.OnAugmentSelected -= HandleAugmentSelected;
     }
 
     private void HandleBoardChanged(PokemonUnit _) => RecalculateSynergies();
+
+    /// <summary>
+    /// 증강 선택은 보드를 건드리지 않지만 시너지 결과를 바꿀 수 있다 — 이브이 영웅증강이
+    /// 돌연변이를 누르기 때문(<see cref="SuppressMutantIfHeroEevee"/>). 이 구독이 없으면
+    /// 증강을 고른 직후부터 "다음 보드 변경"까지 이미 활성인 돌연변이가 그대로 남고,
+    /// 그 사이에 전투가 시작되면 억제됐어야 할 돌연변이 봇이 소환된다(벤치가 가득 차
+    /// 즉시지급이 UnitBenched를 발행하지 못하는 경우가 그 창을 만든다).
+    /// </summary>
+    private void HandleAugmentSelected(AugmentData _) => RecalculateSynergies();
 
     // ─────────────────────────────────────────
     // 재계산

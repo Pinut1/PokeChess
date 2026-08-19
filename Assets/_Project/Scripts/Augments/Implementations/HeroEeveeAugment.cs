@@ -39,4 +39,46 @@ public class HeroEeveeAugment : HeroAugment
         => unit.ApplyEeveeHeroAugment(STAT_MULTIPLIER, PokemonRole.Magician);
 
     protected override void RemoveMobile(PokemonUnit unit) => unit.RemoveEeveeHeroAugment();
+
+    /// <summary>
+    /// <b>진화의 돌로 진화시킨 이브이를 한 마리라도 갖고 있으면 오퍼에 뜨지 않는다</b>
+    /// (기획 확정 2026-08-19).
+    ///
+    /// 이 증강은 이브이를 <b>이브이인 채로</b> 한 마리에 몰아주는 설계다. 이미 돌로 샤미드·쥬피썬더
+    /// 같은 진화체를 만들어 둔 플레이어에게는, 고른 순간 그 투자분이 증강 대상에서 통째로 빠진다 —
+    /// 진화잠금은 앞으로의 진화만 막을 뿐 이미 진화한 개체를 되돌리지 못하기 때문이다.
+    /// 고를 수는 있는데 고르면 손해인 선택지는 오퍼에서 빼는 편이 낫다.
+    ///
+    /// 판정 기준을 "돌 진화"로 잡은 이유 — 돌은 빼기 전까지 유지되는 <b>안정된 상태</b>라 오퍼 시점의
+    /// 스냅샷으로 판단해도 뒤집히지 않는다. 반면 돌연변이 시너지 활성 여부는 유닛을 한 마리
+    /// 내렸다 올리는 것만으로 바뀌어, 오퍼 필터 기준으로 쓰면 "왜 이번엔 안 뜨지"가 된다.
+    ///
+    /// ⚠️ 이 필터는 <b>앞문</b>만 막는다. 증강을 고른 뒤에 파트너가 통신교환으로 진화체를 넘겨주는
+    /// 경로는 그대로 남으므로, 돌연변이 억제(SynergyManager.SuppressMutantIfHeroEevee)와 돌 면역
+    /// (PokemonUnit.TryEquipStone)은 여전히 필요하다. 셋은 서로 대체재가 아니다.
+    /// </summary>
+    public override bool CanBeOffered() => !HasStoneEvolvedEevee();
+
+    /// <summary>
+    /// 보유분(보드+벤치) 중 "돌로 진화한 이브이"가 있는지.
+    /// 돌을 끼면 data가 진화체로 바뀌고 원래 종이 preStoneData에 남으므로, 그 둘로 판정한다
+    /// (진화체를 상점·통신교환으로 직접 얻은 경우는 preStoneData가 없어 여기 걸리지 않는다 — 의도한 범위).
+    /// </summary>
+    private static bool HasStoneEvolvedEevee()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Board == null) return false;
+
+        foreach (var unit in gm.Board.GetUnitsOnBoard())
+            if (IsStoneEvolvedEevee(unit)) return true;
+
+        foreach (var unit in gm.Board.GetUnitsInBench())
+            if (IsStoneEvolvedEevee(unit)) return true;
+
+        return false;
+    }
+
+    private static bool IsStoneEvolvedEevee(PokemonUnit unit)
+        => unit != null && unit.equippedStone != null && unit.preStoneData != null &&
+           string.Equals(unit.preStoneData.pokemonNameEn, "Eevee",
+                         System.StringComparison.OrdinalIgnoreCase);
 }

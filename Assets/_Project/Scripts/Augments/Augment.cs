@@ -42,6 +42,15 @@ public abstract class Augment
     /// </summary>
     public virtual void OnInventoryChanged() { }
 
+    /// <summary>
+    /// 지금 3택1 오퍼에 <b>제시해도 되는 증강인지</b>. false면 그 판의 추첨 풀에서 빠진다.
+    /// AugmentManager가 오퍼를 굴릴 때마다 물어보며, 판정에 필요한 상태(보드 등)는 각 증강이 직접 읽는다.
+    ///
+    /// 기본값은 "언제나 제시 가능" — 이미 보유한 증강을 빼는 것은 AugmentManager가 Owns()로 따로 처리하므로
+    /// 여기서 신경 쓸 필요가 없다. 지금 유일한 사용처는 이브이 영웅증강이며, 이유는 그쪽 오버라이드 참고.
+    /// </summary>
+    public virtual bool CanBeOffered() => true;
+
     // ── 표시용 조회 ────────────────────────────────────────────
 
     /// <summary>
