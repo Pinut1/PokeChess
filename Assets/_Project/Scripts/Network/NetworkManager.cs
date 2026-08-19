@@ -173,6 +173,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC_OnRoundStart는 비접속자에게 유실되므로, 재접속 클라이언트는 이 속성으로 라운드를 복구한다.</summary>
     private const string ROUND_PROP_KEY = "Round";
 
+    /// <summary>이번 라운드가 이미 Battle phase에 진입했는지를 Room CustomProperties에 저장할 때 쓰는 키.
+    /// BroadcastBattleStart(MasterClient 권위)에서 true로 세팅되고, 다음 라운드 BroadcastRoundStart에서
+    /// false로 리셋된다. 전투 중 재접속 클라이언트가 "지금 Shopping인지 Battle인지"를 판단하는 유일한
+    /// 근거 — 이게 없으면 RPC_OnBattleStart(RpcTarget.All, 오프라인 클라이언트에는 유실)를 못 받은
+    /// 재접속자는 이 사실을 영영 알 방법이 없다.</summary>
+    private const string BATTLE_ACTIVE_PROP_KEY = "BattleActive";
+
+    /// <summary>자기 전투 시작 시점 BattleSnapshot(BattleSnapshotCodec.Encode 결과)을 Player
+    /// CustomProperties에 저장할 때 쓰는 키 3종 + 소속 라운드 태그. 재접속한 본인이 자기 전투를
+    /// 복구할 때만 쓰며, 파트너 전송(BroadcastBattleSnapshot/RpcTarget.Others)과는 완전히 별개다.</summary>
+    private const string BATTLE_SNAPSHOT_INTS_PROP_KEY    = "BattleSnapshotInts";
+    private const string BATTLE_SNAPSHOT_FLOATS_PROP_KEY  = "BattleSnapshotFloats";
+    private const string BATTLE_SNAPSHOT_STRINGS_PROP_KEY = "BattleSnapshotStrings";
+    private const string BATTLE_SNAPSHOT_ROUND_PROP_KEY   = "BattleSnapshotRound";
+
+    /// <summary>자기 CurrentBattleTick을 주기적으로(10 tick≈1초 간격) 저장할 때 쓰는 Player
+    /// CustomProperties 키. BATTLE_SNAPSHOT_ROUND_PROP_KEY와 같은 라운드 태그를 공유한다 —
+    /// 스냅샷과 tick은 항상 같은 라운드에 대해서만 함께 유효하므로 별도 라운드 키를 두지 않는다.</summary>
+    private const string BATTLE_TICK_PROP_KEY = "BattleTick";
+
     /// <summary>내가 마지막으로 수신/적용한 라운드. 재접속 시 Room 속성의 현재 라운드와 비교해 유실분을 복구.</summary>
     private int _lastKnownRound;
 
@@ -900,7 +920,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!IsMasterClient) return;
         // 재접속 클라이언트의 라운드 복구용으로 Room 속성에도 기록(RPC는 비접속자에게 유실됨).
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { ROUND_PROP_KEY, round } });
+        // BATTLE_ACTIVE_PROP_KEY도 같이 false로 리셋 — 새 라운드는 항상 Shopping부터 시작하므로
+        // 이전 라운드의 "Battle 진입됨" 흔적이 남아있으면 안 된다.
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { ROUND_PROP_KEY, round },
+            { BATTLE_ACTIVE_PROP_KEY, false }
+        });
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
     }
 
@@ -910,7 +936,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode) { GameEvents.BattleStart(); return; }
 
         if (!IsMasterClient) return;
+        // 재접속 클라이언트의 "지금 Shopping인지 Battle인지" 판정용으로 Room 속성에도 기록
+        // (RPC_OnBattleStart는 오프라인 클라이언트에게 유실됨).
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { BATTLE_ACTIVE_PROP_KEY, true } });
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
+    }
+
+    /// <summary>지금 Room에 기록된 "이번 라운드가 Battle에 진입했는지" 값. Room 속성이 아직 없으면(구버전
+    /// 세션/신규 매치 극초반) false로 취급한다.</summary>
+    public bool IsBattleActiveInRoom()
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return false;
+        return PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(BATTLE_ACTIVE_PROP_KEY, out object v)
+            && v is bool active && active;
     }
 
     /// <summary>MasterClient가 챕터 완주(최종 라운드 클리어)를 전체에 알림. 다음 라운드 대신 호출.</summary>
@@ -2729,6 +2767,82 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 전투 중 재접속 복구용 — 자기 전투 시작 시점 BattleSnapshot을 자기 Player CustomProperties에
+    /// 저장한다. BroadcastBattleSnapshot(파트너 전송, RpcTarget.Others)과 완전히 별개 — 저장만 하고
+    /// 전송은 하지 않는다. 기존 BattleSnapshotCodec.Encode()를 그대로 재사용해 새 직렬화를 만들지 않는다.
+    /// </summary>
+    public void SyncLocalBattleSnapshot(BattleSnapshot snapshot)
+    {
+        if (snapshot == null) return;
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지(기존 관례)
+        if (!PhotonNetwork.InRoom) return;
+
+        BattleSnapshotCodec.EncodedPayload payload = BattleSnapshotCodec.Encode(snapshot);
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { BATTLE_SNAPSHOT_INTS_PROP_KEY, payload.ints },
+            { BATTLE_SNAPSHOT_FLOATS_PROP_KEY, payload.floats },
+            { BATTLE_SNAPSHOT_STRINGS_PROP_KEY, payload.strings },
+            { BATTLE_SNAPSHOT_ROUND_PROP_KEY, snapshot.roundIndex }
+        });
+    }
+
+    /// <summary>
+    /// 전투 중 재접속 복구용 — 자기 CurrentBattleTick을 주기적으로(호출측이 10 tick마다 부름) 저장한다.
+    /// round는 BATTLE_SNAPSHOT_ROUND_PROP_KEY와 같은 값을 써서 스냅샷·tick이 항상 같은 라운드
+    /// 것인지 재접속 시 함께 검증할 수 있게 한다.
+    /// </summary>
+    public void SyncLocalBattleTick(int tick, int round)
+    {
+        if (_isLeavingRoom) return;
+        if (!PhotonNetwork.InRoom) return;
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { BATTLE_TICK_PROP_KEY, tick },
+            { BATTLE_SNAPSHOT_ROUND_PROP_KEY, round }
+        });
+    }
+
+    /// <summary>
+    /// 재접속 시 자기 전투 복구 자료를 조회한다. currentRound와 저장된 라운드가 다르면(이전 판/이전
+    /// 라운드 잔여값) 무조건 실패로 처리한다 — 이전 라운드 데이터로 이번 라운드를 복원하면 안 되기 때문.
+    /// tick은 저장된 적이 없으면(전투 시작 직후 극초반 이탈 등) 0으로 폴백한다.
+    /// </summary>
+    public bool TryGetSavedBattleRecovery(int currentRound, out BattleSnapshot snapshot, out int tick)
+    {
+        snapshot = null;
+        tick = 0;
+
+        if (_soloMode || !PhotonNetwork.InRoom) return false;
+
+        var props = PhotonNetwork.LocalPlayer.CustomProperties;
+        if (!props.TryGetValue(BATTLE_SNAPSHOT_ROUND_PROP_KEY, out object savedRoundObj)) return false;
+        if (!(savedRoundObj is int savedRound) || savedRound != currentRound) return false;
+
+        if (!props.TryGetValue(BATTLE_SNAPSHOT_INTS_PROP_KEY, out object intsObj) ||
+            !props.TryGetValue(BATTLE_SNAPSHOT_FLOATS_PROP_KEY, out object floatsObj) ||
+            !props.TryGetValue(BATTLE_SNAPSHOT_STRINGS_PROP_KEY, out object stringsObj))
+            return false;
+
+        if (!(intsObj is int[] ints) || !(floatsObj is float[] floats) || !(stringsObj is string[] strings))
+            return false;
+
+        if (!BattleSnapshotCodec.TryDecode(ints, floats, strings, out BattleSnapshot decoded, out string error))
+        {
+            Debug.LogWarning($"[Network][Rejoin] 저장된 BattleSnapshot Decode 실패: {error}");
+            return false;
+        }
+
+        snapshot = decoded;
+
+        if (props.TryGetValue(BATTLE_TICK_PROP_KEY, out object tickObj) && tickObj is int savedTick)
+            tick = savedTick;
+
+        return true;
+    }
+
+    /// <summary>
     /// 게임 씬 로드 완료를 알림(라운드 시작 핸드셰이크). GameSceneBootstrap이 GameScene 진입 시 호출.
     /// 두 클라가 모두 준비되면 MasterClient가 라운드 1을 시작한다.
     /// (로비→게임 전환 중 라운드 시작 RPC가 유실되는 레이스 방지)
@@ -3516,16 +3630,59 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // RPC_OnRoundStart를 로컬 직접 호출해 일반 라운드 시작과 같은 리셋 절차(준비/전투결과 속성 초기화)를 탄다.
         // 이 호출이 발행하는 RoundChanged를 ShopManager 등이 "복원 중 재발행"으로 구분할 수 있도록
         // 캐치업 플래그로 감싼다(방금 복원한 상점/골드를 무조건 Roll()/이자 재계산이 덮어쓰는 문제 방지).
+        //
+        // 단, 이번 라운드가 이미 Battle에 진입한 상태라면 RPC_OnRoundStart(=Shopping 강제 진입)를 쏘면
+        // 안 된다 — 전투 중 재접속 전용 경로(전투 복구 또는 결과 대기 유지)로 분기한다.
         if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundObj))
         {
             int currentRound = (int)roundObj;
             if (currentRound > _lastKnownRound)
             {
-                Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+                bool battleActive = IsBattleActiveInRoom();
 
-                _isApplyingReconnectRoundCatchup = true;
-                try { RPC_OnRoundStart(currentRound); }
-                finally { _isApplyingReconnectRoundCatchup = false; }
+                if (!battleActive)
+                {
+                    // 기존 동작 그대로 — 이번 라운드가 아직 Shopping(또는 그 이전)이면 정상 재진입.
+                    Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+
+                    _isApplyingReconnectRoundCatchup = true;
+                    try { RPC_OnRoundStart(currentRound); }
+                    finally { _isApplyingReconnectRoundCatchup = false; }
+                }
+                else
+                {
+                    // 전투 중 재접속. 이번 라운드 결과를 이미 제출했다면(끊기기 직전 내 전투가 이미
+                    // 끝나 ReportBattleResult까지 마친 경우) 전투를 다시 재생/재실행하지 않는다 —
+                    // 결과 중복 제출 방지. RPC_OnRoundStart(Shopping 강제)도 쏘지 않는다 — 실제로는
+                    // 아직 Shopping이 아닌데 억지로 그렇게 만들면 상태가 더 어긋난다. 팀 결과가 실제로
+                    // 확정돼 다음 라운드가 시작되면 그때 정식 RPC_OnRoundStart로 정리된다.
+                    bool myResultAlreadyReported =
+                        PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object myResult) &&
+                        myResult is int myResultInt && myResultInt != RESULT_NOT_REPORTED;
+
+                    if (myResultAlreadyReported)
+                    {
+                        Debug.Log("[Network][Rejoin] 이번 라운드 결과 이미 제출됨 — 전투 재실행 없이 결과 대기 상태 유지");
+                        _lastKnownRound = currentRound;
+                    }
+                    else if (TryGetSavedBattleRecovery(currentRound, out BattleSnapshot savedSnapshot, out int savedTick) &&
+                             GameManager.TryGet(out var gmRecover) && gmRecover.Phase != null && gmRecover.Battle != null)
+                    {
+                        Debug.Log($"[Network][Rejoin] 전투 중 재접속 복구: round={currentRound} tick={savedTick}");
+
+                        gmRecover.Phase.RestoreBattlePhaseAfterReconnect(currentRound);
+
+                        if (!gmRecover.Battle.TryRecoverBattleFromReconnect(savedSnapshot, savedTick, out string recoverFailReason))
+                            Debug.LogWarning($"[Network][Rejoin] 전투 복구 실패({recoverFailReason}) — 결과 대기 상태로 남음(다음 정식 이벤트로 자연 복구 대기)");
+
+                        _lastKnownRound = currentRound;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Network][Rejoin] Battle 진행 중이나 복구용 저장 자료 없음 — 결과 대기 상태 유지(다음 라운드에서 자연 복구)");
+                        _lastKnownRound = currentRound;
+                    }
+                }
             }
         }
     }
@@ -3920,6 +4077,9 @@ public class NetworkManager : MonoBehaviour
     public void BroadcastBattleStart()         => GameEvents.BattleStart();
     public void BroadcastGameCleared()         => GameEvents.GameCleared();
 
+    /// <summary>오프라인은 재접속 자체가 없으므로 실제로 호출될 일은 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public bool IsBattleActiveInRoom() => false;
+
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
     public void BroadcastPlayerReady()
     {
@@ -3939,6 +4099,17 @@ public class NetworkManager : MonoBehaviour
     public int PartnerBattleSnapshotRevision => -1;
     public int LocalBattleSnapshotRevision => 0;
     public bool BroadcastBattleSnapshot(BattleSnapshot _) => false;
+
+    /// <summary>오프라인은 재접속 자체가 없으므로 실제로 호출될 일은 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void SyncLocalBattleSnapshot(BattleSnapshot _) { }
+    public void SyncLocalBattleTick(int _, int __) { }
+    public bool TryGetSavedBattleRecovery(int _, out BattleSnapshot snapshot, out int tick)
+    {
+        snapshot = null;
+        tick = 0;
+        return false;
+    }
+
     public void SyncLocalGold(int _)            { }
     public void SyncLocalAugments(string[] _)   { }
     public void SyncLocalProgression(int _, int __) { }

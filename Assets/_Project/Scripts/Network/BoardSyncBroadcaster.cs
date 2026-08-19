@@ -11,6 +11,16 @@ public class BoardSyncBroadcaster : MonoBehaviour
 {
     private bool _boardDirty;
 
+    /// <summary>전투 중 재접속 복구용 — 마지막으로 Player CustomProperty에 저장한 CurrentBattleTick.
+    /// 10 tick(≈1초)마다 갱신되며 저장할 때마다 이 값도 같이 갱신한다. 전투 시작(HandleBattleStart)마다
+    /// 0으로 리셋 — 그래야 다음 전투도 0부터 다시 10-tick 간격으로 저장된다.</summary>
+    private int _lastSyncedBattleTick;
+
+    /// <summary>Player CustomProperty에 BattleTick을 몇 tick 간격으로 저장할지. TICK_INTERVAL=0.1초
+    /// 기준 10 tick≈1초 — 재접속 복구 오차 상한(≤1초)과 Photon 호출 빈도(초당 1회/인) 사이의
+    /// 균형점(2026-08 재접속 전투 복구 설계 조사에서 확정).</summary>
+    private const int BATTLE_TICK_SYNC_INTERVAL = 10;
+
     private void OnEnable()
     {
         GameEvents.OnUnitPlaced      += MarkBoardDirty;
@@ -66,6 +76,11 @@ public class BoardSyncBroadcaster : MonoBehaviour
 
         BattleSnapshot snapshot = BattleSnapshotCodec.CreateFromCurrentState(gm);
         gm.Network.BroadcastBattleSnapshot(snapshot);
+
+        // 전투 중 재접속 복구용 — 같은 스냅샷을 자기 Player CustomProperty에도 저장(파트너 전송과는
+        // 별개 경로). 재접속 시 이 값을 다시 읽어 BattleManager.TryRecoverBattleFromReconnect에 넘긴다.
+        gm.Network.SyncLocalBattleSnapshot(snapshot);
+        _lastSyncedBattleTick = 0;
     }
 
     private void MarkBoardDirty(PokemonUnit _) => _boardDirty = true;
@@ -131,6 +146,8 @@ public class BoardSyncBroadcaster : MonoBehaviour
 
     private void LateUpdate()
     {
+        SyncBattleTickIfDue();
+
         if (!_boardDirty) return;
         _boardDirty = false;
 
@@ -139,5 +156,24 @@ public class BoardSyncBroadcaster : MonoBehaviour
 
         int[] data = BoardSnapshot.FromBoard(gm.Board, gm.Item).Encode();
         gm.Network.BroadcastBoardSnapshot(data);
+    }
+
+    /// <summary>
+    /// 전투 중 재접속 복구용 — BattleManager.CurrentBattleTick이 마지막 저장값보다
+    /// BATTLE_TICK_SYNC_INTERVAL(10 tick≈1초) 이상 진행됐으면 Player CustomProperty에 갱신한다.
+    /// 매 tick마다 저장하지 않는다(Photon 호출 최소화). 전투 중이 아니면(CurrentBattleTick이 갱신되지
+    /// 않는 상태) 아무 일도 하지 않는다 — _lastSyncedBattleTick과 항상 같은 값을 유지하다가
+    /// HandleBattleStart가 다음 전투 시작 때 0으로 리셋한다.
+    /// </summary>
+    private void SyncBattleTickIfDue()
+    {
+        if (!GameManager.TryGet(out var gm) || gm.Battle == null || gm.Phase == null || gm.Network == null) return;
+        if (gm.Phase.CurrentPhase != GamePhase.Battle) return; // Shopping 등에서는 이전 전투의 남은 tick값을 잘못 저장하지 않는다.
+
+        int currentTick = gm.Battle.CurrentBattleTick;
+        if (currentTick - _lastSyncedBattleTick < BATTLE_TICK_SYNC_INTERVAL) return;
+
+        gm.Network.SyncLocalBattleTick(currentTick, gm.Phase.CurrentRound);
+        _lastSyncedBattleTick = currentTick;
     }
 }
