@@ -14,8 +14,9 @@ using UnityEngine;
 ///   - 팀 공통 HP 텍스트(GDD: 2인 공동 HP — 사람마다 다른 값이 아니라 하나뿐이다)
 ///
 /// 화면 전환(버튼 클릭 → 내 맵/파트너 맵)과 "지금 어느 쪽을 보고 있는지" 표시는 전부
-/// <see cref="PartnerSpectateView"/>가 담당한다 — 보고 있는 쪽 프로필만 밝게, 아닌 쪽은 어둡게
-/// 칠하는 방식이라(_activeFrameColor/_inactiveFrameColor) 여기서 따로 표시할 것이 없다.
+/// <see cref="PartnerSpectateView"/>가 담당한다 — 프로필 색으로 누구인지(방장=_hostColor 보라,
+/// 참가자=_guestColor 파랑, 방 밖=_offlineColor 회색)를, 밝기로 지금 어느 쪽을 보고 있는지
+/// (안 보는 쪽만 _inactiveDim만큼 어둡게)를 나타내는 방식이라 여기서 따로 표시할 것이 없다.
 /// 버튼 onClick도 PartnerSpectateView 쪽 인스펙터 칸에 그대로 물려 둘 것.
 ///
 /// ⚠️ 닉네임은 변경 이벤트가 없다(GameEvents에 파트너 입장/닉네임 변경 이벤트 자체가 없음).

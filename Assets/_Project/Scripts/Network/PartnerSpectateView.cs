@@ -363,9 +363,15 @@ public class PartnerSpectateView : MonoBehaviour
         // 옛 값이라, 틀린 종횡비로 텍스처를 만든다. 그리고 다음 프레임엔 Screen 크기가 그대로라
         // 조건에 걸리지 않아 영영 다시 만들 기회가 오지 않는다.
         // 렌더 크기를 보면 rect가 고쳐진 다음 프레임에 자연히 잡힌다(1프레임 지연은 체감되지 않는다).
+        //
+        // Main Camera가 없는 프레임(씬 전환 중 한두 프레임)에는 그냥 건너뛴다. Screen 크기로
+        // 폴백하면 레터박스가 빠진 종횡비로 텍스처를 한 번 만들고, 다음 프레임에 카메라가 잡히면서
+        // 또 만든다 — 화면에 보이지도 않을 결과를 위해 RenderTexture를 두 번 재할당하는 셈이다.
         Camera mainCamera = Camera.main;
-        int viewWidth  = mainCamera != null ? mainCamera.pixelWidth  : Screen.width;
-        int viewHeight = mainCamera != null ? mainCamera.pixelHeight : Screen.height;
+        if (mainCamera == null) return;
+
+        int viewWidth  = mainCamera.pixelWidth;
+        int viewHeight = mainCamera.pixelHeight;
 
         if (viewWidth == _lastViewWidth && viewHeight == _lastViewHeight) return;
 
