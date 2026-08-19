@@ -63,6 +63,10 @@ public class PartnerSpectateView : MonoBehaviour
 
     private Camera _spectatorCamera;
     private RenderTexture _spectatorTexture;
+
+    // 마지막으로 RenderTexture 크기를 맞춘 화면 해상도. 바뀌면 RefreshTextureOnScreenChange가 다시 만든다.
+    private int _lastScreenWidth;
+    private int _lastScreenHeight;
     private PartnerBattleMirrorController _mirrorController;
     private TextMeshProUGUI _externalViewButtonLabel;
 
@@ -302,6 +306,24 @@ public class PartnerSpectateView : MonoBehaviour
         if (running && !_wasMirrorRunning) HandleMirrorStarted();
         else if (!running && _wasMirrorRunning) HandleMirrorEnded();
         _wasMirrorRunning = running;
+
+        RefreshTextureOnScreenChange();
+    }
+
+    /// <summary>
+    /// 해상도가 바뀌면 RenderTexture를 다시 만든다. EnsureSpectatorTexture는 미러 전투 시작과
+    /// 관전 열기/닫기에서만 불리므로, 관전 중에 옵션창에서 해상도를 바꾸면 종횡비가 안 맞는
+    /// 텍스처가 그대로 남아 화면이 늘어나 보인다(레터박스가 붙으면서 더 눈에 띈다).
+    /// 텍스처가 아직 없으면(관전을 한 번도 안 열었으면) 아무 것도 하지 않는다 — 필요할 때 만들어진다.
+    /// </summary>
+    private void RefreshTextureOnScreenChange()
+    {
+        if (_spectatorTexture == null) return;
+        if (Screen.width == _lastScreenWidth && Screen.height == _lastScreenHeight) return;
+
+        _lastScreenWidth = Screen.width;
+        _lastScreenHeight = Screen.height;
+        EnsureSpectatorTexture(); // 크기가 같으면 내부에서 그대로 빠져나간다
     }
 
     private void CacheOriginalLayout()
@@ -445,7 +467,12 @@ public class PartnerSpectateView : MonoBehaviour
             _spectatorCamera.focalLength = mainCamera.focalLength;
             _spectatorCamera.gateFit = mainCamera.gateFit;
             _spectatorCamera.allowDynamicResolution = mainCamera.allowDynamicResolution;
-            _spectatorCamera.rect = mainCamera.rect;
+            // rect는 복사하지 않는다. Main Camera는 CameraLetterbox 때문에 화면 가운데 16:9만
+            // 그리지만, 관전 카메라는 이미 16:9로 만들어진 RenderTexture 전체에 그린다
+            // (EnsureSpectatorTexture). 여기에 레터박스 rect까지 복사하면 RT 안에 검은 띠가 한 번 더
+            // 구워져 이중 레터박스가 된다. 투영 일치는 rect가 아니라 "같은 종횡비"로 보장된다 —
+            // RT를 16:9로 만들었으므로 관전 카메라의 aspect가 레터박스된 Main Camera와 같아진다.
+            _spectatorCamera.rect = new Rect(0f, 0f, 1f, 1f);
             _spectatorCamera.targetDisplay = mainCamera.targetDisplay;
             // depth는 복사하지 않는다 — Spectator Camera는 항상 targetTexture(RenderTexture)로만
             // 그리고 Main Camera는 백버퍼에 직접 그려 같은 렌더 타깃을 공유하지 않으므로, 두 카메라의
@@ -516,11 +543,22 @@ public class PartnerSpectateView : MonoBehaviour
     /// 사용처라 숨겨진 PartnerPipRawImage의 작은 RectTransform 크기를 기준으로 삼지 않는다).
     /// [1280x720, 1920x1080] 박스 안에서 화면 비율을 유지해 맞춘다.
     /// </summary>
+    /// <summary>
+    /// RenderTexture 크기. 종횡비는 <b>화면이 아니라 Main Camera가 실제로 그리는 영역</b>을 따른다 —
+    /// CameraLetterbox가 뷰포트를 16:9로 줄여 놓으면 화면이 16:10이어도 실제 그림은 16:9다.
+    /// 화면 비율로 만들면 16:9 그림이 16:10 텍스처에 담겨 RawImage에서 늘어난다.
+    /// 레터박스가 없는 구성에서는 pixelRect가 곧 화면 크기라 종전과 같은 값이 나온다.
+    /// </summary>
     private static (int width, int height) ComputeDesiredRenderTextureSize()
     {
         float screenW = Mathf.Max(Screen.width, 1);
         float screenH = Mathf.Max(Screen.height, 1);
-        float aspect = screenW / screenH;
+
+        Camera mainCamera = Camera.main;
+        float viewW = mainCamera != null ? Mathf.Max(mainCamera.pixelWidth, 1) : screenW;
+        float viewH = mainCamera != null ? Mathf.Max(mainCamera.pixelHeight, 1) : screenH;
+
+        float aspect = viewW / viewH;
 
         float width = Mathf.Clamp(screenW, MIN_RENDER_TEXTURE_WIDTH, MAX_RENDER_TEXTURE_WIDTH);
         float height = width / aspect;
