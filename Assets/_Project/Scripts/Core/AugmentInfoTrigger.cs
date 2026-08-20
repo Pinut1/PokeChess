@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -76,7 +75,7 @@ public class AugmentInfoTrigger : MonoBehaviour
         if (_panel == null) return;
 
         // 창 위를 클릭했는데 뒤에 있는 오브젝트까지 눌리는 것을 막는다.
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+        if (PointerUtil.IsOverUI()) return;
 
         if (_toggleOnClick) _panel.Toggle();
         else _panel.Open();
