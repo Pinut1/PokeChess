@@ -3364,6 +3364,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>
     /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감(둘 다 패) + 전체 브로드캐스트.
     /// 승리 수: 2=BothWin, 1=Split, 0=BothLose.
+    /// 단, 최종 보스전(stageType=ChampionBattle && trainerId="GREEN", 5라운드 그린)은
+    /// 한 명만 져도 팀 전체 패배로 취급한다(Split을 BothLose로 승격) — 최종 보스전은
+    /// Split 허용(라이프 유지) 대상이 아니라는 기획. 두 조건을 모두 걸어 이중 확인한다.
     /// </summary>
     private void ResolveTeamRound()
     {
@@ -3377,6 +3380,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
                                  : wins == 1 ? TeamRoundOutcome.Split
                                  : TeamRoundOutcome.BothLose;
+
+        bool isChampionRound = GameManager.TryGet(out var gm) &&
+                                gm.Phase != null && gm.Phase.CurrentStage != null &&
+                                gm.Phase.CurrentStage.stageType == StageType.ChampionBattle &&
+                                gm.Phase.CurrentStage.trainerId == "GREEN";
+
+        if (isChampionRound && outcome == TeamRoundOutcome.Split)
+            outcome = TeamRoundOutcome.BothLose;
 
         if (outcome == TeamRoundOutcome.BothLose)
             ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
