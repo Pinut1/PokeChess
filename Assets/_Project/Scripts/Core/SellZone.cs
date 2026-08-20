@@ -261,6 +261,11 @@ public class SellZone : MonoBehaviour, IDropTarget
     /// 레이캐스트라 관전 오버레이·UI에 가려도 오지 않으므로, 이 매 프레임 폴링이 유일한 탈출구다
     /// (2026-08 QA 리포트 재리뷰 지적 — _pointerHovered만 보고 조기 리턴하면 이미 뜬 안내창을
     /// 다시 닫을 기회가 없었다).
+    ///
+    /// 닫을지는 OnMouseExit과 똑같이 IsHovered(=드래그 호버 포함)로 판단한다(2026-08 재재리뷰
+    /// 지적) — 이 물리 레이캐스트 이벤트는 원래 유닛을 드는 손이 커서를 가려 드래그 중엔 안
+    /// 온다는 전제지만, 그 전제가 어떤 이유로든 깨졌을 때도 드래그 강조가 실수로 같이 꺼지지
+    /// 않도록 OnMouseExit과 같은 기준을 그대로 맞춘다.
     /// </summary>
     private void OnMouseOver()
     {
@@ -270,7 +275,7 @@ public class SellZone : MonoBehaviour, IDropTarget
             {
                 _pointerHovered = false;
                 RefreshHighlight();
-                HideTooltip();
+                if (!IsHovered) HideTooltip();
             }
             return;
         }
