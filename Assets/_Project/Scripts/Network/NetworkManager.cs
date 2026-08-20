@@ -3287,10 +3287,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private bool HasActiveRoundInRoom()
     {
+        return TryGetCurrentRoundFromRoom(out int round) && round >= 1;
+    }
+
+    /// <summary>Room CustomProperties의 ROUND_PROP_KEY를 안전하게 정수로 읽는다. Room이 없거나
+    /// 값이 없거나 예상 타입이 아니면 false(round는 0).</summary>
+    private bool TryGetCurrentRoundFromRoom(out int round)
+    {
+        round = 0;
         if (PhotonNetwork.CurrentRoom == null) return false;
         if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue)) return false;
 
-        try { return System.Convert.ToInt32(roundValue) >= 1; }
+        try { round = System.Convert.ToInt32(roundValue); return true; }
         catch (System.Exception) { return false; }
     }
 
@@ -3386,13 +3394,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // OnRoundChanged를 처리하지 못해 CurrentStage가 null/stale일 수 있는데, Room 속성과
         // StageDatabase는 그런 로컬 동기화 타이밍과 무관하게 항상 최신이다(2026-08 코드리뷰 지적).
         StageData currentStage = null;
-        if (PhotonNetwork.CurrentRoom != null &&
-            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue) &&
-            StageDatabase.Instance != null)
-        {
-            try { currentStage = StageDatabase.Instance.GetForRound(System.Convert.ToInt32(roundValue)); }
-            catch (System.Exception) { currentStage = null; }
-        }
+        if (TryGetCurrentRoundFromRoom(out int currentRound) && StageDatabase.Instance != null)
+            currentStage = StageDatabase.Instance.GetForRound(currentRound);
 
         if (currentStage == null)
             Debug.LogWarning("[Network] 챔피언전 판정용 스테이지 조회 실패 — Room/StageDatabase 상태 확인 필요");
