@@ -323,5 +323,51 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.ApprovePlayerReady();
     }
 
+    /// <summary>
+    /// 전투 중 재접속 복구 전용 진입점. NetworkManager가 "이번 라운드가 이미 Battle이고 내 결과가
+    /// 아직 미제출"임을 확인한 뒤에만 호출한다. 일반 EnterPhase(Battle)과 두 가지가 다르다:
+    /// (1) GameEvents.BattleStart()를 발행하지 않는다 — BoardSyncBroadcaster/SoundManager/
+    ///     AugmentManager 등 다른 OnBattleStart 구독자가 중복 실행되는 것을 막기 위함(재접속 시
+    ///     전투 셋업은 BattleManager.TryRecoverBattleFromReconnect가 스냅샷으로 직접 재구성한다).
+    /// (2) CurrentStage는 ResolveCurrentStage(GameEvents.StageEntered 발행)를 타지 않고 StageDatabase에서
+    ///     직접 조회한다 — StageEntered를 다시 쏘면 RewardManager의 preReward 지급(_paidStages는
+    ///     인스턴스 필드라 재접속으로 새로 생성된 인스턴스에선 비어 있음)이 중복 실행돼 골드/아이템이
+    ///     두 번 지급될 위험이 있다.
+    /// 쇼핑 타이머 등 기존 페이즈 타이머는 정리만 하고 새로 시작하지 않는다(전투 페이즈는 원래 타이머가 없음).
+    /// </summary>
+    public void RestoreBattlePhaseAfterReconnect(int round)
+    {
+        if (_phaseTimer != null)
+        {
+            StopCoroutine(_phaseTimer);
+            _phaseTimer = null;
+        }
+
+        CurrentRound = round;
+        CurrentStage = StageDatabase.Instance != null ? StageDatabase.Instance.GetForRound(round) : null;
+        _teamRoundResolved = false;
+        CurrentPhase = GamePhase.Battle;
+
+        Debug.Log($"[Phase] 재접속 복구 — Battle 진입 | 라운드 {CurrentRound}");
+        GameEvents.PhaseChanged(CurrentPhase);
+    }
+
+    /// <summary>
+    /// 전투 결과 이미 제출 후 재접속 복구 전용 진입점. NetworkManager가 "이번 라운드 내 결과는 이미
+    /// 제출됐다"고 판단했을 때만 호출한다(전투를 재실행하지 않는 케이스) — 재접속 직후 화면이 아무
+    /// 페이즈도 반영하지 못한 채 기본값 Lobby에 남는 UX 갭을 최소한으로 메운다.
+    /// EnterPhase(Result)를 그대로 재사용한다 — Result 케이스는 Battle과 달리 ResultTimer만 시작할 뿐
+    /// GameEvents.BattleStart() 같은 중복 실행 위험이 있는 부작용이 없어 우회 경로가 필요 없다.
+    /// ResultTimer 자체도 기존 로직 그대로 동작한다 — 이 클라이언트가 마스터가 아니면 대기 후 즉시
+    /// 반환하고, 마스터라면(원래 마스터가 재접속한 드문 경우) 팀 결과 대기 후 다음 라운드 진행을
+    /// 정상적으로 재개한다(재접속 전 씬 재생성으로 유실됐던 원래 타이머의 복구).
+    /// </summary>
+    public void RestoreResultPhaseAfterReconnect(int round)
+    {
+        CurrentRound = round;
+        CurrentStage = StageDatabase.Instance != null ? StageDatabase.Instance.GetForRound(round) : null;
+        EnterPhase(GamePhase.Result);
+    }
+
     // Ready 입력은 UIManager, Victory 표시는 PrototypeHud가 담당한다.
 }

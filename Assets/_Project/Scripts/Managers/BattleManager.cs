@@ -107,6 +107,17 @@ public class BattleManager : MonoBehaviour
     private readonly Dictionary<HexCoords, HexTile> _enemyTiles = new();
     private Coroutine _battleCoroutine;
 
+    /// <summary>실전투(RunBattle/RunBattleRecovery)가 지금 실행 중인지. _battleCoroutine은 정상 종료
+    /// 후에도 null로 리셋되지 않아(다음 라운드 HandleBattleStart가 그냥 덮어쓰는 기존 패턴) "지금 실행
+    /// 중인지" 판정에 쓸 수 없다 — _isMirrorBattleRunning과 같은 목적의 별도 플래그.
+    /// TryRecoverBattleFromReconnect의 중복 시작 방지 가드로 쓰인다.</summary>
+    private bool _isBattleRunning;
+
+    /// <summary>실제 전투(미러 아님)에서 이미 완료된 SimulateTick() 횟수. 전투 시작 시 0으로
+    /// 초기화되며 SimulateBattleLoop가 매 틱 갱신한다. 전투 중 재접속 시 "마지막으로 저장된 tick"을
+    /// 계산하는 기준(NetworkManager가 주기적으로 Player CustomProperty에 기록)으로 쓰인다.</summary>
+    public int CurrentBattleTick { get; private set; }
+
     // 이동 BFS(FindNextStep)가 보드 밖으로 벗어나지 않도록 쓰는 전투 가능 전체 좌표(아군 보드 +
     // 그 미러인 적 진영). _enemyTiles는 시각화 캐시라 프리팹 미할당/미러전투 경로에서 비어있을 수
     // 있어 이동 판정에 쓰면 안 된다 — BuildValidCoords()가 BoardManager.GetEnemyBattleCoords()로
@@ -211,6 +222,7 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator RunBattle()
     {
+        _isBattleRunning = true;
         SetupUnits();
 
         if (_units.Count == 0)
@@ -219,6 +231,7 @@ public class BattleManager : MonoBehaviour
             Debug.Log("[Battle] 유닛 없음 → 승리로 처리 (엣지케이스)");
             Cleanup(); // 이 인스턴스 scope의 VFX 정리까지 Cleanup()이 담당(BattleVfxPlayer.ClearScope)
             GameEvents.BattleEnd(BattleEndReason.Victory);
+            _isBattleRunning = false;
             yield break;
         }
 
@@ -228,9 +241,19 @@ public class BattleManager : MonoBehaviour
         ApplySynergyBuffs();
         ApplySynergySpecials();
 
-        // 시뮬레이션 루프(전멸 판정 시 조기 종료, 타임아웃 시 allyWon=null로 남김).
+        yield return RunBattleLoopAndFinish(0);
+        _isBattleRunning = false;
+    }
+
+    /// <summary>
+    /// 시뮬레이션 루프(전멸 판정 시 조기 종료, 타임아웃 시 오버타임)를 실행하고 결과를 GameEvents.BattleEnd로
+    /// 발행한다. RunBattle()(startTick=0)과 재접속 복구(RunBattleRecovery, catch-up 이후 startTick=목표 tick)가
+    /// 공유한다 — 유닛/시너지 셋업은 호출측이 이미 끝낸 상태로 진입한다(SimulateBattleLoop와 동일 전제).
+    /// </summary>
+    private IEnumerator RunBattleLoopAndFinish(int startTick)
+    {
         var result = new BattleLoopResult();
-        yield return SimulateBattleLoop(result);
+        yield return SimulateBattleLoop(result, startTick);
 
         Cleanup(); // 이 인스턴스 scope의 VFX 정리까지 Cleanup()이 담당(BattleVfxPlayer.ClearScope)
 
@@ -257,6 +280,152 @@ public class BattleManager : MonoBehaviour
         GameEvents.BattleEnd(reason);
     }
 
+    // ─────────────────────────────────────────
+    // 전투 중 재접속 복구 — GameEvents.BattleStart()를 다시 발행하지 않는 전용 경로.
+    // BoardSyncBroadcaster/SoundManager/AugmentManager 등 다른 OnBattleStart 구독자가
+    // 중복 실행되는 것을 막기 위해, 호출측(NetworkManager)이 이 진입점을 직접 호출한다.
+    // ─────────────────────────────────────────
+
+    /// <summary>
+    /// 전투 중 재접속 복구 전용 진입점. 저장된 BattleSnapshot으로 전투 시작 상태를 재구성한 뒤
+    /// VFX 없이 targetTick까지 빠르게 재시뮬레이션하고, 이후 기존 SimulateBattleLoop로 정상 이어간다.
+    /// 실패 시(셋업 실패/이미 전투 진행 중 등) false와 failReason을 반환하며 아무 것도 시작하지 않는다.
+    /// </summary>
+    public bool TryRecoverBattleFromReconnect(BattleSnapshot snapshot, int targetTick, out string failReason)
+    {
+        failReason = null;
+
+        if (snapshot == null) { failReason = "BattleSnapshot이 null입니다"; return false; }
+        if (_isBattleRunning) { failReason = "이미 전투가 진행 중입니다"; return false; }
+        if (_isMirrorBattleRunning) { failReason = "미러 전투가 실행 중입니다"; return false; }
+
+        // 전투용 실제 적이 같은 자리에 생성되므로 프리뷰를 먼저 걷어낸다(HandleBattleStart와 동일 이유).
+        ClearEnemyPreview();
+
+        CurrentBattleTick = 0;
+        _battleCoroutine = StartCoroutine(RunBattleRecovery(snapshot, Mathf.Max(0, targetTick)));
+        return true;
+    }
+
+    /// <summary>
+    /// SetupUnitsForReconnect로 전투 시작 상태를 재구성한 뒤, targetTick까지 VFX 없이 SimulateTick()을
+    /// 연속 호출(yield 없음)한다. catch-up 도중 승부가 이미 나면(목표 tick 이전 조기 종료) 거기서 즉시
+    /// GameEvents.BattleEnd를 발행하고 끝낸다 — RunBattleLoopAndFinish로 넘기지 않는다(그러면
+    /// SimulateBattleLoop가 이미 죽은 유닛들로 SimulateTick()을 한 번 더 불필요하게 돌리게 된다).
+    /// targetTick까지 무사히 도달하면 RunBattleLoopAndFinish(tick)으로 넘겨 이후는 완전히 기존
+    /// 정상 전투(RunBattle)와 동일한 코드 경로(SimulateBattleLoop 정상 페이싱 + Cleanup + BattleEnd)를 탄다.
+    /// </summary>
+    private IEnumerator RunBattleRecovery(BattleSnapshot snapshot, int targetTick)
+    {
+        _isBattleRunning = true;
+
+        if (!SetupUnitsForReconnect(snapshot, out string setupFailReason))
+        {
+            Debug.LogWarning($"[Battle][Rejoin] 전투 복구 셋업 실패: {setupFailReason}");
+            _isBattleRunning = false;
+            yield break;
+        }
+
+        if (_units.Count == 0)
+        {
+            Debug.Log("[Battle][Rejoin] 유닛 없음 → 승리로 처리 (엣지케이스)");
+            Cleanup();
+            GameEvents.BattleEnd(BattleEndReason.Victory);
+            _isBattleRunning = false;
+            yield break;
+        }
+
+        ApplySynergyBuffs();
+        ApplySynergySpecials();
+
+        Debug.Log($"[Battle][Rejoin] catch-up 시작 (targetTick={targetTick})");
+
+        _playBattleVfx = false;
+        int tick = 0;
+        bool decided = false;
+        bool allyWon = false;
+
+        while (tick < targetTick && tick < MAX_TICKS)
+        {
+            SimulateTick();
+            tick++;
+            CurrentBattleTick = tick;
+
+            bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
+            bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
+            if (!allyAlive || !enemyAlive)
+            {
+                decided = true;
+                allyWon = allyAlive;
+                break;
+            }
+        }
+        _playBattleVfx = true;
+
+        if (decided)
+        {
+            Cleanup();
+            Debug.Log($"[Battle][Rejoin] catch-up 중 조기 종료 → {(allyWon ? "승" : "패")} (tick {tick})");
+            GameEvents.BattleEnd(allyWon ? BattleEndReason.Victory : BattleEndReason.Defeat);
+            _isBattleRunning = false;
+            yield break;
+        }
+
+        Debug.Log($"[Battle][Rejoin] catch-up 완료(tick {tick}/{targetTick}) — 정상 속도로 전환");
+        yield return RunBattleLoopAndFinish(tick);
+        _isBattleRunning = false;
+    }
+
+    /// <summary>
+    /// 재접속 복구 전용 셋업. 실전투 SetupUnits()와 같은 구조이되 두 가지가 다르다:
+    /// (1) 아군은 SetupAllyUnits(board)로 "지금 살아있는 실제 보드"에서 그대로 만든다 — 전투 중에는
+    ///     보드/벤치 편집이 불가능해(쇼핑 페이즈 전용 조작) 재접속 시점의 보드가 전투 시작 시점과
+    ///     동일하다는 전제이며, 이렇게 해야 BattleUnit.source가 실제 PokemonUnit을 가리켜 Cleanup()의
+    ///     "죽은 유닛 gameObject 재활성화·ResetForBattle()" 처리가 정상 동작한다(SetupMirrorUnits는
+    ///     source=null인 phantom 유닛을 쓰므로 재사용하면 이 부분이 깨진다 — 미러 전투는 원래
+    ///     읽기 전용 관전이라 문제되지 않았을 뿐).
+    /// (2) 적 스테이지는 RoundPhaseManager.CurrentStage 대신 snapshot.stageId로 조회한다 — 재접속
+    ///     직후에는 아직 RoundPhaseManager가 정상적으로 CurrentStage를 갖추지 못했을 수 있어,
+    ///     SetupMirrorUnits와 동일하게 FindStageById(snapshot.stageId)를 그대로 재사용한다.
+    /// 나머지(BuildValidCoords/SpawnEnemiesFromStage/ApplyOnCombatStartEffects/SetupVisuals)는
+    /// 기존 메서드를 그대로 재사용한다.
+    /// </summary>
+    private bool SetupUnitsForReconnect(BattleSnapshot snapshot, out string failReason)
+    {
+        failReason = null;
+        _units.Clear();
+        _previousCoords.Clear();
+        _pendingSpawns.Clear();
+
+        var board = GameManager.Instance.Board;
+        if (board == null)
+        {
+            failReason = "BoardManager 연결 안 됨";
+            return false;
+        }
+
+        BuildValidCoords(board);
+        SetupAllyUnits(board);
+
+        StageData stage = FindStageById(snapshot.stageId);
+        if (stage == null)
+        {
+            failReason = $"StageData 조회 실패: {snapshot.stageId}";
+            return false;
+        }
+
+        int enemyCount = SpawnEnemiesFromStage(stage, board);
+        if (enemyCount == 0)
+        {
+            failReason = $"'{stage.stageId}' 적 구성 생성 실패(DUMMY/풀 누락)";
+            return false;
+        }
+
+        ApplyOnCombatStartEffects();
+        SetupVisuals(board);
+        return true;
+    }
+
     /// <summary>코루틴은 out 파라미터를 못 쓰므로 루프 결과를 담아 전달하는 홀더.</summary>
     private sealed class BattleLoopResult
     {
@@ -267,10 +436,14 @@ public class BattleManager : MonoBehaviour
     /// <summary>
     /// MAX_TICKS까지 매 틱 시뮬레이션. 한쪽이 전멸하면 result.allyWon에 결과를 담고 종료,
     /// 타임아웃이면 오버타임(RunOvertime)으로 넘어간다.
+    /// startTick(기본 0)부터 이어서 진행 — 재접속 복구가 catch-up으로 이미 진행한 tick 수만큼
+    /// 건너뛰고 여기서부터 정상 속도로 이어가되, MAX_TICKS 총량은 그대로 지킨다(catch-up분을
+    /// 더한 만큼 전투가 길어지지 않도록).
     /// </summary>
-    private IEnumerator SimulateBattleLoop(BattleLoopResult result)
+    private IEnumerator SimulateBattleLoop(BattleLoopResult result, int startTick = 0)
     {
-        int tick = 0;
+        int tick = startTick;
+        CurrentBattleTick = tick;
 
         while (tick < MAX_TICKS)
         {
@@ -289,6 +462,7 @@ public class BattleManager : MonoBehaviour
             }
 
             tick++;
+            CurrentBattleTick = tick;
             yield return new WaitForSeconds(TICK_INTERVAL);
         }
 
