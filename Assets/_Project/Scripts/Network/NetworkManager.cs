@@ -23,6 +23,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     private const int   MAX_PLAYERS         = 2;
     private const float CONNECT_TIMEOUT     = 10f;
+    /// <summary>2인 입장 완료 후 씬 전환까지의 대기 시간. 방장 쪽 방 목록 줄이 "2/2"로 갱신되는 걸
+    /// 눈으로 볼 시간을 준다 — 지연 없이 바로 LoadLevel을 부르면 같은 프레임에 로비 씬이 사라져
+    /// 갱신된 인원 표시가 렌더링될 틈이 없다(2026-08 확인).</summary>
+    private const float ROOM_FULL_LOAD_DELAY = 0.5f;
     // Photon 플레이어 닉네임 최대 길이.
     private const int   MAX_NICKNAME_LENGTH = 16;
 
@@ -3274,9 +3278,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.SetCustomProperties(
             new Hashtable { { MATCH_GUID_ROOM_KEY, System.Guid.NewGuid().ToString("N") } });
 
-        PhotonNetwork.LoadLevel(GAME_SCENE_NAME);
+        StartCoroutine(LoadGameSceneAfterDelay());
         // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
         // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
+    }
+
+    /// <summary>
+    /// ROOM_FULL_LOAD_DELAY만큼 기다렸다가 게임 씬을 로드한다. IsOpen=false·matchId 배포는
+    /// OnRoomFull에서 이미 즉시 끝났으므로 이 대기가 다른 클라이언트의 입장을 허용하지 않는다 —
+    /// 순수하게 "방장 화면에 2/2가 그려질 시간을 준다"는 표시용 지연이다.
+    ///
+    /// 대기 중 파트너가 나가 방이 더 이상 가득 차 있지 않으면 로드를 건너뛴다. 이때 OnRoomFull이
+    /// 이미 배포해둔 matchId를 되돌려야 한다 — 안 그러면 파트너가 곧바로 재입장해도 OnRoomFull이
+    /// "이미 생성된 매치"로 오판해 씬을 영영 로드하지 않는다(다음 OnPlayerEnteredRoom → OnRoomFull이
+    /// 매치 존재 체크에서 조용히 막힘).
+    /// </summary>
+    private System.Collections.IEnumerator LoadGameSceneAfterDelay()
+    {
+        yield return new WaitForSeconds(ROOM_FULL_LOAD_DELAY);
+
+        if (!IsMasterClient) yield break;
+        if (PhotonNetwork.CurrentRoom == null) yield break;
+
+        if (PlayerCount != MAX_PLAYERS)
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(
+                new Hashtable { { MATCH_GUID_ROOM_KEY, null } });
+            PhotonNetwork.CurrentRoom.IsOpen = true;
+            yield break;
+        }
+
+        PhotonNetwork.LoadLevel(GAME_SCENE_NAME);
     }
 
     /// <summary>
