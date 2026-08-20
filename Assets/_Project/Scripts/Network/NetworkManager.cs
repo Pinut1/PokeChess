@@ -3394,6 +3394,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             catch (System.Exception) { currentStage = null; }
         }
 
+        if (currentStage == null)
+            Debug.LogWarning("[Network] 챔피언전 판정용 스테이지 조회 실패 — Room/StageDatabase 상태 확인 필요");
+
         bool isChampionRound = currentStage != null &&
                                 currentStage.stageType == StageType.ChampionBattle &&
                                 currentStage.trainerId == "GREEN";
