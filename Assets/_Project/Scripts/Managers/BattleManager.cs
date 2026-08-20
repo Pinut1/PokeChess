@@ -2195,10 +2195,18 @@ public class BattleManager : MonoBehaviour
     ///   2차: 1차 후보가 하나도 없으면(전부 점유돼 있거나 경로가 막혀 있으면), 도달 가능한 칸 중
     ///        공격 가능 영역까지 남은 거리(areaDist = max(0, dist(target) - bu.range))가 지금
     ///        서 있는 칸보다 실제로 더 작은 칸 — range 1(근접)이든 2 이상(원거리)이든 동일 기준.
-    ///   3차: 2차처럼 더 나아지는 칸은 없지만, 지금과 "동일한" 최소 areaDist를 유지하는 도달
-    ///        가능한 칸이 있으면 그쪽으로 계속 이동(제자리 고정 금지 — 타겟 주변 우회 유지).
-    /// 세 기준을 areaDist → steps → CompareCoords(결정적 tie-break, 네트워크 동기화용) 순
-    /// 사전식 비교로 통합했다 — areaDist가 작을수록 항상 이긴다(1차가 2차·3차를 항상 이김).
+    /// 두 기준을 areaDist → steps → CompareCoords(결정적 tie-break, 네트워크 동기화용) 순
+    /// 사전식 비교로 통합했다 — areaDist가 작을수록 항상 이긴다.
+    ///
+    /// 2차보다 나아지는 칸이 하나도 없으면(=지금 위치에서 더 가까워질 방법이 없으면) 제자리
+    /// 대기한다(2026-08, 기획 요청). 예전엔 "지금과 동일한 areaDist인 칸으로 계속 옆걸음"(3차,
+    /// 제자리 고정 금지 목적)과 "막다른 골목이면 방금 온 칸으로라도 되돌아가는 fallback"이
+    /// 있었는데, 아군이 타겟을 완전히 포위해 어느 방향으로도 가까워질 수 없을 때 이 둘이
+    /// 근거리 유닛을 포위망 밖에서 계속 옆걸음(3차)치거나 두 칸 사이를 왕복(fallback)하게
+    /// 만드는 원인이었다(2026-08 실측 영상 확인). 3차는 제거, fallback은 실제 코드리뷰 대응
+    /// 이력이 있어 완전히 지우지 않고 아래에서 주석 처리만 해뒀다 — 되살리려면 "FALLBACK 비활성화"
+    /// 표시된 블록의 주석만 풀면 된다. 이 게임은 전투에 30초 타임아웃(HP 비교 판정)이 있어
+    /// 유닛이 못 풀고 계속 대기해도 전투 자체는 정상 종료된다.
     ///
     /// 물리적 즉시 backtrack 방지: 후보의 "실제로 이번 스텝에 내디딜 첫 칸"(firstStep[current])이
     /// 직전에 있던 칸(_previousCoords[bu])과 같으면 그 후보는 통째로 제외한다. tier(areaDist)나
@@ -2212,15 +2220,16 @@ public class BattleManager : MonoBehaviour
     /// 아니라면(대개 그렇다 — 직전 칸은 여기로 오기 직전 위치이므로 그 자체가 막다른 골목이
     /// 아닌 한 그 칸을 거치지 않는 다른 진입 방향이 있다) 정상적으로 선택된다.
     ///
-    /// 막다른 자리 fallback(2026-08 코드리뷰 대응): "이번 틱에 실제로 내딛는 첫 걸음 자체가
-    /// 방금 온 칸"인 후보만 있는 경우, 예전에는 무조건 제자리 대기였다. 하지만 _previousCoords는
-    /// 실제 이동이 성공했을 때만 갱신되므로(MoveTowards), 대기 상태에서는 절대 갱신되지 않는다 —
-    /// 막힌 지형(그리드 경계·점유 밀집)이 그대로 유지되는 한 같은 이유로 계속 대기해 사실상
-    /// 영구 정지로 이어질 수 있었다. 그래서 backtrack 후보군을 버리지 않고 별도로 추적해뒀다가,
-    /// 진짜로 backtrack을 배제한 정상 후보가 "하나도 없을 때만"(hasBest == false) fallback으로
-    /// 사용한다 — 다른 정상 경로가 하나라도 있으면 기존과 동일하게 절대 선택되지 않으므로
-    /// A↔B 즉시 왕복 방지 목적은 그대로 유지된다. fallback도 areaDist → steps → CompareCoords
-    /// 순서의 동일한 사전식 비교로 고른다.
+    /// 막다른 자리 fallback — 2026-08 코드리뷰 대응으로 한 번 추가됐다가, 아군이 타겟을
+    /// 완전히 포위한 상황에서 두 칸 사이를 계속 왕복하게 만드는 게 실측 확인돼(2026-08,
+    /// 영상 확인) 아래에서 <b>주석 처리로 비활성화</b>했다(완전히 지우지는 않음 — 필요해지면
+    /// "FALLBACK 비활성화" 표시 블록의 주석만 풀면 원래대로 돌아온다). 살아있었을 때 의도:
+    /// "이번 틱에 실제로 내딛는 첫 걸음 자체가 방금 온 칸"인 후보만 있는 경우 무조건 제자리
+    /// 대기하면, _previousCoords가 실제 이동 성공 시에만 갱신되는 탓에(MoveTowards) 막힌
+    /// 지형이 그대로 유지되는 한 같은 이유로 계속 대기해 사실상 영구 정지로 이어질 수 있었다 —
+    /// 그래서 backtrack 후보군을 hasBest가 끝까지 false일 때만 쓰는 fallback으로 남겨뒀었다.
+    /// 지금은 이 게임 전투에 30초 타임아웃(HP 비교 판정)이 있어, 못 풀고 계속 대기해도 전투
+    /// 자체는 정상 종료되므로 "안 풀릴 수도 있는 리스크"보다 "왕복이 안 보이는 것"을 택했다.
     /// </summary>
     private HexCoords FindNextStep(BattleUnit bu, BattleUnit target)
     {
@@ -2238,12 +2247,12 @@ public class BattleManager : MonoBehaviour
         int bestAreaDist = int.MaxValue;
         int bestSteps = int.MaxValue;
 
-        // 막다른 자리 fallback 후보 — backtrack 제외 없이 같은 기준으로 추적한다.
-        // hasBest가 끝까지 false일 때만(=정상 후보가 전혀 없을 때만) 사용한다.
-        bool hasFallback = false;
-        HexCoords fallback = default;
-        int fallbackAreaDist = int.MaxValue;
-        int fallbackSteps = int.MaxValue;
+        // ── FALLBACK 비활성화 (2026-08, 왕복 버그로 주석 처리 — 되살리려면 아래 4줄과
+        // 루프 안의 대응 블록, return문의 주석만 풀면 된다) ──
+        // bool hasFallback = false;
+        // HexCoords fallback = default;
+        // int fallbackAreaDist = int.MaxValue;
+        // int fallbackSteps = int.MaxValue;
 
         while (queue.Count > 0)
         {
@@ -2254,45 +2263,45 @@ public class BattleManager : MonoBehaviour
             {
                 int areaDist = Mathf.Max(0, current.DistanceTo(target.coords) - bu.range);
 
-                if (areaDist <= startAreaDist)
+                // firstStep이 직전 칸과 같은 후보(=이번 스텝에 바로 되돌아가는 경로)는 정상
+                // 후보에서 항상 제외한다(즉시 왕복 방지).
+                bool isImmediateBacktrack = hasPrev && firstStep[current].Equals(prevCoords);
+
+                if (!isImmediateBacktrack && areaDist < startAreaDist)
                 {
-                    // 지금보다 나빠지는 칸은 후보 자체가 아니고(뒷걸음 금지), firstStep이 직전
-                    // 칸과 같은 후보(=이번 스텝에 바로 되돌아가는 경로)는 정상 후보에서 제외한다.
-                    bool isImmediateBacktrack = hasPrev && firstStep[current].Equals(prevCoords);
+                    // 정상 후보: 실제로 지금보다 가까워지는 칸만(예전 "3차" — 동일 areaDist
+                    // 옆걸음 — 제거됨).
+                    bool better;
+                    if (!hasBest) better = true;
+                    else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
+                    else if (steps != bestSteps) better = steps < bestSteps;
+                    else better = CompareCoords(current, best) < 0;
 
-                    if (!isImmediateBacktrack)
+                    if (better)
                     {
-                        bool better;
-                        if (!hasBest) better = true;
-                        else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
-                        else if (steps != bestSteps) better = steps < bestSteps;
-                        else better = CompareCoords(current, best) < 0;
-
-                        if (better)
-                        {
-                            bestAreaDist = areaDist;
-                            bestSteps = steps;
-                            best = current;
-                            hasBest = true;
-                        }
-                    }
-                    else
-                    {
-                        bool betterFallback;
-                        if (!hasFallback) betterFallback = true;
-                        else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
-                        else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
-                        else betterFallback = CompareCoords(current, fallback) < 0;
-
-                        if (betterFallback)
-                        {
-                            fallbackAreaDist = areaDist;
-                            fallbackSteps = steps;
-                            fallback = current;
-                            hasFallback = true;
-                        }
+                        bestAreaDist = areaDist;
+                        bestSteps = steps;
+                        best = current;
+                        hasBest = true;
                     }
                 }
+                // ── FALLBACK 비활성화: backtrack 후보 추적 블록(주석 처리) ──
+                // else if (isImmediateBacktrack && areaDist <= startAreaDist)
+                // {
+                //     bool betterFallback;
+                //     if (!hasFallback) betterFallback = true;
+                //     else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
+                //     else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
+                //     else betterFallback = CompareCoords(current, fallback) < 0;
+                //
+                //     if (betterFallback)
+                //     {
+                //         fallbackAreaDist = areaDist;
+                //         fallbackSteps = steps;
+                //         fallback = current;
+                //         hasFallback = true;
+                //     }
+                // }
             }
 
             foreach (var neighbor in current.GetNeighbors())
@@ -2308,7 +2317,7 @@ public class BattleManager : MonoBehaviour
         }
 
         if (hasBest) return firstStep[best];
-        if (hasFallback) return firstStep[fallback];
+        // if (hasFallback) return firstStep[fallback]; // FALLBACK 비활성화 — 위 주석 블록과 세트
         return bu.coords;
     }
 
