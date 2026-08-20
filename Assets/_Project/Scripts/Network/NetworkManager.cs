@@ -3381,10 +3381,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                                  : wins == 1 ? TeamRoundOutcome.Split
                                  : TeamRoundOutcome.BothLose;
 
-        bool isChampionRound = GameManager.TryGet(out var gm) &&
-                                gm.Phase != null && gm.Phase.CurrentStage != null &&
-                                gm.Phase.CurrentStage.stageType == StageType.ChampionBattle &&
-                                gm.Phase.CurrentStage.trainerId == "GREEN";
+        // RoundPhaseManager.CurrentStage(로컬 캐시) 대신 Room 속성의 서버 확정 라운드 번호로 직접
+        // 조회한다 — 마스터가 라운드5 도중 교체되면 새 마스터의 로컬 RoundPhaseManager가 아직
+        // OnRoundChanged를 처리하지 못해 CurrentStage가 null/stale일 수 있는데, Room 속성과
+        // StageDatabase는 그런 로컬 동기화 타이밍과 무관하게 항상 최신이다(2026-08 코드리뷰 지적).
+        StageData currentStage = null;
+        if (PhotonNetwork.CurrentRoom != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue) &&
+            StageDatabase.Instance != null)
+        {
+            currentStage = StageDatabase.Instance.GetForRound(System.Convert.ToInt32(roundValue));
+        }
+
+        bool isChampionRound = currentStage != null &&
+                                currentStage.stageType == StageType.ChampionBattle &&
+                                currentStage.trainerId == "GREEN";
 
         if (isChampionRound && outcome == TeamRoundOutcome.Split)
             outcome = TeamRoundOutcome.BothLose;
