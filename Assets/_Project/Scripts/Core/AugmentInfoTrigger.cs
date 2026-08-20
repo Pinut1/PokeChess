@@ -98,6 +98,12 @@ public class AugmentInfoTrigger : MonoBehaviour
         PartnerSpectateView spectateView = EnsurePartnerSpectateView();
         if (spectateView == null || !spectateView.IsExpanded) return;
 
+        // "준비 중"(파트너 컨텐츠를 아직 한 번도 못 받음) 상태면 PipRawImage 자체가 꺼져있다 —
+        // 꺼진 오브젝트는 RaycastAll에 절대 안 잡히므로 아래 IsBlockedByOtherUI의 "배경 자신인지"
+        // 비교가 이 상태에서는 항상 실패해 정상 클릭까지 막아버린다(2026-08 재재리뷰 지적). 화면에
+        // 실제로 아무것도 안 보이는 상태라 클릭을 받을 이유도 없으니, 여기서 먼저 걸러낸다.
+        if (!spectateView.IsShowingContent) return;
+
         if (!spectateView.TryProjectWorldToScreen(transform.position, out Vector2 point)) return;
 
         Vector2 screenPos = _pointAction.ReadValue<Vector2>();

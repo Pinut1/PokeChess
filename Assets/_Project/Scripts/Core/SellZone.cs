@@ -271,12 +271,7 @@ public class SellZone : MonoBehaviour, IDropTarget
     {
         if (IsSpectateBlocking() || PointerUtil.IsOverUI())
         {
-            if (_pointerHovered)
-            {
-                _pointerHovered = false;
-                RefreshHighlight();
-                if (!IsHovered) HideTooltip();
-            }
+            if (_pointerHovered) ClearPointerHover();
             return;
         }
 
@@ -287,7 +282,14 @@ public class SellZone : MonoBehaviour, IDropTarget
         ShowTooltip();
     }
 
-    private void OnMouseExit()
+    private void OnMouseExit() => ClearPointerHover();
+
+    /// <summary>
+    /// 커서 호버 상태를 끈다 — OnMouseExit(실제로 커서가 벗어남)과 OnMouseOver의 차단 분기(관전·UI가
+    /// 가로막아 더 이상 호버로 인정 못 함)가 똑같이 쓴다(2026-08 재재리뷰 지적, 중복 제거). 닫을지는
+    /// IsHovered(=드래그 호버 포함)로 판단해, 드래그 중엔 툴팁을 그대로 열어둔다.
+    /// </summary>
+    private void ClearPointerHover()
     {
         _pointerHovered = false;
         RefreshHighlight();
