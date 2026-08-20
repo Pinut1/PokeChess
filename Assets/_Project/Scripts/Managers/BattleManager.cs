@@ -126,11 +126,11 @@ public class BattleManager : MonoBehaviour
     // 이전 전투의 BattleUnit 참조가 안 남게 한다.
     private readonly Dictionary<BattleUnit, HexCoords> _previousCoords = new();
 
-    // 가장 최근에 실제로 사용한 fallback(막다른 자리 후퇴) 후보의 (areaDist, steps) — "그 후퇴가
-    // 뚫어준 상황이 어느 정도였는지"를 기억한다. FindNextStep이 다음 호출에서 새로 계산한
-    // fallback 후보의 (areaDist, steps)가 이 기록과 완전히 같으면(=상황이 그때와 조금도 안
-    // 바뀌었으면) 같은 후퇴를 반복하지 않고 대기한다 — 다르면(주변 점유가 바뀌었거나 타겟이
-    // 바뀌어 areaDist·steps가 달라졌으면) 다시 써도 된다고 본다.
+    // 가장 최근에 실제로 사용한 fallback(막다른 자리 후퇴) 후보의 (타겟, areaDist, steps) —
+    // "그 후퇴가 어떤 타겟을 상대로, 어느 정도 상황을 뚫어줬는지"를 기억한다. FindNextStep이
+    // 다음 호출에서 새로 계산한 fallback 후보가 이 기록과 세 값 전부 완전히 같으면(=같은
+    // 타겟을 상대로 상황이 조금도 안 바뀌었으면) 같은 후퇴를 반복하지 않고 대기한다 — 다르면
+    // (타겟이 바뀌었거나 주변 점유가 바뀌어 areaDist·steps가 달라졌으면) 다시 써도 된다고 본다.
     //
     // "직전 이동이 fallback였는지"만 boolean으로 기억하는 방식은 처음엔 이걸로 했었는데, 유닛이
     // 대기 상태에 들어가면(MoveTowards가 이동 없이 조기 리턴) 그 플래그를 갱신할 기회 자체가
@@ -139,10 +139,16 @@ public class BattleManager : MonoBehaviour
     // 고려했으나 "일정 시간이 지나면 무조건 허용"은 실제로 아무것도 안 바뀌었어도 재시도해
     // 왕복이 다시 보일 수 있다 — 그래서 시간이 아니라 "이 후퇴가 실제로 다른 상황을 뚫어주는지"
     // 자체를 비교하는 이 방식을 택했다(경로 캐시 아님 — 매 호출 새로 계산되는 BFS 결과의
-    // 요약값만 저장). FindNextStep 안에서만 갱신·소비하며, 실제 이동 성공 여부와 무관하게
+    // 요약값만 저장).
+    //
+    // (areaDist, steps) 두 값만 저장했을 때는(2026-08 재리뷰 지적) target을 매 틱 재조준하는
+    // 이 게임에서(FindInRangeEnemy/FindNearestEnemy) 타겟이 바뀌었는데도 우연히 같은
+    // (areaDist, steps) 조합이 나오면 서로 무관한 상황을 "동일 상황"으로 오판해 정당한 이동까지
+    // 막을 수 있었다 — target 참조를 지문에 추가해 타겟이 바뀌는 경우는 항상 "다른 상황"으로
+    // 확실히 구분되게 했다. FindNextStep 안에서만 갱신·소비하며, 실제 이동 성공 여부와 무관하게
     // "다음에 다시 봐도 되는 기준선"으로만 쓰인다. _previousCoords와 같은 생명주기(전투 시작·
     // Cleanup마다 비움)로 관리한다.
-    private readonly Dictionary<BattleUnit, (int areaDist, int steps)> _lastFallbackProfile = new();
+    private readonly Dictionary<BattleUnit, (BattleUnit target, int areaDist, int steps)> _lastFallbackProfile = new();
 
     /// <summary>파트너 관전 미러 전투 코루틴(실전투 _battleCoroutine과 완전히 별도 필드).
     /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
@@ -2354,17 +2360,19 @@ public class BattleManager : MonoBehaviour
         if (hasFallback)
         {
             bool sameSituationAsLastFallback =
-                _lastFallbackProfile.TryGetValue(bu, out (int areaDist, int steps) lastProfile) &&
+                _lastFallbackProfile.TryGetValue(bu, out var lastProfile) &&
+                lastProfile.target == target &&
                 lastProfile.areaDist == fallbackAreaDist && lastProfile.steps == fallbackSteps;
 
             if (!sameSituationAsLastFallback)
             {
-                _lastFallbackProfile[bu] = (fallbackAreaDist, fallbackSteps);
+                _lastFallbackProfile[bu] = (target, fallbackAreaDist, fallbackSteps);
                 return firstStep[fallback];
             }
-            // 지난번 fallback과 (areaDist, steps)가 완전히 같다 = 상황이 조금도 안 바뀌었다 —
-            // 재사용하면 그대로 왕복이 재현되므로 대기한다. 기록은 그대로 둔다(다음 틱에도
-            // 여전히 안 바뀌었으면 계속 대기, 바뀌면 그때 위 분기로 빠져 다시 허용됨).
+            // 지난번 fallback과 (타겟, areaDist, steps)가 완전히 같다 = 같은 타겟을 상대로
+            // 상황이 조금도 안 바뀌었다 — 재사용하면 그대로 왕복이 재현되므로 대기한다. 기록은
+            // 그대로 둔다(다음 틱에도 여전히 안 바뀌었으면 계속 대기, 바뀌면 위 분기로 빠져
+            // 다시 허용됨).
         }
 
         return bu.coords;
