@@ -220,6 +220,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
+    /// <summary>OnRoomFull의 씬 전환 지연 코루틴(LoadGameSceneAfterDelay)이 대기 중인지 — 로컬
+    /// 필드라 네트워크 왕복 없이 즉시 정확하며, 코루틴이 아직 안 끝났는데 OnRoomFull이 다시
+    /// 불려도(파트너 잠깐 이탈→재입장 등) 중복 진입하지 않게 막는다.</summary>
+    private bool _roomFullLoadPending;
+
     /// <summary>
     /// 연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용(2026-08 파트너 이탈 UX 작업에서 변경하지 않음).
     /// ⚠️ 이 값은 Photon 서버가 끊긴 플레이어의 자리를 실제로 보존해주는 한계 시간이다. 남은 플레이어의
@@ -3188,6 +3193,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] {otherPlayer.NickName} 퇴장 (Inactive: {otherPlayer.IsInactive})");
 
+        // 매치가 실제로 시작되기 전(라운드 1 방송 전) 이탈은 이 아래의 "파트너 접속 끊김" 재접속
+        // 대기 흐름(30초 유예 타이머·GameEvents.OpponentDisconnected 등)을 타지 않는다 — 그 흐름은
+        // 진행 중이던 게임을 전제로 한다. OnRoomFull의 씬 전환 지연(ROOM_FULL_LOAD_DELAY) 중에
+        // 파트너가 나가는 경우가 대표적인데, 이때는 아직 GameScene/GameManager조차 없어서 바로
+        // 아래 GameManager.TryGet 가드(GameOver/Victory 판단용)로는 걸러지지 않는다(2026-08
+        // 코드리뷰 지적). HasActiveRoundInRoom()은 서버 권위 값이라 로컬 씬 상태에 의존하지 않는다.
+        if (!HasActiveRoundInRoom())
+            return;
+
         // 응답 전 상대 이탈 — 항복 상태는 정리만 하고, 실제 패배 처리는 남은 이탈 흐름
         // ([포기하기] 선택 시 ConfirmPartnerDisconnectGiveUp → SessionEnded)에 맡긴다.
         _surrenderRequestSent = false;
@@ -3271,42 +3285,50 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        // 대기 코루틴이 이미 도는 중이면 재진입하지 않는다(파트너가 잠깐 나갔다 바로 재입장하는
+        // 경우 등, OnPlayerEnteredRoom이 다시 OnRoomFull을 부를 수 있다) — 로컬 필드라 네트워크
+        // 왕복 지연 없이 즉시 정확하다(아래 matchId 지연 배포와 같은 이유).
+        if (_roomFullLoadPending) return;
+        _roomFullLoadPending = true;
+
         PhotonNetwork.CurrentRoom.IsOpen = false;
-
-        // 이번 판의 matchId(GUID)를 Room 속성으로 배포 — 두 클라이언트가 같은 값으로 전적을 묶는다.
-        // 씬 로드 전에 설정해 게임 시작 시점엔 양쪽 모두 동기화돼 있음.
-        PhotonNetwork.CurrentRoom.SetCustomProperties(
-            new Hashtable { { MATCH_GUID_ROOM_KEY, System.Guid.NewGuid().ToString("N") } });
-
         StartCoroutine(LoadGameSceneAfterDelay());
         // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
         // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
     }
 
     /// <summary>
-    /// ROOM_FULL_LOAD_DELAY만큼 기다렸다가 게임 씬을 로드한다. IsOpen=false·matchId 배포는
-    /// OnRoomFull에서 이미 즉시 끝났으므로 이 대기가 다른 클라이언트의 입장을 허용하지 않는다 —
-    /// 순수하게 "방장 화면에 2/2가 그려질 시간을 준다"는 표시용 지연이다.
+    /// ROOM_FULL_LOAD_DELAY만큼 기다렸다가 게임 씬을 로드한다 — 방장 화면에 "2/2" 인원 표시가
+    /// 씬 전환 전에 그려질 시간을 준다.
     ///
-    /// 대기 중 파트너가 나가 방이 더 이상 가득 차 있지 않으면 로드를 건너뛴다. 이때 OnRoomFull이
-    /// 이미 배포해둔 matchId를 되돌려야 한다 — 안 그러면 파트너가 곧바로 재입장해도 OnRoomFull이
-    /// "이미 생성된 매치"로 오판해 씬을 영영 로드하지 않는다(다음 OnPlayerEnteredRoom → OnRoomFull이
-    /// 매치 존재 체크에서 조용히 막힘).
+    /// matchId(GUID) Room 속성은 <b>여기, 실제로 로드하기 직전에만</b> 배포한다. OnRoomFull에서
+    /// 미리 배포해뒀다가 대기 중 파트너가 나가면 되돌리는 방식은 온라인 방에서
+    /// Room.SetCustomProperties가 비동기(서버 왕복 후에야 로컬 CustomProperties에 반영, 참고:
+    /// Photon/PhotonRealtime/Code/Room.cs SetCustomProperties)라 롤백 자체가 그 왕복 전까지는
+    /// 로컬에 반영 안 된 상태로 남는다 — 그 사이 파트너가 바로 재입장하면 OnRoomFull이 아직 안
+    /// 지워진 옛 matchId를 보고 "기존 매치"로 오판해 씬을 영영 로드하지 않는 문제가 있었다
+    /// (2026-08 코드리뷰 지적). matchId를 아예 미리 쓰지 않으면 되돌릴 것도 없어 이 문제가
+    /// 원천적으로 사라진다 — 재진입 방지는 위 _roomFullLoadPending(로컬 필드)이 대신 맡는다.
     /// </summary>
     private System.Collections.IEnumerator LoadGameSceneAfterDelay()
     {
         yield return new WaitForSeconds(ROOM_FULL_LOAD_DELAY);
+
+        _roomFullLoadPending = false;
 
         if (!IsMasterClient) yield break;
         if (PhotonNetwork.CurrentRoom == null) yield break;
 
         if (PlayerCount != MAX_PLAYERS)
         {
-            PhotonNetwork.CurrentRoom.SetCustomProperties(
-                new Hashtable { { MATCH_GUID_ROOM_KEY, null } });
             PhotonNetwork.CurrentRoom.IsOpen = true;
             yield break;
         }
+
+        // 이번 판의 matchId(GUID)를 Room 속성으로 배포 — 두 클라이언트가 같은 값으로 전적을 묶는다.
+        // 씬 로드 전에 설정해 게임 시작 시점엔 양쪽 모두 동기화돼 있음.
+        PhotonNetwork.CurrentRoom.SetCustomProperties(
+            new Hashtable { { MATCH_GUID_ROOM_KEY, System.Guid.NewGuid().ToString("N") } });
 
         PhotonNetwork.LoadLevel(GAME_SCENE_NAME);
     }
