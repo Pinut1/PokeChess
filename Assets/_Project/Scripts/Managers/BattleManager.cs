@@ -150,6 +150,15 @@ public class BattleManager : MonoBehaviour
     // Cleanup마다 비움)로 관리한다.
     private readonly Dictionary<BattleUnit, (BattleUnit target, int areaDist, int steps)> _lastFallbackProfile = new();
 
+    /// <summary>_previousCoords·_lastFallbackProfile은 항상 같은 생명주기(전투 시작·Cleanup마다
+    /// 비움)라 짝으로 관리한다 — 둘 중 하나만 비우는 실수를 막기 위해 호출부는 이 메서드
+    /// 하나만 부르면 된다.</summary>
+    private void ClearMovementTracking()
+    {
+        _previousCoords.Clear();
+        _lastFallbackProfile.Clear();
+    }
+
     /// <summary>파트너 관전 미러 전투 코루틴(실전투 _battleCoroutine과 완전히 별도 필드).
     /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
     private Coroutine _mirrorBattleCoroutine;
@@ -824,8 +833,7 @@ public class BattleManager : MonoBehaviour
     private void SetupUnits()
     {
         _units.Clear();
-        _previousCoords.Clear();
-        _lastFallbackProfile.Clear();
+        ClearMovementTracking();
         _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         var board = GameManager.Instance.Board;
@@ -2213,6 +2221,22 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
+    /// FindNextStep이 정상 후보(best)·fallback 후보 양쪽에 똑같이 쓰는 areaDist → steps →
+    /// CompareCoords 사전식 비교. 후보(candidate)가 지금까지의 최선(current, hasCurrent가
+    /// false면 아직 없음)보다 나은지 판정한다 — 두 후보 집합의 비교 규칙이 어긋나면 네트워크
+    /// 동기화(결정적 tie-break)가 깨지므로 반드시 이 한 곳만 고치면 되게 모아뒀다.
+    /// </summary>
+    private static bool IsBetterCandidate(
+        bool hasCurrent, int candidateAreaDist, int candidateSteps, HexCoords candidate,
+        int currentAreaDist, int currentSteps, HexCoords current)
+    {
+        if (!hasCurrent) return true;
+        if (candidateAreaDist != currentAreaDist) return candidateAreaDist < currentAreaDist;
+        if (candidateSteps != currentSteps) return candidateSteps < currentSteps;
+        return CompareCoords(candidate, current) < 0;
+    }
+
+    /// <summary>
     /// bu.coords에서 시작해 (유효 좌표 ∩ 미점유) 칸만으로 BFS 전체 탐색을 한 번 수행하고,
     /// 아래 기준으로 가장 좋은 도달 가능한 칸까지의 첫 스텝을 돌려준다(캐시 없음 — 호출마다 새로 계산):
     ///   1차: target을 bu.range 이내에서 때릴 수 있는 빈 칸(= 공격 가능 영역, areaDist == 0)
@@ -2303,13 +2327,7 @@ public class BattleManager : MonoBehaviour
                 {
                     // 정상 후보: 실제로 지금보다 가까워지는 칸만(예전 "3차" — 동일 areaDist
                     // 옆걸음 — 제거됨).
-                    bool better;
-                    if (!hasBest) better = true;
-                    else if (areaDist != bestAreaDist) better = areaDist < bestAreaDist;
-                    else if (steps != bestSteps) better = steps < bestSteps;
-                    else better = CompareCoords(current, best) < 0;
-
-                    if (better)
+                    if (IsBetterCandidate(hasBest, areaDist, steps, current, bestAreaDist, bestSteps, best))
                     {
                         bestAreaDist = areaDist;
                         bestSteps = steps;
@@ -2321,13 +2339,7 @@ public class BattleManager : MonoBehaviour
                 {
                     // 막다른 자리 fallback 후보 — 실제 사용 여부는 루프 밖에서 _lastFallbackProfile와
                     // 비교해 결정한다(여기서는 후보 수집만).
-                    bool betterFallback;
-                    if (!hasFallback) betterFallback = true;
-                    else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
-                    else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
-                    else betterFallback = CompareCoords(current, fallback) < 0;
-
-                    if (betterFallback)
+                    if (IsBetterCandidate(hasFallback, areaDist, steps, current, fallbackAreaDist, fallbackSteps, fallback))
                     {
                         fallbackAreaDist = areaDist;
                         fallbackSteps = steps;
@@ -2484,8 +2496,7 @@ public class BattleManager : MonoBehaviour
         _mirrorTiles.Clear();
         _enemyTiles.Clear();
         _validCoords.Clear();
-        _previousCoords.Clear();
-        _lastFallbackProfile.Clear();
+        ClearMovementTracking();
 
         // 이 인스턴스(실전투 또는 미러)가 만든 VFX만 정리한다 — 정적 전역 리스트를 함께 쓰던 예전
         // BattleVfxPlayer.ClearAllActive()와 달리 상대 인스턴스의 VFX는 건드리지 않는다. Cleanup()은
@@ -2743,8 +2754,7 @@ public class BattleManager : MonoBehaviour
     {
         failReason = null;
         _units.Clear();
-        _previousCoords.Clear();
-        _lastFallbackProfile.Clear();
+        ClearMovementTracking();
         _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
