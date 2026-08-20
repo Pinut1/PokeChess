@@ -242,7 +242,10 @@ public class SellZone : MonoBehaviour, IDropTarget
     private void OnMouseEnter()
     {
         // 파트너 전체화면 관전 중에는 화면 뒤 오브젝트를 건드릴 수 없다 — OnMouseDown과 같은 기준.
-        if (IsSpectateBlocking()) return;
+        // UI 위에 커서가 있을 때도 마찬가지(OnMouseDown의 IsPointerOverGameObject 가드와 같은 이유
+        // — 견본덱 창 등이 통신기를 가리고 있어도 물리 레이캐스트는 그대로 들어와 안내창이 UI를
+        // 뚫고 뜨는 버그가 있었다, 2026-08 QA 리포트).
+        if (IsSpectateBlocking() || IsPointerOverUI()) return;
 
         _pointerHovered = true;
         RefreshHighlight();
@@ -250,13 +253,13 @@ public class SellZone : MonoBehaviour, IDropTarget
     }
 
     /// <summary>
-    /// 관전이 걸려 있는 동안엔 OnMouseEnter가 상태를 세우지 않는다. 관전이 풀렸을 때 커서가 이미
-    /// 올라와 있으면 Unity는 Enter를 다시 보내지 않으므로(이미 '진입'으로 보고 있다) 여기서 따라잡는다.
-    /// 커서가 올라와 있는 동안만 도는 데다 대부분 bool 하나 보고 빠져나간다.
+    /// 관전·UI 차단이 걸려 있는 동안엔 OnMouseEnter가 상태를 세우지 않는다. 그게 풀렸을 때 커서가
+    /// 이미 올라와 있으면 Unity는 Enter를 다시 보내지 않으므로(이미 '진입'으로 보고 있다) 여기서
+    /// 따라잡는다. 커서가 올라와 있는 동안만 도는 데다 대부분 bool 하나 보고 빠져나간다.
     /// </summary>
     private void OnMouseOver()
     {
-        if (_pointerHovered || IsSpectateBlocking()) return;
+        if (_pointerHovered || IsSpectateBlocking() || IsPointerOverUI()) return;
 
         _pointerHovered = true;
         RefreshHighlight();
@@ -400,7 +403,7 @@ public class SellZone : MonoBehaviour, IDropTarget
         // 안내창이 통신기 위에 겹쳐 뜬다. OnMouseDown은 물리 레이캐스트라 UI에 가려도 그대로
         // 들어오는데, 창의 [포켓몬 받기] 버튼과 이 클릭이 같은 TryReceiveNextTradeUnit을 부르므로
         // 가드가 없으면 한 번 눌러 두 마리가 수령된다.
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        if (IsPointerOverUI())
             return;
 
         NetworkManager network =
@@ -427,4 +430,14 @@ public class SellZone : MonoBehaviour, IDropTarget
         GameManager.TryGet(out var gm) &&
         gm.UI != null &&
         gm.UI.IsPartnerSpectateExpanded;
+
+    /// <summary>
+    /// 지금 커서 아래에 UI(견본덱 창 등)가 있는지. OnMouseDown/OnMouseEnter/OnMouseOver는 Main
+    /// Camera 기준 물리 레이캐스트라 화면상 UI에 가려도 그대로 뚫고 들어온다 — 이 가드가 없으면
+    /// 통신기가 UI 뒤에 있어도 안내창이 그 위로 떠버린다(2026-08 QA 리포트: "통신기안내창이
+    /// 견본덱창 뚫음"). OnMouseDown에서 먼저 같은 방식으로 쓰고 있던 것을 호버(Enter/Over)에도
+    /// 똑같이 적용한다.
+    /// </summary>
+    private static bool IsPointerOverUI() =>
+        EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 }
