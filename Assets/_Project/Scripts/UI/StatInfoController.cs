@@ -153,6 +153,11 @@ public class StatInfoController : MonoBehaviour
     /// 전체화면 파트너 관전 중일 때만 동작한다(PIP는 대상 아님 — PartnerSpectateView.IsExpanded 기준).
     /// 아니면 false를 반환해 기존 로컬 판정으로 넘어간다. 전체화면 중이면(파트너 유닛을 맞혔든 못
     /// 맞혔든) 항상 true를 반환해 로컬 판정을 완전히 대체한다.
+    ///
+    /// ⚠️ 이 아래 좌표-거리 판정도 AugmentInfoTrigger의 관전 클릭 판정과 같은 함정이 있었다 —
+    /// 그 지점에 실제로 뭐가 떠 있는지 안 보고 반경/거리만 비교하므로, 그 근처를 덮은 다른 UI를
+    /// 눌러도 파트너 유닛 정보창이 같이 열렸다(2026-08 재재리뷰 지적). PointerUtil.IsBlockedByOtherUI로
+    /// 후보를 찾기 전에 먼저 걸러낸다 — AugmentInfoTrigger와 같은 헬퍼(공용 유틸로 옮김).
     /// </summary>
     private bool TryHandlePartnerOpen()
     {
@@ -164,6 +169,8 @@ public class StatInfoController : MonoBehaviour
         if (mirror == null) { Close(); return true; }
 
         Vector2 screenPos = PointerScreenPos();
+
+        if (PointerUtil.IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject)) { Close(); return true; }
 
         // 로컬 GamePhase가 아니라 미러 자신의 실행 상태로 판단한다 — 내 전투가 먼저 끝나 Result로
         // 넘어가도 파트너 미러 전투는 계속 실행 중일 수 있는데(RoundPhaseManager가 양쪽 결과가

@@ -1,14 +1,40 @@
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
-/// "지금 커서 아래에 UI가 있는지"를 묻는 곳이 여러 군데(SellZone·AugmentInfoTrigger 등)라 하나로
-/// 모았다 — OnMouseDown/OnMouseEnter/OnMouseOver 같은 Main Camera 기준 물리 레이캐스트는 화면상
-/// UI에 가려도 그대로 통과하므로, 그 위에 뜬 UI를 뚫고 상호작용/안내창이 나타나는 걸 막을 때 쓴다
-/// (2026-08 QA 리포트: "통신기안내창이 견본덱창 뚫음"). 각 호출부가 개별적으로 EventSystem.current
-/// null 체크까지 반복하지 않도록 여기 한 곳에서만 관리한다.
+/// "지금 커서 아래에 UI가 있는지"를 묻는 곳이 여러 군데(SellZone·AugmentInfoTrigger·StatInfoController
+/// 등)라 하나로 모았다 — OnMouseDown/OnMouseEnter/OnMouseOver 같은 Main Camera 기준 물리 레이캐스트,
+/// 그리고 관전 화면의 좌표-거리 클릭 판정은 전부 화면상 UI에 가려도 그대로 통과하므로, 그 위에 뜬
+/// UI를 뚫고 상호작용/안내창이 나타나는 걸 막을 때 쓴다(2026-08 QA 리포트: "통신기안내창이
+/// 견본덱창 뚫음"). 각 호출부가 개별적으로 EventSystem.current null 체크까지 반복하지 않도록
+/// 여기 한 곳에서만 관리한다.
 /// </summary>
 public static class PointerUtil
 {
     public static bool IsOverUI() =>
         EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
+    // RaycastAll 호출마다 새로 할당하지 않도록 재사용 — 프레임당 호출자가 많지 않은 폴링/클릭
+    // 경로에서만 쓰여 경쟁이 없다.
+    private static readonly List<RaycastResult> s_uiRaycastBuffer = new();
+
+    /// <summary>
+    /// screenPos 지점의 맨 위 UI가 allowedRoot(예: 관전 배경 RawImage) 소속이 아니면 true — 즉,
+    /// 그 자리를 다른 UI(설정창 버튼 등)가 실제로 덮고 있다는 뜻이다. "소속"은 allowedRoot 자신뿐
+    /// 아니라 그 자식도 포함한다(IsChildOf) — 관전 화면(PartnerSpectateView)은 파트너 HP/마나 바
+    /// 같은 자체 HUD를 배경 RawImage의 자식으로 붙여 PIP/전체화면 전환에 자동으로 따라가게 하므로,
+    /// "배경 자신"만 비교하면 그 HUD 자체를 "다른 UI가 막고 있다"고 오판한다(2026-08 재재재리뷰
+    /// 지적). 아무 UI도 없거나 allowedRoot 소속만 잡히면 false(클릭을 그대로 인정).
+    /// </summary>
+    public static bool IsBlockedByOtherUI(Vector2 screenPos, GameObject allowedRoot)
+    {
+        if (EventSystem.current == null) return false;
+
+        var pointerData = new PointerEventData(EventSystem.current) { position = screenPos };
+        s_uiRaycastBuffer.Clear();
+        EventSystem.current.RaycastAll(pointerData, s_uiRaycastBuffer);
+
+        return s_uiRaycastBuffer.Count > 0 && !s_uiRaycastBuffer[0].gameObject.transform.IsChildOf(allowedRoot.transform);
+    }
 }

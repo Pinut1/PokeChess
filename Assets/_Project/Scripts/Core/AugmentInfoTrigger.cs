@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -22,8 +20,10 @@ using UnityEngine.InputSystem;
 /// 무조건 클릭으로 인정하므로, 그 근처에 다른 UI(설정창 버튼 등)가 우연히 겹쳐 있으면 그걸 눌러도
 /// 증강창까지 같이 열렸다(2026-08 재리뷰 지적). PointerUtil.IsOverUI()는 여기서 못 쓴다 — 관전 중엔
 /// 배경 Image 자체가 항상 "UI 위"로 잡히므로 그걸 그대로 쓰면 증강창이 아예 안 열리게 된다. 대신
-/// EventSystem.RaycastAll로 그 지점의 맨 위 UI가 배경 Image(PartnerSpectateView.PipRawImage)
-/// 자신인지를 확인해, 배경이 아닌 다른 UI가 위에 있을 때만 막는다(IsBlockedByOtherUI).
+/// PointerUtil.IsBlockedByOtherUI로 그 지점의 맨 위 UI가 배경 Image(PartnerSpectateView.PipRawImage)
+/// 소속(자신 또는 그 자식 — 파트너 HP/마나 바도 배경의 자식이라 여기 포함됨)인지를 확인해, 배경
+/// 소속이 아닌 다른 UI가 위에 있을 때만 막는다. StatInfoController.TryHandlePartnerOpen도 같은
+/// 헬퍼를 쓴다(2026-08 재재재리뷰 지적으로 공용 유틸로 옮김).
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class AugmentInfoTrigger : MonoBehaviour
@@ -109,9 +109,9 @@ public class AugmentInfoTrigger : MonoBehaviour
         Vector2 screenPos = _pointAction.ReadValue<Vector2>();
         if (Vector2.Distance(screenPos, point) > _partnerClickRadius) return;
 
-        // 반경 안이어도 그 지점에 배경(PipRawImage)이 아닌 다른 UI가 맨 위에 있으면 그 UI를
+        // 반경 안이어도 그 지점에 배경(PipRawImage) 소속이 아닌 다른 UI가 맨 위에 있으면 그 UI를
         // 클릭한 것으로 보고 넘긴다 — 클래스 doc 참고.
-        if (IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject)) return;
+        if (PointerUtil.IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject)) return;
 
         AugmentData data = ResolvePartnerAugmentData();
         if (_toggleOnClick) _panel.TogglePartner(data);
@@ -122,26 +122,6 @@ public class AugmentInfoTrigger : MonoBehaviour
     {
         if (_partnerSpectateView == null) _partnerSpectateView = FindFirstObjectByType<PartnerSpectateView>();
         return _partnerSpectateView;
-    }
-
-    // RaycastAll 호출마다 새로 할당하지 않도록 재사용 — 이 클래스는 씬에 하나뿐이라 매 프레임
-    // 경쟁할 다른 호출자가 없다.
-    private static readonly List<RaycastResult> s_uiRaycastBuffer = new();
-
-    /// <summary>
-    /// screenPos 지점의 맨 위 UI가 backgroundGO(관전 배경 RawImage) 자신이 아니면 true —
-    /// 즉, 그 자리를 다른 UI(설정창 버튼 등)가 실제로 덮고 있다는 뜻이다. 아무 UI도 없거나
-    /// backgroundGO 자신만 잡히면 false(배경일 뿐이니 클릭을 그대로 인정).
-    /// </summary>
-    private static bool IsBlockedByOtherUI(Vector2 screenPos, GameObject backgroundGO)
-    {
-        if (EventSystem.current == null) return false;
-
-        var pointerData = new PointerEventData(EventSystem.current) { position = screenPos };
-        s_uiRaycastBuffer.Clear();
-        EventSystem.current.RaycastAll(pointerData, s_uiRaycastBuffer);
-
-        return s_uiRaycastBuffer.Count > 0 && s_uiRaycastBuffer[0].gameObject != backgroundGO;
     }
 
     private void HandlePartnerAugmentsChanged(string[] augmentNamesEn)
