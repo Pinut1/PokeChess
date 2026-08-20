@@ -220,10 +220,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
-    /// <summary>OnRoomFull의 씬 전환 지연 코루틴(LoadGameSceneAfterDelay)이 대기 중인지 — 로컬
-    /// 필드라 네트워크 왕복 없이 즉시 정확하며, 코루틴이 아직 안 끝났는데 OnRoomFull이 다시
-    /// 불려도(파트너 잠깐 이탈→재입장 등) 중복 진입하지 않게 막는다.</summary>
-    private bool _roomFullLoadPending;
+    /// <summary>OnRoomFull의 씬 전환 지연 코루틴(LoadGameSceneAfterDelay). 파일 전체의 다른
+    /// 코루틴 필드(_opponentGraceRoutine 등)와 같은 관례대로 Coroutine 참조 자체를 들고 있다 —
+    /// 코루틴이 아직 안 끝났는데 OnRoomFull이 다시 불려도(파트너 잠깐 이탈→재입장 등) 중복
+    /// 진입하지 않게 막고, OnPlayerLeftRoom이 "지금 이 대기 구간에 있는지"를 판정하는 데도
+    /// 그대로 쓴다(null이 아니면 대기 중) — bool이었다면 두 용도를 각각 따로 관리해야 했다.</summary>
+    private Coroutine _roomFullLoadRoutine;
 
     /// <summary>
     /// 연결 끊김 후 재접속 유예 시간(초). Room.PlayerTtl에도 동일하게 적용(2026-08 파트너 이탈 UX 작업에서 변경하지 않음).
@@ -3193,13 +3195,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"[Network] {otherPlayer.NickName} 퇴장 (Inactive: {otherPlayer.IsInactive})");
 
-        // 매치가 실제로 시작되기 전(라운드 1 방송 전) 이탈은 이 아래의 "파트너 접속 끊김" 재접속
-        // 대기 흐름(30초 유예 타이머·GameEvents.OpponentDisconnected 등)을 타지 않는다 — 그 흐름은
-        // 진행 중이던 게임을 전제로 한다. OnRoomFull의 씬 전환 지연(ROOM_FULL_LOAD_DELAY) 중에
-        // 파트너가 나가는 경우가 대표적인데, 이때는 아직 GameScene/GameManager조차 없어서 바로
-        // 아래 GameManager.TryGet 가드(GameOver/Victory 판단용)로는 걸러지지 않는다(2026-08
-        // 코드리뷰 지적). HasActiveRoundInRoom()은 서버 권위 값이라 로컬 씬 상태에 의존하지 않는다.
-        if (!HasActiveRoundInRoom())
+        // OnRoomFull의 씬 전환 지연(ROOM_FULL_LOAD_DELAY, LoadGameSceneAfterDelay 대기 중)에만
+        // 이 아래의 "파트너 접속 끊김" 재접속 대기 흐름(30초 유예 타이머·GameEvents.OpponentDisconnected
+        // 등)을 건너뛴다 — 이 구간은 아직 GameScene/GameManager조차 없어서 바로 아래 GameManager.TryGet
+        // 가드(GameOver/Victory 판단용)로는 걸러지지 않는다(2026-08 코드리뷰 지적).
+        // ⚠️ 이 가드는 딱 그 짧은 구간(_roomFullLoadRoutine != null)에만 걸어야 한다 — 처음엔
+        // "라운드 1 방송 전"(HasActiveRoundInRoom()==false) 전체로 걸었다가, 씬 로드 완료 후
+        // SceneReady 핸드셰이크 대기까지 통째로 가려버려서 그 구간에 파트너가 끊기면 재접속 대기
+        // UI도 없이 영영 멈추는 회귀가 나왔다(2026-08 재리뷰 지적) — LoadLevel 호출 직후부터는
+        // _roomFullLoadRoutine이 이미 null이라 이 가드에 걸리지 않고 정상적으로 아래 흐름을 탄다.
+        if (_roomFullLoadRoutine != null)
             return;
 
         // 응답 전 상대 이탈 — 항복 상태는 정리만 하고, 실제 패배 처리는 남은 이탈 흐름
@@ -3286,13 +3291,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         // 대기 코루틴이 이미 도는 중이면 재진입하지 않는다(파트너가 잠깐 나갔다 바로 재입장하는
-        // 경우 등, OnPlayerEnteredRoom이 다시 OnRoomFull을 부를 수 있다) — 로컬 필드라 네트워크
-        // 왕복 지연 없이 즉시 정확하다(아래 matchId 지연 배포와 같은 이유).
-        if (_roomFullLoadPending) return;
-        _roomFullLoadPending = true;
+        // 경우 등, OnPlayerEnteredRoom이 다시 OnRoomFull을 부를 수 있다).
+        if (_roomFullLoadRoutine != null) return;
 
         PhotonNetwork.CurrentRoom.IsOpen = false;
-        StartCoroutine(LoadGameSceneAfterDelay());
+        _roomFullLoadRoutine = StartCoroutine(LoadGameSceneAfterDelay());
         // 라운드 1 시작은 여기서 하지 않는다 — 씬 전환 중 RPC 유실 방지를 위해
         // 두 클라가 GameScene 로드를 마치고 SceneReady를 올리면(OnPlayerPropertiesUpdate) 그때 시작.
     }
@@ -3308,13 +3311,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 로컬에 반영 안 된 상태로 남는다 — 그 사이 파트너가 바로 재입장하면 OnRoomFull이 아직 안
     /// 지워진 옛 matchId를 보고 "기존 매치"로 오판해 씬을 영영 로드하지 않는 문제가 있었다
     /// (2026-08 코드리뷰 지적). matchId를 아예 미리 쓰지 않으면 되돌릴 것도 없어 이 문제가
-    /// 원천적으로 사라진다 — 재진입 방지는 위 _roomFullLoadPending(로컬 필드)이 대신 맡는다.
+    /// 원천적으로 사라진다 — 재진입 방지는 위 _roomFullLoadRoutine(로컬 필드)이 대신 맡는다.
     /// </summary>
     private System.Collections.IEnumerator LoadGameSceneAfterDelay()
     {
         yield return new WaitForSeconds(ROOM_FULL_LOAD_DELAY);
 
-        _roomFullLoadPending = false;
+        _roomFullLoadRoutine = null;
 
         if (!IsMasterClient) yield break;
         if (PhotonNetwork.CurrentRoom == null) yield break;
