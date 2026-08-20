@@ -303,7 +303,12 @@ public class RoundPhaseManager : MonoBehaviour
         // ⚠️ 이 스킵은 PlayerHealthManager._maxLives=1(공용 라이프 1개) 전제 하에 안전하다 — BothLose가
         // 항상 즉시 게임오버라 "다음 라운드로 진행"할 경우 자체가 없기 때문. 나중에 라이프가 여러 개로
         // 바뀌면(밸런스 기획 확정 전) 이 조건을 "BothLose && 라이프 소진"으로 좁혀야 한다.
-        if (_teamRoundResolved && _lastTeamRoundOutcome == TeamRoundOutcome.BothLose)
+        // NetworkManager.DebugInfiniteTeamHealth(QA 무한 HP 토글)가 켜져 있으면 ApplyTeamDamageLocal이
+        // 데미지를 무시해 HP가 실제로는 안 깎이므로(NetworkManager.cs의 ApplyTeamDamageLocal 참고),
+        // 게임오버 전환도 영영 안 온다 — 이땐 스킵하지 않고 그대로 다음 라운드/완주 판정을 진행한다
+        // (2026-08 코드리뷰 지적 — 스킵을 무조건 걸면 무한 HP 테스트 중 Result 페이즈에서 영구 정지됨).
+        if (_teamRoundResolved && _lastTeamRoundOutcome == TeamRoundOutcome.BothLose &&
+            !NetworkManager.DebugInfiniteTeamHealth)
             yield break;
 
         // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.

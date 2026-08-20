@@ -3390,7 +3390,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue) &&
             StageDatabase.Instance != null)
         {
-            currentStage = StageDatabase.Instance.GetForRound(System.Convert.ToInt32(roundValue));
+            try { currentStage = StageDatabase.Instance.GetForRound(System.Convert.ToInt32(roundValue)); }
+            catch (System.Exception) { currentStage = null; }
         }
 
         bool isChampionRound = currentStage != null &&
