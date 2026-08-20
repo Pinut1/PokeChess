@@ -168,6 +168,13 @@ public class StatInfoController : MonoBehaviour
 
         if (mirror == null) { Close(); return true; }
 
+        // "준비 중"(파트너 컨텐츠를 아직 한 번도 못 받음) 상태면 PipRawImage 자체가 꺼져있다 —
+        // 꺼진 오브젝트는 RaycastAll에 절대 안 잡히므로 아래 IsBlockedByOtherUI가 항상 "안 막힘"으로
+        // 오판할 수 있다(AugmentInfoTrigger.Update()와 같은 함정, 2026-08 재재재재리뷰 지적 —
+        // 그때 AugmentInfoTrigger엔 넣어놓고 여기는 빠뜨렸음). 화면에 실제로 아무것도 안 보이는
+        // 상태라 클릭을 받을 이유도 없으니 여기서 먼저 걸러낸다.
+        if (!spectateView.IsShowingContent) { Close(); return true; }
+
         Vector2 screenPos = PointerScreenPos();
 
         if (PointerUtil.IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject)) { Close(); return true; }
