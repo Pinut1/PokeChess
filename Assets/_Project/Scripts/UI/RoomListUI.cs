@@ -215,27 +215,35 @@ public class RoomListUI :
             // 내 방이 캐시에도 있으면(남의 방에 들어간 경우) 캐시 쪽은 버린다 — 아래에서 최신 상태로 다시 넣는다.
             if (currentRoom != null && room.Name == currentRoom.Name) continue;
 
-            _rows.Add(MakeRow(room, false));
+            _rows.Add(MakeRow(room, room.PlayerCount, false));
         }
 
         // 내 방은 IsVisible을 따지지 않는다 — 방이 잠겨 목록에서 빠진 뒤에도 내가 있는 곳은 보여야 한다.
-        if (currentRoom != null) _rows.Add(MakeRow(currentRoom, true));
+        // playerCount는 currentRoom(Room 타입)에서 직접 읽어 넘긴다 — MakeRow 안에서 RoomInfo
+        // 파라미터로 room.PlayerCount를 읽으면 Room.PlayerCount(실시간 인원, `new`로 가려쓰기됨)가
+        // 아니라 RoomInfo.PlayerCount(로비 목록 갱신 때만 채워지는 옛날 값)가 나온다 — 방을 만든
+        // 뒤로는 로비 갱신을 더 이상 안 받으니 이 값이 처음 값에 영원히 고정된다(2026-08 실측:
+        // 파트너가 들어와도 내 방 줄이 계속 1/2로 보이는 원인이었음).
+        if (currentRoom != null) _rows.Add(MakeRow(currentRoom, currentRoom.PlayerCount, true));
 
         // 서버가 주는 순서는 보장되지 않는다 — 새로고침할 때마다 줄이 뒤바뀌지 않게 고정한다.
         // 내 방만 맨 위로 올리고 나머지는 이름순.
         _rows.Sort(CompareRows);
     }
 
-    private static RoomRow MakeRow(RoomInfo room, bool mine)
+    /// <summary>
+    /// playerCount를 room에서 다시 읽지 않고 파라미터로 받는다 — RoomInfo.PlayerCount와
+    /// Room.PlayerCount는 이름은 같아도 서로 다른 멤버(new로 가려쓰기)라, 호출부가 상황에 맞는
+    /// 값(캐시된 RoomInfo면 그 값, 내가 들어가 있는 Room이면 실시간 값)을 미리 골라 넘겨야 한다.
+    /// </summary>
+    private static RoomRow MakeRow(RoomInfo room, int playerCount, bool mine)
     {
         bool inProgress = room.CustomProperties.ContainsKey(NetworkManager.MATCH_GUID_ROOM_KEY);
-        bool full = room.PlayerCount >= room.MaxPlayers;
+        bool full = playerCount >= room.MaxPlayers;
 
         // 표시 전용 보정 — 내 방 행에서만, 로컬 Photon 상태가 아직 나 자신을 반영하기 전이라
-        // room.PlayerCount가 일시적으로 0으로 읽히는 경우 화면에 0/2로 보이는 것을 막는다.
-        // room.PlayerCount(실제 Photon 값)나 다른 방 행은 전혀 건드리지 않는다 — 이 지역 변수는
-        // count 문자열 표시에만 쓰인다(joinable/full/inProgress 판정은 실제 값을 그대로 쓴다).
-        int displayCount = mine && room.PlayerCount < 1 ? 1 : room.PlayerCount;
+        // playerCount가 일시적으로 0으로 읽히는 경우 화면에 0/2로 보이는 것을 막는다.
+        int displayCount = mine && playerCount < 1 ? 1 : playerCount;
 
         return new RoomRow
         {
