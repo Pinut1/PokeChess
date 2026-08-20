@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 /// <summary>
 /// 유닛 드롭 영역.
@@ -242,7 +241,10 @@ public class SellZone : MonoBehaviour, IDropTarget
     private void OnMouseEnter()
     {
         // 파트너 전체화면 관전 중에는 화면 뒤 오브젝트를 건드릴 수 없다 — OnMouseDown과 같은 기준.
-        if (IsSpectateBlocking()) return;
+        // UI 위에 커서가 있을 때도 마찬가지(OnMouseDown의 IsPointerOverGameObject 가드와 같은 이유
+        // — 견본덱 창 등이 통신기를 가리고 있어도 물리 레이캐스트는 그대로 들어와 안내창이 UI를
+        // 뚫고 뜨는 버그가 있었다, 2026-08 QA 리포트).
+        if (IsSpectateBlocking() || PointerUtil.IsOverUI()) return;
 
         _pointerHovered = true;
         RefreshHighlight();
@@ -250,20 +252,44 @@ public class SellZone : MonoBehaviour, IDropTarget
     }
 
     /// <summary>
-    /// 관전이 걸려 있는 동안엔 OnMouseEnter가 상태를 세우지 않는다. 관전이 풀렸을 때 커서가 이미
-    /// 올라와 있으면 Unity는 Enter를 다시 보내지 않으므로(이미 '진입'으로 보고 있다) 여기서 따라잡는다.
-    /// 커서가 올라와 있는 동안만 도는 데다 대부분 bool 하나 보고 빠져나간다.
+    /// 관전·UI 차단이 걸려 있는 동안엔 OnMouseEnter가 상태를 세우지 않는다. 그게 풀렸을 때 커서가
+    /// 이미 올라와 있으면 Unity는 Enter를 다시 보내지 않으므로(이미 '진입'으로 보고 있다) 여기서
+    /// 따라잡는다. 커서가 올라와 있는 동안만 도는 데다 대부분 bool 하나 보고 빠져나간다.
+    ///
+    /// 반대 순서(호버가 먼저 시작돼 안내창이 이미 떠 있는 상태에서, 커서를 안 뗀 채로 나중에
+    /// 관전이 시작되거나 UI가 그 위를 덮는 경우)도 여기서 잡는다 — OnMouseExit은 순수 물리
+    /// 레이캐스트라 관전 오버레이·UI에 가려도 오지 않으므로, 이 매 프레임 폴링이 유일한 탈출구다
+    /// (2026-08 QA 리포트 재리뷰 지적 — _pointerHovered만 보고 조기 리턴하면 이미 뜬 안내창을
+    /// 다시 닫을 기회가 없었다).
+    ///
+    /// 닫을지는 OnMouseExit과 똑같이 IsHovered(=드래그 호버 포함)로 판단한다(2026-08 재재리뷰
+    /// 지적) — 이 물리 레이캐스트 이벤트는 원래 유닛을 드는 손이 커서를 가려 드래그 중엔 안
+    /// 온다는 전제지만, 그 전제가 어떤 이유로든 깨졌을 때도 드래그 강조가 실수로 같이 꺼지지
+    /// 않도록 OnMouseExit과 같은 기준을 그대로 맞춘다.
     /// </summary>
     private void OnMouseOver()
     {
-        if (_pointerHovered || IsSpectateBlocking()) return;
+        if (IsSpectateBlocking() || PointerUtil.IsOverUI())
+        {
+            if (_pointerHovered) ClearPointerHover();
+            return;
+        }
+
+        if (_pointerHovered) return;
 
         _pointerHovered = true;
         RefreshHighlight();
         ShowTooltip();
     }
 
-    private void OnMouseExit()
+    private void OnMouseExit() => ClearPointerHover();
+
+    /// <summary>
+    /// 커서 호버 상태를 끈다 — OnMouseExit(실제로 커서가 벗어남)과 OnMouseOver의 차단 분기(관전·UI가
+    /// 가로막아 더 이상 호버로 인정 못 함)가 똑같이 쓴다(2026-08 재재리뷰 지적, 중복 제거). 닫을지는
+    /// IsHovered(=드래그 호버 포함)로 판단해, 드래그 중엔 툴팁을 그대로 열어둔다.
+    /// </summary>
+    private void ClearPointerHover()
     {
         _pointerHovered = false;
         RefreshHighlight();
@@ -400,7 +426,7 @@ public class SellZone : MonoBehaviour, IDropTarget
         // 안내창이 통신기 위에 겹쳐 뜬다. OnMouseDown은 물리 레이캐스트라 UI에 가려도 그대로
         // 들어오는데, 창의 [포켓몬 받기] 버튼과 이 클릭이 같은 TryReceiveNextTradeUnit을 부르므로
         // 가드가 없으면 한 번 눌러 두 마리가 수령된다.
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        if (PointerUtil.IsOverUI())
             return;
 
         NetworkManager network =

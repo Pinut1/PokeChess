@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -16,6 +15,15 @@ using UnityEngine.InputSystem;
 /// 투영되는 위치 근처를 클릭했는지 판정한다 — StatInfoController.TryHandlePartnerOpen과 같은 패턴.
 /// 이 경로는 파트너가 실제로 선택한 증강(GameEvents.OnPartnerAugmentsChanged로 캐시)만 표시하며
 /// 로컬 AugmentManager 상태는 전혀 건드리지 않는다.
+///
+/// ⚠️ 이 좌표 비교 방식은 "그 위치에 실제로 뭐가 떠 있는지"는 보지 않는다 — 반경 안에만 들어오면
+/// 무조건 클릭으로 인정하므로, 그 근처에 다른 UI(설정창 버튼 등)가 우연히 겹쳐 있으면 그걸 눌러도
+/// 증강창까지 같이 열렸다(2026-08 재리뷰 지적). PointerUtil.IsOverUI()는 여기서 못 쓴다 — 관전 중엔
+/// 배경 Image 자체가 항상 "UI 위"로 잡히므로 그걸 그대로 쓰면 증강창이 아예 안 열리게 된다. 대신
+/// PointerUtil.IsBlockedByOtherUI로 그 지점의 맨 위 UI가 배경 Image(PartnerSpectateView.PipRawImage)
+/// 소속(자신 또는 그 자식 — 파트너 HP/마나 바도 배경의 자식이라 여기 포함됨)인지를 확인해, 배경
+/// 소속이 아닌 다른 UI가 위에 있을 때만 막는다. StatInfoController.TryHandlePartnerOpen도 같은
+/// 헬퍼를 쓴다(2026-08 재재재리뷰 지적으로 공용 유틸로 옮김).
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class AugmentInfoTrigger : MonoBehaviour
@@ -76,7 +84,7 @@ public class AugmentInfoTrigger : MonoBehaviour
         if (_panel == null) return;
 
         // 창 위를 클릭했는데 뒤에 있는 오브젝트까지 눌리는 것을 막는다.
-        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+        if (PointerUtil.IsOverUI()) return;
 
         if (_toggleOnClick) _panel.Toggle();
         else _panel.Open();
@@ -90,10 +98,20 @@ public class AugmentInfoTrigger : MonoBehaviour
         PartnerSpectateView spectateView = EnsurePartnerSpectateView();
         if (spectateView == null || !spectateView.IsExpanded) return;
 
+        // "준비 중"(파트너 컨텐츠를 아직 한 번도 못 받음) 상태면 PipRawImage 자체가 꺼져있다 —
+        // 꺼진 오브젝트는 RaycastAll에 절대 안 잡히므로 아래 IsBlockedByOtherUI의 "배경 자신인지"
+        // 비교가 이 상태에서는 항상 실패해 정상 클릭까지 막아버린다(2026-08 재재리뷰 지적). 화면에
+        // 실제로 아무것도 안 보이는 상태라 클릭을 받을 이유도 없으니, 여기서 먼저 걸러낸다.
+        if (!spectateView.IsShowingContent) return;
+
         if (!spectateView.TryProjectWorldToScreen(transform.position, out Vector2 point)) return;
 
         Vector2 screenPos = _pointAction.ReadValue<Vector2>();
         if (Vector2.Distance(screenPos, point) > _partnerClickRadius) return;
+
+        // 반경 안이어도 그 지점에 배경(PipRawImage) 소속이 아닌 다른 UI가 맨 위에 있으면 그 UI를
+        // 클릭한 것으로 보고 넘긴다 — 클래스 doc 참고.
+        if (PointerUtil.IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject)) return;
 
         AugmentData data = ResolvePartnerAugmentData();
         if (_toggleOnClick) _panel.TogglePartner(data);
