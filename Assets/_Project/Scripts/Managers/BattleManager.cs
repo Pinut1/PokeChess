@@ -119,12 +119,19 @@ public class BattleManager : MonoBehaviour
     // 편입 시점에 고르는 것이 핵심이다 — 그래야 같은 틱에 다른 유닛이 그 칸으로 이동해도 겹치지 않는다.
     private readonly List<PokemonData> _pendingSpawns = new();
 
-    // FindNextStep의 동일 areaDist(개선 없는) fallback 후보군에서만 참조하는 "직전에 있던 칸"
-    // 1개 기억(경로 캐시 아님 — 오직 A↔B 두 칸짜리 완전 대칭 막다른 자리에서 그 자리로 되돌아가는
-    // 왕복만 막는 용도). 유닛이 실제로 한 칸 이동할 때 MoveTowards가 갱신한다. BattleUnit.cs는
-    // 건드리지 않고 여기(BattleManager)에서만 관리 — 전투 시작(SetupUnits/SetupMirrorUnits)마다
-    // 새로 비우고 Cleanup()에서도 비워, 이전 전투의 BattleUnit 참조가 안 남게 한다.
+    // FindNextStep의 isImmediateBacktrack 판정(정상 후보 제외용)과 막다른 자리 fallback
+    // 후보군에서 참조하는 "직전에 있던 칸" 1개 기억(경로 캐시 아님). 유닛이 실제로 한 칸
+    // 이동할 때 MoveTowards가 갱신한다. BattleUnit.cs는 건드리지 않고 여기(BattleManager)에서만
+    // 관리 — 전투 시작(SetupUnits/SetupMirrorUnits)마다 새로 비우고 Cleanup()에서도 비워,
+    // 이전 전투의 BattleUnit 참조가 안 남게 한다.
     private readonly Dictionary<BattleUnit, HexCoords> _previousCoords = new();
+
+    // 직전 실제 이동이 fallback(막다른 자리 후퇴)였는지. fallback으로 A→B 이동한 바로 다음
+    // 판정에서 B→A(같은 자리로 재후퇴)를 막는 데만 쓴다 — 이게 없으면 완전 대칭 막다른 자리에서
+    // fallback이 매 틱 A↔B를 왕복하게 만든다(2026-08 실측 영상 확인). fallback 이동 1회는
+    // 허용해 진짜 막다른 골목 탈출은 유지하면서, 바로 되돌아가는 두 번째 fallback만 차단한다.
+    // _previousCoords와 같은 생명주기(전투 시작·Cleanup마다 비움)로 관리한다.
+    private readonly Dictionary<BattleUnit, bool> _lastMoveWasFallback = new();
 
     /// <summary>파트너 관전 미러 전투 코루틴(실전투 _battleCoroutine과 완전히 별도 필드).
     /// null이 아니면 이 인스턴스가 이미 미러 전투를 실행 중이라는 뜻이다.</summary>
@@ -801,6 +808,7 @@ public class BattleManager : MonoBehaviour
     {
         _units.Clear();
         _previousCoords.Clear();
+        _lastMoveWasFallback.Clear();
         _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         var board = GameManager.Instance.Board;
@@ -2169,7 +2177,7 @@ public class BattleManager : MonoBehaviour
     /// 타겟을 공격할 수 있는 위치로 한 칸 이동. FindNextStep이 고른 다음 칸으로 옮기기만 한다
     /// (자기 자신이면 이동 없음 — 완전 봉쇄). 실제로 이동했을 때만 옮기기 전 좌표를
     /// _previousCoords에 남긴다 — FindNextStep이 다음 호출에서 "방금 왔던 칸으로 즉시
-    /// 되돌아가는" 동일 areaDist fallback 선택만 피하는 데 쓴다(경로 캐시 아님).
+    /// 되돌아가는" 정상 후보 제외/fallback 판정에 쓴다(경로 캐시 아님).
     /// 이 함수는 SimulateTick 한 번(TICK_INTERVAL)당 최대 1회만 호출되고, 호출될 때마다 정확히
     /// 한 칸만 옮긴다(2026-08 코드리뷰 대응 — 같은 틱 안에서 반복 호출되던 이전 동작 설명 정정).
     /// moveSpeedMultiplier는 이 함수의 호출 횟수나 이동 칸수가 아니라, 호출 주기인
@@ -2182,8 +2190,15 @@ public class BattleManager : MonoBehaviour
         HexCoords next = FindNextStep(bu, target);
         if (next == bu.coords) return;
 
+        // 이번 이동이 fallback(막다른 자리 후퇴)이었는지 기록 — FindNextStep의 정상 후보는
+        // 정의상 firstStep이 prevCoords와 같을 수 없으므로(isImmediateBacktrack 제외), next가
+        // 이동 전 prevCoords와 같다는 것 자체가 이번 선택이 fallback이었다는 뜻이다. 별도로
+        // FindNextStep의 반환 타입을 늘리지 않고 여기서 역산한다.
+        bool wasFallback = _previousCoords.TryGetValue(bu, out HexCoords oldPrev) && next.Equals(oldPrev);
+
         _previousCoords[bu] = bu.coords;
         bu.coords = next;
+        _lastMoveWasFallback[bu] = wasFallback;
         UpdateVisualPosition(bu);
     }
 
@@ -2198,15 +2213,11 @@ public class BattleManager : MonoBehaviour
     /// 두 기준을 areaDist → steps → CompareCoords(결정적 tie-break, 네트워크 동기화용) 순
     /// 사전식 비교로 통합했다 — areaDist가 작을수록 항상 이긴다.
     ///
-    /// 2차보다 나아지는 칸이 하나도 없으면(=지금 위치에서 더 가까워질 방법이 없으면) 제자리
-    /// 대기한다(2026-08, 기획 요청). 예전엔 "지금과 동일한 areaDist인 칸으로 계속 옆걸음"(3차,
-    /// 제자리 고정 금지 목적)과 "막다른 골목이면 방금 온 칸으로라도 되돌아가는 fallback"이
-    /// 있었는데, 아군이 타겟을 완전히 포위해 어느 방향으로도 가까워질 수 없을 때 이 둘이
-    /// 근거리 유닛을 포위망 밖에서 계속 옆걸음(3차)치거나 두 칸 사이를 왕복(fallback)하게
-    /// 만드는 원인이었다(2026-08 실측 영상 확인). 3차는 제거, fallback은 실제 코드리뷰 대응
-    /// 이력이 있어 완전히 지우지 않고 아래에서 주석 처리만 해뒀다 — 되살리려면 "FALLBACK 비활성화"
-    /// 표시된 블록의 주석만 풀면 된다. 이 게임은 전투에 30초 타임아웃(HP 비교 판정)이 있어
-    /// 유닛이 못 풀고 계속 대기해도 전투 자체는 정상 종료된다.
+    /// 2차보다 나아지는 칸이 하나도 없으면(=지금 위치에서 더 가까워질 방법이 없으면) 원칙적으로
+    /// 제자리 대기한다(2026-08, 기획 요청). 예전엔 "지금과 동일한 areaDist인 칸으로 계속
+    /// 옆걸음"(3차, 제자리 고정 금지 목적)이 있었는데, 아군이 타겟을 완전히 포위해 어느
+    /// 방향으로도 가까워질 수 없을 때 근거리 유닛이 포위망 밖에서 계속 옆걸음치는 원인이었다
+    /// (2026-08 실측 영상 확인) — 3차는 완전히 제거했다.
     ///
     /// 물리적 즉시 backtrack 방지: 후보의 "실제로 이번 스텝에 내디딜 첫 칸"(firstStep[current])이
     /// 직전에 있던 칸(_previousCoords[bu])과 같으면 그 후보는 통째로 제외한다. tier(areaDist)나
@@ -2220,16 +2231,20 @@ public class BattleManager : MonoBehaviour
     /// 아니라면(대개 그렇다 — 직전 칸은 여기로 오기 직전 위치이므로 그 자체가 막다른 골목이
     /// 아닌 한 그 칸을 거치지 않는 다른 진입 방향이 있다) 정상적으로 선택된다.
     ///
-    /// 막다른 자리 fallback — 2026-08 코드리뷰 대응으로 한 번 추가됐다가, 아군이 타겟을
-    /// 완전히 포위한 상황에서 두 칸 사이를 계속 왕복하게 만드는 게 실측 확인돼(2026-08,
-    /// 영상 확인) 아래에서 <b>주석 처리로 비활성화</b>했다(완전히 지우지는 않음 — 필요해지면
-    /// "FALLBACK 비활성화" 표시 블록의 주석만 풀면 원래대로 돌아온다). 살아있었을 때 의도:
-    /// "이번 틱에 실제로 내딛는 첫 걸음 자체가 방금 온 칸"인 후보만 있는 경우 무조건 제자리
-    /// 대기하면, _previousCoords가 실제 이동 성공 시에만 갱신되는 탓에(MoveTowards) 막힌
-    /// 지형이 그대로 유지되는 한 같은 이유로 계속 대기해 사실상 영구 정지로 이어질 수 있었다 —
-    /// 그래서 backtrack 후보군을 hasBest가 끝까지 false일 때만 쓰는 fallback으로 남겨뒀었다.
-    /// 지금은 이 게임 전투에 30초 타임아웃(HP 비교 판정)이 있어, 못 풀고 계속 대기해도 전투
-    /// 자체는 정상 종료되므로 "안 풀릴 수도 있는 리스크"보다 "왕복이 안 보이는 것"을 택했다.
+    /// 막다른 자리 fallback(1회 한정, 2026-08 재조정): "이번 틱에 실제로 내딛는 첫 걸음 자체가
+    /// 방금 온 칸"인 후보만 있는 경우, 무조건 제자리 대기하면 _previousCoords가 실제 이동
+    /// 성공 시에만 갱신되는 탓에(MoveTowards) 막힌 지형이 그대로 유지되는 한 같은 이유로 계속
+    /// 대기해 사실상 영구 정지로 이어질 수 있다(2026-08 코드리뷰 대응으로 처음 추가된 이유) —
+    /// 그래서 backtrack 후보군을 hasBest가 끝까지 false일 때만 쓰는 fallback으로 둔다.
+    ///
+    /// 다만 매번 무제한 허용하면, 아군이 타겟을 완전히 포위해 두 칸(A↔B)이 서로의 유일한
+    /// 탈출구인 경우 매 틱 A↔B를 계속 왕복하게 된다(2026-08 실측 영상 확인 — 앞선 시도에서
+    /// fallback을 아예 꺼서 이 왕복은 없앴지만, 그 대신 진짜 막다른 골목에서 영영 못 빠져나오는
+    /// 회귀가 생겼다, 코드리뷰 지적). 그래서 <see cref="_lastMoveWasFallback"/>로 "직전 이동이
+    /// 이미 fallback이었는지"를 기억해뒀다가, fallback 후보 채택 조건에 <c>!lastWasFallback</c>을
+    /// 추가한다 — fallback 이동은 허용하되 두 번 연속으로는 못 쓰게 막는다. A→B(fallback 1회,
+    /// 허용)까지는 되고, 그 직후 B→A(연속 fallback)는 막혀서 제자리 대기 — 실제 탈출(다른 정상
+    /// 경로로 이어지는 경우)은 그대로 되고, A↔B 무한 왕복만 끊긴다.
     /// </summary>
     private HexCoords FindNextStep(BattleUnit bu, BattleUnit target)
     {
@@ -2247,12 +2262,14 @@ public class BattleManager : MonoBehaviour
         int bestAreaDist = int.MaxValue;
         int bestSteps = int.MaxValue;
 
-        // ── FALLBACK 비활성화 (2026-08, 왕복 버그로 주석 처리 — 되살리려면 아래 4줄과
-        // 루프 안의 대응 블록, return문의 주석만 풀면 된다) ──
-        // bool hasFallback = false;
-        // HexCoords fallback = default;
-        // int fallbackAreaDist = int.MaxValue;
-        // int fallbackSteps = int.MaxValue;
+        // 직전 이동이 이미 fallback이었으면 이번엔 fallback을 다시 못 쓴다(연속 2회 금지 —
+        // A↔B 무한 왕복 방지). _lastMoveWasFallback 필드 주석 참고.
+        bool lastWasFallback = _lastMoveWasFallback.TryGetValue(bu, out bool wasFallback) && wasFallback;
+
+        bool hasFallback = false;
+        HexCoords fallback = default;
+        int fallbackAreaDist = int.MaxValue;
+        int fallbackSteps = int.MaxValue;
 
         while (queue.Count > 0)
         {
@@ -2285,23 +2302,23 @@ public class BattleManager : MonoBehaviour
                         hasBest = true;
                     }
                 }
-                // ── FALLBACK 비활성화: backtrack 후보 추적 블록(주석 처리) ──
-                // else if (isImmediateBacktrack && areaDist <= startAreaDist)
-                // {
-                //     bool betterFallback;
-                //     if (!hasFallback) betterFallback = true;
-                //     else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
-                //     else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
-                //     else betterFallback = CompareCoords(current, fallback) < 0;
-                //
-                //     if (betterFallback)
-                //     {
-                //         fallbackAreaDist = areaDist;
-                //         fallbackSteps = steps;
-                //         fallback = current;
-                //         hasFallback = true;
-                //     }
-                // }
+                else if (isImmediateBacktrack && areaDist <= startAreaDist && !lastWasFallback)
+                {
+                    // 막다른 자리 fallback 후보 — 직전 이동이 fallback이 아니었을 때만 추적한다.
+                    bool betterFallback;
+                    if (!hasFallback) betterFallback = true;
+                    else if (areaDist != fallbackAreaDist) betterFallback = areaDist < fallbackAreaDist;
+                    else if (steps != fallbackSteps) betterFallback = steps < fallbackSteps;
+                    else betterFallback = CompareCoords(current, fallback) < 0;
+
+                    if (betterFallback)
+                    {
+                        fallbackAreaDist = areaDist;
+                        fallbackSteps = steps;
+                        fallback = current;
+                        hasFallback = true;
+                    }
+                }
             }
 
             foreach (var neighbor in current.GetNeighbors())
@@ -2317,7 +2334,7 @@ public class BattleManager : MonoBehaviour
         }
 
         if (hasBest) return firstStep[best];
-        // if (hasFallback) return firstStep[fallback]; // FALLBACK 비활성화 — 위 주석 블록과 세트
+        if (hasFallback) return firstStep[fallback];
         return bu.coords;
     }
 
@@ -2428,6 +2445,7 @@ public class BattleManager : MonoBehaviour
         _enemyTiles.Clear();
         _validCoords.Clear();
         _previousCoords.Clear();
+        _lastMoveWasFallback.Clear();
 
         // 이 인스턴스(실전투 또는 미러)가 만든 VFX만 정리한다 — 정적 전역 리스트를 함께 쓰던 예전
         // BattleVfxPlayer.ClearAllActive()와 달리 상대 인스턴스의 VFX는 건드리지 않는다. Cleanup()은
@@ -2686,6 +2704,7 @@ public class BattleManager : MonoBehaviour
         failReason = null;
         _units.Clear();
         _previousCoords.Clear();
+        _lastMoveWasFallback.Clear();
         _pendingSpawns.Clear(); // 이전 전투가 비정상 종료됐을 때의 잔여분 방어
 
         foreach (BattleSnapshot.UnitEntry entry in snapshot.units)
