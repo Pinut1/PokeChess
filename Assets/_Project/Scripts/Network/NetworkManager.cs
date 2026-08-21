@@ -204,7 +204,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>지금까지 내가 보낸 BattleSnapshot revision(단조 증가, 아직 한 번도 안 보냈으면 0). QA 표시용.</summary>
     public int LocalBattleSnapshotRevision => _localBattleSnapshotRevision;
 
-    /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
+    /// <summary>팀 라운드가 BothWin(둘 다 승리)이 아닐 때(Split 포함) 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
     private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글. 빌드/검증 편의용.</summary>
@@ -3370,11 +3370,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감(둘 다 패) + 전체 브로드캐스트.
-    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose.
-    /// 단, 최종 보스전(stageType=ChampionBattle && trainerId="GREEN", 5라운드 그린)은
-    /// 한 명만 져도 팀 전체 패배로 취급한다(Split을 BothLose로 승격) — 최종 보스전은
-    /// Split 허용(라이프 유지) 대상이 아니라는 기획. 두 조건을 모두 걸어 이중 확인한다.
+    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감 + 전체 브로드캐스트.
+    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose. 라이프 차감은 BothWin(둘 다 승리)이 아닌 한 항상 발생한다 —
+    /// 한 명만 져도(Split) 라운드 상관없이 즉시 -1(과거 최종보스 5라운드 한정 승격 규칙은 이 일반 규칙에
+    /// 흡수되어 제거됨 — outcome을 구분해 쓰는 구독자가 없어 Split→BothLose 승격 자체가 더 이상 의미 없었음).
     /// </summary>
     private void ResolveTeamRound()
     {
@@ -3389,25 +3388,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                                  : wins == 1 ? TeamRoundOutcome.Split
                                  : TeamRoundOutcome.BothLose;
 
-        // RoundPhaseManager.CurrentStage(로컬 캐시) 대신 Room 속성의 서버 확정 라운드 번호로 직접
-        // 조회한다 — 마스터가 라운드5 도중 교체되면 새 마스터의 로컬 RoundPhaseManager가 아직
-        // OnRoundChanged를 처리하지 못해 CurrentStage가 null/stale일 수 있는데, Room 속성과
-        // StageDatabase는 그런 로컬 동기화 타이밍과 무관하게 항상 최신이다(2026-08 코드리뷰 지적).
-        StageData currentStage = null;
-        if (TryGetCurrentRoundFromRoom(out int currentRound) && StageDatabase.Instance != null)
-            currentStage = StageDatabase.Instance.GetForRound(currentRound);
-
-        if (currentStage == null)
-            Debug.LogWarning("[Network] 챔피언전 판정용 스테이지 조회 실패 — Room/StageDatabase 상태 확인 필요");
-
-        bool isChampionRound = currentStage != null &&
-                                currentStage.stageType == StageType.ChampionBattle &&
-                                currentStage.trainerId == "GREEN";
-
-        if (isChampionRound && outcome == TeamRoundOutcome.Split)
-            outcome = TeamRoundOutcome.BothLose;
-
-        if (outcome == TeamRoundOutcome.BothLose)
+        if (outcome != TeamRoundOutcome.BothWin)
             ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
 
         Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");

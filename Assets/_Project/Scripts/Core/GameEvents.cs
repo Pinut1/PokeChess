@@ -4,7 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// 한 라운드의 팀(2인) 단위 결과. 각자 보드 승패를 MasterClient가 집계해 판정.
-/// 라이프/보상 규칙: BothWin=풀 보상, Split=라이프 유지+보상 50%, BothLose=라이프 -1+보상 0.
+/// 라이프 규칙: BothWin(둘 다 승리)만 라이프 유지, Split/BothLose는 동일하게 라이프 -1(한 명만 져도 즉시 차감).
+/// 보상은 현재 outcome과 무관하게 동일 지급(outcome별 차등은 미확정 TODO — ShopManager.HandleTeamRoundResolved 참고).
 /// (RPC 전송용으로 int 캐스팅하므로 값 순서를 바꾸지 말 것.)
 /// </summary>
 public enum TeamRoundOutcome

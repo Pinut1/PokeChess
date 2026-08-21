@@ -12,8 +12,8 @@ using UnityEngine;
 public class PlayerHealthManager : MonoBehaviour
 {
     [Header("라이프 설정 (공용 라이프 — 밸런스 기획서 §2.1: 1)")]
-    // 밸런스 기획서 §2.1: 공유 HP 1 (한 번 지면 게임 종료). 두 플레이어가 모두 패배(BothLose)하면 1 감소 → 즉시 게임오버.
-    // 실제 라이프 차감은 NetworkManager가 팀 결과(BothLose) 판정 시 권위로 처리한다.
+    // 밸런스 기획서 §2.1: 공유 HP 1 (한 번 지면 게임 종료). 팀 라운드 결과가 BothWin(둘 다 승리)이
+    // 아니면(Split 포함) 즉시 1 감소 → 게임오버. 실제 라이프 차감은 NetworkManager가 팀 결과 판정 시 권위로 처리한다.
     // ⚠️ SerializeField — 씬/프리팹 인스펙터 값이 우선. 인스펙터도 1로 맞출 것.
     [SerializeField] private int _maxLives = 1;
 
@@ -42,7 +42,7 @@ public class PlayerHealthManager : MonoBehaviour
     private void HandleBattleEnd(BattleEndReason reason)
     {
         // 내 보드 승패를 팀에 보고(승/패 둘 다). 두 플레이어가 모두 보고하면 MasterClient가
-        // 팀 결과(BothWin/Split/BothLose)를 판정하고, 둘 다 패배일 때만 라이프 -1을 권위로 처리한다.
+        // 팀 결과(BothWin/Split/BothLose)를 판정하고, BothWin이 아니면(Split 포함) 라이프 -1을 권위로 처리한다.
         // 라이프 감소/게임오버 통지는 NetworkManager의 Room 속성 변경 콜백에서 발행된다.
         bool isWin = reason == BattleEndReason.Victory || reason == BattleEndReason.DecisionVictory;
         var net = GameManager.Instance != null ? GameManager.Instance.Network : null;
