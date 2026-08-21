@@ -3374,7 +3374,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void RequestBattleResultResendIfNeeded()
     {
-        if (!IsMasterClient || _roundResultResolved) return;
+        // 솔로 모드는 파트너가 없어 재전송 요청 자체가 성립하지 않는다 — ResolveSoloRound가 동기로
+        // 즉시 판정하므로 _roundResultResolved도 쓰지 않는다(솔로는 이 필드를 아예 안 건드림).
+        if (_soloMode || !IsMasterClient || _roundResultResolved) return;
 
         Debug.LogWarning("[Network] 팀 결과 일부 미수신 — 재전송 요청");
         photonView.RPC(nameof(RPC_RequestBattleResultResend), RpcTarget.Others);
@@ -3389,7 +3391,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void TryResolveTeamRoundWithHostFallback()
     {
-        if (!IsMasterClient || _roundResultResolved) return;
+        // 솔로 모드는 파트너가 없어 대체판정 자체가 성립하지 않는다(위 RequestBattleResultResendIfNeeded와 동일 이유).
+        if (_soloMode || !IsMasterClient || _roundResultResolved) return;
 
         if (AllPlayersReportedResult())
         {
@@ -4067,6 +4070,14 @@ public class NetworkManager : MonoBehaviour
         if (!isWin) ReportBattleLoss(1);   // 라이프 -1
         GameEvents.TeamRoundResolved(isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose);
     }
+
+    /// <summary>오프라인은 ReportBattleResult가 항상 동기 즉시 판정이라 재전송·대체판정 자체가 필요 없다
+    /// (실구현과 동일 공개 API 유지용 스텁 — RoundPhaseManager.ResultTimer가 PHOTON_UNITY_NETWORKING
+    /// 여부와 무관하게 컴파일되도록 시그니처만 맞춘다).</summary>
+    public void RequestBattleResultResendIfNeeded() { }
+
+    /// <summary>위 RequestBattleResultResendIfNeeded와 동일 이유로 no-op.</summary>
+    public void TryResolveTeamRoundWithHostFallback() { }
 
     /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
     public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
