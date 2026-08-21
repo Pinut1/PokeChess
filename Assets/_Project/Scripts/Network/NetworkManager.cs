@@ -173,6 +173,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC_OnRoundStart는 비접속자에게 유실되므로, 재접속 클라이언트는 이 속성으로 라운드를 복구한다.</summary>
     private const string ROUND_PROP_KEY = "Round";
 
+    /// <summary>이번 라운드가 이미 Battle에 진입했는지. BroadcastBattleStart(마스터 권위)에서 true로,
+    /// BroadcastRoundStart에서 false로 리셋된다.
+    ///
+    /// 전투 중 재접속한 클라이언트가 "지금 쇼핑인지 전투인지"를 판단하는 유일한 근거다 —
+    /// RPC_OnBattleStart는 RpcTarget.All이라 접속이 끊긴 동안에는 유실되고, 재접속해도 다시 오지 않는다.
+    /// Room 속성은 서버가 들고 있어 재입장 시 그대로 읽을 수 있다.</summary>
+    private const string BATTLE_ACTIVE_PROP_KEY = "BattleActive";
+
     /// <summary>내가 마지막으로 수신/적용한 라운드. 재접속 시 Room 속성의 현재 라운드와 비교해 유실분을 복구.</summary>
     private int _lastKnownRound;
 
@@ -950,7 +958,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!IsMasterClient) return;
         // 재접속 클라이언트의 라운드 복구용으로 Room 속성에도 기록(RPC는 비접속자에게 유실됨).
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { ROUND_PROP_KEY, round } });
+        // 새 라운드는 항상 쇼핑부터 시작하므로 이전 라운드의 "Battle 진입됨" 흔적을 같이 지운다.
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { ROUND_PROP_KEY, round },
+            { BATTLE_ACTIVE_PROP_KEY, false }
+        });
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
     }
 
@@ -960,7 +973,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode) { GameEvents.BattleStart(); return; }
 
         if (!IsMasterClient) return;
+
+        // 재접속 클라이언트의 "지금 전투 중인가" 판정용(RPC는 비접속자에게 유실됨).
+        PhotonNetwork.CurrentRoom.SetCustomProperties(
+            new Hashtable { { BATTLE_ACTIVE_PROP_KEY, true } });
+
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
+    }
+
+    /// <summary>지금 Room에 기록된 "이번 라운드가 Battle에 진입했는지". 속성이 아직 없으면
+    /// (구버전 세션/신규 매치 극초반) false로 취급한다.</summary>
+    public bool IsBattleActiveInRoom()
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return false;
+        return PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(BATTLE_ACTIVE_PROP_KEY, out object v)
+               && v is bool active && active;
     }
 
     /// <summary>MasterClient가 챕터 완주(최종 라운드 클리어)를 전체에 알림. 다음 라운드 대신 호출.</summary>
@@ -3931,6 +3958,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundObj))
         {
             int currentRound = (int)roundObj;
+
+            // 이번 라운드가 이미 Battle에 진입했고 내 결과가 아직 없다면, RPC_OnRoundStart(=쇼핑 강제
+            // 진입)를 쏘면 안 된다 — 실제로는 파트너가 아직 싸우는 중이라 그 라운드에 낄 자리가 없다.
+            // 전투를 복구해 보여주지도 않는다(파트너를 더 기다리게 하고, 재실행 부작용도 크다).
+            // 대신 "파트너 전투가 끝날 때까지 기다려 달라"고 안내하고 다음 라운드부터 합류시킨다.
+            // 내 전투 결과는 파트너 쪽 미러가 계산해 마스터가 대신 채운다
+            // (TryResolveTeamRoundWithMirror). 2026-08-22 파트너 이탈 재설계.
+            bool myResultReported =
+                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object myR) &&
+                myR is int myResult && myResult != RESULT_NOT_REPORTED;
+
+            if (IsBattleActiveInRoom() && !myResultReported)
+            {
+                Debug.LogWarning($"[Network][Rejoin] {currentRound}R 전투 진행 중 재접속 — 이번 라운드는 " +
+                                  "참여하지 않고 결과를 기다린다(다음 라운드부터 합류)");
+                _lastKnownRound = currentRound;
+                GameEvents.AwaitingPartnerBattle();
+                return;
+            }
+
             if (currentRound > _lastKnownRound)
             {
                 Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
@@ -4347,6 +4394,8 @@ public class NetworkManager : MonoBehaviour
 
     public void BroadcastRoundStart(int round) => GameEvents.RoundChanged(round);
     public void BroadcastBattleStart()         => GameEvents.BattleStart();
+    /// <summary>오프라인은 파트너가 없어 재접속 자체가 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public bool IsBattleActiveInRoom() => false;
     public void BroadcastGameCleared()         => GameEvents.GameCleared();
 
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
