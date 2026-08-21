@@ -24,29 +24,31 @@ public class PrototypeHud : MonoBehaviour
 
     private Vector2 _qaScroll;
 
-    /// <summary>QA 단축키 — 최종 라운드로 스킵. 게임오버/완주 화면 검증용(최종 라운드 Split 등)을
-    /// 매 라운드 다 플레이하지 않고 바로 재현하기 위한 개발 편의 기능. ButtonHotkey는 UGUI Button
-    /// 전용이라 이 IMGUI QA 패널엔 안 맞아 직접 키 입력을 본다(ButtonHotkey.cs와 같은 판단 근거).</summary>
-    private void Update()
-    {
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null || !keyboard[Key.S].wasPressedThisFrame) return;
-        if (IsDebugHotkeyBlocked()) return;
-        if (!GameManager.TryGet(out var gm)) return;
-
-        DebugSkipToFinalRound(gm);
-    }
-
-    /// <summary>텍스트 입력 중이거나(닉네임 등 S를 문자로 쳐야 하는 상황) 모달 등으로 막혀 있으면
-    /// 무시한다 — ButtonHotkey.IsBlocked()와 같은 판단.</summary>
-    private static bool IsDebugHotkeyBlocked()
-    {
-        EventSystem es = EventSystem.current;
-        GameObject selected = es != null ? es.currentSelectedGameObject : null;
-        if (selected != null && selected.GetComponent<TMP_InputField>() != null) return true;
-
-        return GameplayInputBlock.IsBlocked();
-    }
+    // QA 단축키 — 최종 라운드로 스킵(S). 게임오버/완주 화면 검증용(최종 라운드 Split 등)을 매
+    // 라운드 다 플레이하지 않고 바로 재현하기 위한 개발 편의 기능이었으나, 실수로 눌릴 위험이 있어
+    // 비활성화(주석 처리)함. QA 패널의 "최종 라운드로 스킵" 버튼은 그대로 유지 — 클릭은 의도적인
+    // 조작이라 실수로 눌릴 위험이 낮다.
+    //
+    // private void Update()
+    // {
+    //     Keyboard keyboard = Keyboard.current;
+    //     if (keyboard == null || !keyboard[Key.S].wasPressedThisFrame) return;
+    //     if (IsDebugHotkeyBlocked()) return;
+    //     if (!GameManager.TryGet(out var gm)) return;
+    //
+    //     DebugSkipToFinalRound(gm);
+    // }
+    //
+    // /// <summary>텍스트 입력 중이거나(닉네임 등 S를 문자로 쳐야 하는 상황) 모달 등으로 막혀 있으면
+    // /// 무시한다 — ButtonHotkey.IsBlocked()와 같은 판단.</summary>
+    // private static bool IsDebugHotkeyBlocked()
+    // {
+    //     EventSystem es = EventSystem.current;
+    //     GameObject selected = es != null ? es.currentSelectedGameObject : null;
+    //     if (selected != null && selected.GetComponent<TMP_InputField>() != null) return true;
+    //
+    //     return GameplayInputBlock.IsBlocked();
+    // }
 
     private void OnGUI()
     {
@@ -144,7 +146,7 @@ public class PrototypeHud : MonoBehaviour
         int lastRound = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
 
         if (GUILayout.Button(
-                lastRound > 0 ? $"최종 라운드로 스킵 (1-{lastRound}) [S]" : "최종 라운드로 스킵 [S]",
+                lastRound > 0 ? $"최종 라운드로 스킵 (1-{lastRound})" : "최종 라운드로 스킵",
                 GUILayout.Height(30f)))
         {
             DebugSkipToFinalRound(gm);
