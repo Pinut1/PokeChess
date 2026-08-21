@@ -204,7 +204,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>지금까지 내가 보낸 BattleSnapshot revision(단조 증가, 아직 한 번도 안 보냈으면 0). QA 표시용.</summary>
     public int LocalBattleSnapshotRevision => _localBattleSnapshotRevision;
 
-    /// <summary>둘 다 패배 시 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
+    /// <summary>팀 라운드가 BothWin(둘 다 승리)이 아닐 때(Split 포함) 차감할 라이프(공용 HP 단위 = 라이프 1).</summary>
     private const int    LIFE_LOSS_ON_TEAM_DEFEAT = 1;
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글. 빌드/검증 편의용.</summary>

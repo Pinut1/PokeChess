@@ -5,7 +5,7 @@ using UnityEngine;
 /// 스테이지 보상 지급 담당.
 /// 밸런스 기획서 §7: "모든 보상은 해당 라운드 전투 시작 전 선지급"(보상 → 상점 → 덱 구성 → 전투).
 /// 따라서 라운드 진입(OnStageEntered) 시 현재 스테이지의 rewardTableId로 RewardDatabase를 조회해 전액 지급한다.
-/// 승/패 배수 없음 — 공유 라이프 모델(BothLose만 -1)이라 라운드 시작 시점엔 결과가 없고, 선지급이 곧 상점 예산이 된다.
+/// 승/패 배수 없음 — 공유 라이프 모델(BothWin이 아니면 -1, Split 포함)이라 라운드 시작 시점엔 결과가 없고, 선지급이 곧 상점 예산이 된다.
 /// 각 클라이언트가 자기 플레이어 몫을 지급한다(2인 각자 경제).
 ///
 /// 스테이지 단일 출처는 RoundPhaseManager.CurrentStage. StageEntered 인자로 직접 받으므로 pull도 불필요.
