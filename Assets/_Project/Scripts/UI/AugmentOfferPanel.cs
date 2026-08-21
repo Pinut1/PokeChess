@@ -155,13 +155,6 @@ public class AugmentOfferPanel : MonoBehaviour
         if (Center_PanelGroup != null)
         {
             Center_PanelGroup.SetActive(true);
-
-            // 이 패널과 유닛 HP/마나 바(Unit_Panel)·파트너 관전 PIP(PartnerPipPanel)가 같은 루트
-            // Canvas(Screen Space Overlay, sortingOrder 0) 아래 형제로 있어, 카드가 화면을 가리는
-            // 동안에도 나중 형제인 그 둘이 위에 그려져 카드를 덮는 문제가 있었다(씬 Hierarchy 확인 완료).
-            // 오퍼가 뜰 때마다 이 오브젝트를 마지막 형제로 올려 항상 최상단에 그려지게 한다 —
-            // sortingOrder를 따로 두거나 HP/마나 바 쪽 로직을 건드리지 않는 최소 수정.
-            Center_PanelGroup.transform.SetAsLastSibling();
         }
         ApplyMinimizedState();
     }
