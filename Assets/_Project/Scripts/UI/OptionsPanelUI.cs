@@ -391,6 +391,13 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
         GameEvents.OnGameCleared          += HandleGameCleared;
+
+        // "파트너 응답 불능"(진짜 이탈은 아님) — 화면은 위 파트너 이탈 대기 모달과 동일하게 재사용하되,
+        // RoundPhaseManager/PartnerBattleMirrorController/PartnerSpectateView 등 "진짜 이탈" 전용
+        // 부작용을 가진 다른 구독자들과는 별개 이벤트로 분리돼 있다(GameEvents.cs 참고).
+        GameEvents.OnPartnerResultUnresponsive    += HandlePartnerResultUnresponsive;
+        GameEvents.OnPartnerResultGiveUpAvailable += HandlePartnerResultGiveUpAvailable;
+        GameEvents.OnPartnerResultRecovered       += HandlePartnerReconnected;
     }
 
     private void OnDisable()
@@ -400,6 +407,10 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
         GameEvents.OnGameCleared          -= HandleGameCleared;
+
+        GameEvents.OnPartnerResultUnresponsive    -= HandlePartnerResultUnresponsive;
+        GameEvents.OnPartnerResultGiveUpAvailable -= HandlePartnerResultGiveUpAvailable;
+        GameEvents.OnPartnerResultRecovered       -= HandlePartnerReconnected;
 
         if (_defeatModalRoutine != null)
         {
@@ -423,6 +434,20 @@ public class OptionsPanelUI : MonoBehaviour
     }
 
     private void HandlePartnerGiveUpAvailable(bool bothDisconnected)
+    {
+        _partnerGiveUpAvailable = true;
+    }
+
+    /// <summary>파트너 응답 불능(진짜 이탈 아님) — HandlePartnerDisconnected와 화면 동작은 동일하다.</summary>
+    private void HandlePartnerResultUnresponsive()
+    {
+        _partnerDisconnectModalOpen = true;
+        _partnerGiveUpAvailable = false;
+        _partnerDisconnectEndConfirmOpen = false;
+    }
+
+    /// <summary>위 상태에서 30초 경과 — HandlePartnerGiveUpAvailable과 화면 동작은 동일하다.</summary>
+    private void HandlePartnerResultGiveUpAvailable()
     {
         _partnerGiveUpAvailable = true;
     }

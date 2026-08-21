@@ -3187,16 +3187,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             _opponentDisconnected = false;
 
-            // 이 이탈이 "응답 불능" 진단에서 넘어온 것이었을 수 있다(OnPlayerLeftRoom의 핸드오프
-            // 참고) — 그쪽 상태/유예 코루틴이 아직 살아있으면 같이 정리한다. 안 하면 이미 대기 모달이
-            // 닫혔는데도 옛 코루틴이 나중에 GracePeriodExpired를 뒤늦게 쏘는 문제가 생긴다.
-            _partnerResultUnresponsive = false;
-            if (_partnerUnresponsiveGraceRoutine != null)
-            {
-                StopCoroutine(_partnerUnresponsiveGraceRoutine);
-                _partnerUnresponsiveGraceRoutine = null;
-            }
-
             // 대기 중 열어뒀던 방을 다시 닫는다(포기 통지용 잠깐 재입장이어도 무해 — 뒤이은 재이탈 시
             // OnPlayerLeftRoom이 다시 열게 되므로 open/close 대칭이 유지됨).
             if (IsMasterClient)
@@ -3277,24 +3267,6 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 30초 대기 타이머와 [포기하기] 노출 상태가 계속 리셋된다.
         if (_opponentDisconnected)
             return;
-
-        // "파트너 응답 불능" 진단(DiagnosePartnerUnresponsiveIfNeeded)이 이미 같은 상대에 대해 같은
-        // 대기 UX(GameEvents.OpponentDisconnected)를 띄워둔 상태일 수 있다 — 그 뒤에 Photon이 실제
-        // 이탈까지 감지하면, 아래 일반 이탈 처리를 그대로 타서 이벤트를 또 쏘고 별도 유예 타이머까지
-        // 새로 시작해버려 이미 거의 다 찬 30초 대기가 처음부터 다시 도는 버그가 있었다(2026-08-22
-        // 코드리뷰 지적). 이벤트/타이머를 새로 만들지 않고 부기만 넘겨받는다 — 유예 카운트다운은
-        // DiagnosePartnerUnresponsiveIfNeeded가 시작한 코루틴이 그대로 이어간다. _opponentDisconnected는
-        // 그래도 true로 켜둬야 나중에 파트너가 진짜로 재입장했을 때 OnPlayerEnteredRoom의 재접속
-        // 감지가 정상 동작한다(그쪽은 _partnerResultUnresponsive를 안 보고 이 플래그만 본다).
-        if (_partnerResultUnresponsive)
-        {
-            _opponentDisconnected = true;
-            _partnerBattleSnapshot = null;
-            _lastPartnerBattleSnapshotRevision = -1;
-            if (IsMasterClient)
-                PhotonNetwork.CurrentRoom.IsOpen = true;
-            return;
-        }
 
         // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
@@ -3492,13 +3464,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         // 파트너가 진짜로 Photon 방을 나갔으면(IsInactive) OnPlayerLeftRoom 경로가 이미 처리 중이다 —
-        // 여기서 또 진단을 띄우면 같은 상황에 대해 이벤트가 두 번 발행된다.
+        // 여기서 또 진단을 띄우면 이미 뜬 "진짜 이탈" 모달 위에 우리 모달까지 겹쳐 뜨는 꼴이 된다.
         Player[] others = PhotonNetwork.PlayerListOthers;
         if (others == null || others.Length == 0 || others[0].IsInactive) return;
 
         _partnerResultUnresponsive = true;
         Debug.LogWarning("[Network] 팀 결과 재전송 후에도 미수신 — 파트너 응답 불능 진단, 이탈 UX로 위임");
-        GameEvents.OpponentDisconnected(RECONNECT_GRACE_PERIOD);
+        // OnOpponentDisconnected가 아니라 전용 이벤트를 쏜다 — OnOpponentDisconnected는 RoundPhaseManager
+        // (페이즈 타이머 강제 정지 — 지금 이 함수를 부르고 있는 ResultTimer 코루틴 자신이 죽어버림),
+        // PartnerBattleMirrorController(미러 전투 중단), PartnerSpectateView(관전 화면 강제 종료)도
+        // 함께 구독하는데, 이들은 전부 "진짜로 자리를 비웠다"는 전제의 부작용이라 이 상황엔 안 맞는다
+        // (2026-08-22 코드리뷰 지적). OptionsPanelUI만 듣는 GameEvents.PartnerResultUnresponsive로 분리.
+        GameEvents.PartnerResultUnresponsive();
 
         if (_partnerUnresponsiveGraceRoutine != null)
             StopCoroutine(_partnerUnresponsiveGraceRoutine);
@@ -3506,7 +3483,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>OpponentGraceRoutine과 동일한 타이밍(GIVE_UP_AVAILABLE_DELAY)으로 [포기하기] 노출을 알린다.
-    /// 트리거가 실제 Photon 이탈이 아니므로 별도 코루틴으로 독립 운영한다.</summary>
+    /// 트리거가 실제 Photon 이탈이 아니므로 별도 코루틴 + 별도 이벤트(GameEvents.PartnerResultGiveUpAvailable)로
+    /// 독립 운영한다. 이 코루틴은 진단(DiagnosePartnerUnresponsiveIfNeeded)당 하나만 존재하므로
+    /// OpponentGraceRoutine의 _gracePeriodExpiredFired 같은 별도 1회 발행 가드가 필요 없다.</summary>
     private System.Collections.IEnumerator PartnerUnresponsiveGraceRoutine()
     {
         yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
@@ -3515,7 +3494,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!_partnerResultUnresponsive) yield break; // 그 사이 정상 판정으로 이미 복구됨
 
         Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
-        FireGracePeriodExpired(false); // 실제 이탈 경로와 같은 1회 발행 가드를 거친다(중복 발행 방지)
+        GameEvents.PartnerResultGiveUpAvailable();
     }
 
     /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
@@ -3552,12 +3531,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 StopCoroutine(_partnerUnresponsiveGraceRoutine);
                 _partnerUnresponsiveGraceRoutine = null;
             }
-            // 이 복구는 OnPlayerEnteredRoom을 거치지 않으므로(파트너가 방을 나간 적이 없음) 그쪽이
-            // 평소에 해주는 _gracePeriodExpiredFired 리셋도 여기서 직접 해준다 — 안 하면 다음 라운드에
-            // 파트너가 또 응답 불능이 됐을 때 FireGracePeriodExpired가 "이미 발행함" 가드에 걸려
-            // 포기하기가 영영 안 뜬다.
-            _gracePeriodExpiredFired = false;
-            GameEvents.OpponentReconnected();
+            // OnOpponentReconnected가 아니라 전용 이벤트로 닫는다 — RoundPhaseManager가
+            // OnOpponentReconnected를 들으면 지금 이 함수를 부르고 있는 ResultTimer를 처음부터
+            // 다시 시작시켜버린다(불필요한 재시작). OptionsPanelUI만 듣는 GameEvents.PartnerResultRecovered로 분리.
+            GameEvents.PartnerResultRecovered();
         }
 
         int wins = 0;
