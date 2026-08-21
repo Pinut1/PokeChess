@@ -51,6 +51,15 @@ public class RoundPhaseManager : MonoBehaviour
     /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).</summary>
     private const float TEAM_RESULT_SAFETY_TIMEOUT = 30f;
 
+    /// <summary>이 시점까지도 팀 결과가 안 왔으면 재전송을 한 번 요청한다(NetworkManager.RequestBattleResultResendIfNeeded).</summary>
+    private const float TEAM_RESULT_NUDGE_AT = 15f;
+
+    /// <summary>이 시점까지도 안 왔으면 방장 결과로 대체 판정을 시도한다(NetworkManager.TryResolveTeamRoundWithHostFallback).
+    /// TEAM_RESULT_SAFETY_TIMEOUT(30s)보다 5초 여유를 둬서, 재전송 RPC 왕복 시간을 흡수하면서도 같은
+    /// 30초 창 안에서 반드시 끝나도록 한다 — 별도 타이머를 새로 두면 이 루프의 타임아웃과 시점이
+    /// 어긋나 서로 다른 시각에 판정/포기를 해버리는 문제가 있었다(2026-08-21 코드리뷰 지적, PR #120 후속).</summary>
+    private const float TEAM_RESULT_FALLBACK_AT = 25f;
+
     // ─────────────────────────────────────────
     // 이벤트 구독
     // ─────────────────────────────────────────
@@ -284,17 +293,31 @@ public class RoundPhaseManager : MonoBehaviour
 
         // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
         // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다.
-        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 둔다.
+        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 두고, 그 안에서 재촉·
+        // 대체판정도 같은 시계로 시도한다(별도 타이머를 두면 이 루프의 타임아웃과 서로 어긋난다).
         float waited = 0f;
+        bool nudged = false;
+        bool fallbackAttempted = false;
         while (!_teamRoundResolved && waited < TEAM_RESULT_SAFETY_TIMEOUT)
         {
             yield return null;
             waited += Time.deltaTime;
+
+            if (!nudged && waited >= TEAM_RESULT_NUDGE_AT)
+            {
+                nudged = true;
+                network.RequestBattleResultResendIfNeeded();
+            }
+            if (!fallbackAttempted && waited >= TEAM_RESULT_FALLBACK_AT)
+            {
+                fallbackAttempted = true;
+                network.TryResolveTeamRoundWithHostFallback();
+            }
         }
         if (!_teamRoundResolved)
             Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
 
-        // 팀 라이프가 이번 라운드로 완전히 소진됐으면(TeamHealth<=0) 여기서는 다음 라운드/완주 어느
+        // 팀 라이프가 이번 라운드로 완전히 소진됐으면(TeamHealth==0) 여기서는 다음 라운드/완주 어느
         // 쪽도 방송하지 않는다. HP 소진에 따른 게임오버 전환은 NetworkManager의 TeamHP Room 속성
         // 갱신(비동기, 별도 네트워크 메시지)이 처리하는데, 그 전환을 기다리지 않고 여기서 곧장
         // 라운드 번호만으로 완주를 판정하면 게임오버 전환이 아직 도착하기 전에 승리 화면이 먼저
@@ -313,9 +336,12 @@ public class RoundPhaseManager : MonoBehaviour
         // QA 리포트 "게임 엔딩 안내창 다름"으로 발견됨.)
         // NetworkManager.DebugInfiniteTeamHealth(QA 무한 HP 토글)가 켜져 있으면 ApplyTeamDamageLocal이
         // 데미지를 무시해 HP가 실제로는 안 깎이므로(NetworkManager.cs의 ApplyTeamDamageLocal 참고),
-        // TeamHealth도 0 이하로 안 내려가 아래 조건이 자연히 스킵되지 않는다 — 명시적으로도 한 번 더
+        // TeamHealth도 0으로 안 내려가 아래 조건이 자연히 스킵되지 않는다 — 명시적으로도 한 번 더
         // 방어해둔다(무한 HP 테스트 중 Result 페이즈에서 영구 정지되는 걸 막기 위함).
-        if (_teamRoundResolved && network.TeamHealth <= 0 && !NetworkManager.DebugInfiniteTeamHealth)
+        // ⚠️ "<= 0"이 아니라 정확히 "== 0"으로 비교한다 — TeamHealth는 아직 초기화 전이면 -1(sentinel,
+        // NetworkManager.TeamHealth 게터 참고)인데, <=0으로 비교하면 "아직 시작도 안 함"과 "라이프 소진"을
+        // 구분 못 해 초기화 타이밍이 꼬이면 라운드 1부터 계속 멈춰버린다(2026-08-21 코드리뷰 지적, PR #120 후속).
+        if (_teamRoundResolved && network.TeamHealth == 0 && !NetworkManager.DebugInfiniteTeamHealth)
             yield break;
 
         // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.
