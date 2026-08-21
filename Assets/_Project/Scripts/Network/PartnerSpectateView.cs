@@ -908,8 +908,21 @@ public class PartnerSpectateView : MonoBehaviour
     {
         if (_mirrorController == null || snapshot == null) return;
 
-        _mirrorController.ClearPartnerEnemyPreviewUnitsOnly();
+        // ⚠️ 순서가 중요하다. 적 바닥(빨간 육각 타일)을 만드는 유일한 경로가 ShowEnemyPreview인데,
+        // 그 안에 "전투 진행 중(_units.Count > 0)이면 아무것도 안 함" 가드가 있다.
+        // 그래서 반드시 이 순서를 지켜야 한다:
+        //   1) StopMirrorBattle — 돌고 있던 미러를 먼저 끝내 _units를 비운다(Cleanup)
+        //   2) RefreshPartnerEnemyPreview — 그제서야 가드를 통과해 타일 + 프리뷰 유닛이 생긴다
+        //   3) ClearPartnerEnemyPreviewUnitsOnly — 프리뷰 유닛만 걷고 타일은 남긴다
+        //   4) StartMirrorBattle — 미러 적이 남은 타일 위에서 싸운다
+        //
+        // 미러를 상시 실행으로 바꾸기 전에는 2)를 관전을 여는 시점(ToggleExpanded)에만 했고, 그때는
+        // 미러가 아직 안 돌아 _units가 비어 있어서 우연히 통과했다. 상시 실행이 되면서 관전을 열 때
+        // 이미 미러가 돌고 있어 가드에 막혔고, 적 유닛이 바닥 타일 없이 떠 있는 버그가 났다
+        // (2026-08-22). 타일 생성을 관전 개방 시점이 아니라 미러 시작 시점에 묶어 해결한다.
         _mirrorController.StopMirrorBattle();
+        RefreshPartnerEnemyPreview();
+        _mirrorController.ClearPartnerEnemyPreviewUnitsOnly();
 
         // 상시 실행 비용 측정용(2026-08-22) — 셋업(visual 생성)과 전투 전체에 걸린 실시간을 잰다.
         // 관전을 안 켠 채로도 미러가 도는 게 감당 가능한지 판단할 근거.
