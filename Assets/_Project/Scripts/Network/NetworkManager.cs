@@ -213,6 +213,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
     private bool _roundResultResolved;
 
+    /// <summary>일부만 보고된 채 남은 팀 결과를 재촉·대체판정하는 MasterClient 코루틴. 라운드 시작 시 리셋.
+    /// (2026-08 코드리뷰 지적 — PR #120: 상대 결과가 끝내 안 오면 라이프 차감 자체가 조용히 스킵되던 문제.)</summary>
+    private Coroutine _teamResultWaitRoutine;
+
+    /// <summary>재전송 요청(RPC_RequestBattleResultResend)을 보내기 전 한 번 더 기다리는 시간.</summary>
+    private const float TEAM_RESULT_NUDGE_DELAY = 15f;
+
+    /// <summary>재전송 요청 후 그래도 안 오면 대체판정으로 넘어가기 전 추가로 기다리는 시간.
+    /// NUDGE_DELAY + FALLBACK_DELAY(15+8=23초)는 RoundPhaseManager.TEAM_RESULT_SAFETY_TIMEOUT(30초)보다
+    /// 짧아야 한다 — 그래야 "판정 자체를 스킵하는" 그쪽 안전장치가 발동하기 전에 여기서 먼저 outcome이 확정된다.</summary>
+    private const float TEAM_RESULT_FALLBACK_DELAY = 8f;
+
+    /// <summary>내가 마지막으로 보고한 전투 결과(승/패). 재전송 요청(RPC_RequestBattleResultResend) 응답용.
+    /// 아직 이번 라운드 전투를 안 끝냈으면 null.</summary>
+    private bool? _lastLocalBattleResult;
+
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
 
@@ -1520,6 +1536,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
+        _lastLocalBattleResult = isWin; // 재전송 요청(RPC_RequestBattleResultResend) 응답용 캐시
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
@@ -2900,6 +2917,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
+        _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
+        if (_teamResultWaitRoutine != null)
+        {
+            StopCoroutine(_teamResultWaitRoutine);
+            _teamResultWaitRoutine = null;
+        }
         _lastKnownRound = round;      // 재접속 라운드 복구 기준점
         _tradeSentThisRound = false;  // 전송 기회는 라운드마다 새로 — 안 쓴 라운드는 이월되지 않는다
 
@@ -3353,8 +3376,70 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             photonView.RPC(nameof(RPC_OnAllPlayersReady), RpcTarget.All);
 
         // 전투 결과 집계: 두 플레이어가 모두 보고했으면 팀 결과 1회 판정.
-        if (changedProps.ContainsKey(BATTLE_RESULT_PROP_KEY) && !_roundResultResolved && AllPlayersReportedResult())
-            ResolveTeamRound();
+        if (changedProps.ContainsKey(BATTLE_RESULT_PROP_KEY) && !_roundResultResolved)
+        {
+            if (AllPlayersReportedResult())
+                ResolveTeamRound();
+            else if (_teamResultWaitRoutine == null)
+                _teamResultWaitRoutine = StartCoroutine(WaitForTeamResultWithFallback());
+        }
+    }
+
+    /// <summary>
+    /// 일부 플레이어 결과만 도착한 상태로 기다리다가, 끝내 안 오면 재전송을 한 번 요청하고,
+    /// 그래도 안 오면 방장 자신의 결과를 팀 결과로 대체 판정한다.
+    /// (상대 결과가 서버까지 전달되지 못하는 네트워크 문제 상황에 대한 안전장치 — 이게 없으면
+    /// RoundPhaseManager의 30초 타임아웃이 "판정 자체를 건너뛰고" 다음 라운드로 넘어가버려서
+    /// 실제로 패배했는데도 팀 라이프가 조용히 안 깎이는 문제가 있었다. 2026-08 PR #120 코드리뷰 지적.)
+    /// </summary>
+    private System.Collections.IEnumerator WaitForTeamResultWithFallback()
+    {
+        yield return new WaitForSeconds(TEAM_RESULT_NUDGE_DELAY);
+        if (_roundResultResolved) { _teamResultWaitRoutine = null; yield break; }
+
+        Debug.LogWarning("[Network] 팀 결과 일부 미수신 — 재전송 요청");
+        photonView.RPC(nameof(RPC_RequestBattleResultResend), RpcTarget.Others);
+
+        yield return new WaitForSeconds(TEAM_RESULT_FALLBACK_DELAY);
+        if (_roundResultResolved) { _teamResultWaitRoutine = null; yield break; }
+
+        // 방장 자신도 아직 전투가 안 끝나 결과가 없으면 대체판정 근거 자체가 없다 — 섣불리 판정하지 않고
+        // RoundPhaseManager의 30초 안전장치(그래도 판정 자체는 못 하지만 진행은 막지 않는 최후 폴백)에 맡긴다.
+        if (!AllPlayersReportedResult() && _lastLocalBattleResult.HasValue)
+            ResolveTeamRoundWithHostFallback();
+
+        _teamResultWaitRoutine = null;
+    }
+
+    /// <summary>재전송 요청 수신 — 이번 라운드 결과를 이미 계산해뒀으면 다시 보고한다.</summary>
+    [PunRPC]
+    private void RPC_RequestBattleResultResend()
+    {
+        if (!_lastLocalBattleResult.HasValue) return;
+
+        Debug.Log("[Network] 팀 결과 재전송 요청 수신 — 내 결과 다시 보고");
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, _lastLocalBattleResult.Value ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>
+    /// 재전송 요청 후에도 상대 결과가 끝내 안 왔을 때: 방장 자신의 결과를 팀 결과로 대신 쓴다
+    /// (방장이 이겼으면 BothWin, 졌으면 BothLose). Split 여부는 알 수 없으므로 포기 — 어차피
+    /// 현재 outcome 소비처(ShopManager/PartnerSpectateView)는 BothWin 여부만 구분해서 쓴다.
+    /// </summary>
+    private void ResolveTeamRoundWithHostFallback()
+    {
+        _roundResultResolved = true;
+
+        bool hostWon = PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v)
+                       && (int)v == 1;
+        TeamRoundOutcome outcome = hostWon ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose;
+
+        if (outcome != TeamRoundOutcome.BothWin)
+            ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT);
+
+        Debug.LogWarning($"[Network] 팀 라운드 결과(대체 판정, 방장 기준): {outcome}");
+        photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, (int)outcome);
     }
 
     /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
@@ -3779,6 +3864,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 현재 NetworkManager 로컬 상태 초기화
         _gameStarted = false;
         _roundResultResolved = false;
+        _lastLocalBattleResult = null;
+        if (_teamResultWaitRoutine != null)
+        {
+            StopCoroutine(_teamResultWaitRoutine);
+            _teamResultWaitRoutine = null;
+        }
 
         // 항복 상태 초기화(이전 판의 잔여 요청/알림이 새 판으로 넘어가지 않도록)
         _surrenderRequestSent = false;
