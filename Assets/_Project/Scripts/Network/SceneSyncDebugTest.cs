@@ -12,7 +12,8 @@ public class SceneSyncDebugTest : MonoBehaviour
 {
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10, 10, 320, 120));
+        // 전적창 열기 버튼(UIManager.DrawOpenButton, 좌측 상단 20,20~180,60)과 겹치지 않도록 그 아래로 배치.
+        GUILayout.BeginArea(new Rect(10, 70, 320, 120));
         GUILayout.Label($"Scene      : {SceneManager.GetActiveScene().name}");
         GUILayout.Label($"Is Master  : {PhotonNetwork.IsMasterClient}");
         GUILayout.Label($"Players    : {PhotonNetwork.CurrentRoom?.PlayerCount ?? 0}");
@@ -26,7 +27,8 @@ public class SceneSyncDebugTest : MonoBehaviour
 {
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10, 10, 320, 120));
+        // 전적창 열기 버튼(UIManager.DrawOpenButton, 좌측 상단 20,20~180,60)과 겹치지 않도록 그 아래로 배치.
+        GUILayout.BeginArea(new Rect(10, 70, 320, 120));
         GUILayout.Label($"Scene : {SceneManager.GetActiveScene().name}");
         GUILayout.Label("PUN2 미설치 — 오프라인 모드");
         GUILayout.EndArea();
