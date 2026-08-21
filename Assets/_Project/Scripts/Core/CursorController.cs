@@ -23,25 +23,20 @@ public class CursorController : Singleton<CursorController>
         ApplyCursor(_normalCursor);
     }
 
+    /// <summary>엣지(눌리는/떼지는 순간) 감지 대신 매 프레임 현재 버튼 상태를 그대로 반영한다.
+    /// 같은 프레임에 눌림+뗌이 동시에 감지되는 경우(저프레임/빠른 클릭)나 창 포커스를 잃었다
+    /// 되찾는 경우처럼 엣지를 놓칠 수 있는 상황에서도 항상 실제 상태와 어긋나지 않는다.</summary>
     private void Update()
     {
-        if (_clickAction.WasPressedThisFrame())
-            ApplyCursor(_pressedCursor);
-        else if (_clickAction.WasReleasedThisFrame())
-            ApplyCursor(_normalCursor);
+        ApplyCursor(_clickAction.IsPressed() ? _pressedCursor : _normalCursor);
     }
 
-    /// <summary>창 밖에서 마우스 버튼을 놓고 돌아오면 눌림 커서에 갇힐 수 있다 —
-    /// 포커스를 되찾을 때 실제 버튼 상태를 다시 확인해 맞춰준다(여전히 누른 채로
-    /// 포커스가 돌아오는 경우까지 정확히 처리하기 위함).</summary>
-    private void OnApplicationFocus(bool hasFocus)
-    {
-        if (hasFocus) ApplyCursor(_clickAction.IsPressed() ? _pressedCursor : _normalCursor);
-    }
+    private Texture2D _appliedTexture;
 
     private void ApplyCursor(Texture2D texture)
     {
-        if (texture == null) return;
+        if (texture == null || texture == _appliedTexture) return;
         Cursor.SetCursor(texture, _hotspot, CursorMode.Auto);
+        _appliedTexture = texture;
     }
 }
