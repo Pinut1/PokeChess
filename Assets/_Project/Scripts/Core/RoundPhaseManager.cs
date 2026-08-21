@@ -42,11 +42,10 @@ public class RoundPhaseManager : MonoBehaviour
 
     private Coroutine _phaseTimer;
 
-    /// <summary>이번 라운드 팀 결과(OnTeamRoundResolved)가 도착했는지. 라운드 시작 시 리셋.</summary>
+    /// <summary>이번 라운드 팀 결과(OnTeamRoundResolved)가 도착했는지. 라운드 시작 시 리셋.
+    /// 실제 라이프 소진 여부는 이 플래그가 아니라 NetworkManager.TeamHealth로 직접 판정한다
+    /// (outcome 값 자체는 더 이상 이 클래스의 판정에 쓰이지 않음).</summary>
     private bool _teamRoundResolved;
-
-    /// <summary>가장 최근 도착한 팀 라운드 결과. _teamRoundResolved가 true일 때만 유효.</summary>
-    private TeamRoundOutcome _lastTeamRoundOutcome;
 
     /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다(전투 최대 길이 MAX_TICKS*TICK_INTERVAL=30s와 동일).
     /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).</summary>
@@ -84,7 +83,6 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
     {
-        _lastTeamRoundOutcome = outcome;
         _teamRoundResolved = true;
     }
 
@@ -296,25 +294,28 @@ public class RoundPhaseManager : MonoBehaviour
         if (!_teamRoundResolved)
             Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
 
-        // 팀이 이번 라운드에서 라이프를 잃었으면(BothWin이 아닌 경우, Split 포함 — NetworkManager.
-        // ResolveTeamRound()가 BothWin이 아닌 한 항상 팀 HP -1 처리) 여기서는 다음 라운드/완주 어느
+        // 팀 라이프가 이번 라운드로 완전히 소진됐으면(TeamHealth<=0) 여기서는 다음 라운드/완주 어느
         // 쪽도 방송하지 않는다. HP 소진에 따른 게임오버 전환은 NetworkManager의 TeamHP Room 속성
         // 갱신(비동기, 별도 네트워크 메시지)이 처리하는데, 그 전환을 기다리지 않고 여기서 곧장
         // 라운드 번호만으로 완주를 판정하면 게임오버 전환이 아직 도착하기 전에 승리 화면이 먼저
         // 방송되는 레이스가 생길 수 있다(2026-08 코드리뷰 지적).
-        // ⚠️ 이 스킵은 PlayerHealthManager._maxLives=1(공용 라이프 1개) 전제 하에 안전하다 — BothWin이
-        // 아니면 항상 즉시 게임오버라 "다음 라운드로 진행"할 경우 자체가 없기 때문. 나중에 라이프가
-        // 여러 개로 바뀌면(밸런스 기획 확정 전) 이 조건을 "BothWin이 아님 && 라이프 소진"으로 좁혀야 한다.
+        // TeamHealth로 직접 판정하는 이유(PlayerHealthManager._maxLives 값에 의존하지 않기 위해):
+        // 과거엔 "_lastTeamRoundOutcome != BothWin"을 "라이프 소진"의 대용 신호로 썼는데, 이건
+        // _maxLives=1(공용 라이프 1개)일 때만 성립하는 암묵적 전제였다 — BothWin이 아니면 항상 즉시
+        // 게임오버였기 때문. 나중에 라이프가 여러 개로 바뀌면, 아직 라이프가 남았는데도 완벽승이
+        // 아니었다는 이유만으로 다음 라운드 진행 자체가 영구히 막히는 문제가 있었다(2026-08-21 코드리뷰
+        // 지적, PR #120 후속). network.TeamHealth는 ResolveTeamRound()가 이미 라이프 차감을 반영한
+        // 뒤의 최신 값을 곧장 읽으므로(Photon 로컬 캐시는 SetCustomProperties 직후 즉시 갱신됨) 별도
+        // 대기 없이 라이프가 실제로 남았는지 그대로 판정할 수 있다.
         // (과거 이 조건이 "== BothLose"로만 좁게 걸려 있어서 최종 라운드에서 Split이 나오면 팀 HP가
         // 0이 되는데도 여기서 스킵하지 않고 완주(Victory) 방송을 그대로 내보내는 버그가 있었다 — 게임오버
         // 전환과 완주 방송이 동시에 경쟁하면서 클라이언트마다 승리/패배 모달이 뒤바뀌어 보였다. 2026-08-21
         // QA 리포트 "게임 엔딩 안내창 다름"으로 발견됨.)
         // NetworkManager.DebugInfiniteTeamHealth(QA 무한 HP 토글)가 켜져 있으면 ApplyTeamDamageLocal이
         // 데미지를 무시해 HP가 실제로는 안 깎이므로(NetworkManager.cs의 ApplyTeamDamageLocal 참고),
-        // 게임오버 전환도 영영 안 온다 — 이땐 스킵하지 않고 그대로 다음 라운드/완주 판정을 진행한다
-        // (2026-08 코드리뷰 지적 — 스킵을 무조건 걸면 무한 HP 테스트 중 Result 페이즈에서 영구 정지됨).
-        if (_teamRoundResolved && _lastTeamRoundOutcome != TeamRoundOutcome.BothWin &&
-            !NetworkManager.DebugInfiniteTeamHealth)
+        // TeamHealth도 0 이하로 안 내려가 아래 조건이 자연히 스킵되지 않는다 — 명시적으로도 한 번 더
+        // 방어해둔다(무한 HP 테스트 중 Result 페이즈에서 영구 정지되는 걸 막기 위함).
+        if (_teamRoundResolved && network.TeamHealth <= 0 && !NetworkManager.DebugInfiniteTeamHealth)
             yield break;
 
         // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.
