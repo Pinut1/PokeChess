@@ -3846,15 +3846,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             if (reported && (int)v == 1) wins++;
         }
 
-        // 파트너가 PlayerList에서 아예 사라진 경우(PlayerTtl 만료 등) 위 순회가 그 자리를 돌지 않아
-        // 미러 대체값이 통째로 무시된다. 그러면 내 결과만으로 집계돼 조용히 다른 판정이 나온다.
-        // 목록에 남아 있을 때(IsInactive 포함)와 같은 결과가 나오도록 여기서 한 번 더 반영한다
-        // (2026-08-22 자체 리뷰). 2인 방 전제라 "나 외 0명"이면 빠진 쪽은 파트너 하나뿐이다.
-        if (_mirrorPartnerResult.HasValue && PhotonNetwork.PlayerListOthers.Length == 0)
-        {
-            if (_mirrorPartnerResult.Value) wins++;
-            Debug.LogWarning("[Network] 파트너가 방에서 제거됨 — 미러 결과를 집계에 직접 반영");
-        }
+        // 파트너가 PlayerList에서 아예 사라진 경우(PlayerTtl 60초 만료)는 일부러 보정하지 않는다.
+        // 그 시점엔 파트너가 그 액터로 재입장할 수 없어 2인 필수인 이 게임을 이어갈 방법이 없고,
+        // 남은 사람은 이탈 대기 모달의 [포기하기]로 세션을 끝내는 흐름만 남는다 — 라운드 결과가
+        // 쓰일 데가 없다. 오히려 미러값을 반영해 BothWin이 나오면 라이프가 안 깎여 다음 라운드를
+        // 방송하게 되는데, 혼자 남은 방에서는 양쪽 보고가 모이지 않아 영영 끝나지 않는 라운드가
+        // 된다. 아무것도 하지 않는 편이 낫다(2026-08-22 리뷰 지적).
 
         TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
                                  : wins == 1 ? TeamRoundOutcome.Split
