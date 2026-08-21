@@ -150,6 +150,30 @@ public class PrototypeHud : MonoBehaviour
             DebugSkipToFinalRound(gm);
         }
 
+        GUILayout.Space(4f);
+
+        // 파트너 응답 불능(전투 결과 미보고) 재현용 — 에디터 일시정지는 네트워크까지 같이 멎어서
+        // "진짜 접속 끊김"과 구분이 안 되니, 이 클라이언트가 보고만 일부러 안 하게 만든다.
+        string suppressLabel =
+            NetworkManager.DebugSuppressBattleResultReport
+                ? "결과 보고 억제(응답불능 재현): ON ▣"
+                : "결과 보고 억제(응답불능 재현): OFF ☐";
+
+        if (GUILayout.Button(suppressLabel, GUILayout.Height(30f)))
+            NetworkManager.DebugSuppressBattleResultReport =
+                !NetworkManager.DebugSuppressBattleResultReport;
+
+        bool hasSuppressed = gm.Network != null && gm.Network.HasSuppressedBattleResult;
+
+        GUI.enabled = hasSuppressed;
+        if (GUILayout.Button(
+                hasSuppressed ? "억제된 결과 지금 보내기" : "억제된 결과 없음",
+                GUILayout.Height(30f)))
+        {
+            gm.Network.DebugSendSuppressedBattleResultNow();
+        }
+        GUI.enabled = true;
+
         GUILayout.Space(8f);
 
         // ─────────────────────────────

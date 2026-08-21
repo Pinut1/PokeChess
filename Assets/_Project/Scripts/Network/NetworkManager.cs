@@ -210,12 +210,24 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글. 빌드/검증 편의용.</summary>
     public static bool DebugInfiniteTeamHealth = false;
 
+    /// <summary>디버그: 켜지면 ReportBattleResult가 실제 보고를 안 하고 붙들어둔다(응답 불능 상황 재현용).
+    /// PrototypeHud에서 토글. "파트너 이탈 UX로 위임" 흐름을 실제 접속 끊김 없이 재현하려는 목적 —
+    /// 에디터 일시정지는 네트워크 자체도 멎어서 "진짜 이탈"과 구분이 안 된다.</summary>
+    public static bool DebugSuppressBattleResultReport = false;
+
     /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
     private bool _roundResultResolved;
 
     /// <summary>내가 마지막으로 보고한 전투 결과(승/패). 재전송 요청(RPC_RequestBattleResultResend) 응답용
     /// 캐시일 뿐, 승패 추측에는 쓰지 않는다. 아직 이번 라운드 전투를 안 끝냈으면 null. 라운드 시작 시 리셋.</summary>
     private bool? _lastLocalBattleResult;
+
+    /// <summary>DebugSuppressBattleResultReport가 켜져 있는 동안 ReportBattleResult가 실제로 보내지 않고
+    /// 붙들어둔 결과. DebugSendSuppressedBattleResultNow()로 나중에 보낼 수 있다. 라운드 시작 시 리셋.</summary>
+    private bool? _suppressedBattleResult;
+
+    /// <summary>지금 억제된(아직 안 보낸) 전투 결과가 있는지. QA 패널에서 "지금 보내기" 버튼 활성화 판정용.</summary>
+    public bool HasSuppressedBattleResult => _suppressedBattleResult.HasValue;
 
     /// <summary>이번 라운드에서 "파트너 응답 불능"을 이미 진단했는지(MasterClient). 라운드 시작 시 리셋.
     /// 파트너가 Photon에는 계속 연결돼 있는데(=진짜 이탈이 아님) 전투 결과 응답만 안 오는 상황을 감지했을
@@ -1534,9 +1546,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
+        if (DebugSuppressBattleResultReport)
+        {
+            _suppressedBattleResult = isWin;
+            Debug.LogWarning($"[Network][QA] 전투 결과 보고 억제 중 — 실제로는 {(isWin ? "승" : "패")}지만 " +
+                              "안 보냄. DebugSendSuppressedBattleResultNow()로 나중에 보낼 수 있음.");
+            return;
+        }
+
         _lastLocalBattleResult = isWin; // 재전송 요청(RPC_RequestBattleResultResend) 응답용 캐시
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>DebugSuppressBattleResultReport로 붙들어뒀던 결과를 지금 보낸다(응답 불능 → 복귀 재현용).
+    /// 억제된 결과가 없으면 아무 것도 안 한다.</summary>
+    public void DebugSendSuppressedBattleResultNow()
+    {
+        if (!_suppressedBattleResult.HasValue)
+        {
+            Debug.LogWarning("[Network][QA] 억제된 결과가 없습니다.");
+            return;
+        }
+
+        if (_isLeavingRoom) return;
+
+        bool isWin = _suppressedBattleResult.Value;
+        _suppressedBattleResult = null;
+        _lastLocalBattleResult = isWin;
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        Debug.Log($"[Network][QA] 억제됐던 결과({(isWin ? "승" : "패")}) 지금 전송");
     }
 
     // ─────────────────────────────────────────
@@ -2916,6 +2956,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
+        _suppressedBattleResult = null; // QA 억제 테스트 잔여값도 라운드마다 새로
         _partnerResultUnresponsive = false;
         if (_partnerUnresponsiveGraceRoutine != null)
         {
@@ -3886,6 +3927,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _gameStarted = false;
         _roundResultResolved = false;
         _lastLocalBattleResult = null;
+        _suppressedBattleResult = null;
         _partnerResultUnresponsive = false;
         if (_partnerUnresponsiveGraceRoutine != null)
         {
@@ -4000,6 +4042,13 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글.</summary>
     public static bool DebugInfiniteTeamHealth = false;
+
+    /// <summary>오프라인은 ReportBattleResult가 항상 동기 즉시 판정이라 억제할 대상 자체가 없다
+    /// (실구현과 동일 공개 API 유지용 스텁).</summary>
+    public static bool DebugSuppressBattleResultReport = false;
+
+    /// <summary>오프라인은 항상 false(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public bool HasSuppressedBattleResult => false;
 
     private void Start()
     {
@@ -4120,6 +4169,9 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>위 RequestBattleResultResendIfNeeded와 동일 이유로 no-op.</summary>
     public void DiagnosePartnerUnresponsiveIfNeeded() { }
+
+    /// <summary>오프라인은 억제할 대상 자체가 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void DebugSendSuppressedBattleResultNow() { }
 
     /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
     public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
