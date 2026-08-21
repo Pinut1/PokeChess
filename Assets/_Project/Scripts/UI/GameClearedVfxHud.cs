@@ -41,6 +41,24 @@ public class GameClearedVfxHud : MonoBehaviour
              "(0,0,0)이면 매번 같은 자리에서 터진다.")]
     [SerializeField] private Vector3 _positionSpread = new(4f, 0f, 4f);
 
+    [Header("성공 사운드")]
+    [Tooltip("완주 순간 한 번 재생할 성공 팡파레(SoundId). None이면 소리 없이 연출만 나온다. " +
+             "SoundCatalog에 해당 id의 클립이 등록돼 있어야 한다. 길이는 상관없다 — " +
+             "타이틀로 나가면 그 시점에 끊긴다.")]
+    [SerializeField] private SoundId _clearSound = SoundId.Victory;
+
+    [Tooltip("팡파레를 울리기 전에 배경음을 멈출지. 켜면 팡파레만 깔끔하게 들리고, " +
+             "끄면 돌고 있던 BGM 위에 겹쳐 울린다. 완주 모달에서 나가는 길이 [타이틀로 이동]뿐이라 " +
+             "타이틀 BGM이 그때 다시 시작되므로, 멈춰도 되돌릴 필요가 없다.")]
+    [SerializeField] private bool _stopBgm = true;
+
+    [Tooltip("음원 앞부분을 몇 초만 재생할지. 원본이 이보다 짧으면 클립이 끝나는 대로 끝난다.")]
+    [SerializeField] private float _playSeconds = 7f;
+
+    [Tooltip("끝에서 몇 초 동안 볼륨을 줄이며 끝낼지. 0이면 뚝 끊긴다 — " +
+             "중간을 잘라 쓰는 음원이라 약간이라도 주는 편이 자연스럽다.")]
+    [SerializeField] private float _fadeOutSeconds = 1f;
+
     [Header("터지는 방식")]
     [Tooltip("총 몇 번 터뜨릴지.")]
     [Range(1, 30)]
@@ -105,8 +123,41 @@ public class GameClearedVfxHud : MonoBehaviour
 
         _played = true;
 
+        PlayClearSound();
+
         if (_routine != null) StopCoroutine(_routine);
         _routine = StartCoroutine(PlayBursts());
+    }
+
+    /// <summary>
+    /// 완주 성공 팡파레를 한 번 재생한다(PlayOneShot).
+    ///
+    /// <b>BGM 채널을 쓰지 않는 이유</b> — PlayBgm은 BGM 소스의 클립 자체를 이 팡파레로 바꿔버린다.
+    /// 그러면 곡이 끝난 뒤 BGM 상태가 "팡파레가 걸린 채 멈춤"으로 남아, 이후 BGM을 다루는 쪽이
+    /// 타이틀 BGM이 돌고 있다고 가정하면 어긋난다. 여긴 그 순간 한 번 울리는 소리면 충분하므로
+    /// SFX 채널의 PlayOneShot으로 얹어 BGM 상태를 그대로 둔다.
+    ///
+    /// 원본이 필요한 길이보다 길어도 된다 — <see cref="_playSeconds"/>만큼만 틀고 끝에서
+    /// 페이드아웃한다(SoundManager.PlaySfxForSeconds). 뚝 자르면 어색해서 약간 줄이며 끝낸다.
+    ///
+    /// 배경음은 <see cref="_stopBgm"/>이 켜져 있으면 울리기 직전에 멈춘다(겹쳐 들리지 않게).
+    /// 멈춘 뒤 되돌리지 않는 이유는 완주 모달에서 나가는 길이 [타이틀로 이동]뿐이고,
+    /// 그 시점에 타이틀 BGM이 다시 시작되기 때문이다.
+    ///
+    /// SoundManager는 자체 싱글톤이라 SoundManager.TryGet으로 조회한다
+    /// (UnitDragController가 효과음을 낼 때 쓰는 것과 같은 방식). Singleton.Instance 널 검사 금지.
+    /// </summary>
+    private void PlayClearSound()
+    {
+        if (!SoundManager.TryGet(out var sound)) return;
+
+        // 팡파레가 없어도(_clearSound == None) BGM 정지는 그대로 적용한다 — 소리를 끄고 싶어서
+        // 비워둔 경우에 배경음만 계속 도는 게 더 어색하다.
+        if (_stopBgm) sound.StopBgm();
+
+        if (_clearSound == SoundId.None) return;
+
+        sound.PlaySfxForSeconds(_clearSound, _playSeconds, _fadeOutSeconds);
     }
 
     private IEnumerator PlayBursts()

@@ -35,6 +35,10 @@ public class SoundManager : Singleton<SoundManager>
     [SerializeField] private AudioMixerGroup _sfxMixerGroup;
 
     private float _sfxVolume = DEFAULT_VOLUME;
+
+    // PlaySfxForSeconds 전용 소스·코루틴. 공용 _sfxSource를 멈추면 다른 효과음까지 끊기므로 분리한다.
+    private AudioSource _timedSfxSource;
+    private Coroutine _timedSfxCoroutine;
     private float _bgmVolume = DEFAULT_VOLUME;
     private float _bgmEntryVolume = 1f; // 현재 재생 중인 BGM의 SoundCatalog 배율 — 슬라이더 조작 시에도 유지해야 함
     private Coroutine _bgmIntroCoroutine;
@@ -294,6 +298,82 @@ public class SoundManager : Singleton<SoundManager>
         }
 
         _sfxSource.PlayOneShot(clip, _sfxVolume * Mathf.Clamp01(volumeMultiplier));
+    }
+
+    /// <summary>
+    /// SFX를 지정한 길이만큼만 재생하고 끝에서 페이드아웃한다. 원본이 필요한 길이보다 긴
+    /// 팡파레·징글에 쓴다(예: 30초 음원에서 앞 7초만).
+    ///
+    /// PlayOneShot을 안 쓰는 이유: 재생 핸들이 없어 중간에 멈출 방법이 없다. 그렇다고 공용
+    /// _sfxSource를 멈추면 그 위에서 울리던 다른 효과음까지 같이 끊긴다. 그래서 전용 소스를
+    /// 하나 따로 만들어 쓴다(같은 SFX 볼륨·믹서 그룹을 따른다).
+    ///
+    /// 끝을 뚝 자르면 어색하므로 마지막 fadeSeconds 동안 볼륨을 줄여 끝낸다.
+    /// seconds가 클립 길이보다 길면 클립이 끝나는 대로 자연히 끝난다.
+    /// </summary>
+    public void PlaySfxForSeconds(SoundId id, float seconds, float fadeSeconds = 1f)
+    {
+        if (id == SoundId.None || seconds <= 0f) return;
+
+        if (_catalog == null)
+        {
+            Debug.LogWarning("[SoundManager] SoundCatalog 미연결 — SFX 재생 스킵");
+            return;
+        }
+
+        if (!_catalog.TryGetClip(id, out var clip, out var entryVolume) || clip == null)
+        {
+            Debug.LogWarning($"[SoundManager] SoundCatalog에 '{id}' 클립 없음 — SFX 재생 스킵");
+            return;
+        }
+
+        EnsureTimedSfxSource();
+
+        if (_timedSfxCoroutine != null) StopCoroutine(_timedSfxCoroutine);
+
+        float volume = _sfxVolume * Mathf.Clamp01(entryVolume);
+        _timedSfxSource.clip   = clip;
+        _timedSfxSource.volume = volume;
+        _timedSfxSource.Play();
+
+        _timedSfxCoroutine = StartCoroutine(FadeOutTimedSfx(seconds, fadeSeconds, volume));
+    }
+
+    /// <summary>PlaySfxForSeconds 전용 소스를 만든다(공용 _sfxSource와 분리 — 위 주석 참고).</summary>
+    private void EnsureTimedSfxSource()
+    {
+        if (_timedSfxSource != null) return;
+
+        _timedSfxSource = gameObject.AddComponent<AudioSource>();
+        _timedSfxSource.playOnAwake = false;
+        _timedSfxSource.loop = false;
+
+        if (_sfxMixerGroup != null) _timedSfxSource.outputAudioMixerGroup = _sfxMixerGroup;
+    }
+
+    /// <summary>seconds에서 fadeSeconds를 뺀 지점부터 볼륨을 줄여 정지한다.</summary>
+    private IEnumerator FadeOutTimedSfx(float seconds, float fadeSeconds, float startVolume)
+    {
+        fadeSeconds = Mathf.Clamp(fadeSeconds, 0f, seconds);
+
+        float holdSeconds = seconds - fadeSeconds;
+        if (holdSeconds > 0f) yield return new WaitForSecondsRealtime(holdSeconds);
+
+        float elapsed = 0f;
+        while (elapsed < fadeSeconds && _timedSfxSource != null && _timedSfxSource.isPlaying)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _timedSfxSource.volume = Mathf.Lerp(startVolume, 0f, elapsed / fadeSeconds);
+            yield return null;
+        }
+
+        if (_timedSfxSource != null)
+        {
+            _timedSfxSource.Stop();
+            _timedSfxSource.volume = startVolume; // 다음 재생을 위해 되돌린다
+        }
+
+        _timedSfxCoroutine = null;
     }
 
     /// <summary>SoundId로 SFX 재생. 카탈로그에 등록된 항목별 볼륨 배율을 함께 적용한다.</summary>
