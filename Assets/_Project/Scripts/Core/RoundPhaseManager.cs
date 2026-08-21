@@ -47,20 +47,25 @@ public class RoundPhaseManager : MonoBehaviour
     /// (outcome 값 자체는 더 이상 이 클래스의 판정에 쓰이지 않음).</summary>
     private bool _teamRoundResolved;
 
-    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다. 전투 최대 길이(35초 =
-    /// BattleManager.MAX_TICKS*TICK_INTERVAL 30s + 연장전 5s)보다 여유를 둔다. 이 시점에 도달해도
+    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다. 전투 최대 길이(50초 =
+    /// BattleManager.MAX_TICKS*TICK_INTERVAL 40s + 연장전 10s)보다 여유를 둔다. 이 시점에 도달해도
     /// 더 이상 추측해서 방송하지 않는다 — TEAM_RESULT_DIAGNOSE_AT에서 이미 "파트너 응답 불능" 진단으로
     /// 넘어갔어야 정상이라, 여기 도달하는 건 그 진단 자체가 안 불린 이례적 상황뿐이다(로그만 남기고 스킵).</summary>
-    private const float TEAM_RESULT_SAFETY_TIMEOUT = 40f;
+    private const float TEAM_RESULT_SAFETY_TIMEOUT = 55f;
 
     /// <summary>이 시점부터 이 간격으로 재전송을 반복 요청한다(NetworkManager.RequestBattleResultResendIfNeeded).</summary>
-    private const float TEAM_RESULT_NUDGE_START_AT = 20f;
+    private const float TEAM_RESULT_NUDGE_START_AT = 35f;
     private const float TEAM_RESULT_NUDGE_INTERVAL = 5f;
 
     /// <summary>재전송 요청을 몇 차례 반복해도 이 시점까지 안 오면 "파트너 응답 불능"으로 진단한다
-    /// (NetworkManager.DiagnosePartnerUnresponsiveIfNeeded). 전투 최대 길이(35초)와 같다 — 정상적으로
-    /// 전투가 오래 걸리는 것과 진짜 응답 불능을 헷갈리지 않기 위한 최소 대기.</summary>
-    private const float TEAM_RESULT_DIAGNOSE_AT = 35f;
+    /// (NetworkManager.DiagnosePartnerUnresponsiveIfNeeded). 전투 최대 길이(50초)와 같다 — 정상적으로
+    /// 전투가 오래 걸리는 것과 진짜 응답 불능을 헷갈리지 않기 위한 최소 대기.
+    /// ⚠️ 이 값은 BattleManager의 MAX_TICKS·_overtimeDuration에 종속된다. 전투 길이를 바꾸면 반드시
+    /// 같이 올릴 것 — 진단 시점이 전투 최대 길이보다 짧으면, 내 전투가 먼저 끝났을 때 아직 정상적으로
+    /// 싸우는 중인 파트너를 "응답 불능"으로 오진단해 대기 모달이 뜬다(2026-08-22 전투 30→40초 상향 시 확인).
+    /// 대기 시계는 "내 전투가 끝난 시점"부터 재므로, 최악의 경우(내 전투가 즉시 끝남) 파트너의 전투
+    /// 최대 길이만큼을 통째로 기다려야 한다.</summary>
+    private const float TEAM_RESULT_DIAGNOSE_AT = 50f;
 
     // ─────────────────────────────────────────
     // 이벤트 구독

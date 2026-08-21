@@ -18544,7 +18544,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StageTopPanelUI
   _nowStageText: {fileID: 1390019014}
   _stageTimeText: {fileID: 103726196}
-  _battleDuration: 30
+  _battleDuration: 40
   _resultDuration: 3
   _noTimerLabel: 00
   _showDecimal: 0
@@ -25862,7 +25862,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BattleManager
   _enemyTilePrefab: {fileID: 5824591497658974836, guid: e921a06b0f266a548b4687f31a2d4dd5, type: 3}
-  _overtimeDuration: 5
+  _overtimeDuration: 10
   _overtimeSpeedMultiplier: 2
   _moveInterval: 0.2
 --- !u!114 &1558058662

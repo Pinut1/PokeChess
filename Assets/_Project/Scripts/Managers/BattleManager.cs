@@ -14,7 +14,7 @@ using UnityEngine;
 public class BattleManager : MonoBehaviour
 {
     private const float TICK_INTERVAL = 0.1f;
-    private const int MAX_TICKS = 300; // 30초 타임아웃
+    private const int MAX_TICKS = 400; // 40초 타임아웃(2026-08-22: 전투 시간 부족 의견 반영, 30초→40초)
 
     // 마나 충전 — 기획 확정(2026-07-10): 초당 10 고정만. 평타/피격비례 충전은 스코프 아웃.
     // 밸런스는 충전 방식이 아니라 유닛별 manaCost(마나통) 크기로 조절한다.
@@ -85,7 +85,7 @@ public class BattleManager : MonoBehaviour
 
     [Tooltip("30초 기본 전투가 끝났는데 적이 남아있을 때 추가로 주는 오버타임 길이(초). " +
              "0 이하면 오버타임 없이 그 시점 적 생존 여부로 즉시 판정한다. 기획 미확정 수치(2026-07-30 기준).")]
-    [SerializeField] private float _overtimeDuration = 5f;
+    [SerializeField] private float _overtimeDuration = 10f;
 
     [Tooltip("오버타임 동안 tick을 더 빠르게 소비하는 배속. 1 이하면 기본 전투와 같은 속도로 진행한다. " +
              "기획 미확정 수치(2026-07-30 기준).")]
