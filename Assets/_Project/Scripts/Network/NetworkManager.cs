@@ -1581,6 +1581,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _lastLocalBattleResult = isWin; // 재전송 요청(RPC_RequestBattleResultResend) 응답용 캐시
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
+        // 미러가 먼저 끝나 있었다면 여기서 바로 판정된다(파트너 부재 시에만).
+        TryResolveTeamRoundWithMirror();
     }
 
     /// <summary>DebugSuppressBattleResultReport로 붙들어뒀던 결과를 지금 보낸다(응답 불능 → 복귀 재현용).
@@ -3005,6 +3008,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
+        _mirrorPartnerResult = null;   // 미러 대체 판정 재료도 라운드마다 새로
         _suppressedBattleResult = null; // QA 억제 테스트 잔여값도 라운드마다 새로
         // 새 라운드가 시작됐는데 직전 라운드의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면
         // (예: QA "최종 라운드로 스킵" 버튼처럼 ResolveTeamRound를 거치지 않고 라운드가 바로 시작되는
@@ -3663,6 +3667,33 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 파트너가 자리를 비워 결과를 못 보낼 때 대신 쓸, 미러 전투가 계산한 파트너 승패.
+    /// 이번 라운드 미러가 끝났고 파트너가 실제로 부재일 때만 판정에 쓰인다. 라운드 시작 시 리셋.
+    /// </summary>
+    private bool? _mirrorPartnerResult;
+
+    /// <summary>
+    /// 파트너가 부재(실제 이탈 또는 응답 불능)라 결과를 못 보낸 상황에서, 미러가 계산한 파트너
+    /// 결과로 팀 라운드를 판정한다. 미러 완료와 내 전투 종료 중 어느 쪽이 늦든 성립하도록 양쪽에서
+    /// 호출한다(몇 번을 불러도 안전 — _roundResultResolved 가드).
+    ///
+    /// ⚠️ 파트너가 멀쩡히 접속해 있으면 이 경로를 타지 않는다 — 미러는 <b>대신 계산하는 수단</b>이지
+    /// 정상 보고를 앞지르는 수단이 아니다. 곧 도착할 실제 값을 미러로 덮어쓰면, 미러가 조금이라도
+    /// 어긋날 때 정상 경로까지 오염된다.
+    /// </summary>
+    private void TryResolveTeamRoundWithMirror()
+    {
+        if (_soloMode || !IsMasterClient || _roundResultResolved) return;
+        if (!_opponentDisconnected && !_partnerResultUnresponsive) return; // 파트너가 붙어 있으면 기다린다
+        if (!_lastLocalBattleResult.HasValue) return;                      // 내 전투가 아직 안 끝났다
+        if (!_mirrorPartnerResult.HasValue) return;                        // 미러 결과가 아직 없다
+
+        Debug.LogWarning("[Network] 파트너 부재 — 미러가 계산한 결과로 팀 라운드 판정 " +
+                         $"(파트너 {(_mirrorPartnerResult.Value ? "승" : "패")})");
+        ResolveTeamRound();
+    }
+
+    /// <summary>
     /// 미러 정확도 검증 전용 수신부(2026-08-22). 값을 캐시만 하고 어떤 판정에도 쓰지 않는다 —
     /// ResolveTeamRound가 파트너의 실제 보고값과 대조해 로그를 남길 때만 읽는다.
     /// 미러 결과를 실제 팀 판정에 쓸지는 이 대조가 100% 일치로 확인된 뒤에 결정한다.
@@ -3671,7 +3702,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         _mirrorVerifyRound = roundIndex;
         _mirrorVerifyPartnerWon = partnerWon;
+
+        // 이번 라운드 것이면 대체 판정 재료로도 쓴다(파트너가 부재일 때만 실제로 쓰인다).
+        if (roundIndex == _lastKnownRound) _mirrorPartnerResult = partnerWon;
         Debug.Log($"[MirrorVerify] 미러 전투 완료 수신 — {roundIndex}R, 미러 판정: 파트너 {(partnerWon ? "승" : "패")}");
+
+        TryResolveTeamRoundWithMirror();
     }
 
     /// <summary>
@@ -3728,8 +3764,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         int wins = 0;
         foreach (var player in PhotonNetwork.PlayerList)
-            if (player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) && (int)v == 1)
-                wins++;
+        {
+            bool reported = player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) &&
+                            v is int r && r != RESULT_NOT_REPORTED;
+
+            // 파트너가 자리를 비워 보고를 못 한 경우, 미러 전투가 계산해둔 값을 대신 쓴다.
+            // 추측이 아니라 계산이다 — 파트너의 실제 보드·적으로 같은 결정론적 시뮬레이션을 돌린
+            // 결과다(BattleManager에 Random 호출이 없다). 자리를 비우지 않았으면 이 경로를 안 탄다.
+            if (!reported && player != PhotonNetwork.LocalPlayer && _mirrorPartnerResult.HasValue)
+            {
+                if (_mirrorPartnerResult.Value) wins++;
+                continue;
+            }
+
+            if (reported && (int)v == 1) wins++;
+        }
 
         TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
                                  : wins == 1 ? TeamRoundOutcome.Split

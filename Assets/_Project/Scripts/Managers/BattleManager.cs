@@ -188,8 +188,18 @@ public class BattleManager : MonoBehaviour
     /// </summary>
     private bool _playBattleVfx = true;
 
-    /// <summary>파트너 이탈 대기 중 전투 일시정지. Time.timeScale을 쓰지 않고 틱 루프 진입 자체를 막는다.</summary>
-    private bool _isPaused;
+    // 파트너 이탈 시 전투를 멈추던 _isPaused는 제거됐다(2026-08-22, 파트너 이탈 재설계).
+    // 원래 PR #67에서 "재접속 대기 팝업 뒤에서 게임이 계속 조작되던" 버그를 고치며 상점/드래그 차단과
+    // 함께 들어간 것인데, 부작용으로 남은 플레이어가 최대 60초(RECONNECT_GRACE_PERIOD) 동안 멈춘 화면을
+    // 보게 됐다 — 빠진 사람이 아니라 남은 사람이 대기 비용을 전부 지는 구조였다.
+    //
+    // 새 방향: 전투 중 이탈이 나도 남은 플레이어는 그대로 전투를 끝낸다. 이탈한 쪽의 전투 결과는
+    // 미러 전투(PartnerBattleMirrorController)가 스냅샷으로 계산하므로, 기다리지 않고 라운드를 완결할 수 있다.
+    // 상점/아이템 조작 차단(NetworkManager.IsAwaitingPartnerReconnect)은 그대로 살아 있어, 전투가 끝난 뒤
+    // 다음 라운드로 넘어가지 못하는 구간은 여전히 막힌다.
+    //
+    // 참고: 미러 루프(RunMirrorBattleTickLoop)는 원래부터 _isPaused를 보지 않았다 — 이 제거로 달라지는 건
+    // 실전투(SimulateBattleLoop/RunOvertime)뿐이다.
 
     // 준비 단계에 미리 보여주는 적 진영(바닥 + 적 모델). 시각 전용이라 BattleUnit을 만들지 않는다 —
     // 스탯 스냅샷은 전투 시작 시점 보드/아이템 기준이어야 하므로 미리 만들어 두면 안 된다.
@@ -209,26 +219,16 @@ public class BattleManager : MonoBehaviour
     {
         GameEvents.OnBattleStart += HandleBattleStart;
         GameEvents.OnStageEntered += HandleStageEntered;
-        GameEvents.OnOpponentDisconnected += HandlePartnerDisconnected;
-        GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
     }
 
     private void OnDisable()
     {
         GameEvents.OnBattleStart -= HandleBattleStart;
         GameEvents.OnStageEntered -= HandleStageEntered;
-        GameEvents.OnOpponentDisconnected -= HandlePartnerDisconnected;
-        GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
 
         // 컴포넌트가 꺼지면 프리뷰를 지울 주체가 사라지므로 씬에 남지 않게 정리한다.
         ClearEnemyPreview();
     }
-
-    /// <summary>파트너 이탈 감지 — 진행 중인 전투 틱을 멈춘다(신규 공격/이동/스킬 없음).</summary>
-    private void HandlePartnerDisconnected(float graceSeconds) => _isPaused = true;
-
-    /// <summary>파트너 재접속 — 멈췄던 지점부터 전투 틱을 재개한다.</summary>
-    private void HandlePartnerReconnected() => _isPaused = false;
 
     /// <summary>라운드 스테이지가 확정되면 준비 단계 동안 이번 라운드 적 진영을 미리 보여준다.</summary>
     private void HandleStageEntered(StageData stage) => ShowEnemyPreview(stage);
@@ -307,9 +307,6 @@ public class BattleManager : MonoBehaviour
 
         while (tick < MAX_TICKS)
         {
-            // 파트너 이탈 대기 중에는 새 틱을 진행하지 않고 재접속까지 그대로 멈춰 있는다.
-            while (_isPaused) yield return null;
-
             SimulateTick();
 
             bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
@@ -369,9 +366,6 @@ public class BattleManager : MonoBehaviour
         {
             for (int i = 0; i < simTicksPerWait; i++)
             {
-                // 파트너 이탈 대기 중에는 오버타임 틱도 진행하지 않는다.
-                while (_isPaused) yield return null;
-
                 SimulateTick();
 
                 bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
