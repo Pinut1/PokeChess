@@ -18,10 +18,10 @@ using UnityEngine.UI;
 /// 태워서 눌린 색 변화(Pressed 트랜지션)까지 재현한다. 키로 눌렀는데 버튼이 가만히 있으면
 /// 먹었는지 알 수 없기 때문이다. 살 수 없는 상태(interactable=false)면 Button 쪽에서 알아서 무시한다.
 ///
-/// ⚠️ 이 컴포넌트는 EventSystem을 거치지 않고 키보드를 직접 본다. 그래서 모달이 조작을 막는
-/// 방식(EventSystem.enabled 끄기, AugmentManager.IsChoiceBlocking 등)에 자동으로 걸리지 않아
-/// <see cref="IsBlocked"/>에서 같은 조건을 직접 확인한다 — UnitDragController가 3D 조작을 막을 때
-/// 쓰는 목록과 같다. 새 모달을 추가하면 여기도 같이 봐야 한다.
+/// ⚠️ 이 컴포넌트는 EventSystem을 거치지 않고 키보드를 직접 본다. 모달의 Dim은 마우스 클릭만
+/// 막을 뿐 키 입력은 그대로 통과시키므로, 막아야 할 상황은 <see cref="GameplayInputBlock"/>에
+/// 물어본다 — UnitDragController가 3D 조작을 막을 때와 <b>같은 판단</b>을 쓴다.
+/// 새로 막을 상황이 생기면 그쪽에만 추가하면 이 컴포넌트도 자동으로 따라간다.
 /// </summary>
 public class ButtonHotkey : MonoBehaviour
 {
@@ -50,13 +50,6 @@ public class ButtonHotkey : MonoBehaviour
         }
     }
 
-    private AugmentManager _augment;
-    private UIManager      _ui;
-    private NetworkManager _network;
-
-    // 매니저를 한 번이라도 찾아봤는지. GameManager가 늦게 준비될 수 있어 찾을 때까지 다시 시도한다.
-    private bool _resolved;
-
     private void Awake()
     {
         if (_button == null) _button = GetComponent<Button>();
@@ -67,8 +60,6 @@ public class ButtonHotkey : MonoBehaviour
                 "[ButtonHotkey] 누를 버튼이 없습니다. Button이 있는 오브젝트에 붙이거나 " +
                 "Button 칸에 직접 물려 주세요.", this);
         }
-
-        ResolveManagers();
     }
 
     private void Update()
@@ -91,40 +82,15 @@ public class ButtonHotkey : MonoBehaviour
     /// 지금 키 입력을 무시해야 하는 상황인지. 마우스로는 못 누르는 상태인데 키로는 눌리는
     /// 구멍을 막는 것이 목적이다.
     /// </summary>
-    private bool IsBlocked()
+    private static bool IsBlocked()
     {
-        EventSystem es = EventSystem.current;
-
-        // 옵션창의 대기 모달·패배 모달은 EventSystem을 꺼서 UI 조작을 통째로 막는다.
-        if (es == null || !es.enabled) return true;
-
         // 글자를 치는 중이면 D·F는 입력 문자다. 닉네임 칸 등에서 상점이 굴러가면 안 된다.
-        GameObject selected = es.currentSelectedGameObject;
+        // (이건 이 컴포넌트만의 사정이라 공용 판정에 넣지 않는다 — 3D 드래그는 무관하다.)
+        EventSystem es = EventSystem.current;
+        GameObject selected = es != null ? es.currentSelectedGameObject : null;
         if (selected != null && selected.GetComponent<TMP_InputField>() != null) return true;
 
-        ResolveManagers();
-
-        if (_augment != null && _augment.IsChoiceBlocking) return true;              // 증강 3택1
-        if (_ui != null && _ui.IsPlusleMinunChoiceBlocking) return true;             // 플러시/마이농 폼 선택
-        if (_network != null && _network.IsAwaitingPartnerReconnect) return true;    // 파트너 재접속 대기
-
-        return false;
-    }
-
-    /// <summary>
-    /// 블로킹 판정에 쓰는 매니저를 찾아둔다. GameManager는 프로젝트 규칙대로 TryGet으로만 조회한다
-    /// (Singleton.Instance 널 검사 금지). AugmentManager는 GameManager와 같은 오브젝트에 있으므로
-    /// UnitDragController와 같은 방식으로 가져온다.
-    /// </summary>
-    private void ResolveManagers()
-    {
-        if (_resolved) return;
-        if (!GameManager.TryGet(out var gm)) return;
-
-        _augment = gm.Augment != null ? gm.Augment : gm.GetComponent<AugmentManager>();
-        _ui      = gm.UI;
-        _network = gm.Network;
-
-        _resolved = true;
+        // 모달·증강 선택·폼 선택·파트너 관전·재접속 대기·매치 종료는 공용 판정 한 곳에서 본다.
+        return GameplayInputBlock.IsBlocked();
     }
 }

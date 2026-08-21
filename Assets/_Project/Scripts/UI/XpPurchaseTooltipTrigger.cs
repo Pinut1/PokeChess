@@ -146,7 +146,14 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
         if (!_hovering || _tooltip == null) return;
 
         string text = Compose();
-        if (string.IsNullOrWhiteSpace(text)) return;
+
+        // 만들 문구가 없으면(씬 전환 중 ShopManager가 사라진 순간 등) 그냥 return하면 안 된다 —
+        // 직전 문구가 화면에 그대로 남아 커서를 뗄 때까지 버틴다. 내 것만 닫는다.
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _tooltip.Hide(this);
+            return;
+        }
 
         // 소유자를 자신으로 넘긴다 — 여러 버튼을 빠르게 훑어도 남의 툴팁을 끄지 않는다.
         _tooltip.Show(this, text);
@@ -179,7 +186,7 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
         // 계산할 다음 레벨 자체가 없으므로 꼬리 줄을 최대 레벨 문구로 바꾼다.
         bool atMaxLevel = shop.RequiredXp <= 0;
 
-        string separator = new('\n', Mathf.Clamp(_blankLines, 1, 3));
+        string separator = TooltipText.Separator(_blankLines);
 
         string title  = Fill(_titleFormat, shop, atMaxLevel);
         string body   = Fill(_bodyFormat, shop, atMaxLevel);
@@ -187,22 +194,11 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
 
         var sb = new System.Text.StringBuilder();
 
-        Append(sb, title, separator);
-        Append(sb, body, separator);
-        Append(sb, footer, separator);
+        TooltipText.Append(sb, title, separator);
+        TooltipText.Append(sb, body, separator);
+        TooltipText.Append(sb, footer, separator);
 
         return sb.ToString();
-    }
-
-    /// <summary>빈 줄은 건너뛴다 — 제목이나 꼬리를 비워두면 그 줄이 통째로 없어진다.</summary>
-    private static void Append(System.Text.StringBuilder sb, string part, string separator)
-    {
-        if (string.IsNullOrWhiteSpace(part)) return;
-
-        if (sb.Length > 0) sb.Append(separator);
-
-        // 단축키가 빠지면 "XP 구매 " 처럼 꼬리 공백이 남는다.
-        sb.Append(part.TrimEnd());
     }
 
     /// <summary>
@@ -233,13 +229,8 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
     /// 단축키 표기("[F]"). 단축키가 안 붙어 있으면 빈 문자열이라 문구에서 통째로 빠진다 —
     /// 없는 키를 "[]"로 남겨두면 오히려 눈에 걸린다.
     /// </summary>
-    private string KeyLabel()
-    {
-        string label = _hotkey != null ? _hotkey.KeyLabel : string.Empty;
-        if (string.IsNullOrEmpty(label)) return string.Empty;
-
-        return string.IsNullOrEmpty(_keyLabelFormat) ? label : string.Format(_keyLabelFormat, label);
-    }
+    private string KeyLabel() =>
+        TooltipText.KeyLabel(_hotkey != null ? _hotkey.KeyLabel : string.Empty, _keyLabelFormat);
 
     private string Gold(int value) => Colorize(value, _colorGoldCost, _goldColor);
     private string Xp(int value)   => Colorize(value, _colorXpValues, _xpColor);

@@ -105,13 +105,13 @@ public class TextTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerE
         if (string.IsNullOrWhiteSpace(_title) && string.IsNullOrWhiteSpace(_footer))
             return FillKey(_text);
 
-        string separator = new('\n', Mathf.Clamp(_blankLines, 1, 3));
+        string separator = TooltipText.Separator(_blankLines);
 
         var sb = new System.Text.StringBuilder();
 
-        Append(sb, FillKey(_title), separator);
-        Append(sb, FillKey(_text), separator);
-        Append(sb, FillKey(_footer), separator);
+        TooltipText.Append(sb, FillKey(_title), separator);
+        TooltipText.Append(sb, FillKey(_text), separator);
+        TooltipText.Append(sb, FillKey(_footer), separator);
 
         return sb.ToString();
     }
@@ -124,24 +124,9 @@ public class TextTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerE
     {
         if (string.IsNullOrEmpty(part)) return part;
 
-        string label = _hotkey != null ? _hotkey.KeyLabel : string.Empty;
+        string key = _hotkey != null ? _hotkey.KeyLabel : string.Empty;
 
-        string replacement =
-            string.IsNullOrEmpty(label)           ? string.Empty :
-            string.IsNullOrEmpty(_keyLabelFormat) ? label :
-                                                    string.Format(_keyLabelFormat, label);
-
-        return part.Replace("{key}", replacement);
-    }
-
-    private static void Append(System.Text.StringBuilder sb, string part, string separator)
-    {
-        if (string.IsNullOrWhiteSpace(part)) return;
-
-        if (sb.Length > 0) sb.Append(separator);
-
-        // 단축키가 빠지면 "새로고침 " 처럼 꼬리 공백이 남는다.
-        sb.Append(part.TrimEnd());
+        return part.Replace("{key}", TooltipText.KeyLabel(key, _keyLabelFormat));
     }
 
     public void OnPointerExit(PointerEventData eventData) => Close();

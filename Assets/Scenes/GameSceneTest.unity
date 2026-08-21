@@ -7984,7 +7984,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
-  _title: "<b> \uC0C8\uB85C\uACE0\uCE68 [{key}]</b>"
+  _title: "<b> \uC0C8\uB85C\uACE0\uCE68 {key}</b>"
   _text: "\uD3EC\uCF13\uBAAC \uC13C\uD130 \uC0C1\uC810\uC744 \uC0C8\uB85C\uACE0\uCE68\uD574\uC11C
     \uC0C8\uB85C\uC6B4 \uD3EC\uCF13\uBAAC\uC744 \uB9CC\uB098 \uBCF4\uC138\uC694."
   _footer: 
@@ -21434,7 +21434,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a398d8e3423f86d4c94a516d90b9cf53, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XpPurchaseTooltipTrigger
-  _titleFormat: "<b> XP \uAD6C\uB9E4 [{key}]</b>"
+  _titleFormat: "<b> XP \uAD6C\uB9E4 {key}</b>"
   _bodyFormat: "{buyXp} XP\uB97C \uD68D\uB4DD\uD574 \uB808\uBCA8 \uC5C5\uD558\uC138\uC694.
     \uB808\uBCA8 \uC5C5\uD558\uBA74 \uD300 \uADDC\uBAA8\uAC00 \uCEE4\uC9C0\uACE0
     \uC0C1\uC810\uC5D0\uC11C \uB354 \uAC15\uB825\uD55C \uCC54\uD53C\uC5B8\uC744 \uAD6C\uB9E4\uD560
@@ -25919,7 +25919,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 393c1ffbbbb38db4b924fef0e84431b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkManager
-  _soloMode: 1
+  _soloMode: 0
 --- !u!114 &1558058665
 MonoBehaviour:
   m_ObjectHideFlags: 0
