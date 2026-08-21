@@ -47,23 +47,12 @@ public class RoundPhaseManager : MonoBehaviour
     /// (outcome 값 자체는 더 이상 이 클래스의 판정에 쓰이지 않음).</summary>
     private bool _teamRoundResolved;
 
-    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다. 이 대기는 "방장 자신의 전투가 끝난
-    /// 시점"부터 재는데, 전투 자체가 최대 35초(BattleManager.MAX_TICKS*TICK_INTERVAL=30s + 연장전
-    /// _overtimeDuration=5s)까지 걸릴 수 있어 방장 전투가 아주 빨리(수 초 안에) 끝나도 상대방의 정상적인
-    /// 최대 전투 시간을 확실히 덮도록 여유를 크게 잡는다(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).</summary>
-    private const float TEAM_RESULT_SAFETY_TIMEOUT = 45f;
-
-    /// <summary>이 시점까지도 팀 결과가 안 왔으면 재전송을 한 번 요청한다(NetworkManager.RequestBattleResultResendIfNeeded).</summary>
-    private const float TEAM_RESULT_NUDGE_AT = 25f;
-
-    /// <summary>이 시점까지도 안 왔으면 방장 결과로 대체 판정을 시도한다(NetworkManager.TryResolveTeamRoundWithHostFallback).
-    /// 40초는 전투 최대 길이(35초)보다 5초 여유를 둔 값이다 — 방장 전투가 극단적으로 빨리 끝나더라도(예:
-    /// 0초에 가깝게) 이 시점이면 상대방의 전투는 규칙상 반드시 끝나 있어야 하므로, 아직 안 끝난 정상
-    /// 전투 결과를 잘못 무시하고 대체판정해버리는 일이 없다. TEAM_RESULT_SAFETY_TIMEOUT(45s)보다는
-    /// 5초 여유를 둬서, 재전송 RPC 왕복 시간을 흡수하면서도 같은 대기 창 안에서 반드시 끝나도록 한다 —
-    /// 별도 타이머를 새로 두면 이 루프의 타임아웃과 시점이 어긋나 서로 다른 시각에 판정/포기를 해버리는
-    /// 문제가 있었다(2026-08-21 코드리뷰 지적, PR #120 후속. 40s로 상향한 것도 같은 후속 지적).</summary>
-    private const float TEAM_RESULT_FALLBACK_AT = 40f;
+    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다(전투 최대 길이 MAX_TICKS*TICK_INTERVAL=30s와 동일).
+    /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).
+    /// 재촉·대체판정(재전송 요청 후 방장 결과로 대신 정하기)은 2026-08-21 코드리뷰에서 승패를 지어내는
+    /// 문제로 지적되어 제거함 — 대신 "파트너 응답 불능 진단 + 기존 이탈 UX로 위임" 방식으로 재설계하는
+    /// 티켓이 별도로 있음(담당: 황해인). 이 타임아웃 도달 시 그냥 다음 라운드로 진행하는 기존 동작으로 되돌림.</summary>
+    private const float TEAM_RESULT_SAFETY_TIMEOUT = 30f;
 
     // ─────────────────────────────────────────
     // 이벤트 구독
@@ -304,26 +293,12 @@ public class RoundPhaseManager : MonoBehaviour
 
         // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
         // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다.
-        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 두고, 그 안에서 재촉·
-        // 대체판정도 같은 시계로 시도한다(별도 타이머를 두면 이 루프의 타임아웃과 서로 어긋난다).
+        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 둔다.
         float waited = 0f;
-        bool nudged = false;
-        bool fallbackAttempted = false;
         while (!_teamRoundResolved && waited < TEAM_RESULT_SAFETY_TIMEOUT)
         {
             yield return null;
             waited += Time.deltaTime;
-
-            if (!nudged && waited >= TEAM_RESULT_NUDGE_AT)
-            {
-                nudged = true;
-                network.RequestBattleResultResendIfNeeded();
-            }
-            if (!fallbackAttempted && waited >= TEAM_RESULT_FALLBACK_AT)
-            {
-                fallbackAttempted = true;
-                network.TryResolveTeamRoundWithHostFallback();
-            }
         }
         if (!_teamRoundResolved)
             Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
