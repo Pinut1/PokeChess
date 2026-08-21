@@ -3387,6 +3387,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
         _opponentDisconnected = true;
 
+        // 파트너 부재가 방금 확정됐다 — 미러 대체 판정을 다시 시도한다.
+        // 이 재시도가 없으면 "내 전투가 Photon 이탈 감지(~10초)보다 먼저 끝난" 흔한 경우에
+        // 대체 판정이 영영 안 걸린다: 결과 보고 시점과 미러 완료 시점에는 아직 이 플래그가
+        // false라 게이트에 막히고, 그 뒤로는 아무도 다시 부르지 않기 때문이다(2026-08-22 자체 리뷰).
+        TryResolveTeamRoundWithMirror();
+
         // 파트너가 없는 동안 저장된 BattleSnapshot을 그대로 들고 있으면 재접속 후(또는 새 스냅샷을
         // 아직 못 받은 상태에서) 이전 라운드의 오래된 상태를 쓸 위험이 있다 — 이탈 시점에 비운다.
         // revision도 함께 리셋해야 재접속 후 재전송이 "과거 revision"으로 잘못 걸러지지 않는다.
@@ -3587,6 +3593,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 고르려면 이 값이 이 클라이언트에도 있어야 한다.
         _partnerResultUnresponsive = true;
         GameEvents.PartnerResultUnresponsive();
+
+        // 위 _opponentDisconnected와 같은 이유 — 부재가 확정된 시점에 대체 판정을 다시 시도한다.
+        TryResolveTeamRoundWithMirror();
     }
 
     [PunRPC]
@@ -3671,6 +3680,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         _partnerResultUnresponsive = true;
         Debug.LogWarning("[Network] 팀 결과 재전송 후에도 미수신 — 파트너 응답 불능 진단, 이탈 UX로 위임");
+
+        // 부재가 확정됐으니 미러 결과가 있으면 여기서 바로 판정된다(있으면 아래 모달은 곧 닫힌다).
+        TryResolveTeamRoundWithMirror();
         // OnOpponentDisconnected가 아니라 전용 이벤트를 쏜다 — OnOpponentDisconnected는 RoundPhaseManager
         // (페이즈 타이머 강제 정지 — 지금 이 함수를 부르고 있는 ResultTimer 코루틴 자신이 죽어버림),
         // PartnerBattleMirrorController(미러 전투 중단), PartnerSpectateView(관전 화면 강제 종료)도
@@ -3832,6 +3844,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             }
 
             if (reported && (int)v == 1) wins++;
+        }
+
+        // 파트너가 PlayerList에서 아예 사라진 경우(PlayerTtl 만료 등) 위 순회가 그 자리를 돌지 않아
+        // 미러 대체값이 통째로 무시된다. 그러면 내 결과만으로 집계돼 조용히 다른 판정이 나온다.
+        // 목록에 남아 있을 때(IsInactive 포함)와 같은 결과가 나오도록 여기서 한 번 더 반영한다
+        // (2026-08-22 자체 리뷰). 2인 방 전제라 "나 외 0명"이면 빠진 쪽은 파트너 하나뿐이다.
+        if (_mirrorPartnerResult.HasValue && PhotonNetwork.PlayerListOthers.Length == 0)
+        {
+            if (_mirrorPartnerResult.Value) wins++;
+            Debug.LogWarning("[Network] 파트너가 방에서 제거됨 — 미러 결과를 집계에 직접 반영");
         }
 
         TeamRoundOutcome outcome = wins >= 2 ? TeamRoundOutcome.BothWin
@@ -4343,6 +4365,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 직전 판에서 기록한 팀 HP 임시값이 새 판으로 넘어오면, 아직 초기화(-1) 전인데도
         // 그 값이 읽혀 InitTeamHealth가 "이미 설정됨"으로 오판한다.
         _pendingTeamHp = null;
+        // 미러 대체 판정 재료도 같이 비운다. 지금은 뒤따르는 RPC_OnRoundStart(1)이 지워주지만,
+        // "다른 곳이 지워줄 것"에 기대는 대신 여기서 확실히 끊는다(2026-08-22 자체 리뷰).
+        _mirrorPartnerResult = null;
+        _mirrorVerifyRound = null;
         // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
         // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
         // (2026-08-22 코드리뷰 지적).
