@@ -109,7 +109,14 @@ public class RoleTooltipController : MonoBehaviour
             return;
         }
 
-        Show(owner, EffectiveRoleOf(data));
+        // data를 그대로 넘긴다 — 안 넘기면 설명창의 아이템 줄에 "이 종이 쓸 수 있는 진화의 돌"이
+        // 빠진다(RoleTooltipUI.BindItems는 pokemon이 null이면 돌 추가를 통째로 건너뛴다).
+        // 예전엔 역할 문자열만 넘겨서, 스탯창(StatInfoPanelUI)에서는 돌이 뜨는데 상점 카드
+        // (UnitShopBarUI)에서는 같은 종인데도 안 뜨는 차이가 있었다(2026-08-22).
+        //
+        // evolutionLocked는 false다 — 잠금은 이미 보유한 유닛(PokemonUnit)의 상태이고,
+        // 이 경로는 아직 사지 않은 종(상점 카드)을 보여주는 자리다.
+        Show(owner, EffectiveRoleOf(data), data, false);
     }
 
     /// <summary>이미 산 유닛의 역할을 띄운다. PokemonUnit.Role이 증강 오버라이드를 이미 반영한다.</summary>
