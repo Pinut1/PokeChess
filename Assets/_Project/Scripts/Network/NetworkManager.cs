@@ -3466,6 +3466,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_RequestBattleResultResend()
     {
         if (!_lastLocalBattleResult.HasValue) return;
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지(다른 SetCustomProperties 호출부와 동일 가드)
 
         Debug.Log("[Network] 팀 결과 재전송 요청 수신 — 내 결과 다시 보고");
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, _lastLocalBattleResult.Value ? 1 : 0 } };
@@ -3514,7 +3515,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!_partnerResultUnresponsive) yield break; // 그 사이 정상 판정으로 이미 복구됨
 
         Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
-        GameEvents.GracePeriodExpired(false);
+        FireGracePeriodExpired(false); // 실제 이탈 경로와 같은 1회 발행 가드를 거친다(중복 발행 방지)
     }
 
     /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
@@ -3551,6 +3552,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 StopCoroutine(_partnerUnresponsiveGraceRoutine);
                 _partnerUnresponsiveGraceRoutine = null;
             }
+            // 이 복구는 OnPlayerEnteredRoom을 거치지 않으므로(파트너가 방을 나간 적이 없음) 그쪽이
+            // 평소에 해주는 _gracePeriodExpiredFired 리셋도 여기서 직접 해준다 — 안 하면 다음 라운드에
+            // 파트너가 또 응답 불능이 됐을 때 FireGracePeriodExpired가 "이미 발행함" 가드에 걸려
+            // 포기하기가 영영 안 뜬다.
+            _gracePeriodExpiredFired = false;
             GameEvents.OpponentReconnected();
         }
 
