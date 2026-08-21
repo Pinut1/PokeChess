@@ -3479,6 +3479,35 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
+    // ─────────────────────────────────────────
+    // "파트너 응답 불능" 수신측(Others) RPC — GameEvents.OnPartnerResult*는 프로세스 로컬 C# 이벤트라
+    // 발행한 쪽(항상 방장)에서만 보인다. 상대방도 같은 대기 모달/포기하기를 보게 하려면 RPC로 알려줘야
+    // 한다(2026-08-22 코드리뷰 지적 — 이게 없으면 방장이 아닌 쪽은 아무 안내 없이 화면만 멈춰있었다).
+    // ─────────────────────────────────────────
+
+    [PunRPC]
+    private void RPC_PartnerResultUnresponsive()
+    {
+        // 로컬 플래그도 같이 켠다 — 방장이 아닌 쪽이 먼저 [포기하기]를 누를 수도 있는데, 그때
+        // ConfirmPartnerDisconnectGiveUp()이 정확한 SessionEndReason(PartnerResultUnresponsive)을
+        // 고르려면 이 값이 이 클라이언트에도 있어야 한다.
+        _partnerResultUnresponsive = true;
+        GameEvents.PartnerResultUnresponsive();
+    }
+
+    [PunRPC]
+    private void RPC_PartnerResultGiveUpAvailable()
+    {
+        GameEvents.PartnerResultGiveUpAvailable();
+    }
+
+    [PunRPC]
+    private void RPC_PartnerResultRecovered()
+    {
+        _partnerResultUnresponsive = false;
+        GameEvents.PartnerResultRecovered();
+    }
+
     /// <summary>
     /// "응답 불능" 진단 상태를 정리한다(플래그를 끄고 유예 코루틴을 멈춘다) — 정리 자체는 정상 판정
     /// (ResolveTeamRound)·새 라운드 시작(RPC_OnRoundStart)·재시작(RPC_RestartGame)·실제 이탈로의
@@ -3500,7 +3529,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         if (wasUnresponsive && notifyRecovered)
+        {
             GameEvents.PartnerResultRecovered();
+            // 파트너 쪽 화면도 같이 닫아준다 — 이 이벤트는 프로세스 로컬 C# 이벤트라 RPC 없이는
+            // 상대방에게 전달되지 않는다(2026-08-22 코드리뷰 지적).
+            photonView.RPC(nameof(RPC_PartnerResultRecovered), RpcTarget.Others);
+        }
     }
 
     /// <summary>
@@ -3549,6 +3583,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 함께 구독하는데, 이들은 전부 "진짜로 자리를 비웠다"는 전제의 부작용이라 이 상황엔 안 맞는다
         // (2026-08-22 코드리뷰 지적). OptionsPanelUI만 듣는 GameEvents.PartnerResultUnresponsive로 분리.
         GameEvents.PartnerResultUnresponsive();
+        // 이 이벤트는 프로세스 로컬 C# 이벤트라 방장 자신에게만 보인다 — 상대방도 같은 화면을 보게
+        // RPC로 알려준다(2026-08-22 코드리뷰 지적. 안 하면 상대방은 아무 안내도 없이 그냥 멈춰있는
+        // 화면만 보게 된다).
+        photonView.RPC(nameof(RPC_PartnerResultUnresponsive), RpcTarget.Others);
 
         if (_partnerUnresponsiveGraceRoutine != null)
             StopCoroutine(_partnerUnresponsiveGraceRoutine);
@@ -3572,6 +3610,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
                 Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
                 GameEvents.PartnerResultGiveUpAvailable();
+                photonView.RPC(nameof(RPC_PartnerResultGiveUpAvailable), RpcTarget.Others);
             });
     }
 
