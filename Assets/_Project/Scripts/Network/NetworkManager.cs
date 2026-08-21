@@ -2957,7 +2957,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
         _suppressedBattleResult = null; // QA 억제 테스트 잔여값도 라운드마다 새로
-        _partnerResultUnresponsive = false;
+        // 새 라운드가 시작됐는데 직전 라운드의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면
+        // (예: QA "최종 라운드로 스킵" 버튼처럼 ResolveTeamRound를 거치지 않고 라운드가 바로 시작되는
+        // 경로) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — 안 그러면 OptionsPanelUI가 그
+        // 신호를 영영 못 받아 대기 모달이 멈춰있게 된다(2026-08-22 코드리뷰 지적).
+        if (_partnerResultUnresponsive)
+        {
+            _partnerResultUnresponsive = false;
+            GameEvents.PartnerResultRecovered();
+        }
         if (_partnerUnresponsiveGraceRoutine != null)
         {
             StopCoroutine(_partnerUnresponsiveGraceRoutine);
@@ -3268,6 +3276,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_opponentDisconnected)
             return;
 
+        // "응답 불능" 진단이 먼저 떠 있던 상태였는데 이제 진짜 이탈까지 확인됐다 — 더 확실한 신호가
+        // 왔으니 우리 쪽 유예 타이머는 정리하고(중복 병행 방지), 아래 일반 이탈 처리가 처음부터
+        // 새로 담당하게 넘긴다. 안 지우면 응답불능 유예 타이머(GameEvents.PartnerResultGiveUpAvailable)와
+        // 방금 새로 시작될 실제 이탈 유예 타이머(GameEvents.OnGracePeriodExpired)가 동시에 돌게 된다
+        // (2026-08-22 코드리뷰 지적).
+        if (_partnerResultUnresponsive)
+        {
+            _partnerResultUnresponsive = false;
+            if (_partnerUnresponsiveGraceRoutine != null)
+            {
+                StopCoroutine(_partnerUnresponsiveGraceRoutine);
+                _partnerUnresponsiveGraceRoutine = null;
+            }
+        }
+
         // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
         // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
@@ -3299,12 +3322,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private System.Collections.IEnumerator OpponentGraceRoutine()
     {
-        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
-        _opponentGraceRoutine = null;
+        yield return GraceDelayRoutine(
+            () => _opponentGraceRoutine = null,
+            () =>
+            {
+                bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
+                Debug.LogWarning($"[Network] 상대 이탈 30초 경과 — 포기하기 노출 가능 (둘 다 끊김: {bothDisconnected})");
+                FireGracePeriodExpired(bothDisconnected);
+            });
+    }
 
-        bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
-        Debug.LogWarning($"[Network] 상대 이탈 30초 경과 — 포기하기 노출 가능 (둘 다 끊김: {bothDisconnected})");
-        FireGracePeriodExpired(bothDisconnected);
+    /// <summary>
+    /// GIVE_UP_AVAILABLE_DELAY만큼 기다린 뒤 clearSelf()로 자기 자신을 가리키던 필드를 비우고
+    /// onExpired를 부른다. OpponentGraceRoutine·PartnerUnresponsiveGraceRoutine이 공유하는
+    /// "기다렸다가 아직 유효하면 알림" 패턴을 한 곳에 모은 것(2026-08-22 코드리뷰 지적 — 중복 제거).
+    /// </summary>
+    private System.Collections.IEnumerator GraceDelayRoutine(System.Action clearSelf, System.Action onExpired)
+    {
+        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
+        clearSelf();
+        onExpired();
     }
 
     /// <summary>같은 이탈 건에 대해 GracePeriodExpired(포기 가능 알림)를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
@@ -3488,13 +3525,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// OpponentGraceRoutine의 _gracePeriodExpiredFired 같은 별도 1회 발행 가드가 필요 없다.</summary>
     private System.Collections.IEnumerator PartnerUnresponsiveGraceRoutine()
     {
-        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
-        _partnerUnresponsiveGraceRoutine = null;
+        yield return GraceDelayRoutine(
+            () => _partnerUnresponsiveGraceRoutine = null,
+            () =>
+            {
+                // 대기 중 정상 판정(ResolveTeamRound)이나 실제 이탈 핸드오프(OnPlayerLeftRoom)로
+                // 이미 꺼졌을 수 있다 — 그때는 알림을 쏘지 않는다.
+                if (!_partnerResultUnresponsive) return;
 
-        if (!_partnerResultUnresponsive) yield break; // 그 사이 정상 판정으로 이미 복구됨
-
-        Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
-        GameEvents.PartnerResultGiveUpAvailable();
+                Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
+                GameEvents.PartnerResultGiveUpAvailable();
+            });
     }
 
     /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
@@ -3939,7 +3980,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _roundResultResolved = false;
         _lastLocalBattleResult = null;
         _suppressedBattleResult = null;
-        _partnerResultUnresponsive = false;
+        // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
+        // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
+        // (2026-08-22 코드리뷰 지적).
+        if (_partnerResultUnresponsive)
+        {
+            _partnerResultUnresponsive = false;
+            GameEvents.PartnerResultRecovered();
+        }
         if (_partnerUnresponsiveGraceRoutine != null)
         {
             StopCoroutine(_partnerUnresponsiveGraceRoutine);

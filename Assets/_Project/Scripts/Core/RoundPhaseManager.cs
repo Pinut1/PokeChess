@@ -303,10 +303,18 @@ public class RoundPhaseManager : MonoBehaviour
         // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다. 그 안에서
         // 재전송 요청·응답불능 진단도 같은 시계로 시도한다(별도 타이머를 두면 이 루프의 타임아웃과
         // 서로 어긋난다 — 2026-08-21 코드리뷰 지적, PR #120 후속).
+        //
+        // ⚠️ TEAM_RESULT_SAFETY_TIMEOUT은 "진단(diagnosed)이 아직 안 불린" 경우에만 적용한다. 진단이
+        // 뜨고 나면 NetworkManager 쪽에서 그 뒤로 GIVE_UP_AVAILABLE_DELAY(30초)를 더 기다린 뒤에야
+        // 포기하기가 노출되는데, 안전 타임아웃(40초)이 진단 시점(35초)과 5초 차이밖에 안 나면 포기하기가
+        // 뜨기(35+30=65초) 한참 전에 "여기 오면 안 된다" 에러가 매번 찍히는 계산 오류가 있었다
+        // (2026-08-22 코드리뷰 지적). 진단이 뜬 뒤로는 무기한 대기하고(기존 실제 이탈 흐름과 동일 철학 —
+        // HandleSessionEnded가 [포기하기] 선택 시 이 코루틴을 직접 끊어준다), 안전 타임아웃은 "진단
+        // 로직 자체가 안 불린" 진짜 이례적 상황에만 의미를 갖는다.
         float waited = 0f;
         float nextNudgeAt = TEAM_RESULT_NUDGE_START_AT;
         bool diagnosed = false;
-        while (!_teamRoundResolved && waited < TEAM_RESULT_SAFETY_TIMEOUT)
+        while (!_teamRoundResolved && (diagnosed || waited < TEAM_RESULT_SAFETY_TIMEOUT))
         {
             yield return null;
             waited += Time.deltaTime;
@@ -324,13 +332,12 @@ public class RoundPhaseManager : MonoBehaviour
         }
         if (!_teamRoundResolved)
         {
-            // 응답불능 진단(TEAM_RESULT_DIAGNOSE_AT)이 정상적으로 불렸다면 이 시점부턴 파트너 이탈 UX가
-            // 통제권을 쥐고 있고(무기한 대기 → 플레이어의 [포기하기]), HandleSessionEnded가 이 코루틴을
-            // 직접 끊어줄 것이므로 여기 도달할 일이 없어야 정상이다. 도달했다는 건 진단 로직 자체가 안
-            // 불렸거나 실패한 이례적 상황 — 그래도 승패를 지어내지 않는다는 원칙은 끝까지 지킨다:
-            // 방송하지 않고 그냥 스킵한다(QA 로그로 반드시 잡아야 하는 상황).
-            Debug.LogError("[Phase] 팀 라운드 결과 미수신(안전 타임아웃 도달) — 응답불능 진단이 정상 작동했다면 " +
-                            "여기 도달하면 안 된다. 승패를 추측하지 않고 다음 라운드 방송을 스킵한다.");
+            // diagnosed==true였다면 위 while 조건상 여기 도달할 수 없다(무기한 대기) — 그러므로 여기
+            // 도달했다는 건 진단 로직 자체가 안 불린 채로 안전 타임아웃에 걸렸다는 뜻이다(진짜 이례적
+            // 상황). 그래도 승패를 지어내지 않는다는 원칙은 끝까지 지킨다: 방송하지 않고 그냥 스킵한다
+            // (QA 로그로 반드시 잡아야 하는 상황).
+            Debug.LogError("[Phase] 팀 라운드 결과 미수신(안전 타임아웃 도달, 응답불능 진단 자체가 안 불림) — " +
+                            "승패를 추측하지 않고 다음 라운드 방송을 스킵한다.");
             yield break;
         }
 
