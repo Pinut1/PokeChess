@@ -29559,6 +29559,7 @@ GameObject:
   - component: {fileID: 1837747141}
   - component: {fileID: 1837747140}
   - component: {fileID: 1837747139}
+  - component: {fileID: 1837747143}
   m_Layer: 0
   m_Name: Sky_Mirror
   m_TagString: Untagged
@@ -29660,6 +29661,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1837747143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1837747138}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61bddb41279e84342a670b0ab705701b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameClearedVfxHud
+  _vfxPrefab: {fileID: 7750853977139984564, guid: 6a7b26737f4a19a40b5f385c66dc96a9, type: 3}
+  _vfxVariants: []
+  _spawnPosition: {x: 0, y: -9, z: 0}
+  _spawnEuler: {x: -90, y: 0, z: 0}
+  _positionSpread: {x: 4, y: 0, z: 4}
+  _burstCount: 1
+  _interval: 0.22
+  _lifetime: 4
+  _scaleRange: {x: 0.8, y: 1.4}
 --- !u!1 &1838729714
 GameObject:
   m_ObjectHideFlags: 0
