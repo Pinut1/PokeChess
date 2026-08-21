@@ -1173,7 +1173,7 @@ public class UIManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     /// <summary>
-    /// 화면 상단 중앙에 전적창 열기/닫기 버튼을 표시한다.
+    /// 화면 좌측 상단에 전적창 열기/닫기 버튼을 표시한다.
     /// 전적창을 열 때는 로컬 저장소의 최신 전적을 다시 불러온다.
     /// </summary>
     private void DrawOpenButton()
@@ -1181,7 +1181,7 @@ public class UIManager : MonoBehaviour
         const float width = 160f;
         const float height = 40f;
 
-        float x = (Screen.width - width) * 0.5f;
+        float x = 20f;
         float y = 20f;
 
         string label = _showMatchHistory ? "전적창 닫기" : "전적창 열기";
