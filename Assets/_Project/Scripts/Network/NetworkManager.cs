@@ -3187,6 +3187,16 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             _opponentDisconnected = false;
 
+            // 이 이탈이 "응답 불능" 진단에서 넘어온 것이었을 수 있다(OnPlayerLeftRoom의 핸드오프
+            // 참고) — 그쪽 상태/유예 코루틴이 아직 살아있으면 같이 정리한다. 안 하면 이미 대기 모달이
+            // 닫혔는데도 옛 코루틴이 나중에 GracePeriodExpired를 뒤늦게 쏘는 문제가 생긴다.
+            _partnerResultUnresponsive = false;
+            if (_partnerUnresponsiveGraceRoutine != null)
+            {
+                StopCoroutine(_partnerUnresponsiveGraceRoutine);
+                _partnerUnresponsiveGraceRoutine = null;
+            }
+
             // 대기 중 열어뒀던 방을 다시 닫는다(포기 통지용 잠깐 재입장이어도 무해 — 뒤이은 재이탈 시
             // OnPlayerLeftRoom이 다시 열게 되므로 open/close 대칭이 유지됨).
             if (IsMasterClient)
@@ -3267,6 +3277,24 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 30초 대기 타이머와 [포기하기] 노출 상태가 계속 리셋된다.
         if (_opponentDisconnected)
             return;
+
+        // "파트너 응답 불능" 진단(DiagnosePartnerUnresponsiveIfNeeded)이 이미 같은 상대에 대해 같은
+        // 대기 UX(GameEvents.OpponentDisconnected)를 띄워둔 상태일 수 있다 — 그 뒤에 Photon이 실제
+        // 이탈까지 감지하면, 아래 일반 이탈 처리를 그대로 타서 이벤트를 또 쏘고 별도 유예 타이머까지
+        // 새로 시작해버려 이미 거의 다 찬 30초 대기가 처음부터 다시 도는 버그가 있었다(2026-08-22
+        // 코드리뷰 지적). 이벤트/타이머를 새로 만들지 않고 부기만 넘겨받는다 — 유예 카운트다운은
+        // DiagnosePartnerUnresponsiveIfNeeded가 시작한 코루틴이 그대로 이어간다. _opponentDisconnected는
+        // 그래도 true로 켜둬야 나중에 파트너가 진짜로 재입장했을 때 OnPlayerEnteredRoom의 재접속
+        // 감지가 정상 동작한다(그쪽은 _partnerResultUnresponsive를 안 보고 이 플래그만 본다).
+        if (_partnerResultUnresponsive)
+        {
+            _opponentDisconnected = true;
+            _partnerBattleSnapshot = null;
+            _lastPartnerBattleSnapshotRevision = -1;
+            if (IsMasterClient)
+                PhotonNetwork.CurrentRoom.IsOpen = true;
+            return;
+        }
 
         // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
