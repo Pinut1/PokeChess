@@ -1,7 +1,4 @@
-using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 프로토타입 HUD (IMGUI). 내 골드 / 파트너 골드 / 팀 라이프 / 라운드·페이즈 / 남은 상점 기능을 한 곳에 표시.
@@ -23,32 +20,6 @@ public class PrototypeHud : MonoBehaviour
     private void OnPartnerGold(int gold) => _partnerGold = gold;
 
     private Vector2 _qaScroll;
-
-    // QA 단축키 — 최종 라운드로 스킵(S). 게임오버/완주 화면 검증용(최종 라운드 Split 등)을 매
-    // 라운드 다 플레이하지 않고 바로 재현하기 위한 개발 편의 기능이었으나, 실수로 눌릴 위험이 있어
-    // 비활성화(주석 처리)함. QA 패널의 "최종 라운드로 스킵" 버튼은 그대로 유지 — 클릭은 의도적인
-    // 조작이라 실수로 눌릴 위험이 낮다.
-    //
-    // private void Update()
-    // {
-    //     Keyboard keyboard = Keyboard.current;
-    //     if (keyboard == null || !keyboard[Key.S].wasPressedThisFrame) return;
-    //     if (IsDebugHotkeyBlocked()) return;
-    //     if (!GameManager.TryGet(out var gm)) return;
-    //
-    //     DebugSkipToFinalRound(gm);
-    // }
-    //
-    // /// <summary>텍스트 입력 중이거나(닉네임 등 S를 문자로 쳐야 하는 상황) 모달 등으로 막혀 있으면
-    // /// 무시한다 — ButtonHotkey.IsBlocked()와 같은 판단.</summary>
-    // private static bool IsDebugHotkeyBlocked()
-    // {
-    //     EventSystem es = EventSystem.current;
-    //     GameObject selected = es != null ? es.currentSelectedGameObject : null;
-    //     if (selected != null && selected.GetComponent<TMP_InputField>() != null) return true;
-    //
-    //     return GameplayInputBlock.IsBlocked();
-    // }
 
     private void OnGUI()
     {
