@@ -3362,8 +3362,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
-    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감(둘 다 패) + 전체 브로드캐스트.
-    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose.
+    /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감 + 전체 브로드캐스트.
+    /// 승리 수: 2=BothWin, 1=Split, 0=BothLose. 라이프 차감은 BothWin(둘 다 승리)이 아닌 한 항상 발생한다 —
+    /// 한 명만 져도(Split) 라운드 상관없이 즉시 -1.
     /// </summary>
     private void ResolveTeamRound()
     {
@@ -3378,7 +3379,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                                  : wins == 1 ? TeamRoundOutcome.Split
                                  : TeamRoundOutcome.BothLose;
 
-        if (outcome == TeamRoundOutcome.BothLose)
+        if (outcome != TeamRoundOutcome.BothWin)
             ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
 
         Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");
