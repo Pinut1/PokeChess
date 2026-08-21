@@ -222,6 +222,11 @@ public class RoundPhaseManager : MonoBehaviour
                 break;
 
             case GamePhase.Battle:
+                // Room CustomProperties에 BattleActive=true를 기록(재접속 클라이언트의 Shopping/Battle
+                // 판정 근거) — MarkBattleActiveInRoom()은 Property만 기록하고 GameEvents.BattleStart()를
+                // 다시 발행하지 않으므로, 바로 아래 직접 호출과 합쳐도 BattleStart가 중복 발행되지 않는다.
+                if (GameManager.TryGet(out var gmBattleEnter) && gmBattleEnter.Network != null)
+                    gmBattleEnter.Network.MarkBattleActiveInRoom();
                 GameEvents.BattleStart();
                 break;
 

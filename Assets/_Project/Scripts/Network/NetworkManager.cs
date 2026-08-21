@@ -937,9 +937,27 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (!IsMasterClient) return;
         // 재접속 클라이언트의 "지금 Shopping인지 Battle인지" 판정용으로 Room 속성에도 기록
-        // (RPC_OnBattleStart는 오프라인 클라이언트에게 유실됨).
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { BATTLE_ACTIVE_PROP_KEY, true } });
+        // (RPC_OnBattleStart는 오프라인 클라이언트에게 유실됨). Room Property 기록 자체는
+        // MarkBattleActiveInRoom()에 위임 — RoundPhaseManager.EnterPhase(Battle)도 같은 메서드를
+        // 직접 호출해 이 책임(Property 기록)을 재사용한다(코드 중복 방지).
+        MarkBattleActiveInRoom();
         photonView.RPC(nameof(RPC_OnBattleStart), RpcTarget.All);
+    }
+
+    /// <summary>
+    /// 실제 Battle 페이즈 진입 시 Room CustomProperties에 BattleActive=true만 기록한다(MasterClient 권위,
+    /// 비마스터 호출은 안전하게 no-op). <b>GameEvents.BattleStart()는 발행하지 않는다</b> — 전투 진입은
+    /// RoundPhaseManager.EnterPhase(Battle)이 각 클라이언트에서 직접 GameEvents.BattleStart()를 호출하는
+    /// 구조라(RPC_OnAllPlayersReady → 각자 로컬 EnterPhase), BroadcastBattleStart()가 하던 것처럼
+    /// RPC_OnBattleStart 경로로 한 번 더 발행하면 BoardSyncBroadcaster/SoundManager/AugmentManager 등
+    /// OnBattleStart 구독자가 전부 중복 실행된다. RoundPhaseManager.EnterPhase(GamePhase.Battle)이
+    /// GameEvents.BattleStart() 호출과 함께 이 메서드를 직접 호출해 Room Property만 기록한다.
+    /// </summary>
+    public void MarkBattleActiveInRoom()
+    {
+        if (_soloMode) return;
+        if (!IsMasterClient) return;
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable { { BATTLE_ACTIVE_PROP_KEY, true } });
     }
 
     /// <summary>지금 Room에 기록된 "이번 라운드가 Battle에 진입했는지" 값. Room 속성이 아직 없으면(구버전
@@ -3274,6 +3292,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             yield break; // 포기 통지가 먼저 도착 — 재접속 성공 처리를 생략한다.
 
         Debug.Log($"[Network] 상대 재접속 성공 — 대기 종료 (IsAwaitingPartnerReconnect={_opponentDisconnected})");
+
+        // 파트너 관전(MirrorBattle) 캐시 복구용 — 반대 방향(B→A) 보완. 재접속 클라이언트(A)는 자기
+        // savedSnapshot을 복구 성공 시 나(B)에게 재전송하지만(ResyncAfterReconnect), 나는 이탈한 적이
+        // 없어 그 경로를 타지 않는다 — 그래서 "내가 상대 재접속을 확정한 이 시점"에 내 저장 스냅샷을
+        // 직접 재전송해야 A의 NetworkManager._partnerBattleSnapshot(새 프로세스라 처음부터 비어 있음)이
+        // 다시 채워진다. TryGetSavedBattleRecovery는 내 Player CustomProperties에 저장해둔 내 전투
+        // 시작 시점 스냅샷을 그대로 읽어 디코드만 할 뿐(재조회·재구성 없음), 라운드가 일치할 때만
+        // 반환한다 — 새 스냅샷을 만들지 않으므로 GameEvents.BattleStart() 재발행도, 내 전투 재시작/
+        // catch-up/결과 재제출도 전혀 일어나지 않는다.
+        if (IsBattleActiveInRoom() &&
+            GameManager.TryGet(out var gmSelf) && gmSelf.Phase != null &&
+            TryGetSavedBattleRecovery(gmSelf.Phase.CurrentRound, out BattleSnapshot mySnapshot, out _))
+        {
+            BroadcastBattleSnapshot(mySnapshot);
+        }
+
         GameEvents.OpponentReconnected();
     }
 
@@ -3685,7 +3719,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                         gmRecover.Phase.RestoreBattlePhaseAfterReconnect(currentRound);
 
                         if (!gmRecover.Battle.TryRecoverBattleFromReconnect(savedSnapshot, savedTick, out string recoverFailReason))
+                        {
                             Debug.LogWarning($"[Network][Rejoin] 전투 복구 실패({recoverFailReason}) — 결과 대기 상태로 남음(다음 정식 이벤트로 자연 복구 대기)");
+                        }
+                        else
+                        {
+                            // 파트너 관전(MirrorBattle) 캐시 복구용 — A(재접속 클라이언트) 이탈 시
+                            // 파트너의 NetworkManager._partnerBattleSnapshot이 비워지고(OnPlayerLeftRoom),
+                            // 이 재접속 복구 경로는 GameEvents.BattleStart()를 재발행하지 않아
+                            // BoardSyncBroadcaster.HandleBattleStart()도 다시 실행되지 않는다 — 그래서
+                            // 원래는 파트너에게 새 BattleSnapshot이 다시 전달될 방법이 없었다(파트너가
+                            // "파트너 화면 보기"를 열어도 TryStartMirrorBattleFromCache가
+                            // HasPartnerBattleSnapshot==false로 막혀 정적 프리뷰만 보이는 원인).
+                            // 전투 복구가 실제로 성공했을 때만, 이미 복원해둔 savedSnapshot을 그대로
+                            // 재전송한다. BroadcastBattleStart()는 호출하지 않으므로 GameEvents.BattleStart()는
+                            // 발행되지 않고(RPC_OnBattleSnapshot 자체가 스냅샷 전송 RPC일 뿐 BattleStart와
+                            // 무관), SoundManager/AugmentManager/QAManager 등 OnBattleStart 구독자는
+                            // 전혀 재실행되지 않는다. savedSnapshot.roundIndex는 TryGetSavedBattleRecovery가
+                            // 이미 currentRound와 일치함을 검증한 뒤에만 반환한 값이라 별도 확인이 필요 없다.
+                            BroadcastBattleSnapshot(savedSnapshot);
+                        }
 
                         _lastKnownRound = currentRound;
                     }
@@ -4091,6 +4144,10 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>오프라인은 재접속 자체가 없으므로 실제로 호출될 일은 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
     public bool IsBattleActiveInRoom() => false;
+
+    /// <summary>오프라인은 Room 자체가 없다 — RoundPhaseManager.EnterPhase(Battle)이 실구현과 동일하게
+    /// 안전하게 호출할 수 있도록 no-op 스텁만 유지한다.</summary>
+    public void MarkBattleActiveInRoom() { }
 
     /// <summary>오프라인(1인)에서는 누르는 즉시 "모두 준비"로 처리</summary>
     public void BroadcastPlayerReady()
