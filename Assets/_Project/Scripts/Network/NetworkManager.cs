@@ -2728,6 +2728,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         get
         {
             if (_soloMode || !PhotonNetwork.InRoom) return _soloTeamHp;
+
+            // 방금 내가 기록한 값이 있으면 그걸 우선한다 — Room 속성은 서버를 한 번 돌아
+            // OnRoomPropertiesUpdate로 되돌아올 때까지 로컬 캐시가 갱신되지 않기 때문이다.
+            // (2026-08-22 확인: SetCustomProperties 직후 즉시 갱신된다는 기존 전제가 틀렸다.)
+            if (_pendingTeamHp.HasValue) return _pendingTeamHp.Value;
+
             var props = PhotonNetwork.CurrentRoom?.CustomProperties;
             if (props != null && props.TryGetValue(TEAM_HP_PROP_KEY, out object hp))
                 return (int)hp;
@@ -2736,6 +2742,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     private int _soloTeamHp = -1; // 솔로 모드용 로컬 팀 HP 저장
+
+    /// <summary>
+    /// 내가 방금 Room 속성에 기록한 팀 HP. 서버 에코(OnRoomPropertiesUpdate)가 도착하면 폐기한다.
+    ///
+    /// 이게 없으면 <see cref="SetTeamHealthProp"/> 직후에 <see cref="TeamHealth"/>를 읽어도
+    /// <b>차감 전 값</b>이 나온다 — Room 속성은 서버를 한 번 돌아야 로컬 캐시가 갱신되기 때문이다.
+    /// 실제로 이 때문에 최종 라운드 Split에서 팀 HP가 0이 됐는데도 RoundPhaseManager.ResultTimer의
+    /// 스킵 가드(TeamHealth == 0)가 통과해 완주(Victory)가 방송되고, 뒤늦게 도착한 HP 0이
+    /// 게임오버로 덮어써서 클라이언트마다 승리/패배 모달이 갈리는 버그가 있었다.
+    /// 전적(MatchRecorder)은 먼저 온 Victory로 확정돼 진 게임이 클리어로 기록되기까지 했다
+    /// (2026-08-22 재현 로그 확인 — PR #120이 못 잡은 원래 원인).
+    /// </summary>
+    private int? _pendingTeamHp;
 
     /// <summary>
     /// 내 보드 배치 스냅샷을 상대 클라이언트에게 송출(미러 렌더용). 상대에게만 전송.
@@ -2899,6 +2918,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void SetTeamHealthProp(int hp)
     {
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
+
+        // 서버 에코가 오기 전까지 TeamHealth가 이 값을 읽도록 남긴다(_pendingTeamHp 주석 참고).
+        // 기록을 실제로 보낸 뒤가 아니라 보내기 직전에 세워도 무방하다 — 이 클라이언트가 쓴 값이
+        // 곧 권위값이고(팀 HP는 마스터 단일 기록자), 실패하면 어차피 에코도 안 와서 갱신되지 않는다.
+        _pendingTeamHp = hp;
+
         var props = new Hashtable { { TEAM_HP_PROP_KEY, hp } };
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
@@ -3689,6 +3714,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!propertiesThatChanged.TryGetValue(TEAM_HP_PROP_KEY, out object hp)) return;
 
         int health = (int)hp;
+
+        // 서버 확정값이 도착했으니 내가 들고 있던 임시값은 버린다 — 이후로는 Room 속성이 진실이다.
+        _pendingTeamHp = null;
         GameEvents.HealthChanged(health);
         if (health <= 0)
         {
@@ -4046,6 +4074,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _roundResultResolved = false;
         _lastLocalBattleResult = null;
         _suppressedBattleResult = null;
+        // 직전 판에서 기록한 팀 HP 임시값이 새 판으로 넘어오면, 아직 초기화(-1) 전인데도
+        // 그 값이 읽혀 InitTeamHealth가 "이미 설정됨"으로 오판한다.
+        _pendingTeamHp = null;
         // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
         // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
         // (2026-08-22 코드리뷰 지적).
