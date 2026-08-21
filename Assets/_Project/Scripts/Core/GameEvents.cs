@@ -68,6 +68,16 @@ public static class GameEvents
     /// </summary>
     public static event Action<TeamRoundOutcome> OnTeamRoundResolved;
 
+    /// <summary>
+    /// 파트너 미러 전투(PartnerBattleMirrorController)가 끝까지 재생 완료됨. 인자 = (라운드, 미러가 낸 아군 승리 여부).
+    /// 여기서 "아군"은 미러 기준이라 <b>파트너 진영</b>을 가리킨다(파트너 유닛이 BattleTeam.Ally로 생성됨).
+    ///
+    /// ⚠️ <b>판정에 쓰지 말 것</b> — 미러는 관전 표시용이고, 이 이벤트는 파트너가 실제로 보고한
+    /// 전투 결과와 대조해 미러의 정확도를 로그로 확인하기 위한 검증 전용이다(2026-08-22).
+    /// 미러 결과를 실제 팀 판정에 쓸지는 이 대조가 100% 일치로 확인된 뒤에 결정한다.
+    /// </summary>
+    public static event Action<int, bool> OnPartnerMirrorBattleCompleted;
+
     /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
     public static event Action OnAllPlayersReady;
 
@@ -381,6 +391,7 @@ public static class GameEvents
     public static void BattleEnd(BattleEndReason reason) => OnBattleEnd?.Invoke(reason);
     public static void OvertimeStarted(float duration) => OnOvertimeStarted?.Invoke(duration);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
+    public static void PartnerMirrorBattleCompleted(int roundIndex, bool partnerWon) => OnPartnerMirrorBattleCompleted?.Invoke(roundIndex, partnerWon);
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();
     public static void ApprovePlayerReady()    => OnPlayerReadyApproved?.Invoke();

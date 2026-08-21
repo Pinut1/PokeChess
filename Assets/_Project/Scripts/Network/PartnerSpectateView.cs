@@ -296,7 +296,19 @@ public class PartnerSpectateView : MonoBehaviour
     /// </summary>
     private void HandlePartnerBattleSnapshotChanged(BattleSnapshot snapshot)
     {
-        if (!_isExpanded) return;
+        // 관전 화면을 열었는지와 무관하게 미러를 돌린다(2026-08-22).
+        //
+        // 과거엔 여기 `if (!_isExpanded) return;`이 있어서, 파트너 화면을 열어둔 동안에만 미러가
+        // 돌았다. 관전이 목적일 땐 그게 맞았지만 두 가지가 걸린다:
+        //  1) 미러 결과가 실제 전투와 일치하는지 검증하려면 매 라운드 값이 필요한데, 사람이 화면을
+        //     켜둬야만 데이터가 생겨서 한 번 깜빡이면 그 라운드가 통째로 비었다.
+        //  2) 더 중요하게 — 파트너가 전투 도중 이탈하면 그 사람의 전투 결과를 알 방법이 미러뿐인데,
+        //     하필 그때 관전을 안 보고 있었다면 결과를 영영 계산할 수 없다.
+        //
+        // 카메라(_spectatorCamera)는 UpdateCameraState가 따로 관리하므로 관전을 안 켜면 렌더 비용은
+        // 들지 않는다 — 늘어나는 건 미러 유닛 visual 생성과 틱 시뮬레이션 비용뿐이다.
+        // ⚠️ 이 비용이 실제로 감당 가능한지 확인 중이다(2026-08-22). 프레임 저하가 크면 visual 없이
+        // 계산만 하는 경로를 따로 만드는 쪽으로 간다.
         if (GameManager.TryGet(out var gm) && gm.Phase != null && IsMatchEnded(gm.Phase.CurrentPhase)) return;
         StartOrReplaceMirrorBattle(snapshot);
     }
@@ -899,11 +911,27 @@ public class PartnerSpectateView : MonoBehaviour
         _mirrorController.ClearPartnerEnemyPreviewUnitsOnly();
         _mirrorController.StopMirrorBattle();
 
+        // 상시 실행 비용 측정용(2026-08-22) — 셋업(visual 생성)과 전투 전체에 걸린 실시간을 잰다.
+        // 관전을 안 켠 채로도 미러가 도는 게 감당 가능한지 판단할 근거.
+        float setupStart = Time.realtimeSinceStartup;
+
         _mirrorController.StartMirrorBattle(
             snapshot,
             result =>
             {
                 _completedMirrorRoundIndex = snapshot.roundIndex;
+
+                Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 종료 — 유닛 {_mirrorController.MirrorVisualCount}기, " +
+                          $"{result.elapsedTicks}틱, 실시간 {Time.realtimeSinceStartup - setupStart:F1}초, " +
+                          $"관전 화면 {(_isExpanded ? "켜짐" : "꺼짐")}");
+
+                // 검증 전용(2026-08-22) — 미러가 낸 승패를 알려, NetworkManager가 파트너의 실제 보고값과
+                // 대조 로그를 남길 수 있게 한다. 이 클래스는 여전히 아무 판정에도 관여하지 않는다
+                // (값을 발행만 하고, 미러 결과가 실제 게임 상태를 바꾸는 경로는 만들지 않는다).
+                bool partnerWon = result.outcome == BattleEndReason.Victory ||
+                                  result.outcome == BattleEndReason.DecisionVictory;
+                GameEvents.PartnerMirrorBattleCompleted(snapshot.roundIndex, partnerWon);
+
                 if (_isExpanded) RefreshPartnerEnemyPreview();
             },
             error => { if (_isExpanded) RefreshPartnerEnemyPreview(); });

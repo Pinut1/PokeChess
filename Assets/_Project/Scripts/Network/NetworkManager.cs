@@ -235,6 +235,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// (2026-08-21 티켓: 승패를 추측하는 대신 기존 이탈 UX로 위임).</summary>
     private bool _partnerResultUnresponsive;
 
+    /// <summary>미러 정확도 검증(2026-08-22, 판정 미사용) — 파트너 미러 전투가 완료된 라운드와
+    /// 그때 미러가 낸 파트너 승패. 미러는 관전 화면을 연 동안에만 돌기 때문에 값이 없을 수 있다
+    /// (그때는 대조를 건너뛰고 그 사실만 로그에 남긴다).</summary>
+    private int? _mirrorVerifyRound;
+    private bool _mirrorVerifyPartnerWon;
+
     /// <summary>_partnerResultUnresponsive 진단 후 GIVE_UP_AVAILABLE_DELAY 대기용 코루틴.
     /// OpponentGraceRoutine과 동일한 타이밍이지만 트리거가 달라 독립적으로 운영한다.</summary>
     private Coroutine _partnerUnresponsiveGraceRoutine;
@@ -315,6 +321,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnUnitSold += HandleUnitSnapshotDirty;
         GameEvents.OnUnitChanged += HandleUnitSnapshotDirty;
         GameEvents.OnInventoryChanged += HandleUnitSnapshotDirtyNoArg;
+
+        // 미러 정확도 검증(2026-08-22, 판정에는 미사용) — ResolveTeamRound에서 파트너의 실제
+        // 보고값과 대조 로그를 남기기 위해 미러 결과를 받아 캐시만 해둔다.
+        GameEvents.OnPartnerMirrorBattleCompleted += HandlePartnerMirrorBattleCompleted;
     }
 
     public override void OnDisable()
@@ -322,6 +332,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnPhaseChanged -= HandlePhaseChanged;
         GameEvents.OnGoldTransferRequested -= HandleGoldTransferRequested;
         GameEvents.OnPlayerReadyApproved -= BroadcastPlayerReady;
+        GameEvents.OnPartnerMirrorBattleCompleted -= HandlePartnerMirrorBattleCompleted;
 
         GameEvents.OnUnitPlaced -= HandleUnitSnapshotDirty;
         GameEvents.OnUnitBenched -= HandleUnitSnapshotDirty;
@@ -3652,6 +3663,52 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// 미러 정확도 검증 전용 수신부(2026-08-22). 값을 캐시만 하고 어떤 판정에도 쓰지 않는다 —
+    /// ResolveTeamRound가 파트너의 실제 보고값과 대조해 로그를 남길 때만 읽는다.
+    /// 미러 결과를 실제 팀 판정에 쓸지는 이 대조가 100% 일치로 확인된 뒤에 결정한다.
+    /// </summary>
+    private void HandlePartnerMirrorBattleCompleted(int roundIndex, bool partnerWon)
+    {
+        _mirrorVerifyRound = roundIndex;
+        _mirrorVerifyPartnerWon = partnerWon;
+        Debug.Log($"[MirrorVerify] 미러 전투 완료 수신 — {roundIndex}R, 미러 판정: 파트너 {(partnerWon ? "승" : "패")}");
+    }
+
+    /// <summary>
+    /// 미러가 낸 파트너 승패와 파트너가 실제로 보고한 값을 대조해 로그만 남긴다(2026-08-22 검증).
+    /// 판정 결과에는 전혀 영향을 주지 않는다 — 미러를 판정에 쓸 수 있는지 판단할 근거를 모으는 용도.
+    /// ⚠️ 미러는 관전 화면(파트너 화면 보기)을 연 동안에만 돌기 때문에, 검증하려면 그 화면을 켜둔
+    /// 채로 라운드를 진행해야 한다. 안 켜면 비교할 미러 값 자체가 생기지 않는다.
+    /// </summary>
+    private void LogMirrorAccuracy(int round)
+    {
+        if (!_mirrorVerifyRound.HasValue || _mirrorVerifyRound.Value != round)
+        {
+            Debug.Log($"[MirrorVerify] {round}R — 미러 결과 없음(관전 미개방 또는 미완료), 대조 건너뜀");
+            return;
+        }
+
+        Player[] others = PhotonNetwork.PlayerListOthers;
+        if (others == null || others.Length == 0) return;
+
+        if (!others[0].CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) ||
+            !(v is int reported) || reported == RESULT_NOT_REPORTED)
+        {
+            Debug.Log($"[MirrorVerify] {round}R — 파트너 실제 보고값 없음, 대조 건너뜀");
+            return;
+        }
+
+        bool actualWon = reported == 1;
+        bool match = actualWon == _mirrorVerifyPartnerWon;
+
+        string line = $"[MirrorVerify] {round}R — 미러: 파트너 {(_mirrorVerifyPartnerWon ? "승" : "패")} / " +
+                      $"실제 보고: 파트너 {(actualWon ? "승" : "패")} → {(match ? "일치" : "불일치")}";
+
+        if (match) Debug.Log(line);
+        else       Debug.LogError(line + " — 미러 재현이 실제 전투와 어긋납니다(관전 화면도 틀리게 보이는 상태).");
+    }
+
+    /// <summary>
     /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감 + 전체 브로드캐스트.
     /// 승리 수: 2=BothWin, 1=Split, 0=BothLose. 라이프 차감은 BothWin(둘 다 승리)이 아닌 한 항상 발생한다 —
     /// 한 명만 져도(Split) 라운드 상관없이 즉시 -1(과거 최종보스 5라운드 한정 승격 규칙은 이 일반 규칙에
@@ -3680,6 +3737,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (outcome != TeamRoundOutcome.BothWin)
             ApplyTeamDamageLocal(LIFE_LOSS_ON_TEAM_DEFEAT); // 라이프 -1 (마스터 권위)
+
+        // 미러 정확도 검증(2026-08-22) — 판정에는 영향 없음, 로그만 남긴다.
+        LogMirrorAccuracy(_lastKnownRound);
 
         Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");
         photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, (int)outcome);
