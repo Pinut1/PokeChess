@@ -23,6 +23,12 @@ using UnityEngine.UI;
 ///   {xp}        현재 레벨에서 모은 XP
 ///   {needXp}    다음 레벨까지 필요한 총 XP
 ///   {remainXp}  다음 레벨까지 남은 XP
+///   {buyCount}  다음 레벨까지 필요한 구매 횟수(남은 XP ÷ 1회 획득 XP, 올림)
+///   {goldToNext} 다음 레벨까지 드는 총 골드({buyCount} × 1회 비용). 기본으로 노란색이 입혀진다
+///
+/// ⚠️ {cost}는 <b>구매 1회</b> 비용이라 "{nextLevel}레벨까지 {cost}골드"처럼 쓰면 거짓말이 된다 —
+/// Lv3부터는 필요 XP(6·10·20…)가 1회 획득량(4)을 넘어 여러 번 사야 한다. 다음 레벨까지의
+/// 비용을 말하려면 반드시 {goldToNext}를 쓸 것.
 ///
 /// TMP 리치텍스트(&lt;b&gt;, &lt;size&gt;, &lt;color&gt;, &lt;sprite&gt;)를 그대로 쓸 수 있다.
 ///
@@ -66,7 +72,7 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
     [SerializeField] private string _keyLabelFormat = "[{0}]";
 
     [Header("숫자 색상")]
-    [Tooltip("골드로 나가는 값({cost})에 입힐 색. 끄면 본문과 같은 색으로 나온다.")]
+    [Tooltip("골드로 나가는 값({cost}·{goldToNext})에 입힐 색. 끄면 본문과 같은 색으로 나온다.")]
     [SerializeField] private bool _colorGoldCost = true;
 
     [Tooltip("골드 값에 입힐 색. 알파는 무시된다(TMP color 태그는 RGB만 쓴다).")]
@@ -213,6 +219,11 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
         int required = shop.RequiredXp;
         int remain   = atMaxLevel ? 0 : Mathf.Max(0, required - shop.CurrentXp);
 
+        // 남은 XP를 1회 획득량으로 나눠 올린다 — 4XP짜리 구매로 6XP를 채우려면 두 번 사야 한다.
+        // 획득량이 0 이하면(인스펙터 오설정) 몇 번을 사도 레벨이 오르지 않으므로 0으로 둔다.
+        int buyAmount = shop.BuyXpAmount;
+        int buyCount  = (atMaxLevel || buyAmount <= 0) ? 0 : (remain + buyAmount - 1) / buyAmount;
+
         return format
             .Replace("{key}",       KeyLabel())
             .Replace("{buyXp}",     Xp(shop.BuyXpAmount))
@@ -222,7 +233,9 @@ public class XpPurchaseTooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPo
             .Replace("{nextLevel}", (shop.CurrentLevel + 1).ToString())
             .Replace("{xp}",        Xp(shop.CurrentXp))
             .Replace("{needXp}",    Xp(required))
-            .Replace("{remainXp}",  Xp(remain));
+            .Replace("{remainXp}",  Xp(remain))
+            .Replace("{buyCount}",  buyCount.ToString())
+            .Replace("{goldToNext}", Gold(buyCount * shop.BuyXpCostGold));
     }
 
     /// <summary>

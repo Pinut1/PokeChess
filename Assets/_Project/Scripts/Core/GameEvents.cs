@@ -95,6 +95,14 @@ public static class GameEvents
     /// <summary>XP 변경. 인자 = (현재 XP, 다음 레벨 필요 XP). ShopManager가 발행.</summary>
     public static event Action<int, int> OnXpChanged;
 
+    /// <summary>
+    /// 재접속 복원으로 레벨/XP가 통째로 되돌려짐. 인자 = (복원된 레벨, 복원된 XP).
+    /// ShopManager.RestoreProgressionState()가 OnLevelChanged/OnXpChanged를 쏘기 <b>직전</b>에 발행한다 —
+    /// 뒤따르는 레벨 변경이 "플레이 중 레벨업"이 아니라 복원임을 알리기 위한 것으로,
+    /// 레벨업 연출처럼 <b>한 번뿐인 순간</b>을 표현하는 구독자가 자기 자신을 걸러낼 수 있게 한다.
+    /// </summary>
+    public static event Action<int, int> OnProgressionRestored;
+
     /// <summary>보드 배치 가능 기물 수 변경. 인자 = 변경 후 캡. ShopManager가 단일 소스로 발행.</summary>
     public static event Action<int> OnUnitCapChanged;
 
@@ -359,6 +367,7 @@ public static class GameEvents
     public static void GoldChanged(int amount) => OnGoldChanged?.Invoke(amount);
     public static void LevelChanged(int level) => OnLevelChanged?.Invoke(level);
     public static void XpChanged(int current, int required) => OnXpChanged?.Invoke(current, required);
+    public static void ProgressionRestored(int level, int currentXp) => OnProgressionRestored?.Invoke(level, currentXp);
     public static void UnitCapChanged(int cap) => OnUnitCapChanged?.Invoke(cap);
     public static void HealthChanged(int health) => OnHealthChanged?.Invoke(health);
     public static void PartnerGoldChanged(int gold) => OnPartnerGoldChanged?.Invoke(gold);

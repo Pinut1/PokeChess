@@ -11,9 +11,12 @@ using UnityEngine;
 /// <b>레벨 1칸당 OnLevelChanged를 한 번씩</b> 쏘기 때문에 이벤트 자체가 이미 2번 오고,
 /// 다만 둘 다 같은 프레임에 도착하므로 여기서 큐에 쌓아 시간차를 준다.
 ///
-/// ⚠️ 재접속 복원(ShopManager.RestoreProgressionState)도 같은 OnLevelChanged를 쓴다 —
-/// 이때는 Lv1 → Lv5처럼 한 이벤트에서 여러 칸이 한꺼번에 뛴다. 그래서 <b>증가폭이 정확히 +1일 때만</b>
-/// 연출한다. 실제 레벨업은 항상 +1씩 오므로 걸러지지 않고, 복원/동기화 점프만 조용히 무시된다.
+/// ⚠️ 재접속 복원(ShopManager.RestoreProgressionState)도 같은 OnLevelChanged를 쓴다 — 플레이어가
+/// 목격하지 않은 레벨이라 연출하면 안 된다. 그래서 복원은 <b>증가폭으로 추측하지 않고</b>
+/// <see cref="GameEvents.OnProgressionRestored"/>로 직접 구분한다. 복원은 항상 여러 칸을 뛴다고 가정하면
+/// 자리를 비운 사이 <b>정확히 한 칸만</b> 오른 뒤 재접속했을 때 +1로 보여 연출이 잘못 재생된다.
+/// ShopManager가 복원 신호를 LevelChanged보다 <b>먼저</b> 쏘므로, 여기서 기준값을 미리 당겨두면
+/// 뒤따르는 LevelChanged는 증가폭 0이 되어 자연히 걸러진다.
 /// </summary>
 public class LevelUpArrowHud : MonoBehaviour
 {
@@ -81,13 +84,15 @@ public class LevelUpArrowHud : MonoBehaviour
 
     private void OnEnable()
     {
-        GameEvents.OnLevelChanged += HandleLevelChanged;
+        GameEvents.OnLevelChanged        += HandleLevelChanged;
+        GameEvents.OnProgressionRestored += HandleProgressionRestored;
         SyncBaseline();
     }
 
     private void OnDisable()
     {
-        GameEvents.OnLevelChanged -= HandleLevelChanged;
+        GameEvents.OnLevelChanged        -= HandleLevelChanged;
+        GameEvents.OnProgressionRestored -= HandleProgressionRestored;
 
         // 비활성화되는 동안 재생 중이던 화살표는 정리한다 — 다시 켰을 때 멈춰 있던 잔상이 남지 않도록.
         for (int i = _active.Count - 1; i >= 0; i--) Release(i);
@@ -114,6 +119,13 @@ public class LevelUpArrowHud : MonoBehaviour
         _lastLevel = gm.Shop.CurrentLevel;
     }
 
+    /// <summary>
+    /// 재접속 복원 — 플레이어가 보지 못한 레벨 변화이므로 연출 없이 기준값만 새로 잡는다.
+    /// 이 신호는 뒤따를 OnLevelChanged보다 먼저 오므로(ShopManager.RestoreProgressionState),
+    /// 여기서 기준을 맞춰두면 그 LevelChanged는 증가폭 0이 되어 걸러진다.
+    /// </summary>
+    private void HandleProgressionRestored(int level, int currentXp) => _lastLevel = level;
+
     private void HandleLevelChanged(int level)
     {
         if (_lastLevel < 0)
@@ -125,7 +137,8 @@ public class LevelUpArrowHud : MonoBehaviour
         int delta = level - _lastLevel;
         _lastLevel = level;
 
-        // +1만 진짜 레벨업. 복원/동기화로 인한 점프(+2 이상)나 하락은 연출하지 않는다(클래스 주석 참고).
+        // 진짜 레벨업은 ShopManager가 한 칸씩 쏘므로 항상 +1이다. 복원은 위에서 이미 기준을 맞춰
+        // 증가폭 0으로 들어오고, 그 밖의 점프(+2 이상)나 하락도 목격한 레벨업이 아니라 연출하지 않는다.
         if (delta != 1) return;
 
         _pending++;
