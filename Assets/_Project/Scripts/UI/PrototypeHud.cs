@@ -1,4 +1,7 @@
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// 프로토타입 HUD (IMGUI). 내 골드 / 파트너 골드 / 팀 라이프 / 라운드·페이즈 / 남은 상점 기능을 한 곳에 표시.
@@ -20,6 +23,30 @@ public class PrototypeHud : MonoBehaviour
     private void OnPartnerGold(int gold) => _partnerGold = gold;
 
     private Vector2 _qaScroll;
+
+    /// <summary>QA 단축키 — 최종 라운드로 스킵. 게임오버/완주 화면 검증용(최종 라운드 Split 등)을
+    /// 매 라운드 다 플레이하지 않고 바로 재현하기 위한 개발 편의 기능. ButtonHotkey는 UGUI Button
+    /// 전용이라 이 IMGUI QA 패널엔 안 맞아 직접 키 입력을 본다(ButtonHotkey.cs와 같은 판단 근거).</summary>
+    private void Update()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null || !keyboard[Key.S].wasPressedThisFrame) return;
+        if (IsDebugHotkeyBlocked()) return;
+        if (!GameManager.TryGet(out var gm)) return;
+
+        DebugSkipToFinalRound(gm);
+    }
+
+    /// <summary>텍스트 입력 중이거나(닉네임 등 S를 문자로 쳐야 하는 상황) 모달 등으로 막혀 있으면
+    /// 무시한다 — ButtonHotkey.IsBlocked()와 같은 판단.</summary>
+    private static bool IsDebugHotkeyBlocked()
+    {
+        EventSystem es = EventSystem.current;
+        GameObject selected = es != null ? es.currentSelectedGameObject : null;
+        if (selected != null && selected.GetComponent<TMP_InputField>() != null) return true;
+
+        return GameplayInputBlock.IsBlocked();
+    }
 
     private void OnGUI()
     {
@@ -104,6 +131,23 @@ public class PrototypeHud : MonoBehaviour
                 GUILayout.Height(30f)))
         {
             DebugRefreshItemShop(gm);
+        }
+
+        GUILayout.Space(8f);
+
+        // ─────────────────────────────
+        // 라운드 디버그
+        // ─────────────────────────────
+
+        GUILayout.Label("── 라운드 디버그 ──");
+
+        int lastRound = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
+
+        if (GUILayout.Button(
+                lastRound > 0 ? $"최종 라운드로 스킵 (1-{lastRound}) [S]" : "최종 라운드로 스킵 [S]",
+                GUILayout.Height(30f)))
+        {
+            DebugSkipToFinalRound(gm);
         }
 
         GUILayout.Space(8f);
@@ -228,6 +272,30 @@ public class PrototypeHud : MonoBehaviour
             $"[PrototypeHud][QA] 재조합기 -{amount} 처리 완료 — " +
             $"보유 {gm.Item.ReforgerCount}개"
         );
+    }
+
+    /// <summary>최종 라운드로 즉시 스킵(게임오버/완주 화면 검증용). 마스터클라이언트가 아니면
+    /// NetworkManager.BroadcastRoundStart 내부에서 자동으로 무시된다(다른 QA 버튼과 달리 별도
+    /// 마스터 체크가 필요 없음 — BroadcastRoundStart가 이미 그렇게 만들어져 있다).
+    /// 라운드 번호만 바꿀 뿐 골드/보드/레벨은 그대로 둔다 — 최종 라운드 전투/결과 UI만 빨리
+    /// 보고 싶을 때 쓰는 용도라 진행 상태를 흉내 낼 필요가 없다.</summary>
+    private void DebugSkipToFinalRound(GameManager gm)
+    {
+        if (gm.Network == null)
+        {
+            Debug.LogWarning("[PrototypeHud] NetworkManager가 없습니다.");
+            return;
+        }
+
+        int lastRound = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
+        if (lastRound <= 0)
+        {
+            Debug.LogWarning("[PrototypeHud] StageDatabase가 비어있어 최종 라운드를 알 수 없습니다.");
+            return;
+        }
+
+        gm.Network.BroadcastRoundStart(lastRound);
+        Debug.Log($"[PrototypeHud][QA] 최종 라운드(1-{lastRound})로 스킵");
     }
 
     private void DebugAddGold(
