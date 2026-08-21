@@ -2968,16 +2968,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // (예: QA "최종 라운드로 스킵" 버튼처럼 ResolveTeamRound를 거치지 않고 라운드가 바로 시작되는
         // 경로) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — 안 그러면 OptionsPanelUI가 그
         // 신호를 영영 못 받아 대기 모달이 멈춰있게 된다(2026-08-22 코드리뷰 지적).
-        if (_partnerResultUnresponsive)
-        {
-            _partnerResultUnresponsive = false;
-            GameEvents.PartnerResultRecovered();
-        }
-        if (_partnerUnresponsiveGraceRoutine != null)
-        {
-            StopCoroutine(_partnerUnresponsiveGraceRoutine);
-            _partnerUnresponsiveGraceRoutine = null;
-        }
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
         _lastKnownRound = round;      // 재접속 라운드 복구 기준점
         _tradeSentThisRound = false;  // 전송 기회는 라운드마다 새로 — 안 쓴 라운드는 이월되지 않는다
 
@@ -3284,19 +3275,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             return;
 
         // "응답 불능" 진단이 먼저 떠 있던 상태였는데 이제 진짜 이탈까지 확인됐다 — 더 확실한 신호가
-        // 왔으니 우리 쪽 유예 타이머는 정리하고(중복 병행 방지), 아래 일반 이탈 처리가 처음부터
-        // 새로 담당하게 넘긴다. 안 지우면 응답불능 유예 타이머(GameEvents.PartnerResultGiveUpAvailable)와
+        // 왔으니 우리 쪽 유예 타이머는 정리하고(중복 병행 방지), 아래 일반 이탈 처리가 처음부터 새로
+        // 담당하게 넘긴다. 대기 모달은 계속 떠 있어야 하므로(진짜 이탈 흐름이 곧바로 이어받음)
+        // notifyRecovered는 false — 안 지우면 응답불능 유예 타이머(GameEvents.PartnerResultGiveUpAvailable)와
         // 방금 새로 시작될 실제 이탈 유예 타이머(GameEvents.OnGracePeriodExpired)가 동시에 돌게 된다
         // (2026-08-22 코드리뷰 지적).
-        if (_partnerResultUnresponsive)
-        {
-            _partnerResultUnresponsive = false;
-            if (_partnerUnresponsiveGraceRoutine != null)
-            {
-                StopCoroutine(_partnerUnresponsiveGraceRoutine);
-                _partnerUnresponsiveGraceRoutine = null;
-            }
-        }
+        ClearPartnerResultUnresponsive(notifyRecovered: false);
 
         // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
@@ -3490,6 +3474,30 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>
+    /// "응답 불능" 진단 상태를 정리한다(플래그를 끄고 유예 코루틴을 멈춘다) — 정리 자체는 정상 판정
+    /// (ResolveTeamRound)·새 라운드 시작(RPC_OnRoundStart)·재시작(RPC_RestartGame)·실제 이탈로의
+    /// 핸드오프(OnPlayerLeftRoom)까지 네 곳에서 똑같이 필요해서 하나로 모았다(2026-08-22 코드리뷰
+    /// 지적 — 중복 제거). notifyRecovered가 true면 대기 모달을 닫으라는 신호(GameEvents.
+    /// PartnerResultRecovered)도 같이 쏜다 — 진짜로 상황이 풀렸을 때만 true를 준다. 실제 이탈로
+    /// 넘어가는 경우(대기 모달은 계속 떠 있어야 함)나, 애초에 진단 상태가 아니었던 경우는 false로 불러도
+    /// 안전하다(원래 켜져 있던 상태였을 때만 신호를 쏘도록 내부에서 판정).
+    /// </summary>
+    private void ClearPartnerResultUnresponsive(bool notifyRecovered)
+    {
+        bool wasUnresponsive = _partnerResultUnresponsive;
+        _partnerResultUnresponsive = false;
+
+        if (_partnerUnresponsiveGraceRoutine != null)
+        {
+            StopCoroutine(_partnerUnresponsiveGraceRoutine);
+            _partnerUnresponsiveGraceRoutine = null;
+        }
+
+        if (wasUnresponsive && notifyRecovered)
+            GameEvents.PartnerResultRecovered();
+    }
+
+    /// <summary>
     /// RoundPhaseManager.ResultTimer의 대기 루프에서 재전송 요청 후에도 오래(예: 35초) 결과가 안 오면
     /// 한 번 호출됨. 승패를 추측하지 않는다 — 대신 파트너가 Photon에는 연결돼 있는데 결과만 안 오는
     /// 상황인지 확인하고, 맞으면 "응답 불능"으로 진단해 기존 파트너 이탈 UX(대기 모달 → 유예 →
@@ -3576,19 +3584,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 정상적으로 결과가 모여 판정하는 거니까 그 진단을 취소하고 대기 UI를 되돌린다. 파트너가 실제로
         // Photon 방을 나간 게 아니라서 OnPlayerEnteredRoom이 다시 불릴 일이 없다 — 이 복구를 직접 안
         // 해주면 파트너가 정상 복귀해도 화면이 "대기 중"에 계속 멈춰있게 된다.
-        if (_partnerResultUnresponsive)
-        {
-            _partnerResultUnresponsive = false;
-            if (_partnerUnresponsiveGraceRoutine != null)
-            {
-                StopCoroutine(_partnerUnresponsiveGraceRoutine);
-                _partnerUnresponsiveGraceRoutine = null;
-            }
-            // OnOpponentReconnected가 아니라 전용 이벤트로 닫는다 — RoundPhaseManager가
-            // OnOpponentReconnected를 들으면 지금 이 함수를 부르고 있는 ResultTimer를 처음부터
-            // 다시 시작시켜버린다(불필요한 재시작). OptionsPanelUI만 듣는 GameEvents.PartnerResultRecovered로 분리.
-            GameEvents.PartnerResultRecovered();
-        }
+        // (OnOpponentReconnected가 아니라 전용 이벤트로 닫는 이유: RoundPhaseManager가 OnOpponentReconnected를
+        // 들으면 지금 이 함수를 부르고 있는 ResultTimer를 처음부터 다시 시작시켜버린다 — 불필요한 재시작.)
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
 
         int wins = 0;
         foreach (var player in PhotonNetwork.PlayerList)
@@ -3995,16 +3993,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
         // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
         // (2026-08-22 코드리뷰 지적).
-        if (_partnerResultUnresponsive)
-        {
-            _partnerResultUnresponsive = false;
-            GameEvents.PartnerResultRecovered();
-        }
-        if (_partnerUnresponsiveGraceRoutine != null)
-        {
-            StopCoroutine(_partnerUnresponsiveGraceRoutine);
-            _partnerUnresponsiveGraceRoutine = null;
-        }
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
 
         // 항복 상태 초기화(이전 판의 잔여 요청/알림이 새 판으로 넘어가지 않도록)
         _surrenderRequestSent = false;
