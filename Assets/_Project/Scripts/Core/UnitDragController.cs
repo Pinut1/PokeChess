@@ -45,21 +45,13 @@ public class UnitDragController : MonoBehaviour
     private IDropTarget _hovered;
     private readonly Plane _groundPlane = new Plane(Vector3.up, Vector3.zero);
 
-    private AugmentManager _augmentManager;
-    private UIManager _uiManager;
-    private NetworkManager _network;
-
     private void Awake()
     {
         if (_camera == null)
             _camera = Camera.main;
 
-        if (GameManager.TryGet(out var gm))
-        {
-            _augmentManager = gm.GetComponent<AugmentManager>();
-            _uiManager = gm.UI;
-            _network = gm.Network;
-        }
+        // 조작 차단 판정에 쓰던 매니저 캐시(_augmentManager/_uiManager/_network)는
+        // GameplayInputBlock으로 옮겨 갔다 — 여기서는 더 이상 들고 있지 않는다.
     }
 
     private void OnEnable()
@@ -78,18 +70,6 @@ public class UnitDragController : MonoBehaviour
     {
         if (_camera == null) return;
 
-        // 매치가 완전히 끝난 상태(Victory/GameOver)면 3D 조작 전면 차단(2026-08 코드리뷰 대응 —
-        // 승리/패배 결과 모달과 짝을 이루는 내부 안전장치). 결과 모달의 Dim은 uGUI 버튼 클릭만
-        // 막고 이 컨트롤러의 Camera 기반 Physics.Raycast는 막지 못한다(아래 관전 화면 차단과 같은
-        // 이유 — IsPartnerSpectateExpanded 주석 참고). GamePhase.Battle만 허용하는 화이트리스트가
-        // 아니라 종료 상태 두 개만 거르는 blacklist라, Shopping 중 파트너가 아직 Battle인 정상
-        // 진행 상황에는 전혀 영향을 주지 않는다.
-        if (IsMatchEndedPhase())
-        {
-            if (_held != null) CancelDrag();
-            return;
-        }
-
         // 통신교환(6b46074a)이 "쇼핑 페이즈에서만 드래그"를 완화했다:
         // 전투 중에도 벤치 유닛은 집어서 전송 대기열로 보낼 수 있어야 한다.
         // 필드 유닛만 전투 중 조작을 막는다 — master의 쇼핑 전용 검사로 되돌리지 말 것.
@@ -101,32 +81,14 @@ public class UnitDragController : MonoBehaviour
             return;
         }
 
-        // 증강 선택창이 펼쳐진 동안 3D 조작 차단
-        if (_augmentManager != null && _augmentManager.IsChoiceBlocking)
-        {
-            if (_held != null) CancelDrag();
-            return;
-        }
-
-        // 플러시/마이농 선택창이 펼쳐진 동안 3D 조작 차단(증강과 동일한 방식)
-        if (_uiManager != null && _uiManager.IsPlusleMinunChoiceBlocking)
-        {
-            if (_held != null) CancelDrag();
-            return;
-        }
-
-        // 파트너 재접속 대기 중엔 3D 조작 차단(증강/폼 선택창과 동일한 방식). 이 컨트롤러는 새 Input
-        // System을 직접 폴링해 EventSystem.enabled 토글(옵션창의 대기 모달 입력 차단)로는 막히지 않는다.
-        if (_network != null && _network.IsAwaitingPartnerReconnect)
-        {
-            if (_held != null) CancelDrag();
-            return;
-        }
-
-        // 파트너 전체화면 관전 중엔 3D 조작 차단(위와 동일한 방식). 관전 화면은 Canvas RawImage일
-        // 뿐이라 이 컨트롤러의 Main Camera 기반 Physics.Raycast를 막지 못해, 화면 뒤 내 실제
-        // 보드/벤치가 그대로 맞아 조작되는 입력 관통 버그가 있었다(2026-08 확인).
-        if (_uiManager != null && _uiManager.IsPartnerSpectateExpanded)
+        // 매치 종료(Victory/GameOver)·공용 모달·증강 선택·폼 선택·파트너 관전·재접속 대기.
+        // 이 컨트롤러는 새 Input System을 직접 폴링하고 Main Camera로 Physics.Raycast를 쏘므로,
+        // 모달의 Dim(Raycast Target 켜진 전체화면 Image)이 uGUI 클릭만 막아 줄 뿐 이쪽 입력은
+        // 그대로 관통한다 — 그래서 상황을 직접 확인해야 한다.
+        //
+        // 판단 목록은 GameplayInputBlock 한 곳에 모아 뒀다. 예전엔 여기와 ButtonHotkey가 같은
+        // 목록을 따로 나열해 한쪽만 갱신되는 드리프트가 있었다(2026-08 코드리뷰 지적).
+        if (GameplayInputBlock.IsBlocked())
         {
             if (_held != null) CancelDrag();
             return;
@@ -166,14 +128,6 @@ public class UnitDragController : MonoBehaviour
     {
         var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
         return phase != null && phase.CurrentPhase == GamePhase.Battle;
-    }
-
-    /// <summary>매치가 완전히 끝난 상태(Victory/GameOver)인지 — blacklist 가드(2026-08 코드리뷰 대응).
-    /// PartnerSpectateView.IsMatchEnded와 같은 판단 기준(Victory/GameOver만 거름)이다.</summary>
-    private static bool IsMatchEndedPhase()
-    {
-        var phase = GameManager.TryGet(out var gm) ? gm.Phase : null;
-        return phase != null && (phase.CurrentPhase == GamePhase.Victory || phase.CurrentPhase == GamePhase.GameOver);
     }
 
     /// <summary>

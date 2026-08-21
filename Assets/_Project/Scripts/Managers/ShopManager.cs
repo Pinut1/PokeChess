@@ -115,6 +115,9 @@ public class ShopManager : MonoBehaviour
     public int BuyXpCostGold => _buyXpCostGold;
     public int BuyXpAmount => _buyXpAmount;
 
+    /// <summary>라운드 시작 시 자동 지급되는 XP. 툴팁 등 UI 표시용 노출(BuyXp* 와 같은 이유).</summary>
+    public int RoundXpReward => _roundXpReward;
+
     public int ShopSize => _shopSize;
     public int ItemShopSize => _itemShopSize;
     public int ItemPrice => _itemPrice;
@@ -499,6 +502,10 @@ public class ShopManager : MonoBehaviour
         CurrentXp = _currentLevel >= _maxLevel ? 0 : restoredXp;
 
         Debug.Log($"[LevelXP] 재접속 복원: Lv.{_currentLevel}, XP {CurrentXp}/{RequiredXp}");
+
+        // 복원임을 먼저 알린다 — 뒤따르는 LevelChanged를 "플레이 중 레벨업"으로 오해하면
+        // 레벨업 연출 같은 일회성 피드백이 복원만으로 재생된다. 순서가 계약이므로 반드시 먼저 쏴야 한다.
+        GameEvents.ProgressionRestored(_currentLevel, CurrentXp);
 
         // LevelChanged는 ShopManager 자신의 HandleLevelChanged를 거쳐 UnitCapChanged까지 발행한다.
         GameEvents.LevelChanged(_currentLevel);

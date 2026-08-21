@@ -1,12 +1,23 @@
 using UnityEngine;
 
 /// <summary>
-/// 역할 설명창(RoleTooltipUI)을 여닫고 커서 오른쪽 위에 붙이는 쪽.
+/// 역할 설명창(RoleTooltipUI)을 여닫고 자리를 잡아 주는 쪽.
 ///
-/// ⚠️ <b>항상 활성인 오브젝트</b>(Canvas 등)에 붙일 것. 툴팁 자신에 붙이면
-/// 닫힌 동안 호출을 받지 못한다 — 다른 툴팁 컨트롤러와 같은 규약이다.
+/// 자리 잡는 방식이 둘이다(<see cref="_followCursor"/>).
+///   켜짐(기본) — 커서 오른쪽 위에 붙어 따라다닌다. 상점 카드·유닛처럼 <b>대상이 여럿</b>이라
+///                 어디에 띄울지 미리 정할 수 없는 툴팁용.
+///   꺼짐       — 씬에 배치해둔 자리에 그대로 뜬다. 화면에 버튼이 한 곳뿐이라
+///                 <b>뜰 자리가 정해져 있는</b> 안내 툴팁용(XP 구매 설명 등).
+///
+/// ⚠️ <b>툴팁 자신에는 붙이지 말 것</b> — 설명창은 씬에 꺼둔 채로 저장하므로 열어줄 쪽이 없어진다.
+/// 그 밖에는 꺼질 수 있는 패널에 붙어도 된다. 컨트롤러가 꺼지면 OnDisable이 자기 설명창을 같이 닫아,
+/// 호버 중이던 트리거가 정리를 빠뜨려도 설명창만 화면에 남지 않는다.
+/// (설명창 프리팹마다 컨트롤러가 하나씩 필요해서 "항상 활성인 오브젝트" 한 곳에 몰아넣으면
+/// 같은 이름의 컴포넌트가 여러 개 쌓여 인스펙터에서 구분이 안 되고, 필드에 끌어다 놓을 때
+/// 첫 번째 것이 자동으로 물린다 — 그래서 가까운 패널에 두는 편이 낫다.)
 ///
 /// 툴팁 루트의 <b>부모에는 레이아웃 그룹을 두지 말 것</b> — 여기서 잡은 위치를 매 프레임 되돌린다.
+/// (고정 자리 모드에서는 여기서 위치를 건드리지 않으므로 이 제약도 없다.)
 /// </summary>
 public class RoleTooltipController : MonoBehaviour
 {
@@ -14,7 +25,11 @@ public class RoleTooltipController : MonoBehaviour
     [Tooltip("씬에 배치해둔 설명창(RoleTooltip_Pf). 씬에는 꺼둔 상태로 저장할 것.")]
     [SerializeField] private RoleTooltipUI _panel;
 
-    [Header("커서 기준 위치")]
+    [Header("자리 잡기")]
+    [Tooltip("켜면 커서를 따라다닌다(기존 동작). 끄면 씬에 배치해둔 자리에 그대로 뜬다 — " +
+             "아래 커서 오프셋·화면 여백은 이 값이 켜져 있을 때만 쓰인다.")]
+    [SerializeField] private bool _followCursor = true;
+
     [Tooltip("커서로부터 떨어뜨릴 거리(픽셀). 오른쪽 위로 띄우려면 둘 다 양수.")]
     [SerializeField] private Vector2 _cursorOffset = new(18f, 18f);
 
@@ -40,6 +55,14 @@ public class RoleTooltipController : MonoBehaviour
 
         _panel.gameObject.SetActive(false);
     }
+
+    /// <summary>
+    /// 컨트롤러가 꺼질 때 자기 설명창도 닫는다. 설명창은 컨트롤러의 자식이 아니라 따로 배치돼 있어
+    /// 같이 사라지지 않으므로, 이게 없으면 <b>커서를 올린 채 패널이 꺼진 순간</b> 설명창만 화면에 남는다.
+    /// 지금은 트리거들이 각자 OnDisable에서 닫아주고 있어 드러나지 않지만, 이 컨트롤러를 재사용하는
+    /// 쪽이 그 정리를 빠뜨려도 붙박이가 생기지 않게 하는 마지막 안전장치다.
+    /// </summary>
+    private void OnDisable() => Close();
 
     /// <summary>
     /// 인스펙터에 안 물렸을 때의 폴백 탐색. 씬에 설명창이 <b>여러 개일 수 있다</b> —
@@ -135,7 +158,9 @@ public class RoleTooltipController : MonoBehaviour
         }
 
         _owner = owner;
-        Place(Input.mousePosition);
+
+        // 고정 자리 모드에서는 씬에 잡아둔 위치를 그대로 둔다.
+        if (_followCursor) Place(Input.mousePosition);
     }
 
     /// <summary>커서가 나갔을 때. 이미 다른 쪽이 띄운 툴팁은 건드리지 않는다.</summary>
@@ -159,9 +184,11 @@ public class RoleTooltipController : MonoBehaviour
         if (_panel != null) _panel.gameObject.SetActive(false);
     }
 
-    // 열려 있는 동안 커서를 따라간다.
+    // 열려 있는 동안 커서를 따라간다. 고정 자리 모드면 아무 것도 하지 않는다.
     private void LateUpdate()
     {
+        if (!_followCursor) return;
+
         if (_panel != null && _panel.gameObject.activeSelf)
             Place(Input.mousePosition);
     }
