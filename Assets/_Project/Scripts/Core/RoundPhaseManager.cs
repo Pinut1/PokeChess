@@ -106,6 +106,12 @@ public class RoundPhaseManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
+        // 이미 게임오버로 확정된 뒤 뒤늦게 도착한 다음 라운드 신호는 무시한다(HandleGameCleared와 동일 가드).
+        // 게임오버는 라운드 승패 경쟁과 무관하게 항복/접속끊김 포기 등 별도 경로로도 발생하므로,
+        // 그 경로로 이미 GameOver에 들어간 클라이언트가 뒤늦은 RoundChanged로 다시 상점 화면에
+        // 끌려나오는 걸 막는다(2026-08-21 코드리뷰 지적, PR #120 후속).
+        if (CurrentPhase == GamePhase.GameOver) return;
+
         CurrentRound = round;
         _teamRoundResolved = false;
         ResolveCurrentStage(round);
