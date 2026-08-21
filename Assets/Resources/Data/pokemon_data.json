@@ -2008,7 +2008,7 @@
         "Mutant"
       ],
       "role": "Assassin",
-      "obtainBy": "synergy",
+      "obtainBy": "bot",
       "evolvesInto": ""
     },
     {
@@ -2029,7 +2029,7 @@
         "Mutant"
       ],
       "role": "Warrior",
-      "obtainBy": "synergy",
+      "obtainBy": "bot",
       "evolvesInto": ""
     },
     {
@@ -2050,7 +2050,7 @@
         "Mutant"
       ],
       "role": "Tanker",
-      "obtainBy": "synergy",
+      "obtainBy": "bot",
       "evolvesInto": ""
     },
     {
@@ -2071,7 +2071,7 @@
         "Mutant"
       ],
       "role": "Magician",
-      "obtainBy": "synergy",
+      "obtainBy": "bot",
       "evolvesInto": ""
     },
     {

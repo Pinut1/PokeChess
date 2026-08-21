@@ -65,13 +65,19 @@ public class PokemonData : ScriptableObject
     /// 플레이어가 어떤 경로로든 보유할 수 있는 포켓몬인지. 적(봇) 전용이면 false.
     /// 시너지 목록·도감처럼 "내가 쓸 수 있는 유닛"을 보여주는 UI는 이걸로 걸러야 한다.
     ///
-    /// 현재 적 전용은 obtainBy=wild 하나뿐(잉어킹). evolution·stone·trade·synergy는
-    /// 상점에 안 나올 뿐 플레이어가 얻는 유닛이므로 true다.
+    /// 플레이어가 못 쓰는 경로는 둘이다:
+    ///  - obtainBy=wild — 적 전용(잉어킹)
+    ///  - obtainBy=bot  — 시너지가 전투 중 소환하는 봇(돌연변이의 에브이·블래키·글레이시아·님피아).
+    ///                    소환물이라 보드에 올릴 수 없다.
+    /// evolution·stone·trade·synergy는 상점에 안 나올 뿐 플레이어가 얻는 유닛이므로 true다
+    /// (synergy = 플러시·마이농처럼 시너지로 <b>획득</b>하는 유닛. bot과 헷갈리지 말 것 —
+    ///  예전엔 둘을 synergy 하나로 뭉쳐놔서 돌연변이 툴팁에 소환 봇 4종이 같이 떴다. 2026-08-22).
     /// ⚠️ obtainBy가 비어 있으면(구 데이터·미임포트) 안전하게 true로 본다 —
     /// 새로 추가된 필드라 <b>Import Pokemon JSON을 다시 돌려야</b> 값이 채워진다.
     /// </summary>
     public bool IsPlayerObtainable =>
-        !string.Equals(obtainBy, "wild", System.StringComparison.OrdinalIgnoreCase);
+        !string.Equals(obtainBy, "wild", System.StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(obtainBy, "bot",  System.StringComparison.OrdinalIgnoreCase);
 
     [Header("에셋 참조")]
     public GameObject modelPrefab;
