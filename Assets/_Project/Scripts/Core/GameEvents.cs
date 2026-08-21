@@ -25,7 +25,8 @@ public enum SessionEndReason
     ReconnectFailed,   // 본인 재접속 실패
     PartnerAbandoned,  // 상대 미재접속(협동 불가)
     BothDisconnected,  // 둘 다 연결 끊김
-    Surrender          // 2인 합의 항복(옵션창)
+    Surrender,         // 2인 합의 항복(옵션창)
+    PartnerResultUnresponsive // 상대는 연결돼 있는데 전투 결과 응답만 없어 포기(진짜 이탈 아님, 2026-08-22 추가)
 }
 
 /// <summary>

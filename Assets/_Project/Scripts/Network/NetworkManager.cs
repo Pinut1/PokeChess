@@ -906,7 +906,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void ConfirmPartnerDisconnectGiveUp()
     {
-        GameEvents.SessionEnded(SessionEndReason.PartnerAbandoned);
+        // 대기 화면은 같지만 사유는 구분해서 전적에 남긴다 — 진짜 이탈(PartnerAbandoned)과
+        // "연결은 살아있는데 결과 응답만 없어서 포기"(PartnerResultUnresponsive)는 다른 상황이다
+        // (2026-08-22 코드리뷰 지적 — 하나로 뭉뚱그리면 일시적 응답 지연이 파트너가 진짜로
+        // 게임을 버렸다고 잘못 기록된다).
+        SessionEndReason reason = _partnerResultUnresponsive
+            ? SessionEndReason.PartnerResultUnresponsive
+            : SessionEndReason.PartnerAbandoned;
+        GameEvents.SessionEnded(reason);
     }
 
     // ─────────────────────────────────────────
@@ -3499,6 +3506,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             ResolveTeamRound(); // 막판에 도착한 경우 — 정상 판정
             return;
         }
+
+        // 방장 자신도 아직 결과를 안 보고했으면(전투가 안 끝났거나, QA 억제 토글을 자기 자신에게
+        // 켜놨거나) 안 온 게 파트너 쪽이라고 단정할 근거가 없다 — 여기서 "파트너 응답 불능"으로
+        // 잘못 진단하면 정작 문제는 내 쪽인데 상대를 탓하는 모달이 뜬다(2026-08-22 코드리뷰 지적).
+        if (!_lastLocalBattleResult.HasValue) return;
 
         // 파트너가 진짜로 Photon 방을 나갔으면(IsInactive) OnPlayerLeftRoom 경로가 이미 처리 중이다 —
         // 여기서 또 진단을 띄우면 이미 뜬 "진짜 이탈" 모달 위에 우리 모달까지 겹쳐 뜨는 꼴이 된다.
