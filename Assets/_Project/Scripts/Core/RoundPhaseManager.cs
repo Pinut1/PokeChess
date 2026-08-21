@@ -45,6 +45,9 @@ public class RoundPhaseManager : MonoBehaviour
     /// <summary>이번 라운드 팀 결과(OnTeamRoundResolved)가 도착했는지. 라운드 시작 시 리셋.</summary>
     private bool _teamRoundResolved;
 
+    /// <summary>가장 최근 도착한 팀 라운드 결과. _teamRoundResolved가 true일 때만 유효.</summary>
+    private TeamRoundOutcome _lastTeamRoundOutcome;
+
     /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다(전투 최대 길이 MAX_TICKS*TICK_INTERVAL=30s와 동일).
     /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).</summary>
     private const float TEAM_RESULT_SAFETY_TIMEOUT = 30f;
@@ -79,7 +82,11 @@ public class RoundPhaseManager : MonoBehaviour
         GameEvents.OnTeamRoundResolved    -= HandleTeamRoundResolved;
     }
 
-    private void HandleTeamRoundResolved(TeamRoundOutcome outcome) => _teamRoundResolved = true;
+    private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
+    {
+        _lastTeamRoundOutcome = outcome;
+        _teamRoundResolved = true;
+    }
 
     // ─────────────────────────────────────────
     // 이벤트 핸들러
@@ -288,6 +295,21 @@ public class RoundPhaseManager : MonoBehaviour
         }
         if (!_teamRoundResolved)
             Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
+
+        // 팀이 이번 라운드에서 패배 확정(BothLose)됐으면 여기서는 다음 라운드/완주 어느 쪽도 방송하지 않는다.
+        // HP 소진에 따른 게임오버 전환은 NetworkManager의 TeamHP Room 속성 갱신(비동기, 별도 네트워크 메시지)이
+        // 처리하는데, 그 전환을 기다리지 않고 여기서 곧장 라운드 번호만으로 완주를 판정하면 게임오버 전환이
+        // 아직 도착하기 전에 승리 화면이 먼저 방송되는 레이스가 생길 수 있다(2026-08 코드리뷰 지적).
+        // ⚠️ 이 스킵은 PlayerHealthManager._maxLives=1(공용 라이프 1개) 전제 하에 안전하다 — BothLose가
+        // 항상 즉시 게임오버라 "다음 라운드로 진행"할 경우 자체가 없기 때문. 나중에 라이프가 여러 개로
+        // 바뀌면(밸런스 기획 확정 전) 이 조건을 "BothLose && 라이프 소진"으로 좁혀야 한다.
+        // NetworkManager.DebugInfiniteTeamHealth(QA 무한 HP 토글)가 켜져 있으면 ApplyTeamDamageLocal이
+        // 데미지를 무시해 HP가 실제로는 안 깎이므로(NetworkManager.cs의 ApplyTeamDamageLocal 참고),
+        // 게임오버 전환도 영영 안 온다 — 이땐 스킵하지 않고 그대로 다음 라운드/완주 판정을 진행한다
+        // (2026-08 코드리뷰 지적 — 스킵을 무조건 걸면 무한 HP 테스트 중 Result 페이즈에서 영구 정지됨).
+        if (_teamRoundResolved && _lastTeamRoundOutcome == TeamRoundOutcome.BothLose &&
+            !NetworkManager.DebugInfiniteTeamHealth)
+            yield break;
 
         // 최종 라운드를 클리어했으면 다음 라운드 대신 완주(Victory)를 알린다.
         // (StageDatabase.GetForRound는 stages가 비지 않으면 항상 클램프해 null을 안 주므로

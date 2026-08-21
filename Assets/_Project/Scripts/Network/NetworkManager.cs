@@ -3287,10 +3287,18 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private bool HasActiveRoundInRoom()
     {
+        return TryGetCurrentRoundFromRoom(out int round) && round >= 1;
+    }
+
+    /// <summary>Room CustomProperties의 ROUND_PROP_KEY를 안전하게 정수로 읽는다. Room이 없거나
+    /// 값이 없거나 예상 타입이 아니면 false(round는 0).</summary>
+    private bool TryGetCurrentRoundFromRoom(out int round)
+    {
+        round = 0;
         if (PhotonNetwork.CurrentRoom == null) return false;
         if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundValue)) return false;
 
-        try { return System.Convert.ToInt32(roundValue) >= 1; }
+        try { round = System.Convert.ToInt32(roundValue); return true; }
         catch (System.Exception) { return false; }
     }
 
@@ -3364,7 +3372,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>
     /// MasterClient: 두 플레이어 승패를 집계해 팀 결과 판정 → 라이프 차감 + 전체 브로드캐스트.
     /// 승리 수: 2=BothWin, 1=Split, 0=BothLose. 라이프 차감은 BothWin(둘 다 승리)이 아닌 한 항상 발생한다 —
-    /// 한 명만 져도(Split) 라운드 상관없이 즉시 -1.
+    /// 한 명만 져도(Split) 라운드 상관없이 즉시 -1(과거 최종보스 5라운드 한정 승격 규칙은 이 일반 규칙에
+    /// 흡수되어 제거됨 — outcome을 구분해 쓰는 구독자가 없어 Split→BothLose 승격 자체가 더 이상 의미 없었음).
     /// </summary>
     private void ResolveTeamRound()
     {
