@@ -326,8 +326,11 @@ public class RoundPhaseManager : MonoBehaviour
             }
             if (!diagnosed && waited >= TEAM_RESULT_DIAGNOSE_AT)
             {
-                diagnosed = true;
-                network.DiagnosePartnerUnresponsiveIfNeeded();
+                // 반환값이 true일 때만 래치한다 — false는 "아직 방장 자신 결과도 없어서 아무 것도
+                // 못 정했다"는 뜻이라, 여기서 무조건 true로 래치해버리면 화면에 아무 것도 안 뜬 채로
+                // 안전 타임아웃까지 무력화돼 영구 정지한다(2026-08-22 코드리뷰 지적 — 실제 회귀였음).
+                // false면 다음 프레임에 다시 시도한다.
+                diagnosed = network.DiagnosePartnerUnresponsiveIfNeeded();
             }
         }
         if (!_teamRoundResolved)

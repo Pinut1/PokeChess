@@ -865,9 +865,13 @@ public class OptionsPanelUI : MonoBehaviour
 
     /// <summary>
     /// 종료 확인의 두 선택지. 패배 기록(SessionEnded)은 여기서 실제로 고른 시점에만 발행된다.
-    /// "타이틀로"는 PartnerAbandoned로 완전히 끝난 매치이므로 ReturnToTitleAfterMatchEnd(완료 매치
-    /// 전용 경로 — 저장된 재접속 세션까지 정리)를 탄다(2026-08 코드리뷰 대응). 일반 ConfirmReturnToTitle을
-    /// 쓰면 재접속 세션이 남아 타이틀의 [이전 게임으로 들어가기]에 이미 끝난 매치가 잘못 노출된다.
+    /// "타이틀로"는 완전히 끝난 매치이므로 ReturnToTitleAfterMatchEnd(완료 매치 전용 경로 — 저장된
+    /// 재접속 세션까지 정리)를 탄다(2026-08 코드리뷰 대응). 일반 ConfirmReturnToTitle을 쓰면 재접속
+    /// 세션이 남아 타이틀의 [이전 게임으로 들어가기]에 이미 끝난 매치가 잘못 노출된다.
+    /// 이 모달은 "진짜 이탈"과 "파트너 응답 불능" 양쪽에서 공유하는데, 사유는
+    /// gameManager.Network.ConfirmPartnerDisconnectGiveUp() 내부에서 결정되는 것과 반드시 같아야
+    /// 한다 — 여기서 따로 PartnerAbandoned로 고정하면 전적 기록과 재접속 세션 정리 로그가 서로 다른
+    /// 사유를 가리키게 된다(2026-08-22 코드리뷰 지적).
     /// </summary>
     private void HandlePartnerDisconnectGiveUp(bool returnToTitle)
     {
@@ -876,10 +880,18 @@ public class OptionsPanelUI : MonoBehaviour
         _partnerDisconnectModalOpen = false;
         _partnerGiveUpAvailable = false;
 
+        bool isResultUnresponsive = false;
         if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+        {
+            isResultUnresponsive = gameManager.Network.IsPartnerResultUnresponsive;
             gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+        }
 
-        if (returnToTitle) ReturnToTitleAfterMatchEnd(SessionEndReason.PartnerAbandoned);
+        SessionEndReason reason = isResultUnresponsive
+            ? SessionEndReason.PartnerResultUnresponsive
+            : SessionEndReason.PartnerAbandoned;
+
+        if (returnToTitle) ReturnToTitleAfterMatchEnd(reason);
         else QuitGame();
     }
 

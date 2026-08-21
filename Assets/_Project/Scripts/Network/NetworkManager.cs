@@ -546,6 +546,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// ShopManager/ItemManager/UnitDragController 등 입력 처리부가 공통으로 체크해 대기 중 조작을 막는다(2026-08).</summary>
     public bool IsAwaitingPartnerReconnect => _opponentDisconnected;
 
+    /// <summary>지금 대기 중인 사유가 "진짜 이탈"이 아니라 "파트너 응답 불능"인지. OptionsPanelUI가
+    /// [포기하기] 이후 처리에서 SessionEndReason을 고를 때 ConfirmPartnerDisconnectGiveUp()과
+    /// 똑같은 판단을 하기 위해 공개한다(2026-08-22 코드리뷰 지적 — 안 맞추면 전적엔 정확히 기록되는데
+    /// 재접속 세션 정리 로그에는 늘 "PartnerAbandoned"로만 남아 실제 사유와 어긋났다).</summary>
+    public bool IsPartnerResultUnresponsive => _partnerResultUnresponsive;
+
     /// <summary>디버그 로그에 UserId 전체를 남기지 않기 위한 축약 표시(앞 8자).</summary>
     private static string ShortUserId(string userId) =>
         string.IsNullOrEmpty(userId) ? "(없음)" : userId[..Mathf.Min(8, userId.Length)];
@@ -3505,25 +3511,35 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// (2026-08-21 티켓 — 방장 결과로 승패를 추측하던 이전 방식은 라이프 차감이 잘못 스킵되는
     /// 비대칭 버그가 있어 제거함. PR #120 참고).
     /// </summary>
-    public void DiagnosePartnerUnresponsiveIfNeeded()
+    public bool DiagnosePartnerUnresponsiveIfNeeded()
     {
-        if (_soloMode || !IsMasterClient || _roundResultResolved || _partnerResultUnresponsive) return;
+        // 반환값은 "더 이상 안전 타임아웃을 걱정 안 해도 되는지"다 — RoundPhaseManager.ResultTimer가
+        // 이 값을 그대로 diagnosed 래치에 쓴다. true를 주는 모든 경로는 이미 뭔가가(정상 판정 완료,
+        // 진단 모달 노출, 실제 이탈 흐름 진행 중) 화면에 반영됐거나 반영될 예정인 경우다. 반대로
+        // "아직 아무 것도 모른다"인 경우(false)에 true를 잘못 주면, ResultTimer가 무기한 대기로
+        // 넘어가버려 안전 타임아웃도 화면도 영영 없이 조용히 멈춰버린다(2026-08-22 코드리뷰 지적 —
+        // 이 함수가 void였을 때 호출 자체만으로 diagnosed=true가 래치돼 실제로 이 버그가 있었다).
+        if (_soloMode || !IsMasterClient) return true;  // 이 클라이언트가 판단할 상황이 아님 — 더 볼 것 없음
+        if (_roundResultResolved || _partnerResultUnresponsive) return true; // 이미 처리됨
 
         if (AllPlayersReportedResult())
         {
             ResolveTeamRound(); // 막판에 도착한 경우 — 정상 판정
-            return;
+            return true;
         }
 
         // 방장 자신도 아직 결과를 안 보고했으면(전투가 안 끝났거나, QA 억제 토글을 자기 자신에게
         // 켜놨거나) 안 온 게 파트너 쪽이라고 단정할 근거가 없다 — 여기서 "파트너 응답 불능"으로
         // 잘못 진단하면 정작 문제는 내 쪽인데 상대를 탓하는 모달이 뜬다(2026-08-22 코드리뷰 지적).
-        if (!_lastLocalBattleResult.HasValue) return;
+        // 아직 아무 결론도 못 냈으므로 false — ResultTimer가 안전 타임아웃을 계속 적용하며
+        // 다음 프레임에 다시 시도하게 한다.
+        if (!_lastLocalBattleResult.HasValue) return false;
 
         // 파트너가 진짜로 Photon 방을 나갔으면(IsInactive) OnPlayerLeftRoom 경로가 이미 처리 중이다 —
         // 여기서 또 진단을 띄우면 이미 뜬 "진짜 이탈" 모달 위에 우리 모달까지 겹쳐 뜨는 꼴이 된다.
+        // 그쪽 흐름이 이미 화면을 책임지고 있으므로 true(더 볼 것 없음).
         Player[] others = PhotonNetwork.PlayerListOthers;
-        if (others == null || others.Length == 0 || others[0].IsInactive) return;
+        if (others == null || others.Length == 0 || others[0].IsInactive) return true;
 
         _partnerResultUnresponsive = true;
         Debug.LogWarning("[Network] 팀 결과 재전송 후에도 미수신 — 파트너 응답 불능 진단, 이탈 UX로 위임");
@@ -3537,6 +3553,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_partnerUnresponsiveGraceRoutine != null)
             StopCoroutine(_partnerUnresponsiveGraceRoutine);
         _partnerUnresponsiveGraceRoutine = StartCoroutine(PartnerUnresponsiveGraceRoutine());
+        return true;
     }
 
     /// <summary>OpponentGraceRoutine과 동일한 타이밍(GIVE_UP_AVAILABLE_DELAY)으로 [포기하기] 노출을 알린다.
@@ -4073,6 +4090,7 @@ public class NetworkManager : MonoBehaviour
     public bool RejoinFailed           => false;
     public bool PartnerGaveUpReconnect => false;
     public bool IsAwaitingPartnerReconnect => false; // 오프라인은 파트너 이탈 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsPartnerResultUnresponsive => false; // 오프라인은 파트너 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsResumingRejoinedMatch => false; // 오프라인은 재접속 개념 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsApplyingReconnectRoundCatchup => false; // 오프라인은 재접속 캐치업 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public void AttemptRejoinSavedSession()          { }
@@ -4228,7 +4246,7 @@ public class NetworkManager : MonoBehaviour
     public void RequestBattleResultResendIfNeeded() { }
 
     /// <summary>위 RequestBattleResultResendIfNeeded와 동일 이유로 no-op.</summary>
-    public void DiagnosePartnerUnresponsiveIfNeeded() { }
+    public bool DiagnosePartnerUnresponsiveIfNeeded() => true; // 오프라인은 즉시 판정이라 더 볼 것 없음
 
     /// <summary>오프라인은 억제할 대상 자체가 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
     public void DebugSendSuppressedBattleResultNow() { }
