@@ -1,12 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// 역할 설명창(RoleTooltipUI)을 여닫고 커서 오른쪽 위에 붙이는 쪽.
+/// 역할 설명창(RoleTooltipUI)을 여닫고 자리를 잡아 주는 쪽.
+///
+/// 자리 잡는 방식이 둘이다(<see cref="_followCursor"/>).
+///   켜짐(기본) — 커서 오른쪽 위에 붙어 따라다닌다. 상점 카드·유닛처럼 <b>대상이 여럿</b>이라
+///                 어디에 띄울지 미리 정할 수 없는 툴팁용.
+///   꺼짐       — 씬에 배치해둔 자리에 그대로 뜬다. 화면에 버튼이 한 곳뿐이라
+///                 <b>뜰 자리가 정해져 있는</b> 안내 툴팁용(XP 구매 설명 등).
 ///
 /// ⚠️ <b>항상 활성인 오브젝트</b>(Canvas 등)에 붙일 것. 툴팁 자신에 붙이면
 /// 닫힌 동안 호출을 받지 못한다 — 다른 툴팁 컨트롤러와 같은 규약이다.
 ///
 /// 툴팁 루트의 <b>부모에는 레이아웃 그룹을 두지 말 것</b> — 여기서 잡은 위치를 매 프레임 되돌린다.
+/// (고정 자리 모드에서는 여기서 위치를 건드리지 않으므로 이 제약도 없다.)
 /// </summary>
 public class RoleTooltipController : MonoBehaviour
 {
@@ -14,7 +21,11 @@ public class RoleTooltipController : MonoBehaviour
     [Tooltip("씬에 배치해둔 설명창(RoleTooltip_Pf). 씬에는 꺼둔 상태로 저장할 것.")]
     [SerializeField] private RoleTooltipUI _panel;
 
-    [Header("커서 기준 위치")]
+    [Header("자리 잡기")]
+    [Tooltip("켜면 커서를 따라다닌다(기존 동작). 끄면 씬에 배치해둔 자리에 그대로 뜬다 — " +
+             "아래 커서 오프셋·화면 여백은 이 값이 켜져 있을 때만 쓰인다.")]
+    [SerializeField] private bool _followCursor = true;
+
     [Tooltip("커서로부터 떨어뜨릴 거리(픽셀). 오른쪽 위로 띄우려면 둘 다 양수.")]
     [SerializeField] private Vector2 _cursorOffset = new(18f, 18f);
 
@@ -135,7 +146,9 @@ public class RoleTooltipController : MonoBehaviour
         }
 
         _owner = owner;
-        Place(Input.mousePosition);
+
+        // 고정 자리 모드에서는 씬에 잡아둔 위치를 그대로 둔다.
+        if (_followCursor) Place(Input.mousePosition);
     }
 
     /// <summary>커서가 나갔을 때. 이미 다른 쪽이 띄운 툴팁은 건드리지 않는다.</summary>
@@ -159,9 +172,11 @@ public class RoleTooltipController : MonoBehaviour
         if (_panel != null) _panel.gameObject.SetActive(false);
     }
 
-    // 열려 있는 동안 커서를 따라간다.
+    // 열려 있는 동안 커서를 따라간다. 고정 자리 모드면 아무 것도 하지 않는다.
     private void LateUpdate()
     {
+        if (!_followCursor) return;
+
         if (_panel != null && _panel.gameObject.activeSelf)
             Place(Input.mousePosition);
     }

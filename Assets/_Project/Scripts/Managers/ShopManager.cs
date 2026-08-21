@@ -115,6 +115,9 @@ public class ShopManager : MonoBehaviour
     public int BuyXpCostGold => _buyXpCostGold;
     public int BuyXpAmount => _buyXpAmount;
 
+    /// <summary>라운드 시작 시 자동 지급되는 XP. 툴팁 등 UI 표시용 노출(BuyXp* 와 같은 이유).</summary>
+    public int RoundXpReward => _roundXpReward;
+
     public int ShopSize => _shopSize;
     public int ItemShopSize => _itemShopSize;
     public int ItemPrice => _itemPrice;
