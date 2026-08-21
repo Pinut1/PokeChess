@@ -94,6 +94,59 @@ public class ItemManager : MonoBehaviour
     // ──────────────────────────────────────────
 
     /// <summary>
+    /// 재접속 복원 전용 — 저장된 인벤토리 상태를 부작용 없이 직접 반영한다.
+    ///
+    /// AddItem/AddStone/AddItemCoupon 같은 정상 획득 경로를 쓰지 않는 이유:
+    /// 그쪽은 인벤토리 상한 검사·로그·조합 판정 같은 획득 시점 동작을 동반하는데,
+    /// 복원은 "이미 갖고 있던 것을 그대로 되돌리는" 것이라 그 동작이 다시 일어나면 안 된다
+    /// (ShopManager.RestoreProgressionState / RestoreRerollCount와 같은 규약).
+    ///
+    /// id로 넘기는 이유는 Photon CustomProperties에 ScriptableObject 참조를 담을 수 없어서다.
+    /// DB에서 못 찾은 id는 조용히 버리지 않고 경고를 남긴다 — 데이터가 바뀌어 사라진 아이템을
+    /// 알아채지 못하면 "재접속했더니 아이템이 몇 개 없어졌다"가 원인 불명으로 남는다.
+    /// </summary>
+    public void RestoreInventoryState(int[] itemIds, int[] stoneIds, bool hasRemover,
+                                      int reforgerCount, int itemCoupon)
+    {
+        _items.Clear();
+        _stones.Clear();
+
+        var itemDb  = ItemDatabase.Instance;
+        var stoneDb = EvolutionStoneDatabase.Instance;
+
+        if (itemIds != null && itemDb != null)
+        {
+            foreach (int id in itemIds)
+            {
+                ItemData data = itemDb.GetById(id);
+                if (data != null) _items.Add(data);
+                else Debug.LogWarning($"[Item][Rejoin] 아이템 id {id}를 DB에서 못 찾아 복원에서 빠졌습니다.");
+            }
+        }
+
+        if (stoneIds != null && stoneDb != null)
+        {
+            foreach (int id in stoneIds)
+            {
+                EvolutionStoneData data = stoneDb.GetById(id);
+                if (data != null) _stones.Add(data);
+                else Debug.LogWarning($"[Item][Rejoin] 진화의 돌 id {id}를 DB에서 못 찾아 복원에서 빠졌습니다.");
+            }
+        }
+
+        _hasRemover   = hasRemover;
+        ReforgerCount = Mathf.Max(0, reforgerCount);
+        ItemCoupon    = Mathf.Max(0, itemCoupon);
+
+        Debug.Log($"[Item][Rejoin] 인벤토리 복원: 아이템 {_items.Count} / 돌 {_stones.Count} / " +
+                  $"제거기 {(_hasRemover ? "O" : "X")} / 재조합기 {ReforgerCount} / 쿠폰 {ItemCoupon} " +
+                  $"({InventoryCount}/{MAX_INVENTORY_SIZE})");
+
+        GameEvents.InventoryChanged();
+        GameEvents.ItemCouponChanged(ItemCoupon);
+    }
+
+    /// <summary>
     /// 아이템 쿠폰을 증가 또는 감소시킨다.
     /// 결과는 0 미만으로 내려가지 않는다.
     /// </summary>

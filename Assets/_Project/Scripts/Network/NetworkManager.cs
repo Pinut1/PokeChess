@@ -123,6 +123,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// CustomProperties에 저장할 때 쓰는 키(1차 구현 — 저장/복원 기반만).</summary>
     private const string UNITS_PROP_KEY = "Units";
 
+    /// <summary>인벤토리(장착 안 한 아이템·진화의 돌·제거기·재조합기·쿠폰)를 저장할 때 쓰는 키.
+    /// 유닛에 <b>장착된</b> 아이템은 UNITS_PROP_KEY(UnitSaveData.ItemIds)가 이미 들고 있다 —
+    /// 여긴 "들고만 있던 것"이라 저장 위치가 따로 없어 재접속 때 통째로 사라지던 부분이다
+    /// (2026-08-22 추가).</summary>
+    private const string ITEM_INVENTORY_PROP_KEY = "Inventory";
+
     /// <summary>유닛 스냅샷 저장 디바운스 지연(초). 벤치 정리처럼 배치/판매 이벤트가 짧은 시간에
     /// 연달아 발생해도 SetCustomProperties를 매번 동기 호출하지 않고, 마지막 변경 후 이 시간만큼
     /// 조용하면 그때 한 번만 저장한다(Photon CustomProperties 갱신 빈도 제한 회피, 2026-08 코드리뷰).</summary>
@@ -135,6 +141,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 발생시키는 OnUnitPlaced/OnUnitBenched로 인해 저장 핸들러가 재실행되며 불완전한 스냅샷을
     /// 덮어쓰는 것을 막는다(2026-08 설계 검토에서 확인된 위험).</summary>
     private bool _isRestoringUnitSnapshot;
+    private bool _isRestoringInventory;
+    private Coroutine _saveInventoryCoroutine;
 
     /// <summary>
     /// ResyncAfterReconnect()의 라운드 캐치업(RPC_OnRoundStart 로컬 호출) 실행 중인지. 이 호출이
@@ -153,6 +161,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     /// <summary>UnitSaveData[]를 JsonUtility로 직렬화하기 위한 래퍼(JsonUtility는 배열을 루트로 직렬화 못 함).
     /// 순수 JSON 변환 전용 — BoardManager는 이 타입을 몰라도 된다.</summary>
+    /// <summary>인벤토리 저장용 직렬화 래퍼. Photon에 ScriptableObject 참조를 담을 수 없어 전부 id로 옮긴다.</summary>
+    [System.Serializable]
+    private class InventorySnapshot
+    {
+        public int[] itemIds;
+        public int[] stoneIds;
+        public bool  hasRemover;
+        public int   reforgerCount;
+        public int   itemCoupon;
+    }
+
     [System.Serializable]
     private class UnitSnapshotWrapper
     {
@@ -330,6 +349,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnUnitChanged += HandleUnitSnapshotDirty;
         GameEvents.OnInventoryChanged += HandleUnitSnapshotDirtyNoArg;
 
+        // 인벤토리 스냅샷(장착 안 한 아이템·돌·제거기·재조합기·쿠폰) 저장 트리거.
+        // OnInventoryChanged는 유닛 스냅샷도 같이 갱신해야 해서 위와 중복 구독한다 —
+        // 장착/해제가 두 스냅샷을 동시에 바꾸기 때문이다.
+        GameEvents.OnInventoryChanged  += HandleInventoryDirty;
+        GameEvents.OnItemCouponChanged += HandleItemCouponDirty;
+
         // 미러 정확도 검증(2026-08-22, 판정에는 미사용) — ResolveTeamRound에서 파트너의 실제
         // 보고값과 대조 로그를 남기기 위해 미러 결과를 받아 캐시만 해둔다.
         GameEvents.OnPartnerMirrorBattleCompleted += HandlePartnerMirrorBattleCompleted;
@@ -347,6 +372,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         GameEvents.OnUnitSold -= HandleUnitSnapshotDirty;
         GameEvents.OnUnitChanged -= HandleUnitSnapshotDirty;
         GameEvents.OnInventoryChanged -= HandleUnitSnapshotDirtyNoArg;
+        GameEvents.OnInventoryChanged  -= HandleInventoryDirty;
+        GameEvents.OnItemCouponChanged -= HandleItemCouponDirty;
 
         base.OnDisable();
     }
@@ -4089,6 +4116,29 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 gm.Augment.RestoreAugmentByNameEn(nameEn);
         }
 
+        // 인벤토리(장착 안 한 아이템·돌·제거기·재조합기·쿠폰). 유닛에 장착된 아이템은 아래
+        // 유닛 스냅샷이 따로 들고 있다. 저장 위치가 없어 재접속 때 통째로 사라지던 부분이다
+        // (2026-08-22 추가). 복원 중 발행되는 InventoryChanged/ItemCouponChanged가 곧바로
+        // 저장을 다시 걸지 않도록 가드로 감싼다.
+        if (gm.Item != null && myProps.TryGetValue(ITEM_INVENTORY_PROP_KEY, out object myInvJson) &&
+            myInvJson is string invJson && !string.IsNullOrEmpty(invJson))
+        {
+            InventorySnapshot inv = null;
+            try { inv = JsonUtility.FromJson<InventorySnapshot>(invJson); }
+            catch (System.Exception e) { Debug.LogError($"[Network][Rejoin] 인벤토리 스냅샷 파싱 실패: {e.Message}"); }
+
+            if (inv != null)
+            {
+                _isRestoringInventory = true;
+                try
+                {
+                    gm.Item.RestoreInventoryState(inv.itemIds, inv.stoneIds, inv.hasRemover,
+                                                  inv.reforgerCount, inv.itemCoupon);
+                }
+                finally { _isRestoringInventory = false; }
+            }
+        }
+
         // 유닛/보드/벤치(1차 구현) — BoardManager.RestoreFromSnapshot()이 기존 TryPlaceUnit/
         // TryPlaceInBench를 재사용하며 OnUnitPlaced/OnUnitBenched를 그대로 발생시키므로,
         // 그 이벤트로 다시 저장 핸들러가 실행돼 불완전한 스냅샷을 덮어쓰지 않도록 가드로 감싼다.
@@ -4120,6 +4170,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>유닛 스냅샷 저장 트리거(인자 없는 이벤트용, OnInventoryChanged). 복원 중엔 무시한다.</summary>
     private void HandleUnitSnapshotDirtyNoArg() => RequestSaveUnitSnapshot();
 
+    /// <summary>인벤토리 스냅샷 저장 트리거.</summary>
+    private void HandleInventoryDirty() => RequestSaveInventorySnapshot();
+
+    /// <summary>쿠폰도 같은 스냅샷에 들어 있어 변경 시 함께 저장한다.</summary>
+    private void HandleItemCouponDirty(int _) => RequestSaveInventorySnapshot();
+
     /// <summary>
     /// 유닛 스냅샷 저장을 디바운스로 예약한다. 벤치 정리처럼 배치/판매 이벤트가 한 프레임 사이에
     /// 여러 번 연달아 발생해도, 매번 직렬화+SetCustomProperties를 동기 호출하지 않고 마지막 요청
@@ -4139,6 +4195,60 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         yield return new WaitForSeconds(UNIT_SNAPSHOT_SAVE_DELAY);
         _saveUnitSnapshotCoroutine = null;
         SaveUnitSnapshot();
+    }
+
+    /// <summary>인벤토리 저장 트리거. 복원 중이거나 방 밖이면 무시한다(유닛 스냅샷과 같은 규약).</summary>
+    private void RequestSaveInventorySnapshot()
+    {
+        if (_isRestoringInventory) return;
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+
+        if (_saveInventoryCoroutine != null) StopCoroutine(_saveInventoryCoroutine);
+        _saveInventoryCoroutine = StartCoroutine(SaveInventoryAfterDelay());
+    }
+
+    private System.Collections.IEnumerator SaveInventoryAfterDelay()
+    {
+        yield return new WaitForSeconds(UNIT_SNAPSHOT_SAVE_DELAY);
+        _saveInventoryCoroutine = null;
+        SaveInventorySnapshot();
+    }
+
+    /// <summary>
+    /// 인벤토리(장착 안 한 아이템·돌·제거기·재조합기·쿠폰)를 Player CustomProperties에 저장한다.
+    /// 유닛에 장착된 아이템은 SaveUnitSnapshot이 이미 담으므로 여기선 다루지 않는다.
+    /// </summary>
+    private void SaveInventorySnapshot()
+    {
+        if (_soloMode || !PhotonNetwork.InRoom || _isLeavingRoom) return;
+        if (!GameManager.TryGet(out var gm) || gm.Item == null) return;
+
+        var item = gm.Item;
+        var snapshot = new InventorySnapshot
+        {
+            itemIds       = IdsOf(item.Items,  d => d.id),
+            stoneIds      = IdsOf(item.Stones, d => d.id),
+            hasRemover    = item.HasRemover,
+            reforgerCount = item.ReforgerCount,
+            itemCoupon    = item.ItemCoupon,
+        };
+
+        string json = JsonUtility.ToJson(snapshot);
+        PhotonNetwork.LocalPlayer.SetCustomProperties(
+            new Hashtable { { ITEM_INVENTORY_PROP_KEY, json } });
+    }
+
+    /// <summary>ScriptableObject 목록을 id 배열로. null 항목은 건너뛴다.</summary>
+    private static int[] IdsOf<T>(System.Collections.Generic.IReadOnlyList<T> list,
+                                  System.Func<T, int> idOf) where T : class
+    {
+        if (list == null || list.Count == 0) return System.Array.Empty<int>();
+
+        var result = new System.Collections.Generic.List<int>(list.Count);
+        foreach (T entry in list)
+            if (entry != null) result.Add(idOf(entry));
+
+        return result.ToArray();
     }
 
     /// <summary>
