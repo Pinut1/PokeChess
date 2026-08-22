@@ -102,6 +102,14 @@ public class PartnerSpectateView : MonoBehaviour
     /// 함께 리셋된다.</summary>
     private int? _completedMirrorRoundIndex;
 
+    /// <summary>지금 미러 전투가 돌고 있는 라운드 번호(BattleSnapshot.roundIndex). null이면 실행 중인
+    /// 미러 없음. HandlePartnerBattleSnapshotChanged가 "같은 라운드 스냅샷이 또 왔을 때 진행 중인 미러를
+    /// tick 0부터 리셋해버리는 것"을 막는 용도로만 쓴다 — 재접속 시 BoardSyncBroadcaster가 전투 시작
+    /// 스냅샷을 다시 방송하면서 실제로 그 사고가 났다(2026-08-22 Editor.log 분석: 한 라운드에서 미러가
+    /// 4번 재시작됐고, 첫 회차가 낸 정답을 마지막 재시작본의 MAX_TICKS 타임아웃 판정이 덮어썼다).
+    /// _completedMirrorRoundIndex와 같은 시점(HandleStageEntered)에 함께 리셋된다.</summary>
+    private int? _runningMirrorRoundIndex;
+
     /// <summary>지금 파트너 화면이 전체화면으로 열려 있는지(PIP 축소 상태는 포함하지 않음).
     /// UnitStatusBarHud 등 "지금 내 로컬 화면 전체가 파트너 관전으로 덮여 있는지"만 알면 되는
     /// 다른 컴포넌트가 참조한다 — 이 클래스가 그 UI들을 직접 켜고 끄지는 않는다.</summary>
@@ -282,6 +290,7 @@ public class PartnerSpectateView : MonoBehaviour
     {
         _teamRoundResolved = false;
         _completedMirrorRoundIndex = null;
+        _runningMirrorRoundIndex = null;
 
         if (!_isExpanded) return;
         if (_mirrorController != null) _mirrorController.ShowPartnerEnemyPreview(stage);
@@ -310,6 +319,20 @@ public class PartnerSpectateView : MonoBehaviour
         // ⚠️ 이 비용이 실제로 감당 가능한지 확인 중이다(2026-08-22). 프레임 저하가 크면 visual 없이
         // 계산만 하는 경로를 따로 만드는 쪽으로 간다.
         if (GameManager.TryGet(out var gm) && gm.Phase != null && IsMatchEnded(gm.Phase.CurrentPhase)) return;
+
+        // 같은 라운드 스냅샷이 다시 와도 미러를 재시작하지 않는다(2026-08-22).
+        //
+        // BattleSnapshot은 GameEvents.OnBattleStart 단일 트리거로 전투당 1회만 전송되므로
+        // (BoardSyncBroadcaster.HandleBattleStart) 같은 roundIndex로 또 오는 것은 전부 재접속 재방송이고
+        // 새 정보가 없다. 그런데 이 경로에는 TryStartMirrorBattleFromCache와 달리 중복 방지 가드가
+        // 하나도 없어서, 재접속할 때마다 이미 답을 낸(또는 한창 돌고 있는) 미러가 tick 0부터 다시
+        // 돌았다. 미러가 상시 실행으로 바뀌기 전에는 `if (!_isExpanded) return;`이 이 경로를 사실상
+        // 막고 있어 드러나지 않았다.
+        //
+        // 라운드가 바뀌면 두 가드 다 통과해 정상적으로 교체된다.
+        if (_completedMirrorRoundIndex == snapshot.roundIndex) return;
+        if (_runningMirrorRoundIndex == snapshot.roundIndex) return;
+
         StartOrReplaceMirrorBattle(snapshot);
     }
 
@@ -928,10 +951,13 @@ public class PartnerSpectateView : MonoBehaviour
         // 관전을 안 켠 채로도 미러가 도는 게 감당 가능한지 판단할 근거.
         float setupStart = Time.realtimeSinceStartup;
 
+        _runningMirrorRoundIndex = snapshot.roundIndex;
+
         _mirrorController.StartMirrorBattle(
             snapshot,
             result =>
             {
+                _runningMirrorRoundIndex = null;
                 _completedMirrorRoundIndex = snapshot.roundIndex;
 
                 Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 종료 — 유닛 {_mirrorController.MirrorVisualCount}기, " +
@@ -947,7 +973,13 @@ public class PartnerSpectateView : MonoBehaviour
 
                 if (_isExpanded) RefreshPartnerEnemyPreview();
             },
-            error => { if (_isExpanded) RefreshPartnerEnemyPreview(); });
+            error =>
+            {
+                // 실패는 "완료"가 아니므로 _completedMirrorRoundIndex는 건드리지 않는다 —
+                // _runningMirrorRoundIndex만 풀어 같은 라운드 재시도 여지를 남긴다.
+                _runningMirrorRoundIndex = null;
+                if (_isExpanded) RefreshPartnerEnemyPreview();
+            });
     }
 
     /// <summary>PartnerViewButton 하위 TMP 텍스트를 관전 상태에 맞게 갱신한다. 새 Inspector 참조를
