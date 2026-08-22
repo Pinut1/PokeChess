@@ -198,6 +198,68 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
     }
 
+    /// <summary>XP_ROUND_PROP_KEY를 쓴 직후의 값. _processedRoundLocal과 같은 이유의 방어.</summary>
+    private int _xpRoundLocal;
+
+    /// <summary>내가 라운드 종료 XP를 받은 최고 라운드(없으면 0).</summary>
+    private int LastRoundXpGrantedRound
+    {
+        get
+        {
+            int fromProp = 0;
+            if (PhotonNetwork.InRoom &&
+                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(XP_ROUND_PROP_KEY, out object v) &&
+                v is int i)
+            {
+                fromProp = i;
+            }
+            return Mathf.Max(fromProp, _xpRoundLocal);
+        }
+    }
+
+    /// <summary>라운드 종료 XP를 받았음을 기록한다. 기록을 낮추지 않는다(새 판 리셋은 RPC_OnRoundStart가 직접 한다).</summary>
+    private void SetRoundXpGrantedRound(int round)
+    {
+        if (round <= LastRoundXpGrantedRound) return;
+
+        _xpRoundLocal = round;
+        if (PhotonNetwork.InRoom)
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { XP_ROUND_PROP_KEY, round } });
+    }
+
+    /// <summary>
+    /// 이탈해 있는 동안 확정된 라운드의 종료 XP를 보정한다.
+    ///
+    /// RPC_OnTeamRoundResolved는 RpcTarget.All(버퍼링 없음)이라 확정 순간 방에 없었으면 영영 못 받는다.
+    /// 재접속 시 XP는 "이탈 직전 서버 저장값"으로 복원되므로 그 라운드분이 통째로 빠진다. 골드·보상과
+    /// 달리 XP는 레벨 → 배치 유닛 수 상한으로 이어져 회복이 훨씬 어렵고, 파트너 이탈 재설계에서는
+    /// 미러가 그 사람의 보드로 실제 전투를 치러 승패까지 낸 뒤이므로 "안 뛴 라운드"로 취급할 근거도 없다.
+    ///
+    /// 현재 라운드가 M이면 1..M-1은 모두 확정된 상태다. 내가 받은 최고 라운드와의 차이만큼 채운다.
+    /// 반드시 RestoreLocalPlayerStateAfterReconnect()의 레벨/XP 복원 <b>뒤</b>에 호출해야 한다 —
+    /// 앞이면 복원이 덮어쓴다.
+    /// </summary>
+    private void GrantMissedRoundXp(int currentRound)
+    {
+        int resolvedThrough = currentRound - 1;
+        int missed = resolvedThrough - LastRoundXpGrantedRound;
+        if (missed <= 0) return;
+
+        var shop = GameManager.TryGet(out var gm) ? gm.Shop : null;
+        if (shop == null)
+        {
+            Debug.LogWarning("[Network][Rejoin] ShopManager 없음 — 라운드 종료 XP 보정 생략");
+            return;
+        }
+
+        int amount = missed * shop.RoundXpReward;
+        Debug.Log($"[Network][Rejoin] 이탈 중 확정된 라운드 종료 XP 보정: {missed}라운드분 +{amount}XP " +
+                  $"(내가 받은 최고 {LastRoundXpGrantedRound}R, 확정 완료 {resolvedThrough}R)");
+
+        shop.AddXp(amount);
+        SetRoundXpGrantedRound(resolvedThrough);
+    }
+
     /// <summary>UnitSaveData[]를 JsonUtility로 직렬화하기 위한 래퍼(JsonUtility는 배열을 루트로 직렬화 못 함).
     /// 순수 JSON 변환 전용 — BoardManager는 이 타입을 몰라도 된다.</summary>
     /// <summary>인벤토리 저장용 직렬화 래퍼. Photon에 ScriptableObject 참조를 담을 수 없어 전부 id로 옮긴다.</summary>
@@ -244,6 +306,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 지나가버린 새 라운드인지 가르는 유일한 근거다. ROUND_PROP_KEY(방 전체의 현재 라운드)와 달리
     /// 플레이어별 값이다.</summary>
     private const string PROCESSED_ROUND_PROP_KEY = "ProcessedRound";
+
+    /// <summary>이 플레이어가 "라운드 종료 XP"(ShopManager.HandleTeamRoundResolved)를 실제로 받은 최고
+    /// 라운드. PROCESSED_ROUND_PROP_KEY(라운드 <b>시작</b> 처리)와 반드시 분리해야 한다 — 결과 확정과
+    /// 다음 라운드 시작 사이(Result 페이즈)에 이탈하면 두 값이 실제로 갈리고, 하나로 뭉치면 그 구간
+    /// 이탈자에게 XP를 이중 지급한다.</summary>
+    private const string XP_ROUND_PROP_KEY = "XpRound";
 
     /// <summary>내가 마지막으로 수신/적용한 라운드. 재접속 시 Room 속성의 현재 라운드와 비교해 유실분을 복구.</summary>
     private int _lastKnownRound;
@@ -3113,6 +3181,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             props[PROCESSED_ROUND_PROP_KEY] = round;
             _processedRoundLocal = round;
         }
+
+        // 새 판은 아직 확정된 라운드가 없다. SetRoundXpGrantedRound는 값을 낮추지 못하므로 여기서 직접 0으로.
+        if (round == 1)
+        {
+            props[XP_ROUND_PROP_KEY] = 0;
+            _xpRoundLocal = 0;
+        }
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
@@ -3166,6 +3241,10 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_OnTeamRoundResolved(int outcome)
     {
         GameEvents.TeamRoundResolved((TeamRoundOutcome)outcome);
+
+        // 이 라운드의 종료 XP(ShopManager.HandleTeamRoundResolved)를 실제로 받았음을 남긴다 —
+        // 재접속 보정(GrantMissedRoundXp)이 이중 지급하지 않게 하는 유일한 근거.
+        SetRoundXpGrantedRound(_lastKnownRound);
     }
 
     /// <summary>솔로 모드(1인=팀) 즉시 판정. 승=BothWin, 패=BothLose(라이프 -1).</summary>
@@ -4081,6 +4160,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             if (currentRound > _lastKnownRound)
             {
                 Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+
+                // 라운드 시작 효과(보상/이자)보다 먼저 — 시간 순서상 직전 라운드의 종료가 앞이다.
+                GrantMissedRoundXp(currentRound);
 
                 // RPC_OnRoundStart가 PROCESSED_ROUND_PROP_KEY를 갱신하므로 반드시 호출 "전"에 판정한다.
                 _isCatchupRoundAlreadyProcessed = currentRound <= LastProcessedRoundStart;
