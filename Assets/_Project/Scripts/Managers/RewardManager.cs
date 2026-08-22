@@ -25,16 +25,21 @@ public class RewardManager : MonoBehaviour
     /// <summary>라운드 진입(전투 전) 시 해당 스테이지 보상을 전액 선지급.</summary>
     private void HandleStageEntered(StageData stage)
     {
-        // 재접속으로 인한 씬 재로드 캐치업(ResyncAfterReconnect의 라운드 복구, RPC_OnRoundStart 로컬
-        // 재호출)이면 보상을 다시 지급하지 않는다. _paidStages는 이 인스턴스 안에서만 유효한 중복
-        // 방지라 씬이 재생성되는 재접속 케이스는 막지 못해 이 가드가 별도로 필요하다.
-        // IsApplyingReconnectRoundCatchup을 쓴다(ShopManager.HandleRoundChanged와 동일 패턴) — 이 값은
-        // RPC_OnRoundStart 호출 하나만 try/finally로 좁게 감싸 자동으로 꺼진다. IsResumingRejoinedMatch는
-        // 재접속 성공 후 되돌아 꺼지는 지점이 없어 그걸 쓰면 재접속 이후 남은 라운드 전부의 보상이
-        // 영구히 스킵되는 회귀가 있었다(2026-08 코드리뷰에서 발견).
-        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+        // 재접속 캐치업(ResyncAfterReconnect의 라운드 복구, RPC_OnRoundStart 로컬 재호출) 중이라도,
+        // **이미 보상을 받은 라운드를 다시 재생하는 경우에만** 스킵한다. _paidStages는 이 인스턴스
+        // 안에서만 유효한 중복 방지라 씬이 재생성되는 재접속 케이스는 막지 못해 이 가드가 별도로 필요하다.
+        //
+        // 예전에는 IsApplyingReconnectRoundCatchup(캐치업이기만 하면 참)을 썼다. 게임이 멈춰 기다려주던
+        // 시절에는 "재접속하면 이미 보상을 받은 그 라운드로 돌아온다"가 참이라 문제가 없었지만, 파트너
+        // 이탈 재설계로 남은 사람이 계속 진행하게 되면서 재접속자는 한 번도 받은 적 없는 라운드로
+        // 복귀하게 됐고 그 라운드 보상이 통째로 증발했다(2026-08-22 실측). 판단 기준을 "캐치업이냐"에서
+        // "실제로 이미 받았냐"로 바꾼 것이 IsReplayingProcessedRound다.
+        //
+        // IsResumingRejoinedMatch는 쓰지 않는다 — 재접속 성공 후 꺼지는 지점이 없어 그걸 쓰면 재접속
+        // 이후 남은 라운드 전부의 보상이 영구히 스킵되는 회귀가 있었다(2026-08 코드리뷰에서 발견).
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsReplayingProcessedRound)
         {
-            Debug.Log("[Reward] 재접속 라운드 캐치업 중 — 스테이지 보상 재지급 스킵");
+            Debug.Log("[Reward] 이미 보상을 받은 라운드의 캐치업 재생 — 재지급 스킵");
             return;
         }
 
