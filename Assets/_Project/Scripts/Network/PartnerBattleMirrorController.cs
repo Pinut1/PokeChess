@@ -181,19 +181,21 @@ public class PartnerBattleMirrorController : MonoBehaviour
         if (_opponentBoardView != null) _opponentBoardView.SetSuppressed(suppressed);
     }
 
-    private void OnEnable()
-    {
-        GameEvents.OnOpponentDisconnected += HandleOpponentDisconnected;
-    }
-
-    private void OnDisable()
-    {
-        GameEvents.OnOpponentDisconnected -= HandleOpponentDisconnected;
-    }
-
-    /// <summary>파트너 이탈 시 실행 중인 미러 전투를 조용히 중단한다 — 별도 결과 보고 없음.
-    /// 기존 파트너 대기 팝업/게임 일시정지 흐름은 건드리지 않는다(그건 기존 시스템 몫).</summary>
-    private void HandleOpponentDisconnected(float graceSeconds) => StopMirrorBattle();
+    // ⚠️ 파트너 이탈(GameEvents.OnOpponentDisconnected)에 StopMirrorBattle을 걸지 않는다 — 걸면 안 된다.
+    //
+    // 예전에는 여기서 이탈을 구독해 미러를 중단했다. 미러가 순수 관전 기능이던 시절에는 "볼 사람이
+    // 나갔으니 정리한다"가 맞는 판단이었다. 그런데 파트너 이탈 재설계에서 미러는 **이탈한 파트너의
+    // 전투 결과를 계산하는 유일한 수단**이 됐다(NetworkManager.TryResolveTeamRoundWithMirror).
+    // 이탈 시점에 중단해버리면 정작 그 값이 필요한 순간에 값이 사라진다.
+    //
+    // 2026-08-22 실측: 전투 도중 파트너를 종료시키자 미러가 그 자리에서 소멸했고
+    // ([MirrorCost] 시작 3건 / 종료 0건), 대조는 "미러 결과 없음"으로 건너뛰었다. 그 판이 굴러간
+    // 것은 파트너가 유예 안에 돌아와 직접 결과를 보고했기 때문일 뿐, 돌아오지 않았다면 라운드가
+    // 닫히지 않았다.
+    //
+    // 안 멈춰도 뒷정리는 자동이다 — 정상 완주 시 BattleManager.FinishMirrorBattle이 Cleanup()으로
+    // 미러 visual을 파괴하고, StartMirrorBattle의 onComplete/onFailed가 SetOpponentBoardSuppressed(false)를
+    // 되돌린다. 라운드가 끝나면 PartnerSpectateView.HandleTeamRoundResolved가 어차피 한 번 더 정리한다.
 
     /// <summary>
     /// 실행 중인 미러 전투를 즉시 중단한다(결과 콜백 없음). 외부(관전 시스템이 새 BattleSnapshot으로
