@@ -440,6 +440,13 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
     {
+        if (GameManager.TryGet(out var gm) && gm.Network != null &&
+            gm.Network.IsApplyingReconnectRoundResultCatchup)
+        {
+            Debug.Log("[LevelXP] 재접속 결과 복구 — NetworkManager가 누락 XP를 보정했으므로 중복 지급 스킵");
+            return;
+        }
+
         AddXp(_roundXpReward);
     }
 

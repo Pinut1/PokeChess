@@ -178,15 +178,12 @@ public class BattleManager : MonoBehaviour
     private Transform _visualParent;
 
     /// <summary>
-    /// true면 BattleVfxPlayer.Play*를 호출한다. 실전투/미러 인스턴스 모두 기본값 true를 그대로 쓴다.
-    /// 예전에는 미러 인스턴스에서 false로 꺼뒀다 — BattleVfxPlayer._activeVfx가 static 전역이라
-    /// 실전투와 미러가 서로의 VFX를 지울 위험이 있었기 때문(ClearAllActive가 실전투 종료 시 전체를
-    /// 지움). 지금은 BattleVfxPlayer가 scope(이 인스턴스 자신)별로 생성 목록을 분리해 관리하고
-    /// (ClearScope), Play* 호출부(BasicAttack 등)가 this를 scope로 넘기므로 이 문제가 해소됐다 —
-    /// 그래서 미러도 VFX를 켠 채로 안전하게 실행한다. 이 필드/게이트 자체는 향후 다시 끌 필요가
-    /// 생길 때를 대비해 구조만 유지한다(현재는 아무 경로도 false로 설정하지 않음).
+    /// true면 BattleVfxPlayer.Play*를 호출한다. 실전투는 기본값 true, 상시 실행되는 미러는 계산 비용을
+    /// 줄이기 위해 ConfigureMirrorVisuals에서 false로 설정한다. 인스턴스별 scope 분리는 유지되므로
+    /// 향후 관전 미러 VFX를 다시 켜더라도 실전투 VFX와 정리 범위가 섞이지 않는다.
     /// </summary>
     private bool _playBattleVfx = true;
+    private bool _renderBattleVisuals = true;
 
     // 파트너 이탈 시 전투를 멈추던 _isPaused는 제거됐다(2026-08-22, 파트너 이탈 재설계).
     // 원래 PR #67에서 "재접속 대기 팝업 뒤에서 게임이 계속 조작되던" 버그를 고치며 상점/드래그 차단과
@@ -263,31 +260,11 @@ public class BattleManager : MonoBehaviour
 
         // 시뮬레이션 루프(전멸 판정 시 조기 종료, 타임아웃 시 allyWon=null로 남김).
         var result = new BattleLoopResult();
-        yield return SimulateBattleLoop(result);
+        yield return SimulateBattleLoop(result, BattleLoopOptions.Live);
 
         Cleanup(); // 이 인스턴스 scope의 VFX 정리까지 Cleanup()이 담당(BattleVfxPlayer.ClearScope)
 
-        // 30초 안에 승부가 안 났으면(조기 종료 없음) 오버타임으로 넘어간다(기획 확정 2026-07-30).
-        BattleEndReason reason;
-        if (result.allyWon != null)
-        {
-            // 기본 30초 이내 조기 종료 (한쪽 전멸)
-            reason = result.allyWon.Value ? BattleEndReason.Victory : BattleEndReason.Defeat;
-            Debug.Log($"[Battle] 조기 종료 → {reason} (전멸)");
-        }
-        else
-        {
-            // 기존: 타임아웃 후 HP 합계 비교로 판정(레퍼런스 게임과 달라 폐기, 롤백 대비 보존).
-            // bool allyWon = DetermineWinnerByRemainingHp();
-            // reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
-
-            // 변경: 타임아웃 후 오버타임 진행, 종료 시 적이 하나라도 살아있으면 무조건 패배.
-            bool allyWon = result.overtimeAllyWon ?? false;
-            reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
-            // 타임아웃 길이는 MAX_TICKS에서 뽑는다 — 상수만 바꾸고 문구를 못 고쳐 "30초"가 박힌 채
-            // 40초 전투를 찍던 문제(2026-08-22 로그)를 다시 만들지 않기 위함.
-            Debug.Log($"[Battle] 타임아웃 {MAX_TICKS * TICK_INTERVAL:0.#}초 경과 → 오버타임 진행 → {reason} (적 생존 여부 판정)");
-        }
+        BattleEndReason reason = ResolveBattleEndReason(result, log: true);
 
         GameEvents.BattleEnd(reason);
     }
@@ -297,19 +274,40 @@ public class BattleManager : MonoBehaviour
     {
         public bool? allyWon; // null = 기본 30초 안에 미결(오버타임으로 진행), true/false = 한쪽 전멸로 확정.
         public bool? overtimeAllyWon; // 오버타임 결과(즉시 전멸 또는 시간 종료 판정). allyWon이 이미 확정됐으면 안 채워짐.
+        public int elapsedTicks;
+        public System.Exception error;
+        public int errorTick;
+    }
+
+    private readonly struct BattleLoopOptions
+    {
+        public readonly bool useRealtimeWait;
+        public readonly bool emitOvertimeEvent;
+        public readonly bool captureTickExceptions;
+
+        private BattleLoopOptions(bool useRealtimeWait, bool emitOvertimeEvent, bool captureTickExceptions)
+        {
+            this.useRealtimeWait = useRealtimeWait;
+            this.emitOvertimeEvent = emitOvertimeEvent;
+            this.captureTickExceptions = captureTickExceptions;
+        }
+
+        public static BattleLoopOptions Live => new(false, true, false);
+        public static BattleLoopOptions Mirror => new(true, false, true);
     }
 
     /// <summary>
     /// MAX_TICKS까지 매 틱 시뮬레이션. 한쪽이 전멸하면 result.allyWon에 결과를 담고 종료,
     /// 타임아웃이면 오버타임(RunOvertime)으로 넘어간다.
     /// </summary>
-    private IEnumerator SimulateBattleLoop(BattleLoopResult result)
+    private IEnumerator SimulateBattleLoop(BattleLoopResult result, BattleLoopOptions options)
     {
         int tick = 0;
 
         while (tick < MAX_TICKS)
         {
-            SimulateTick();
+            if (!TrySimulateTick(result, options, tick)) yield break;
+            result.elapsedTicks++;
 
             bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
             bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
@@ -321,10 +319,10 @@ public class BattleManager : MonoBehaviour
             }
 
             tick++;
-            yield return new WaitForSeconds(TICK_INTERVAL);
+            yield return CreateTickWait(TICK_INTERVAL, options.useRealtimeWait);
         }
 
-        yield return RunOvertime(result);
+        yield return RunOvertime(result, options);
     }
 
     /// <summary>
@@ -336,7 +334,7 @@ public class BattleManager : MonoBehaviour
     /// tick 계산(공속/이동/스킬쿨다운/상태이상 등) 자체는 바꾸지 않아 일부 시스템만 빨라지는 불균형이 없다.
     /// 종료 시 적 생존 여부만으로 판정(아군 생존 수/HP/처치 수는 사용하지 않음).
     /// </summary>
-    private IEnumerator RunOvertime(BattleLoopResult result)
+    private IEnumerator RunOvertime(BattleLoopResult result, BattleLoopOptions options)
     {
         if (_overtimeDuration <= 0f)
         {
@@ -345,7 +343,8 @@ public class BattleManager : MonoBehaviour
         }
 
         // 실제로 시간을 두고 진행하는 오버타임에 진입할 때만, 이 메서드 호출당 정확히 1회 발행(UI 타이머 전환용).
-        GameEvents.OvertimeStarted(_overtimeDuration);
+        if (options.emitOvertimeEvent)
+            GameEvents.OvertimeStarted(_overtimeDuration);
 
         // 현실 시간 축 — 오버타임이 실제로 유지되는 대기 횟수(배속과 무관).
         int realTicks = Mathf.CeilToInt(_overtimeDuration / TICK_INTERVAL);
@@ -368,7 +367,8 @@ public class BattleManager : MonoBehaviour
         {
             for (int i = 0; i < simTicksPerWait; i++)
             {
-                SimulateTick();
+                if (!TrySimulateTick(result, options, result.elapsedTicks)) yield break;
+                result.elapsedTicks++;
 
                 bool allyAlive  = HasAliveUnit(BattleTeam.Ally);
                 bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
@@ -379,12 +379,53 @@ public class BattleManager : MonoBehaviour
                     yield break;
                 }
 
-                yield return new WaitForSeconds(subInterval);
+                yield return CreateTickWait(subInterval, options.useRealtimeWait);
             }
         }
 
         // 오버타임 실제 시간 종료 — 적이 한 마리라도 살아있으면 무조건 패배(기획 확정). 아군 생존 수/HP 무관.
         result.overtimeAllyWon = !HasAliveUnit(BattleTeam.Enemy);
+    }
+
+    private bool TrySimulateTick(BattleLoopResult result, BattleLoopOptions options, int tick)
+    {
+        if (!options.captureTickExceptions)
+        {
+            SimulateTick();
+            return true;
+        }
+
+        try
+        {
+            SimulateTick();
+            return true;
+        }
+        catch (System.Exception ex)
+        {
+            result.error = ex;
+            result.errorTick = tick;
+            return false;
+        }
+    }
+
+    private static object CreateTickWait(float seconds, bool realtime) =>
+        realtime ? (object)new WaitForSecondsRealtime(seconds) : new WaitForSeconds(seconds);
+
+    private BattleEndReason ResolveBattleEndReason(BattleLoopResult result, bool log)
+    {
+        if (result.allyWon.HasValue)
+        {
+            BattleEndReason early = result.allyWon.Value ? BattleEndReason.Victory : BattleEndReason.Defeat;
+            if (log) Debug.Log($"[Battle] 조기 종료 → {early} (전멸)");
+            return early;
+        }
+
+        bool won = result.overtimeAllyWon ?? false;
+        BattleEndReason decision = won ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
+        if (log)
+            Debug.Log($"[Battle] 타임아웃 {MAX_TICKS * TICK_INTERVAL:0.#}초 경과 → 오버타임 진행 → " +
+                      $"{decision} (적 생존 여부 판정)");
+        return decision;
     }
 
     // ─────────────────────────────────────────
@@ -1407,6 +1448,8 @@ public class BattleManager : MonoBehaviour
     {
         if (bu.source != null)
             bu.source.gameObject.SetActive(false);
+
+        if (!_renderBattleVisuals) return;
 
         GameObject visual;
         if (bu.data != null && bu.data.modelPrefab != null)
@@ -2548,9 +2591,8 @@ public class BattleManager : MonoBehaviour
     /// 이 인스턴스를 미러 전투 전용으로 설정한다 — 이후 생성되는 모든 visual이 offset만큼
     /// 이동해 표시되고 parent 아래로 모인다(_visualParent가 null이 아니게 됨 → ResolveVisualLayer()가
     /// PartnerSpectateVisual을 반환하게 되는 것도 이 한 줄에서 갈린다).
-    /// _playBattleVfx는 건드리지 않는다 — 기본값 true를 실전투와 동일하게 그대로 쓴다. VFX가
-    /// 실전투와 서로 지우지 않는 것은 BattleVfxPlayer의 scope 분리(ClearScope)가, 화면이 섞이지
-    /// 않는 것은 Layer 분리(ResolveVisualLayer → BattleVfxPlayer.Create의 layer 인자)가 보장한다.
+    /// 상시 실행 비용을 줄이기 위해 VFX와 모델 렌더는 기본적으로 끈다. 관전 UI가 열리면 모델만
+    /// SetMirrorVisualsVisible로 지연 생성하며, VFX는 권위 계산과 무관하므로 계속 끈다.
     /// 실전투 인스턴스는 절대 호출하지 않는다(기본값 Vector3.zero/null을 그대로 유지해야
     /// 기존 동작이 보존된다). PartnerBattleMirrorController가 미러 BattleManager를 만든 직후 1회만 호출한다.
     /// </summary>
@@ -2558,6 +2600,32 @@ public class BattleManager : MonoBehaviour
     {
         _visualOffset = offset;
         _visualParent = parent;
+        // 상시 실행 미러는 권위 결과 계산이 우선이다. 관전용 모델은 유지하되 전투마다 발생하는
+        // 평타/스킬/보호막 VFX Instantiate 비용은 내지 않는다.
+        _playBattleVfx = false;
+        _renderBattleVisuals = false;
+    }
+
+    /// <summary>권위 계산용 미러의 visual을 필요할 때만 lazy 생성한다. 시뮬레이션 좌표·HP에는 영향 없다.</summary>
+    public void SetMirrorVisualsVisible(bool visible)
+    {
+        if (_visualParent == null || _renderBattleVisuals == visible) return;
+        _renderBattleVisuals = visible;
+
+        foreach (var bu in _units)
+        {
+            if (visible)
+            {
+                if (bu.IsAlive && bu.visual == null) SpawnVisual(bu);
+                continue;
+            }
+
+            if (bu.visual != null) Destroy(bu.visual);
+            bu.visual = null;
+            bu.facing = null;
+            if (bu.shieldVfxInstance != null) Destroy(bu.shieldVfxInstance);
+            bu.shieldVfxInstance = null;
+        }
     }
 
     /// <summary>이 인스턴스의 Inspector 연결 적 진영 바닥 프리팹. 미러 인스턴스가 실제 로컬 인스턴스
@@ -2632,10 +2700,8 @@ public class BattleManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 실전투 SimulateBattleLoop/RunOvertime(GameEvents.OvertimeStarted 발행 등)은 재사용하지 않고,
-    /// SimulateTick/HasAliveUnit(둘 다 기존 private 메서드 그대로)만 써서 자체 루프를 돈다 —
-    /// 미러는 화면에 안 보이므로 오버타임의 "실시간 유지" 연출이 필요 없다(고정 틱까지 즉시 판정).
-    /// 유닛/시너지 셋업은 RunMirrorBattle에서 이미 동기적으로 끝낸 상태로 진입한다.
+    /// 실전투와 동일한 SimulateBattleLoop/RunOvertime을 사용한다. 미러만 실시간 대기를 사용하고
+    /// OvertimeStarted UI 이벤트를 억제하며, 틱 예외를 onFailed로 변환한다.
     ///
     /// WaitForSecondsRealtime을 쓴다 — 실전투(RunBattle/SimulateBattleLoop/RunOvertime)의 WaitForSeconds는
     /// 그대로 두고, 미러 루프만 향후 게임 내부 Time.timeScale 변화로부터 독립시키기 위함(현재 원인으로
@@ -2645,46 +2711,18 @@ public class BattleManager : MonoBehaviour
         System.Action<MirrorBattleResult> onComplete,
         System.Action<string> onFailed)
     {
-        int tick = 0;
-        while (tick < MAX_TICKS)
+        // 실제 전투와 동일한 기본 틱·오버타임·동시전멸·최종 판정 경로를 사용한다.
+        // 차이는 대기 방식(Realtime)과 오버타임 UI 이벤트 억제, 예외를 onFailed로 돌리는 것뿐이다.
+        var result = new BattleLoopResult();
+        yield return SimulateBattleLoop(result, BattleLoopOptions.Mirror);
+
+        if (result.error != null)
         {
-            // SimulateTick()에서 처리되지 않은 예외가 나면 코루틴이 조용히 죽어 IsRunning이 true로
-            // 고착되고 visual도 고아 상태로 남는다(FinishMirrorBattle/AbortMirrorBattle 어느 쪽도 못 탐) —
-            // yield break는 catch 안에서 쓸 수 없으므로(C# 제약) 예외만 잡아두고 실제 종료 처리·yield break는
-            // try/catch 바깥에서 한다.
-            System.Exception tickException = null;
-            try
-            {
-                SimulateTick();
-            }
-            catch (System.Exception ex)
-            {
-                tickException = ex;
-            }
-
-            if (tickException != null)
-            {
-                HandleMirrorBattleException(tickException, tick, onFailed);
-                yield break;
-            }
-
-            bool allyAlive = HasAliveUnit(BattleTeam.Ally);
-            bool enemyAlive = HasAliveUnit(BattleTeam.Enemy);
-
-            if (!allyAlive || !enemyAlive)
-            {
-                FinishMirrorBattle(allyAlive ? BattleEndReason.Victory : BattleEndReason.Defeat, tick, onComplete);
-                yield break;
-            }
-
-            tick++;
-            yield return new WaitForSecondsRealtime(TICK_INTERVAL);
+            HandleMirrorBattleException(result.error, result.errorTick, onFailed);
+            yield break;
         }
 
-        // 타임아웃 — 실전투 오버타임의 최종 판정 규칙과 동일(적 하나라도 살아있으면 패배)만 적용,
-        // 실시간 대기 구간(RunOvertime)은 생략한다.
-        bool decisionWin = !HasAliveUnit(BattleTeam.Enemy);
-        FinishMirrorBattle(decisionWin ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat, tick, onComplete);
+        FinishMirrorBattle(ResolveBattleEndReason(result, log: false), result.elapsedTicks, onComplete);
     }
 
     /// <summary>

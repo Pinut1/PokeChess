@@ -72,9 +72,8 @@ public static class GameEvents
     /// 파트너 미러 전투(PartnerBattleMirrorController)가 끝까지 재생 완료됨. 인자 = (라운드, 미러가 낸 아군 승리 여부).
     /// 여기서 "아군"은 미러 기준이라 <b>파트너 진영</b>을 가리킨다(파트너 유닛이 BattleTeam.Ally로 생성됨).
     ///
-    /// ⚠️ <b>판정에 쓰지 말 것</b> — 미러는 관전 표시용이고, 이 이벤트는 파트너가 실제로 보고한
-    /// 전투 결과와 대조해 미러의 정확도를 로그로 확인하기 위한 검증 전용이다(2026-08-22).
-    /// 미러 결과를 실제 팀 판정에 쓸지는 이 대조가 100% 일치로 확인된 뒤에 결정한다.
+    /// 정상 연결 중에는 실제 보고값과 정확도를 대조하고, 전투 중 이탈로 해당 라운드를 건너뛴
+    /// 플레이어에게는 NetworkManager가 라운드 번호를 검증한 뒤 대체 판정으로 사용한다.
     /// </summary>
     public static event Action<int, bool> OnPartnerMirrorBattleCompleted;
 

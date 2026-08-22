@@ -242,6 +242,13 @@ public class PartnerBattleMirrorController : MonoBehaviour
         if (_mirrorBattleManager != null) _mirrorBattleManager.ClearMirrorEnemyPreviewUnitsOnly();
     }
 
+    /// <summary>관전 UI가 실제로 보일 때만 미러 유닛 모델을 만든다. 권위 시뮬레이션은 계속 실행된다.</summary>
+    public void SetMirrorVisualsVisible(bool visible)
+    {
+        EnsureMirrorBattleManager();
+        _mirrorBattleManager.SetMirrorVisualsVisible(visible);
+    }
+
     /// <summary>
     /// 파트너 BattleSnapshot으로 미러 전투를 시작한다. 이미 실행 중이면 onFailed만 호출한다.
     /// 시작 직전 OpponentBoardView 표시를 잠깐 끄고, 성공/실패 어느 쪽으로 끝나든 다시 켠다.
