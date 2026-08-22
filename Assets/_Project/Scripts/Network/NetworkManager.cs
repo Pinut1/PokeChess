@@ -159,6 +159,45 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 이 시점의 RoundChanged를 "복원 중 재발행"으로 구분해 자신의 초기화 로직을 건너뛸 때 쓴다.</summary>
     public bool IsApplyingReconnectRoundCatchup => _isApplyingReconnectRoundCatchup;
 
+    /// <summary>지금 진행 중인 캐치업이 "이미 라운드 시작 효과를 적용한 라운드"의 재실행인지.
+    /// ResyncAfterReconnect가 RPC_OnRoundStart를 부르기 직전에 계산해둔다.</summary>
+    private bool _isCatchupRoundAlreadyProcessed;
+
+    /// <summary>
+    /// 이미 처리한 라운드를 캐치업으로 다시 재생하는 중인지 — 보상·이자·Roll 같은 라운드 시작 효과를
+    /// 건너뛰어야 하는 조건. IsApplyingReconnectRoundCatchup(=캐치업이기만 하면 참)과 다르다.
+    ///
+    /// 예전에는 소비자들이 IsApplyingReconnectRoundCatchup을 그대로 썼다. "재접속하면 내가 이탈 전에
+    /// 이미 보상을 받은 그 라운드로 돌아온다"는 전제였고, 게임이 멈춰 기다려주던 시절에는 참이었다.
+    /// 파트너 이탈 재설계로 남은 사람이 계속 진행하게 되면서 재접속자는 **한 번도 받은 적 없는 라운드**로
+    /// 복귀하게 됐고, 그 라운드의 보상·이자가 통째로 증발했다(2026-08-22 실측: 2라운드 전투 중 이탈 후
+    /// 3라운드로 복귀했으나 "[Reward] 재접속 라운드 캐치업 중 — 스테이지 보상 재지급 스킵").
+    ///
+    /// 판단 기준을 "캐치업이냐"에서 "실제로 이미 받았냐"로 바꾼다.
+    /// </summary>
+    public bool IsReplayingProcessedRound =>
+        _isApplyingReconnectRoundCatchup && _isCatchupRoundAlreadyProcessed;
+
+    /// <summary>PROCESSED_ROUND_PROP_KEY를 쓴 직후의 값. Photon 로컬 캐시 갱신 시점에 기대지 않기
+    /// 위한 방어 — 같은 성격의 사고가 TeamHealth에서 이미 한 번 났다(커밋 ee4b6b6f).</summary>
+    private int _processedRoundLocal;
+
+    /// <summary>내가 라운드 시작 효과를 적용한 최고 라운드(없으면 0).</summary>
+    private int LastProcessedRoundStart
+    {
+        get
+        {
+            int fromProp = 0;
+            if (PhotonNetwork.InRoom &&
+                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PROCESSED_ROUND_PROP_KEY, out object v) &&
+                v is int i)
+            {
+                fromProp = i;
+            }
+            return Mathf.Max(fromProp, _processedRoundLocal);
+        }
+    }
+
     /// <summary>UnitSaveData[]를 JsonUtility로 직렬화하기 위한 래퍼(JsonUtility는 배열을 루트로 직렬화 못 함).
     /// 순수 JSON 변환 전용 — BoardManager는 이 타입을 몰라도 된다.</summary>
     /// <summary>인벤토리 저장용 직렬화 래퍼. Photon에 ScriptableObject 참조를 담을 수 없어 전부 id로 옮긴다.</summary>
@@ -199,6 +238,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC_OnBattleStart는 RpcTarget.All이라 접속이 끊긴 동안에는 유실되고, 재접속해도 다시 오지 않는다.
     /// Room 속성은 서버가 들고 있어 재입장 시 그대로 읽을 수 있다.</summary>
     private const string BATTLE_ACTIVE_PROP_KEY = "BattleActive";
+
+    /// <summary>이 플레이어가 "라운드 시작 효과"(스테이지 보상·이자·상점 Roll·증강 라운드 효과)를
+    /// 실제로 적용한 최고 라운드. 재접속 캐치업이 이미 처리한 라운드의 재실행인지, 자리를 비운 사이
+    /// 지나가버린 새 라운드인지 가르는 유일한 근거다. ROUND_PROP_KEY(방 전체의 현재 라운드)와 달리
+    /// 플레이어별 값이다.</summary>
+    private const string PROCESSED_ROUND_PROP_KEY = "ProcessedRound";
 
     /// <summary>내가 마지막으로 수신/적용한 라운드. 재접속 시 Room 속성의 현재 라운드와 비교해 유실분을 복구.</summary>
     private int _lastKnownRound;
@@ -3059,6 +3104,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
         };
         if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
+
+        // 이 라운드의 시작 효과를 실제로 적용했음을 남긴다(IsReplayingProcessedRound의 근거).
+        // 이미 처리한 라운드의 캐치업 재실행이면 round <= 저장값이라 기록을 낮추지 않는다.
+        // 새 판(1라운드)은 이전 판 값이 남아 있으면 안 되므로 무조건 1로 되돌린다.
+        if (round == 1 || round > LastProcessedRoundStart)
+        {
+            props[PROCESSED_ROUND_PROP_KEY] = round;
+            _processedRoundLocal = round;
+        }
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
@@ -4028,9 +4082,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             {
                 Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
 
+                // RPC_OnRoundStart가 PROCESSED_ROUND_PROP_KEY를 갱신하므로 반드시 호출 "전"에 판정한다.
+                _isCatchupRoundAlreadyProcessed = currentRound <= LastProcessedRoundStart;
+                Debug.Log($"[Network][Rejoin] 라운드 시작 효과 — 내가 마지막으로 처리한 라운드 " +
+                          $"{LastProcessedRoundStart}R, 복귀 대상 {currentRound}R → " +
+                          $"{(_isCatchupRoundAlreadyProcessed ? "이미 처리함(스킵)" : "미처리(지급)")}");
+
                 _isApplyingReconnectRoundCatchup = true;
                 try { RPC_OnRoundStart(currentRound); }
-                finally { _isApplyingReconnectRoundCatchup = false; }
+                finally
+                {
+                    _isApplyingReconnectRoundCatchup = false;
+                    _isCatchupRoundAlreadyProcessed = false;
+                }
             }
         }
     }
@@ -4452,6 +4516,7 @@ public class NetworkManager : MonoBehaviour
     public bool IsPartnerResultUnresponsive => false; // 오프라인은 파트너 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsResumingRejoinedMatch => false; // 오프라인은 재접속 개념 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsApplyingReconnectRoundCatchup => false; // 오프라인은 재접속 캐치업 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsReplayingProcessedRound => false; // 위와 같은 이유(실구현과 동일 공개 API 유지용 스텁).
     public void AttemptRejoinSavedSession()          { }
     public void AcknowledgeRejoinFailure()           { }
     public void AbandonPreviousSession()             { }
