@@ -960,7 +960,7 @@ public class PartnerSpectateView : MonoBehaviour
                 _runningMirrorRoundIndex = null;
                 _completedMirrorRoundIndex = snapshot.roundIndex;
 
-                Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 종료 — 유닛 {_mirrorController.MirrorVisualCount}기, " +
+                Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 종료 — " +
                           $"{result.elapsedTicks}틱, 실시간 {Time.realtimeSinceStartup - setupStart:F1}초, " +
                           $"관전 화면 {(_isExpanded ? "켜짐" : "꺼짐")}");
 
@@ -980,6 +980,12 @@ public class PartnerSpectateView : MonoBehaviour
                 _runningMirrorRoundIndex = null;
                 if (_isExpanded) RefreshPartnerEnemyPreview();
             });
+
+        // 유닛 수는 여기서 찍는다 — 종료 콜백에서는 항상 0으로 나온다.
+        // BattleManager.FinishMirrorBattle이 Cleanup()을 onComplete 호출보다 먼저 실행하므로
+        // 그 시점엔 미러 visual이 전부 파괴된 뒤다. 반대로 StartMirrorBattle은 유닛/시너지 셋업을
+        // 동기적으로 끝낸 뒤 코루틴을 띄우므로(RunMirrorBattle), 호출 직후인 여기서는 실제 수가 잡힌다.
+        Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 시작 — 유닛 {_mirrorController.MirrorVisualCount}기");
     }
 
     /// <summary>PartnerViewButton 하위 TMP 텍스트를 관전 상태에 맞게 갱신한다. 새 Inspector 참조를
