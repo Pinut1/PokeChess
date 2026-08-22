@@ -281,10 +281,12 @@ public class BattleManager : MonoBehaviour
             // bool allyWon = DetermineWinnerByRemainingHp();
             // reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
 
-            // 변경: 30초 후 오버타임 진행, 종료 시 적이 하나라도 살아있으면 무조건 패배.
+            // 변경: 타임아웃 후 오버타임 진행, 종료 시 적이 하나라도 살아있으면 무조건 패배.
             bool allyWon = result.overtimeAllyWon ?? false;
             reason = allyWon ? BattleEndReason.DecisionVictory : BattleEndReason.DecisionDefeat;
-            Debug.Log($"[Battle] 타임아웃 30초 경과 → 오버타임 진행 → {reason} (적 생존 여부 판정)");
+            // 타임아웃 길이는 MAX_TICKS에서 뽑는다 — 상수만 바꾸고 문구를 못 고쳐 "30초"가 박힌 채
+            // 40초 전투를 찍던 문제(2026-08-22 로그)를 다시 만들지 않기 위함.
+            Debug.Log($"[Battle] 타임아웃 {MAX_TICKS * TICK_INTERVAL:0.#}초 경과 → 오버타임 진행 → {reason} (적 생존 여부 판정)");
         }
 
         GameEvents.BattleEnd(reason);
