@@ -375,13 +375,18 @@ public class ShopManager : MonoBehaviour
 
     private void HandleRoundChanged(int round)
     {
-        // 재접속 라운드 캐치업(NetworkManager.ResyncAfterReconnect의 RPC_OnRoundStart 로컬 재호출)으로
-        // 인한 재발행이면 여기서 아무것도 하지 않는다 — 이자 재계산/Roll/RollItemShop이 방금 복원된
-        // 골드·상점 상태를 덮어쓰는 문제가 있었다(2026-08 확인). 일반 라운드 진행(마스터가 실제로
-        // BroadcastRoundStart를 전체 방송하는 경우)에는 이 플래그가 켜져 있지 않아 기존 그대로 동작한다.
-        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsApplyingReconnectRoundCatchup)
+        // 재접속 캐치업이 **이미 처리한 라운드**를 다시 재생하는 경우에만 아무것도 하지 않는다 —
+        // 이자 재계산/Roll/RollItemShop이 방금 복원된 골드·상점 상태를 덮어쓰는 문제가 있었다(2026-08 확인).
+        //
+        // 자리를 비운 사이 지나가버린 **새 라운드**로 복귀한 경우에는 그대로 진행해야 한다. 예전에는
+        // IsApplyingReconnectRoundCatchup(캐치업이기만 하면 참)을 써서 그 경우까지 스킵했고, 재접속자가
+        // 그 라운드의 이자를 통째로 못 받았다(RewardManager의 스테이지 보상과 같은 성격의 버그, 2026-08-22).
+        //
+        // 일반 라운드 진행(마스터가 실제로 BroadcastRoundStart를 전체 방송하는 경우)에는 이 플래그가
+        // 켜져 있지 않아 기존 그대로 동작한다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null && gm.Network.IsReplayingProcessedRound)
         {
-            Debug.Log("[Shop] 재접속 라운드 캐치업 — Roll/이자 재계산 스킵(복원된 상점/골드 유지)");
+            Debug.Log("[Shop] 이미 처리한 라운드의 캐치업 재생 — Roll/이자 재계산 스킵(복원된 상점/골드 유지)");
             return;
         }
 
@@ -435,6 +440,13 @@ public class ShopManager : MonoBehaviour
     /// </summary>
     private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
     {
+        if (GameManager.TryGet(out var gm) && gm.Network != null &&
+            gm.Network.IsApplyingReconnectRoundResultCatchup)
+        {
+            Debug.Log("[LevelXP] 재접속 결과 복구 — NetworkManager가 누락 XP를 보정했으므로 중복 지급 스킵");
+            return;
+        }
+
         AddXp(_roundXpReward);
     }
 

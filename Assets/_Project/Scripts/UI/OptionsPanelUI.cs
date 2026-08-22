@@ -203,6 +203,7 @@ public class OptionsPanelUI : MonoBehaviour
         PartnerDisconnectWait,
         PartnerDisconnectEndConfirm,
         PartnerGaveUp,
+        AwaitingPartnerBattle,
         Defeat,
         Victory
     }
@@ -218,6 +219,10 @@ public class OptionsPanelUI : MonoBehaviour
     // 구분한다. false(기본값)가 진짜 이탈. HandlePartnerDisconnected가 다시 뜨면 항상 false로
     // 되돌아간다(더 확실한 신호가 왔으므로).
     private bool _partnerDisconnectIsResultUnresponsive;
+
+    // 전투 도중 이탈했다 재접속했는데 파트너 전투가 아직 진행 중이라 이번 라운드엔 낄 자리가 없는 상태.
+    // 위 파트너 이탈 대기와 방향이 반대다 — 여긴 내가 늦게 돌아온 쪽이라 [포기하기]가 없다.
+    private bool _awaitingPartnerBattle;
 
     // 대기 모달에 [포기하기]를 이미 붙였는지. 유예가 끝난 뒤 매 프레임 다시 붙이지 않으려고 둔다.
     private bool _partnerGiveUpButtonShown;
@@ -403,6 +408,11 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnPartnerResultUnresponsive    += HandlePartnerResultUnresponsive;
         GameEvents.OnPartnerResultGiveUpAvailable += HandlePartnerResultGiveUpAvailable;
         GameEvents.OnPartnerResultRecovered       += HandlePartnerReconnected;
+
+        // 재접속 후 파트너 전투 대기 — 시작은 전용 이벤트, 종료는 라운드 판정/다음 라운드로 자연히 풀린다.
+        GameEvents.OnAwaitingPartnerBattle += HandleAwaitingPartnerBattle;
+        GameEvents.OnTeamRoundResolved     += HandleAwaitingPartnerBattleEnded;
+        GameEvents.OnRoundChanged          += HandleAwaitingPartnerBattleEndedByRound;
     }
 
     private void OnDisable()
@@ -416,6 +426,10 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnPartnerResultUnresponsive    -= HandlePartnerResultUnresponsive;
         GameEvents.OnPartnerResultGiveUpAvailable -= HandlePartnerResultGiveUpAvailable;
         GameEvents.OnPartnerResultRecovered       -= HandlePartnerReconnected;
+
+        GameEvents.OnAwaitingPartnerBattle -= HandleAwaitingPartnerBattle;
+        GameEvents.OnTeamRoundResolved     -= HandleAwaitingPartnerBattleEnded;
+        GameEvents.OnRoundChanged          -= HandleAwaitingPartnerBattleEndedByRound;
 
         if (_defeatModalRoutine != null)
         {
@@ -459,6 +473,15 @@ public class OptionsPanelUI : MonoBehaviour
     {
         _partnerGiveUpAvailable = true;
     }
+
+    /// <summary>재접속했는데 파트너가 아직 싸우는 중 — 이번 라운드는 결과만 기다린다.</summary>
+    private void HandleAwaitingPartnerBattle() => _awaitingPartnerBattle = true;
+
+    /// <summary>라운드 판정이 끝났으면 더 기다릴 이유가 없다.</summary>
+    private void HandleAwaitingPartnerBattleEnded(TeamRoundOutcome _) => _awaitingPartnerBattle = false;
+
+    /// <summary>다음 라운드가 시작됐으면 이제 합류할 수 있다.</summary>
+    private void HandleAwaitingPartnerBattleEndedByRound(int _) => _awaitingPartnerBattle = false;
 
     private void HandlePartnerReconnected()
     {
@@ -859,6 +882,28 @@ public class OptionsPanelUI : MonoBehaviour
             }
 
             return true;
+        }
+
+        // ④ 재접속 후 파트너 전투 대기. 파트너는 멀쩡히 싸우는 중이라 [포기하기]가 없다 —
+        //    라운드 판정이 끝나거나 다음 라운드가 시작되면 저절로 풀린다.
+        if (_awaitingPartnerBattle)
+        {
+            if (_activeModal != ModalContent.AwaitingPartnerBattle)
+            {
+                _activeModal = ModalContent.AwaitingPartnerBattle;
+                _modalDialog.ShowWaiting(
+                    "전투 진행 중\n"
+                    + "파트너의 전투가 진행되고 있습니다.\n"
+                    + "전투 결과까지 잠시 기다려주세요.");
+            }
+
+            return true;
+        }
+
+        if (_activeModal == ModalContent.AwaitingPartnerBattle)
+        {
+            _modalDialog.Close();
+            _activeModal = ModalContent.None;
         }
 
         // 이탈 상태가 풀렸는데(파트너 재접속) 창이 남아 있으면 내린다.

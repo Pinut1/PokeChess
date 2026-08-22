@@ -75,6 +75,13 @@ public class StatInfoPanelUI : MonoBehaviour
     [FormerlySerializedAs("_sellPriceFormat")]
     [SerializeField] private string _costFormat = "{0}";
 
+    [Tooltip("코스트별 테두리 프레임 Image. 비워두면 프레임 교체를 건너뛴다(기존 씬 배선 호환).")]
+    [SerializeField] private Image _costFrame;
+
+    [Tooltip("코스트별 프레임 스프라이트 (인덱스 = cost-1, 1~5코스트). ShopCardUI._normalFrames와 같은 " +
+             "에셋을 그대로 물리면 상점 카드와 테두리가 일치한다. 해당 칸이 비어 있으면 프레임을 숨긴다.")]
+    [SerializeField] private Sprite[] _costFrames = new Sprite[5];
+
     [Tooltip("성급 아이콘. 성급에 따라 스프라이트만 갈아끼운다.")]
     [SerializeField] private Image _starImage;
 
@@ -534,6 +541,25 @@ public class StatInfoPanelUI : MonoBehaviour
 
         if (_costText != null)
             _costText.text = string.Format(_costFormat, data.cost);
+
+        ApplyCostFrame(data.cost);
+    }
+
+    /// <summary>
+    /// 코스트별 테두리 프레임 교체. ShopCardUI가 카드에 하는 것과 같은 방식(인덱스 = cost-1)이라,
+    /// 같은 스프라이트 배열을 물리면 상점 카드와 스탯창 테두리가 일치한다.
+    /// 배선이 비어 있으면 조용히 건너뛴다 — 이 기능이 없던 시절의 씬/프리팹도 그대로 동작해야 한다.
+    /// </summary>
+    private void ApplyCostFrame(int cost)
+    {
+        if (_costFrame == null) return;
+
+        Sprite sprite = _costFrames != null && _costFrames.Length > 0
+            ? _costFrames[Mathf.Clamp(cost - 1, 0, _costFrames.Length - 1)]
+            : null;
+
+        _costFrame.sprite = sprite;
+        _costFrame.enabled = sprite != null; // 미등록 칸이 흰 사각형으로 남지 않게(일러스트와 같은 규칙)
     }
 
     /// <summary>"Archer" → "Archer(원거리딜러)". 대응표에 없으면 영문만 그대로 쓴다.</summary>

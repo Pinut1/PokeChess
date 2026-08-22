@@ -40,7 +40,7 @@ MonoBehaviour:
   attackVfxId: Ice_S
   evolvesIntoEn: 
   shopBuyable: 0
-  obtainBy: synergy
+  obtainBy: bot
   modelPrefab: {fileID: 7802018124579567730, guid: 65bb5e72c9941534e9eb0db30c2174e4, type: 3}
   voiceClip: {fileID: 8300000, guid: c5f218620cafdb342b6c9f700b580c00, type: 3}
   icon: {fileID: -3733370446600812037, guid: f4336272df25b5f49a26bc037724fd76, type: 3}
