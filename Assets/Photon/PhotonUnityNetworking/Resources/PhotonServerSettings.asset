@@ -73,6 +73,10 @@ MonoBehaviour:
   - RPC_RequestBoardSnapshot
   - RPC_RequestSharedDebugUnitBySpecies
   - RPC_ResolveSharedDebugUnitBySpecies
+  - RPC_RequestBattleResultResend
+  - RPC_PartnerResultUnresponsive
+  - RPC_PartnerResultGiveUpAvailable
+  - RPC_PartnerResultRecovered
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

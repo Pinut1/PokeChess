@@ -214,6 +214,11 @@ public class OptionsPanelUI : MonoBehaviour
     private bool _partnerGiveUpAvailable;
     private bool _partnerDisconnectEndConfirmOpen;
 
+    // 대기 모달을 띄운 게 "진짜 이탈"인지 "파트너 응답 불능"인지 — 안내 문구를 다르게 쓰기 위해
+    // 구분한다. false(기본값)가 진짜 이탈. HandlePartnerDisconnected가 다시 뜨면 항상 false로
+    // 되돌아간다(더 확실한 신호가 왔으므로).
+    private bool _partnerDisconnectIsResultUnresponsive;
+
     // 대기 모달에 [포기하기]를 이미 붙였는지. 유예가 끝난 뒤 매 프레임 다시 붙이지 않으려고 둔다.
     private bool _partnerGiveUpButtonShown;
 
@@ -391,6 +396,13 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentReconnected  += HandlePartnerReconnected;
         GameEvents.OnSessionEnded         += HandleSessionEnded;
         GameEvents.OnGameCleared          += HandleGameCleared;
+
+        // "파트너 응답 불능"(진짜 이탈은 아님) — 화면은 위 파트너 이탈 대기 모달과 동일하게 재사용하되,
+        // RoundPhaseManager/PartnerBattleMirrorController/PartnerSpectateView 등 "진짜 이탈" 전용
+        // 부작용을 가진 다른 구독자들과는 별개 이벤트로 분리돼 있다(GameEvents.cs 참고).
+        GameEvents.OnPartnerResultUnresponsive    += HandlePartnerResultUnresponsive;
+        GameEvents.OnPartnerResultGiveUpAvailable += HandlePartnerResultGiveUpAvailable;
+        GameEvents.OnPartnerResultRecovered       += HandlePartnerReconnected;
     }
 
     private void OnDisable()
@@ -400,6 +412,10 @@ public class OptionsPanelUI : MonoBehaviour
         GameEvents.OnOpponentReconnected  -= HandlePartnerReconnected;
         GameEvents.OnSessionEnded         -= HandleSessionEnded;
         GameEvents.OnGameCleared          -= HandleGameCleared;
+
+        GameEvents.OnPartnerResultUnresponsive    -= HandlePartnerResultUnresponsive;
+        GameEvents.OnPartnerResultGiveUpAvailable -= HandlePartnerResultGiveUpAvailable;
+        GameEvents.OnPartnerResultRecovered       -= HandlePartnerReconnected;
 
         if (_defeatModalRoutine != null)
         {
@@ -420,9 +436,26 @@ public class OptionsPanelUI : MonoBehaviour
         _partnerDisconnectModalOpen = true;
         _partnerGiveUpAvailable = false;
         _partnerDisconnectEndConfirmOpen = false;
+        _partnerDisconnectIsResultUnresponsive = false; // 더 확실한 신호(진짜 이탈)가 왔으므로 되돌린다
     }
 
     private void HandlePartnerGiveUpAvailable(bool bothDisconnected)
+    {
+        _partnerGiveUpAvailable = true;
+    }
+
+    /// <summary>파트너 응답 불능(진짜 이탈 아님) — 안내 문구만 다르고 화면 동작은
+    /// HandlePartnerDisconnected와 동일하다(PollPartnerDisconnectModals 참고).</summary>
+    private void HandlePartnerResultUnresponsive()
+    {
+        _partnerDisconnectModalOpen = true;
+        _partnerGiveUpAvailable = false;
+        _partnerDisconnectEndConfirmOpen = false;
+        _partnerDisconnectIsResultUnresponsive = true;
+    }
+
+    /// <summary>위 상태에서 30초 경과 — HandlePartnerGiveUpAvailable과 화면 동작은 동일하다.</summary>
+    private void HandlePartnerResultGiveUpAvailable()
     {
         _partnerGiveUpAvailable = true;
     }
@@ -432,6 +465,7 @@ public class OptionsPanelUI : MonoBehaviour
         _partnerDisconnectModalOpen = false;
         _partnerGiveUpAvailable = false;
         _partnerDisconnectEndConfirmOpen = false;
+        _partnerDisconnectIsResultUnresponsive = false;
 
         // 떠 있던 대기 모달은 다음 Update의 PollPartnerDisconnectModals가 내린다.
     }
@@ -805,7 +839,16 @@ public class OptionsPanelUI : MonoBehaviour
                 _activeModal = ModalContent.PartnerDisconnectWait;
                 _partnerGiveUpButtonShown = false;
 
-                _modalDialog.ShowWaiting("팀원이 연결 끊김\n재접속을 기다리는 중입니다...");
+                // 진짜 이탈과 파트너 응답 불능은 원인이 다르므로 문구도 다르게 안내한다 — "응답 불능"
+                // 쪽은 아직 연결이 끊긴 게 아니라서 "연결 끊김"이라고 하면 부정확하다. 파트너 닉네임을
+                // 넣어 누구를 기다리는지 명확히 한다(2026-08-22 코드리뷰 대응).
+                string partnerName = network != null ? network.PartnerNickname : "";
+                string message = _partnerDisconnectIsResultUnresponsive
+                    ? (string.IsNullOrEmpty(partnerName)
+                        ? "팀원의 응답을 기다리는 중입니다..."
+                        : $"{partnerName}님의 응답을 기다리는 중입니다...")
+                    : "팀원이 연결 끊김\n재접속을 기다리는 중입니다...";
+                _modalDialog.ShowWaiting(message);
             }
 
             // 유예가 끝나면 [포기하기]가 뒤늦게 붙는다(문구는 그대로 둔다).
@@ -840,9 +883,13 @@ public class OptionsPanelUI : MonoBehaviour
 
     /// <summary>
     /// 종료 확인의 두 선택지. 패배 기록(SessionEnded)은 여기서 실제로 고른 시점에만 발행된다.
-    /// "타이틀로"는 PartnerAbandoned로 완전히 끝난 매치이므로 ReturnToTitleAfterMatchEnd(완료 매치
-    /// 전용 경로 — 저장된 재접속 세션까지 정리)를 탄다(2026-08 코드리뷰 대응). 일반 ConfirmReturnToTitle을
-    /// 쓰면 재접속 세션이 남아 타이틀의 [이전 게임으로 들어가기]에 이미 끝난 매치가 잘못 노출된다.
+    /// "타이틀로"는 완전히 끝난 매치이므로 ReturnToTitleAfterMatchEnd(완료 매치 전용 경로 — 저장된
+    /// 재접속 세션까지 정리)를 탄다(2026-08 코드리뷰 대응). 일반 ConfirmReturnToTitle을 쓰면 재접속
+    /// 세션이 남아 타이틀의 [이전 게임으로 들어가기]에 이미 끝난 매치가 잘못 노출된다.
+    /// 이 모달은 "진짜 이탈"과 "파트너 응답 불능" 양쪽에서 공유하는데, 사유는
+    /// gameManager.Network.ConfirmPartnerDisconnectGiveUp() 내부에서 결정되는 것과 반드시 같아야
+    /// 한다 — 여기서 따로 PartnerAbandoned로 고정하면 전적 기록과 재접속 세션 정리 로그가 서로 다른
+    /// 사유를 가리키게 된다(2026-08-22 코드리뷰 지적).
     /// </summary>
     private void HandlePartnerDisconnectGiveUp(bool returnToTitle)
     {
@@ -851,10 +898,18 @@ public class OptionsPanelUI : MonoBehaviour
         _partnerDisconnectModalOpen = false;
         _partnerGiveUpAvailable = false;
 
+        bool isResultUnresponsive = false;
         if (GameManager.TryGet(out var gameManager) && gameManager.Network != null)
+        {
+            isResultUnresponsive = gameManager.Network.IsPartnerResultUnresponsive;
             gameManager.Network.ConfirmPartnerDisconnectGiveUp();
+        }
 
-        if (returnToTitle) ReturnToTitleAfterMatchEnd(SessionEndReason.PartnerAbandoned);
+        SessionEndReason reason = isResultUnresponsive
+            ? SessionEndReason.PartnerResultUnresponsive
+            : SessionEndReason.PartnerAbandoned;
+
+        if (returnToTitle) ReturnToTitleAfterMatchEnd(reason);
         else QuitGame();
     }
 

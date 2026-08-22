@@ -25,7 +25,8 @@ public enum SessionEndReason
     ReconnectFailed,   // 본인 재접속 실패
     PartnerAbandoned,  // 상대 미재접속(협동 불가)
     BothDisconnected,  // 둘 다 연결 끊김
-    Surrender          // 2인 합의 항복(옵션창)
+    Surrender,         // 2인 합의 항복(옵션창)
+    PartnerResultUnresponsive // 상대는 연결돼 있는데 전투 결과 응답만 없어 포기(진짜 이탈 아님, 2026-08-22 추가)
 }
 
 /// <summary>
@@ -324,6 +325,26 @@ public static class GameEvents
     public static event Action<SessionEndReason> OnSessionEnded;
 
     /// <summary>
+    /// 파트너가 Photon에는 연결돼 있는데 이번 라운드 전투 결과 보고만 안 오는 상황(NetworkManager.
+    /// DiagnosePartnerUnresponsiveIfNeeded). OnOpponentDisconnected와 OptionsPanelUI 화면상으로는
+    /// 동일한 대기 모달을 띄우지만, 실제 이탈이 아니므로 일부러 다른 이벤트로 분리했다 — OnOpponentDisconnected는
+    /// RoundPhaseManager(페이즈 타이머 강제 정지)·PartnerBattleMirrorController(미러 전투 중단)·
+    /// PartnerSpectateView(관전 화면 강제 종료)도 함께 구독하는데, 이들은 전부 "진짜로 자리를 비웠다"는
+    /// 전제로 만들어진 부작용이라 "아직 붙어있고 결과만 늦는" 이 상황에 적용하면 안 된다
+    /// (2026-08-22 코드리뷰 지적 — OnOpponentDisconnected 재사용이 자기 자신을 구동하던 코루틴을
+    /// 죽이거나 정상 진행 중인 관전 화면을 강제로 닫아버리는 문제가 있었다). OptionsPanelUI만 구독할 것.
+    /// </summary>
+    public static event Action OnPartnerResultUnresponsive;
+
+    /// <summary>위 OnPartnerResultUnresponsive 발생 30초 후 — [포기하기] 버튼을 노출해도 되는 시점.
+    /// OnGracePeriodExpired와 같은 타이밍 개념이지만 트리거가 다르므로 별도 이벤트로 둔다.</summary>
+    public static event Action OnPartnerResultGiveUpAvailable;
+
+    /// <summary>OnPartnerResultUnresponsive로 대기하던 중 결과가 뒤늦게 도착해 정상 판정으로 복귀함.
+    /// OnOpponentReconnected와 같은 개념(대기 모달 종료)이지만 트리거가 다르므로 별도 이벤트로 둔다.</summary>
+    public static event Action OnPartnerResultRecovered;
+
+    /// <summary>
     /// 마지막 라운드(챕터 최종 스테이지) 클리어 — 게임 완주(승리).
     /// MasterClient가 최종 라운드 결과 후 BroadcastGameCleared로 전체에 발행 →
     /// RoundPhaseManager가 GamePhase.Victory로 전환. (다음 라운드를 브로드캐스트하지 않음.)
@@ -410,6 +431,9 @@ public static class GameEvents
     public static void OpponentReconnected()        => OnOpponentReconnected?.Invoke();
     public static void GracePeriodExpired(bool bothDisconnected) => OnGracePeriodExpired?.Invoke(bothDisconnected);
     public static void SessionEnded(SessionEndReason reason) => OnSessionEnded?.Invoke(reason);
+    public static void PartnerResultUnresponsive()   => OnPartnerResultUnresponsive?.Invoke();
+    public static void PartnerResultGiveUpAvailable() => OnPartnerResultGiveUpAvailable?.Invoke();
+    public static void PartnerResultRecovered()      => OnPartnerResultRecovered?.Invoke();
     public static void GameCleared()                => OnGameCleared?.Invoke();
     public static void MatchRecorded(MatchRecord record) => OnMatchRecorded?.Invoke(record);
     public static void RequestServerMatches(int count) => OnServerMatchesRequested?.Invoke(count);

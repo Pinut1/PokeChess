@@ -47,12 +47,20 @@ public class RoundPhaseManager : MonoBehaviour
     /// (outcome 값 자체는 더 이상 이 클래스의 판정에 쓰이지 않음).</summary>
     private bool _teamRoundResolved;
 
-    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다(전투 최대 길이 MAX_TICKS*TICK_INTERVAL=30s와 동일).
-    /// 파트너 전투가 아직 진행 중인데 내 쪽만 끝나 먼저 다음 라운드가 시작되는 것을 막기 위함(PLACEHOLDER 안전장치 — RPC 유실 시 영구 정지 방지).
-    /// 재촉·대체판정(재전송 요청 후 방장 결과로 대신 정하기)은 2026-08-21 코드리뷰에서 승패를 지어내는
-    /// 문제로 지적되어 제거함 — 대신 "파트너 응답 불능 진단 + 기존 이탈 UX로 위임" 방식으로 재설계하는
-    /// 티켓이 별도로 있음(담당: 황해인). 이 타임아웃 도달 시 그냥 다음 라운드로 진행하는 기존 동작으로 되돌림.</summary>
-    private const float TEAM_RESULT_SAFETY_TIMEOUT = 30f;
+    /// <summary>다음 라운드 시작 전 팀 결과를 최대 이만큼 더 기다린다. 전투 최대 길이(35초 =
+    /// BattleManager.MAX_TICKS*TICK_INTERVAL 30s + 연장전 5s)보다 여유를 둔다. 이 시점에 도달해도
+    /// 더 이상 추측해서 방송하지 않는다 — TEAM_RESULT_DIAGNOSE_AT에서 이미 "파트너 응답 불능" 진단으로
+    /// 넘어갔어야 정상이라, 여기 도달하는 건 그 진단 자체가 안 불린 이례적 상황뿐이다(로그만 남기고 스킵).</summary>
+    private const float TEAM_RESULT_SAFETY_TIMEOUT = 40f;
+
+    /// <summary>이 시점부터 이 간격으로 재전송을 반복 요청한다(NetworkManager.RequestBattleResultResendIfNeeded).</summary>
+    private const float TEAM_RESULT_NUDGE_START_AT = 20f;
+    private const float TEAM_RESULT_NUDGE_INTERVAL = 5f;
+
+    /// <summary>재전송 요청을 몇 차례 반복해도 이 시점까지 안 오면 "파트너 응답 불능"으로 진단한다
+    /// (NetworkManager.DiagnosePartnerUnresponsiveIfNeeded). 전투 최대 길이(35초)와 같다 — 정상적으로
+    /// 전투가 오래 걸리는 것과 진짜 응답 불능을 헷갈리지 않기 위한 최소 대기.</summary>
+    private const float TEAM_RESULT_DIAGNOSE_AT = 35f;
 
     // ─────────────────────────────────────────
     // 이벤트 구독
@@ -292,16 +300,49 @@ public class RoundPhaseManager : MonoBehaviour
         if (!network.IsMasterClient) yield break;
 
         // 파트너 전투가 아직 진행 중일 수 있음(각자 보드 따로 시뮬레이션) — 팀 결과(OnTeamRoundResolved)가
-        // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다.
-        // RPC 유실 등으로 영영 안 올 가능성에 대한 안전장치로 최대 대기시간을 둔다.
+        // 도착할 때까지 추가로 기다려서 한쪽만 끝났는데 다음 라운드가 먼저 시작되는 걸 막는다. 그 안에서
+        // 재전송 요청·응답불능 진단도 같은 시계로 시도한다(별도 타이머를 두면 이 루프의 타임아웃과
+        // 서로 어긋난다 — 2026-08-21 코드리뷰 지적, PR #120 후속).
+        //
+        // ⚠️ TEAM_RESULT_SAFETY_TIMEOUT은 "진단(diagnosed)이 아직 안 불린" 경우에만 적용한다. 진단이
+        // 뜨고 나면 NetworkManager 쪽에서 그 뒤로 GIVE_UP_AVAILABLE_DELAY(30초)를 더 기다린 뒤에야
+        // 포기하기가 노출되는데, 안전 타임아웃(40초)이 진단 시점(35초)과 5초 차이밖에 안 나면 포기하기가
+        // 뜨기(35+30=65초) 한참 전에 "여기 오면 안 된다" 에러가 매번 찍히는 계산 오류가 있었다
+        // (2026-08-22 코드리뷰 지적). 진단이 뜬 뒤로는 무기한 대기하고(기존 실제 이탈 흐름과 동일 철학 —
+        // HandleSessionEnded가 [포기하기] 선택 시 이 코루틴을 직접 끊어준다), 안전 타임아웃은 "진단
+        // 로직 자체가 안 불린" 진짜 이례적 상황에만 의미를 갖는다.
         float waited = 0f;
-        while (!_teamRoundResolved && waited < TEAM_RESULT_SAFETY_TIMEOUT)
+        float nextNudgeAt = TEAM_RESULT_NUDGE_START_AT;
+        bool diagnosed = false;
+        while (!_teamRoundResolved && (diagnosed || waited < TEAM_RESULT_SAFETY_TIMEOUT))
         {
             yield return null;
             waited += Time.deltaTime;
+
+            if (waited >= nextNudgeAt && waited < TEAM_RESULT_DIAGNOSE_AT)
+            {
+                nextNudgeAt += TEAM_RESULT_NUDGE_INTERVAL;
+                network.RequestBattleResultResendIfNeeded();
+            }
+            if (!diagnosed && waited >= TEAM_RESULT_DIAGNOSE_AT)
+            {
+                // 반환값이 true일 때만 래치한다 — false는 "아직 방장 자신 결과도 없어서 아무 것도
+                // 못 정했다"는 뜻이라, 여기서 무조건 true로 래치해버리면 화면에 아무 것도 안 뜬 채로
+                // 안전 타임아웃까지 무력화돼 영구 정지한다(2026-08-22 코드리뷰 지적 — 실제 회귀였음).
+                // false면 다음 프레임에 다시 시도한다.
+                diagnosed = network.DiagnosePartnerUnresponsiveIfNeeded();
+            }
         }
         if (!_teamRoundResolved)
-            Debug.LogWarning("[Phase] 팀 라운드 결과 미수신(타임아웃) — 안전장치로 다음 라운드 진행");
+        {
+            // diagnosed==true였다면 위 while 조건상 여기 도달할 수 없다(무기한 대기) — 그러므로 여기
+            // 도달했다는 건 진단 로직 자체가 안 불린 채로 안전 타임아웃에 걸렸다는 뜻이다(진짜 이례적
+            // 상황). 그래도 승패를 지어내지 않는다는 원칙은 끝까지 지킨다: 방송하지 않고 그냥 스킵한다
+            // (QA 로그로 반드시 잡아야 하는 상황).
+            Debug.LogError("[Phase] 팀 라운드 결과 미수신(안전 타임아웃 도달, 응답불능 진단 자체가 안 불림) — " +
+                            "승패를 추측하지 않고 다음 라운드 방송을 스킵한다.");
+            yield break;
+        }
 
         // 팀 라이프가 이번 라운드로 완전히 소진됐으면(TeamHealth==0) 여기서는 다음 라운드/완주 어느
         // 쪽도 방송하지 않는다. HP 소진에 따른 게임오버 전환은 NetworkManager의 TeamHP Room 속성

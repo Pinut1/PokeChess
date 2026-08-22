@@ -109,6 +109,47 @@ public class PrototypeHud : MonoBehaviour
         GUILayout.Space(8f);
 
         // ─────────────────────────────
+        // 라운드 디버그
+        // ─────────────────────────────
+
+        GUILayout.Label("── 라운드 디버그 ──");
+
+        int lastRound = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
+
+        if (GUILayout.Button(
+                lastRound > 0 ? $"최종 라운드로 스킵 (1-{lastRound})" : "최종 라운드로 스킵",
+                GUILayout.Height(30f)))
+        {
+            DebugSkipToFinalRound(gm);
+        }
+
+        GUILayout.Space(4f);
+
+        // 파트너 응답 불능(전투 결과 미보고) 재현용 — 에디터 일시정지는 네트워크까지 같이 멎어서
+        // "진짜 접속 끊김"과 구분이 안 되니, 이 클라이언트가 보고만 일부러 안 하게 만든다.
+        string suppressLabel =
+            NetworkManager.DebugSuppressBattleResultReport
+                ? "결과 보고 억제(응답불능 재현): ON ▣"
+                : "결과 보고 억제(응답불능 재현): OFF ☐";
+
+        if (GUILayout.Button(suppressLabel, GUILayout.Height(30f)))
+            NetworkManager.DebugSuppressBattleResultReport =
+                !NetworkManager.DebugSuppressBattleResultReport;
+
+        bool hasSuppressed = gm.Network != null && gm.Network.HasSuppressedBattleResult;
+
+        GUI.enabled = hasSuppressed;
+        if (GUILayout.Button(
+                hasSuppressed ? "억제된 결과 지금 보내기" : "억제된 결과 없음",
+                GUILayout.Height(30f)))
+        {
+            gm.Network.DebugSendSuppressedBattleResultNow();
+        }
+        GUI.enabled = true;
+
+        GUILayout.Space(8f);
+
+        // ─────────────────────────────
         // 도구 디버그
         // ─────────────────────────────
 
@@ -228,6 +269,30 @@ public class PrototypeHud : MonoBehaviour
             $"[PrototypeHud][QA] 재조합기 -{amount} 처리 완료 — " +
             $"보유 {gm.Item.ReforgerCount}개"
         );
+    }
+
+    /// <summary>최종 라운드로 즉시 스킵(게임오버/완주 화면 검증용). 마스터클라이언트가 아니면
+    /// NetworkManager.BroadcastRoundStart 내부에서 자동으로 무시된다(다른 QA 버튼과 달리 별도
+    /// 마스터 체크가 필요 없음 — BroadcastRoundStart가 이미 그렇게 만들어져 있다).
+    /// 라운드 번호만 바꿀 뿐 골드/보드/레벨은 그대로 둔다 — 최종 라운드 전투/결과 UI만 빨리
+    /// 보고 싶을 때 쓰는 용도라 진행 상태를 흉내 낼 필요가 없다.</summary>
+    private void DebugSkipToFinalRound(GameManager gm)
+    {
+        if (gm.Network == null)
+        {
+            Debug.LogWarning("[PrototypeHud] NetworkManager가 없습니다.");
+            return;
+        }
+
+        int lastRound = StageDatabase.Instance != null ? StageDatabase.Instance.LastRound : 0;
+        if (lastRound <= 0)
+        {
+            Debug.LogWarning("[PrototypeHud] StageDatabase가 비어있어 최종 라운드를 알 수 없습니다.");
+            return;
+        }
+
+        gm.Network.BroadcastRoundStart(lastRound);
+        Debug.Log($"[PrototypeHud][QA] 최종 라운드(1-{lastRound})로 스킵");
     }
 
     private void DebugAddGold(

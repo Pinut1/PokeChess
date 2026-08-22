@@ -210,8 +210,34 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글. 빌드/검증 편의용.</summary>
     public static bool DebugInfiniteTeamHealth = false;
 
+    /// <summary>디버그: 켜지면 ReportBattleResult가 실제 보고를 안 하고 붙들어둔다(응답 불능 상황 재현용).
+    /// PrototypeHud에서 토글. "파트너 이탈 UX로 위임" 흐름을 실제 접속 끊김 없이 재현하려는 목적 —
+    /// 에디터 일시정지는 네트워크 자체도 멎어서 "진짜 이탈"과 구분이 안 된다.</summary>
+    public static bool DebugSuppressBattleResultReport = false;
+
     /// <summary>이번 라운드 팀 결과를 이미 판정했는지(MasterClient, 중복 발행 방지). 라운드 시작 시 리셋.</summary>
     private bool _roundResultResolved;
+
+    /// <summary>내가 마지막으로 보고한 전투 결과(승/패). 재전송 요청(RPC_RequestBattleResultResend) 응답용
+    /// 캐시일 뿐, 승패 추측에는 쓰지 않는다. 아직 이번 라운드 전투를 안 끝냈으면 null. 라운드 시작 시 리셋.</summary>
+    private bool? _lastLocalBattleResult;
+
+    /// <summary>DebugSuppressBattleResultReport가 켜져 있는 동안 ReportBattleResult가 실제로 보내지 않고
+    /// 붙들어둔 결과. DebugSendSuppressedBattleResultNow()로 나중에 보낼 수 있다. 라운드 시작 시 리셋.</summary>
+    private bool? _suppressedBattleResult;
+
+    /// <summary>지금 억제된(아직 안 보낸) 전투 결과가 있는지. QA 패널에서 "지금 보내기" 버튼 활성화 판정용.</summary>
+    public bool HasSuppressedBattleResult => _suppressedBattleResult.HasValue;
+
+    /// <summary>이번 라운드에서 "파트너 응답 불능"을 이미 진단했는지(MasterClient). 라운드 시작 시 리셋.
+    /// 파트너가 Photon에는 계속 연결돼 있는데(=진짜 이탈이 아님) 전투 결과 응답만 안 오는 상황을 감지했을
+    /// 때 켠다. _opponentDisconnected(Photon 실제 이탈용)와는 트리거·해제 조건이 달라 별도로 관리한다
+    /// (2026-08-21 티켓: 승패를 추측하는 대신 기존 이탈 UX로 위임).</summary>
+    private bool _partnerResultUnresponsive;
+
+    /// <summary>_partnerResultUnresponsive 진단 후 GIVE_UP_AVAILABLE_DELAY 대기용 코루틴.
+    /// OpponentGraceRoutine과 동일한 타이밍이지만 트리거가 달라 독립적으로 운영한다.</summary>
+    private Coroutine _partnerUnresponsiveGraceRoutine;
 
     /// <summary>라운드 1을 한 번만 시작하기 위한 마스터 가드.</summary>
     private bool _gameStarted;
@@ -519,6 +545,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>파트너 연결 끊김으로 재접속을 기다리는 중인지(무한 대기 포함, 30초 유예와 무관하게 true).
     /// ShopManager/ItemManager/UnitDragController 등 입력 처리부가 공통으로 체크해 대기 중 조작을 막는다(2026-08).</summary>
     public bool IsAwaitingPartnerReconnect => _opponentDisconnected;
+
+    /// <summary>지금 대기 중인 사유가 "진짜 이탈"이 아니라 "파트너 응답 불능"인지. OptionsPanelUI가
+    /// [포기하기] 이후 처리에서 SessionEndReason을 고를 때 ConfirmPartnerDisconnectGiveUp()과
+    /// 똑같은 판단을 하기 위해 공개한다(2026-08-22 코드리뷰 지적 — 안 맞추면 전적엔 정확히 기록되는데
+    /// 재접속 세션 정리 로그에는 늘 "PartnerAbandoned"로만 남아 실제 사유와 어긋났다).</summary>
+    public bool IsPartnerResultUnresponsive => _partnerResultUnresponsive;
 
     /// <summary>디버그 로그에 UserId 전체를 남기지 않기 위한 축약 표시(앞 8자).</summary>
     private static string ShortUserId(string userId) =>
@@ -880,7 +912,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void ConfirmPartnerDisconnectGiveUp()
     {
-        GameEvents.SessionEnded(SessionEndReason.PartnerAbandoned);
+        // 대기 화면은 같지만 사유는 구분해서 전적에 남긴다 — 진짜 이탈(PartnerAbandoned)과
+        // "연결은 살아있는데 결과 응답만 없어서 포기"(PartnerResultUnresponsive)는 다른 상황이다
+        // (2026-08-22 코드리뷰 지적 — 하나로 뭉뚱그리면 일시적 응답 지연이 파트너가 진짜로
+        // 게임을 버렸다고 잘못 기록된다).
+        SessionEndReason reason = _partnerResultUnresponsive
+            ? SessionEndReason.PartnerResultUnresponsive
+            : SessionEndReason.PartnerAbandoned;
+        GameEvents.SessionEnded(reason);
     }
 
     // ─────────────────────────────────────────
@@ -1520,8 +1559,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지
 
+        if (DebugSuppressBattleResultReport)
+        {
+            _suppressedBattleResult = isWin;
+            Debug.LogWarning($"[Network][QA] 전투 결과 보고 억제 중 — 실제로는 {(isWin ? "승" : "패")}지만 " +
+                              "안 보냄. DebugSendSuppressedBattleResultNow()로 나중에 보낼 수 있음.");
+            return;
+        }
+
+        _lastLocalBattleResult = isWin; // 재전송 요청(RPC_RequestBattleResultResend) 응답용 캐시
         var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    /// <summary>DebugSuppressBattleResultReport로 붙들어뒀던 결과를 지금 보낸다(응답 불능 → 복귀 재현용).
+    /// 억제된 결과가 없으면 아무 것도 안 한다.</summary>
+    public void DebugSendSuppressedBattleResultNow()
+    {
+        if (!_suppressedBattleResult.HasValue)
+        {
+            Debug.LogWarning("[Network][QA] 억제된 결과가 없습니다.");
+            return;
+        }
+
+        if (_isLeavingRoom) return;
+
+        bool isWin = _suppressedBattleResult.Value;
+        _suppressedBattleResult = null;
+        _lastLocalBattleResult = isWin;
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        Debug.Log($"[Network][QA] 억제됐던 결과({(isWin ? "승" : "패")}) 지금 전송");
     }
 
     // ─────────────────────────────────────────
@@ -2900,6 +2968,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
+        _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
+        _suppressedBattleResult = null; // QA 억제 테스트 잔여값도 라운드마다 새로
+        // 새 라운드가 시작됐는데 직전 라운드의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면
+        // (예: QA "최종 라운드로 스킵" 버튼처럼 ResolveTeamRound를 거치지 않고 라운드가 바로 시작되는
+        // 경로) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — 안 그러면 OptionsPanelUI가 그
+        // 신호를 영영 못 받아 대기 모달이 멈춰있게 된다(2026-08-22 코드리뷰 지적).
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
         _lastKnownRound = round;      // 재접속 라운드 복구 기준점
         _tradeSentThisRound = false;  // 전송 기회는 라운드마다 새로 — 안 쓴 라운드는 이월되지 않는다
 
@@ -3205,6 +3280,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_opponentDisconnected)
             return;
 
+        // "응답 불능" 진단이 먼저 떠 있던 상태였는데 이제 진짜 이탈까지 확인됐다 — 더 확실한 신호가
+        // 왔으니 우리 쪽 유예 타이머는 정리하고(중복 병행 방지), 아래 일반 이탈 처리가 처음부터 새로
+        // 담당하게 넘긴다. 대기 모달은 계속 떠 있어야 하므로(진짜 이탈 흐름이 곧바로 이어받음)
+        // notifyRecovered는 false — 안 지우면 응답불능 유예 타이머(GameEvents.PartnerResultGiveUpAvailable)와
+        // 방금 새로 시작될 실제 이탈 유예 타이머(GameEvents.OnGracePeriodExpired)가 동시에 돌게 된다
+        // (2026-08-22 코드리뷰 지적).
+        ClearPartnerResultUnresponsive(notifyRecovered: false);
+
         // 2026-08 파트너 이탈 UX: 의도적 퇴장(타이틀로/게임종료로 인한 LeaveRoom)과 비정상 연결 끊김을
         // 더 이상 구분하지 않는다 — 남은 플레이어 입장에서는 어느 쪽이든 "파트너가 없다"는 동일한 상황이므로
         // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
@@ -3236,12 +3319,26 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// </summary>
     private System.Collections.IEnumerator OpponentGraceRoutine()
     {
-        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
-        _opponentGraceRoutine = null;
+        yield return GraceDelayRoutine(
+            () => _opponentGraceRoutine = null,
+            () =>
+            {
+                bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
+                Debug.LogWarning($"[Network] 상대 이탈 30초 경과 — 포기하기 노출 가능 (둘 다 끊김: {bothDisconnected})");
+                FireGracePeriodExpired(bothDisconnected);
+            });
+    }
 
-        bool bothDisconnected = !PhotonNetwork.IsConnectedAndReady;
-        Debug.LogWarning($"[Network] 상대 이탈 30초 경과 — 포기하기 노출 가능 (둘 다 끊김: {bothDisconnected})");
-        FireGracePeriodExpired(bothDisconnected);
+    /// <summary>
+    /// GIVE_UP_AVAILABLE_DELAY만큼 기다린 뒤 clearSelf()로 자기 자신을 가리키던 필드를 비우고
+    /// onExpired를 부른다. OpponentGraceRoutine·PartnerUnresponsiveGraceRoutine이 공유하는
+    /// "기다렸다가 아직 유효하면 알림" 패턴을 한 곳에 모은 것(2026-08-22 코드리뷰 지적 — 중복 제거).
+    /// </summary>
+    private System.Collections.IEnumerator GraceDelayRoutine(System.Action clearSelf, System.Action onExpired)
+    {
+        yield return new WaitForSeconds(GIVE_UP_AVAILABLE_DELAY);
+        clearSelf();
+        onExpired();
     }
 
     /// <summary>같은 이탈 건에 대해 GracePeriodExpired(포기 가능 알림)를 한 번만 발행한다. 파트너 재입장 시 리셋.</summary>
@@ -3357,6 +3454,166 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             ResolveTeamRound();
     }
 
+    /// <summary>
+    /// RoundPhaseManager.ResultTimer의 대기 루프 중간(예: 20/25/30초 경과)에 반복 호출됨 —
+    /// 아직 결과가 없는 플레이어에게 재전송을 요청한다. 이미 판정됐으면 아무 것도 안 한다.
+    /// 몇 번을 불러도 안전(멱등) — 호출 빈도는 RoundPhaseManager 쪽에서 정한다.
+    /// </summary>
+    public void RequestBattleResultResendIfNeeded()
+    {
+        if (_soloMode || !IsMasterClient || _roundResultResolved) return;
+
+        Debug.LogWarning("[Network] 팀 결과 일부 미수신 — 재전송 요청");
+        photonView.RPC(nameof(RPC_RequestBattleResultResend), RpcTarget.Others);
+    }
+
+    /// <summary>재전송 요청 수신 — 이번 라운드 결과를 이미 계산해뒀으면 다시 보고한다.</summary>
+    [PunRPC]
+    private void RPC_RequestBattleResultResend()
+    {
+        if (!_lastLocalBattleResult.HasValue) return;
+        if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지(다른 SetCustomProperties 호출부와 동일 가드)
+
+        Debug.Log("[Network] 팀 결과 재전송 요청 수신 — 내 결과 다시 보고");
+        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, _lastLocalBattleResult.Value ? 1 : 0 } };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+    }
+
+    // ─────────────────────────────────────────
+    // "파트너 응답 불능" 수신측(Others) RPC — GameEvents.OnPartnerResult*는 프로세스 로컬 C# 이벤트라
+    // 발행한 쪽(항상 방장)에서만 보인다. 상대방도 같은 대기 모달/포기하기를 보게 하려면 RPC로 알려줘야
+    // 한다(2026-08-22 코드리뷰 지적 — 이게 없으면 방장이 아닌 쪽은 아무 안내 없이 화면만 멈춰있었다).
+    // ─────────────────────────────────────────
+
+    [PunRPC]
+    private void RPC_PartnerResultUnresponsive()
+    {
+        // 로컬 플래그도 같이 켠다 — 방장이 아닌 쪽이 먼저 [포기하기]를 누를 수도 있는데, 그때
+        // ConfirmPartnerDisconnectGiveUp()이 정확한 SessionEndReason(PartnerResultUnresponsive)을
+        // 고르려면 이 값이 이 클라이언트에도 있어야 한다.
+        _partnerResultUnresponsive = true;
+        GameEvents.PartnerResultUnresponsive();
+    }
+
+    [PunRPC]
+    private void RPC_PartnerResultGiveUpAvailable()
+    {
+        GameEvents.PartnerResultGiveUpAvailable();
+    }
+
+    [PunRPC]
+    private void RPC_PartnerResultRecovered()
+    {
+        _partnerResultUnresponsive = false;
+        GameEvents.PartnerResultRecovered();
+    }
+
+    /// <summary>
+    /// "응답 불능" 진단 상태를 정리한다(플래그를 끄고 유예 코루틴을 멈춘다) — 정리 자체는 정상 판정
+    /// (ResolveTeamRound)·새 라운드 시작(RPC_OnRoundStart)·재시작(RPC_RestartGame)·실제 이탈로의
+    /// 핸드오프(OnPlayerLeftRoom)까지 네 곳에서 똑같이 필요해서 하나로 모았다(2026-08-22 코드리뷰
+    /// 지적 — 중복 제거). notifyRecovered가 true면 대기 모달을 닫으라는 신호(GameEvents.
+    /// PartnerResultRecovered)도 같이 쏜다 — 진짜로 상황이 풀렸을 때만 true를 준다. 실제 이탈로
+    /// 넘어가는 경우(대기 모달은 계속 떠 있어야 함)나, 애초에 진단 상태가 아니었던 경우는 false로 불러도
+    /// 안전하다(원래 켜져 있던 상태였을 때만 신호를 쏘도록 내부에서 판정).
+    /// </summary>
+    private void ClearPartnerResultUnresponsive(bool notifyRecovered)
+    {
+        bool wasUnresponsive = _partnerResultUnresponsive;
+        _partnerResultUnresponsive = false;
+
+        if (_partnerUnresponsiveGraceRoutine != null)
+        {
+            StopCoroutine(_partnerUnresponsiveGraceRoutine);
+            _partnerUnresponsiveGraceRoutine = null;
+        }
+
+        if (wasUnresponsive && notifyRecovered)
+        {
+            GameEvents.PartnerResultRecovered();
+            // 파트너 쪽 화면도 같이 닫아준다 — 이 이벤트는 프로세스 로컬 C# 이벤트라 RPC 없이는
+            // 상대방에게 전달되지 않는다(2026-08-22 코드리뷰 지적).
+            photonView.RPC(nameof(RPC_PartnerResultRecovered), RpcTarget.Others);
+        }
+    }
+
+    /// <summary>
+    /// RoundPhaseManager.ResultTimer의 대기 루프에서 재전송 요청 후에도 오래(예: 35초) 결과가 안 오면
+    /// 한 번 호출됨. 승패를 추측하지 않는다 — 대신 파트너가 Photon에는 연결돼 있는데 결과만 안 오는
+    /// 상황인지 확인하고, 맞으면 "응답 불능"으로 진단해 기존 파트너 이탈 UX(대기 모달 → 유예 →
+    /// [포기하기] 버튼)로 넘긴다. 최종 결정은 플레이어가 [포기하기]를 눌러야만 내려진다
+    /// (2026-08-21 티켓 — 방장 결과로 승패를 추측하던 이전 방식은 라이프 차감이 잘못 스킵되는
+    /// 비대칭 버그가 있어 제거함. PR #120 참고).
+    /// </summary>
+    public bool DiagnosePartnerUnresponsiveIfNeeded()
+    {
+        // 반환값은 "더 이상 안전 타임아웃을 걱정 안 해도 되는지"다 — RoundPhaseManager.ResultTimer가
+        // 이 값을 그대로 diagnosed 래치에 쓴다. true를 주는 모든 경로는 이미 뭔가가(정상 판정 완료,
+        // 진단 모달 노출, 실제 이탈 흐름 진행 중) 화면에 반영됐거나 반영될 예정인 경우다. 반대로
+        // "아직 아무 것도 모른다"인 경우(false)에 true를 잘못 주면, ResultTimer가 무기한 대기로
+        // 넘어가버려 안전 타임아웃도 화면도 영영 없이 조용히 멈춰버린다(2026-08-22 코드리뷰 지적 —
+        // 이 함수가 void였을 때 호출 자체만으로 diagnosed=true가 래치돼 실제로 이 버그가 있었다).
+        if (_soloMode || !IsMasterClient) return true;  // 이 클라이언트가 판단할 상황이 아님 — 더 볼 것 없음
+        if (_roundResultResolved || _partnerResultUnresponsive) return true; // 이미 처리됨
+
+        if (AllPlayersReportedResult())
+        {
+            ResolveTeamRound(); // 막판에 도착한 경우 — 정상 판정
+            return true;
+        }
+
+        // 방장 자신도 아직 결과를 안 보고했으면(전투가 안 끝났거나, QA 억제 토글을 자기 자신에게
+        // 켜놨거나) 안 온 게 파트너 쪽이라고 단정할 근거가 없다 — 여기서 "파트너 응답 불능"으로
+        // 잘못 진단하면 정작 문제는 내 쪽인데 상대를 탓하는 모달이 뜬다(2026-08-22 코드리뷰 지적).
+        // 아직 아무 결론도 못 냈으므로 false — ResultTimer가 안전 타임아웃을 계속 적용하며
+        // 다음 프레임에 다시 시도하게 한다.
+        if (!_lastLocalBattleResult.HasValue) return false;
+
+        // 파트너가 진짜로 Photon 방을 나갔으면(IsInactive) OnPlayerLeftRoom 경로가 이미 처리 중이다 —
+        // 여기서 또 진단을 띄우면 이미 뜬 "진짜 이탈" 모달 위에 우리 모달까지 겹쳐 뜨는 꼴이 된다.
+        // 그쪽 흐름이 이미 화면을 책임지고 있으므로 true(더 볼 것 없음).
+        Player[] others = PhotonNetwork.PlayerListOthers;
+        if (others == null || others.Length == 0 || others[0].IsInactive) return true;
+
+        _partnerResultUnresponsive = true;
+        Debug.LogWarning("[Network] 팀 결과 재전송 후에도 미수신 — 파트너 응답 불능 진단, 이탈 UX로 위임");
+        // OnOpponentDisconnected가 아니라 전용 이벤트를 쏜다 — OnOpponentDisconnected는 RoundPhaseManager
+        // (페이즈 타이머 강제 정지 — 지금 이 함수를 부르고 있는 ResultTimer 코루틴 자신이 죽어버림),
+        // PartnerBattleMirrorController(미러 전투 중단), PartnerSpectateView(관전 화면 강제 종료)도
+        // 함께 구독하는데, 이들은 전부 "진짜로 자리를 비웠다"는 전제의 부작용이라 이 상황엔 안 맞는다
+        // (2026-08-22 코드리뷰 지적). OptionsPanelUI만 듣는 GameEvents.PartnerResultUnresponsive로 분리.
+        GameEvents.PartnerResultUnresponsive();
+        // 이 이벤트는 프로세스 로컬 C# 이벤트라 방장 자신에게만 보인다 — 상대방도 같은 화면을 보게
+        // RPC로 알려준다(2026-08-22 코드리뷰 지적. 안 하면 상대방은 아무 안내도 없이 그냥 멈춰있는
+        // 화면만 보게 된다).
+        photonView.RPC(nameof(RPC_PartnerResultUnresponsive), RpcTarget.Others);
+
+        if (_partnerUnresponsiveGraceRoutine != null)
+            StopCoroutine(_partnerUnresponsiveGraceRoutine);
+        _partnerUnresponsiveGraceRoutine = StartCoroutine(PartnerUnresponsiveGraceRoutine());
+        return true;
+    }
+
+    /// <summary>OpponentGraceRoutine과 동일한 타이밍(GIVE_UP_AVAILABLE_DELAY)으로 [포기하기] 노출을 알린다.
+    /// 트리거가 실제 Photon 이탈이 아니므로 별도 코루틴 + 별도 이벤트(GameEvents.PartnerResultGiveUpAvailable)로
+    /// 독립 운영한다. 이 코루틴은 진단(DiagnosePartnerUnresponsiveIfNeeded)당 하나만 존재하므로
+    /// OpponentGraceRoutine의 _gracePeriodExpiredFired 같은 별도 1회 발행 가드가 필요 없다.</summary>
+    private System.Collections.IEnumerator PartnerUnresponsiveGraceRoutine()
+    {
+        yield return GraceDelayRoutine(
+            () => _partnerUnresponsiveGraceRoutine = null,
+            () =>
+            {
+                // 대기 중 정상 판정(ResolveTeamRound)이나 실제 이탈 핸드오프(OnPlayerLeftRoom)로
+                // 이미 꺼졌을 수 있다 — 그때는 알림을 쏘지 않는다.
+                if (!_partnerResultUnresponsive) return;
+
+                Debug.LogWarning("[Network] 파트너 응답 불능 30초 경과 — 포기하기 노출 가능");
+                GameEvents.PartnerResultGiveUpAvailable();
+                photonView.RPC(nameof(RPC_PartnerResultGiveUpAvailable), RpcTarget.Others);
+            });
+    }
+
     /// <summary>모든 플레이어가 이번 라운드 전투 결과를 보고했는지(-1=미보고).</summary>
     private bool AllPlayersReportedResult()
     {
@@ -3378,6 +3635,14 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void ResolveTeamRound()
     {
         _roundResultResolved = true;
+
+        // "파트너 응답 불능" 진단이 떠 있던 상태였다면(DiagnosePartnerUnresponsiveIfNeeded 참고), 지금
+        // 정상적으로 결과가 모여 판정하는 거니까 그 진단을 취소하고 대기 UI를 되돌린다. 파트너가 실제로
+        // Photon 방을 나간 게 아니라서 OnPlayerEnteredRoom이 다시 불릴 일이 없다 — 이 복구를 직접 안
+        // 해주면 파트너가 정상 복귀해도 화면이 "대기 중"에 계속 멈춰있게 된다.
+        // (OnOpponentReconnected가 아니라 전용 이벤트로 닫는 이유: RoundPhaseManager가 OnOpponentReconnected를
+        // 들으면 지금 이 함수를 부르고 있는 ResultTimer를 처음부터 다시 시작시켜버린다 — 불필요한 재시작.)
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
 
         int wins = 0;
         foreach (var player in PhotonNetwork.PlayerList)
@@ -3779,6 +4044,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 현재 NetworkManager 로컬 상태 초기화
         _gameStarted = false;
         _roundResultResolved = false;
+        _lastLocalBattleResult = null;
+        _suppressedBattleResult = null;
+        // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
+        // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
+        // (2026-08-22 코드리뷰 지적).
+        ClearPartnerResultUnresponsive(notifyRecovered: true);
 
         // 항복 상태 초기화(이전 판의 잔여 요청/알림이 새 판으로 넘어가지 않도록)
         _surrenderRequestSent = false;
@@ -3858,6 +4129,7 @@ public class NetworkManager : MonoBehaviour
     public bool RejoinFailed           => false;
     public bool PartnerGaveUpReconnect => false;
     public bool IsAwaitingPartnerReconnect => false; // 오프라인은 파트너 이탈 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsPartnerResultUnresponsive => false; // 오프라인은 파트너 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsResumingRejoinedMatch => false; // 오프라인은 재접속 개념 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsApplyingReconnectRoundCatchup => false; // 오프라인은 재접속 캐치업 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public void AttemptRejoinSavedSession()          { }
@@ -3887,6 +4159,13 @@ public class NetworkManager : MonoBehaviour
 
     /// <summary>디버그: 켜지면 팀 공통 HP가 절대 깎이지 않음(무한 HP). PrototypeHud에서 토글.</summary>
     public static bool DebugInfiniteTeamHealth = false;
+
+    /// <summary>오프라인은 ReportBattleResult가 항상 동기 즉시 판정이라 억제할 대상 자체가 없다
+    /// (실구현과 동일 공개 API 유지용 스텁).</summary>
+    public static bool DebugSuppressBattleResultReport = false;
+
+    /// <summary>오프라인은 항상 false(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public bool HasSuppressedBattleResult => false;
 
     private void Start()
     {
@@ -3999,6 +4278,17 @@ public class NetworkManager : MonoBehaviour
         if (!isWin) ReportBattleLoss(1);   // 라이프 -1
         GameEvents.TeamRoundResolved(isWin ? TeamRoundOutcome.BothWin : TeamRoundOutcome.BothLose);
     }
+
+    /// <summary>오프라인은 ReportBattleResult가 항상 동기 즉시 판정이라 재전송·응답불능 진단 자체가
+    /// 필요 없다(실구현과 동일 공개 API 유지용 스텁 — RoundPhaseManager.ResultTimer가
+    /// PHOTON_UNITY_NETWORKING 여부와 무관하게 컴파일되도록 시그니처만 맞춘다).</summary>
+    public void RequestBattleResultResendIfNeeded() { }
+
+    /// <summary>위 RequestBattleResultResendIfNeeded와 동일 이유로 no-op.</summary>
+    public bool DiagnosePartnerUnresponsiveIfNeeded() => true; // 오프라인은 즉시 판정이라 더 볼 것 없음
+
+    /// <summary>오프라인은 억제할 대상 자체가 없다(실구현과 동일 공개 API 유지용 스텁).</summary>
+    public void DebugSendSuppressedBattleResultNow() { }
 
     /// <summary>오프라인은 파트너가 없어 통신교환 불가.</summary>
     public void SendTradeUnit(PokemonUnit unit) => Debug.LogWarning("[Trade] 오프라인 — 파트너 없음, 전송 불가");
