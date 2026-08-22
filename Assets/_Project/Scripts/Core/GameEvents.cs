@@ -68,6 +68,26 @@ public static class GameEvents
     /// </summary>
     public static event Action<TeamRoundOutcome> OnTeamRoundResolved;
 
+    /// <summary>
+    /// 파트너 미러 전투(PartnerBattleMirrorController)가 끝까지 재생 완료됨. 인자 = (라운드, 미러가 낸 아군 승리 여부).
+    /// 여기서 "아군"은 미러 기준이라 <b>파트너 진영</b>을 가리킨다(파트너 유닛이 BattleTeam.Ally로 생성됨).
+    ///
+    /// 정상 연결 중에는 실제 보고값과 정확도를 대조하고, 전투 중 이탈로 해당 라운드를 건너뛴
+    /// 플레이어에게는 NetworkManager가 라운드 번호를 검증한 뒤 대체 판정으로 사용한다.
+    /// </summary>
+    public static event Action<int, bool> OnPartnerMirrorBattleCompleted;
+
+    /// <summary>
+    /// 전투 도중 이탈했다가 재접속했는데, 파트너의 전투가 아직 진행 중이라 이번 라운드에는
+    /// 낄 자리가 없는 상태. 재접속한 본인에게만 발행된다(NetworkManager.ResyncAfterReconnect).
+    ///
+    /// 파트너 이탈(OnOpponentDisconnected)과 성격이 다르다 — 여긴 <b>내가</b> 늦게 돌아온 쪽이고,
+    /// 파트너는 멀쩡히 싸우는 중이다. 그래서 [포기하기]도 없고 상대를 기다린다는 안내도 아니다.
+    /// 대기 종료는 별도 이벤트 없이 OnTeamRoundResolved(라운드 판정) 또는 OnRoundChanged(다음 라운드)로
+    /// 자연히 풀린다 — 둘 중 무엇이 오든 더 이상 기다릴 이유가 없기 때문이다.
+    /// </summary>
+    public static event Action OnAwaitingPartnerBattle;
+
     /// <summary>두 플레이어 모두 준비 완료 — 전투 페이즈로 전환</summary>
     public static event Action OnAllPlayersReady;
 
@@ -381,6 +401,8 @@ public static class GameEvents
     public static void BattleEnd(BattleEndReason reason) => OnBattleEnd?.Invoke(reason);
     public static void OvertimeStarted(float duration) => OnOvertimeStarted?.Invoke(duration);
     public static void TeamRoundResolved(TeamRoundOutcome outcome) => OnTeamRoundResolved?.Invoke(outcome);
+    public static void PartnerMirrorBattleCompleted(int roundIndex, bool partnerWon) => OnPartnerMirrorBattleCompleted?.Invoke(roundIndex, partnerWon);
+    public static void AwaitingPartnerBattle() => OnAwaitingPartnerBattle?.Invoke();
     public static void AllPlayersReady()       => OnAllPlayersReady?.Invoke();
     public static void RequestPlayerReady()    => OnPlayerReadyRequested?.Invoke();
     public static void ApprovePlayerReady()    => OnPlayerReadyApproved?.Invoke();

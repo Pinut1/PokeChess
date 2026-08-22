@@ -26,7 +26,7 @@ public class StageTopPanelUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _stageTimeText;
 
     [Tooltip("전투 제한시간(초). BattleManager의 MAX_TICKS × TICK_INTERVAL과 맞출 것.")]
-    [SerializeField] private float _battleDuration = 30f;
+    [SerializeField] private float _battleDuration = 40f;
 
     [Tooltip("결과 페이즈 노출시간(초). RoundPhaseManager._resultDuration과 맞출 것.")]
     [SerializeField] private float _resultDuration = 3f;

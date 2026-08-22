@@ -102,6 +102,14 @@ public class PartnerSpectateView : MonoBehaviour
     /// 함께 리셋된다.</summary>
     private int? _completedMirrorRoundIndex;
 
+    /// <summary>지금 미러 전투가 돌고 있는 라운드 번호(BattleSnapshot.roundIndex). null이면 실행 중인
+    /// 미러 없음. HandlePartnerBattleSnapshotChanged가 "같은 라운드 스냅샷이 또 왔을 때 진행 중인 미러를
+    /// tick 0부터 리셋해버리는 것"을 막는 용도로만 쓴다 — 재접속 시 BoardSyncBroadcaster가 전투 시작
+    /// 스냅샷을 다시 방송하면서 실제로 그 사고가 났다(2026-08-22 Editor.log 분석: 한 라운드에서 미러가
+    /// 4번 재시작됐고, 첫 회차가 낸 정답을 마지막 재시작본의 MAX_TICKS 타임아웃 판정이 덮어썼다).
+    /// _completedMirrorRoundIndex와 같은 시점(HandleStageEntered)에 함께 리셋된다.</summary>
+    private int? _runningMirrorRoundIndex;
+
     /// <summary>지금 파트너 화면이 전체화면으로 열려 있는지(PIP 축소 상태는 포함하지 않음).
     /// UnitStatusBarHud 등 "지금 내 로컬 화면 전체가 파트너 관전으로 덮여 있는지"만 알면 되는
     /// 다른 컴포넌트가 참조한다 — 이 클래스가 그 UI들을 직접 켜고 끄지는 않는다.</summary>
@@ -282,6 +290,7 @@ public class PartnerSpectateView : MonoBehaviour
     {
         _teamRoundResolved = false;
         _completedMirrorRoundIndex = null;
+        _runningMirrorRoundIndex = null;
 
         if (!_isExpanded) return;
         if (_mirrorController != null) _mirrorController.ShowPartnerEnemyPreview(stage);
@@ -296,8 +305,34 @@ public class PartnerSpectateView : MonoBehaviour
     /// </summary>
     private void HandlePartnerBattleSnapshotChanged(BattleSnapshot snapshot)
     {
-        if (!_isExpanded) return;
+        // 관전 화면을 열었는지와 무관하게 미러를 돌린다(2026-08-22).
+        //
+        // 과거엔 여기 `if (!_isExpanded) return;`이 있어서, 파트너 화면을 열어둔 동안에만 미러가
+        // 돌았다. 관전이 목적일 땐 그게 맞았지만 두 가지가 걸린다:
+        //  1) 미러 결과가 실제 전투와 일치하는지 검증하려면 매 라운드 값이 필요한데, 사람이 화면을
+        //     켜둬야만 데이터가 생겨서 한 번 깜빡이면 그 라운드가 통째로 비었다.
+        //  2) 더 중요하게 — 파트너가 전투 도중 이탈하면 그 사람의 전투 결과를 알 방법이 미러뿐인데,
+        //     하필 그때 관전을 안 보고 있었다면 결과를 영영 계산할 수 없다.
+        //
+        // 카메라(_spectatorCamera)는 UpdateCameraState가 따로 관리하므로 관전을 안 켜면 렌더 비용은
+        // 들지 않는다 — 늘어나는 건 미러 유닛 visual 생성과 틱 시뮬레이션 비용뿐이다.
+        // ⚠️ 이 비용이 실제로 감당 가능한지 확인 중이다(2026-08-22). 프레임 저하가 크면 visual 없이
+        // 계산만 하는 경로를 따로 만드는 쪽으로 간다.
         if (GameManager.TryGet(out var gm) && gm.Phase != null && IsMatchEnded(gm.Phase.CurrentPhase)) return;
+
+        // 같은 라운드 스냅샷이 다시 와도 미러를 재시작하지 않는다(2026-08-22).
+        //
+        // BattleSnapshot은 GameEvents.OnBattleStart 단일 트리거로 전투당 1회만 전송되므로
+        // (BoardSyncBroadcaster.HandleBattleStart) 같은 roundIndex로 또 오는 것은 전부 재접속 재방송이고
+        // 새 정보가 없다. 그런데 이 경로에는 TryStartMirrorBattleFromCache와 달리 중복 방지 가드가
+        // 하나도 없어서, 재접속할 때마다 이미 답을 낸(또는 한창 돌고 있는) 미러가 tick 0부터 다시
+        // 돌았다. 미러가 상시 실행으로 바뀌기 전에는 `if (!_isExpanded) return;`이 이 경로를 사실상
+        // 막고 있어 드러나지 않았다.
+        //
+        // 라운드가 바뀌면 두 가드 다 통과해 정상적으로 교체된다.
+        if (_completedMirrorRoundIndex == snapshot.roundIndex) return;
+        if (_runningMirrorRoundIndex == snapshot.roundIndex) return;
+
         StartOrReplaceMirrorBattle(snapshot);
     }
 
@@ -411,9 +446,14 @@ public class PartnerSpectateView : MonoBehaviour
 
     private void HandleMirrorStarted()
     {
-        EnsureSpectatorCamera();
-        PositionSpectatorCameraAtPartnerBoard();
-        EnsureSpectatorTexture();
+        // 권위 판정용 미러는 관전 UI가 닫혀 있어도 상시 실행된다. 표시 요청이 없으면 두 번째
+        // 카메라와 고해상도 RenderTexture를 만들지 않는다.
+        if (_isExpanded || _debugShowPip)
+        {
+            EnsureSpectatorCamera();
+            PositionSpectatorCameraAtPartnerBoard();
+            EnsureSpectatorTexture();
+        }
         UpdatePipContent();
     }
 
@@ -459,7 +499,7 @@ public class PartnerSpectateView : MonoBehaviour
     {
         if (_spectatorCamera == null || _mirrorController == null) return;
 
-        bool shouldPresent = _isExpanded || _debugShowPip || _mirrorController.IsRunning;
+        bool shouldPresent = _isExpanded || _debugShowPip;
         bool hasContent = _mirrorController.IsRunning || _mirrorController.HasPartnerBoardSnapshot;
 
         _spectatorCamera.enabled = shouldPresent && hasContent;
@@ -481,6 +521,8 @@ public class PartnerSpectateView : MonoBehaviour
     public void SetDebugPipVisible(bool visible)
     {
         _debugShowPip = visible;
+        if (_mirrorController != null)
+            _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
         RefreshPanelVisibility();
         UpdatePipContent();
     }
@@ -767,6 +809,9 @@ public class PartnerSpectateView : MonoBehaviour
         if (_isExpanded == expanded) return;
         _isExpanded = expanded;
 
+        if (_mirrorController != null)
+            _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
+
         if (_isExpanded)
         {
             // 미러가 아직 안 돌고 있어도 버튼만으로 열 수 있으니 방어적으로 보장.
@@ -896,17 +941,62 @@ public class PartnerSpectateView : MonoBehaviour
     {
         if (_mirrorController == null || snapshot == null) return;
 
-        _mirrorController.ClearPartnerEnemyPreviewUnitsOnly();
+        // ⚠️ 순서가 중요하다. 적 바닥(빨간 육각 타일)을 만드는 유일한 경로가 ShowEnemyPreview인데,
+        // 그 안에 "전투 진행 중(_units.Count > 0)이면 아무것도 안 함" 가드가 있다.
+        // 그래서 반드시 이 순서를 지켜야 한다:
+        //   1) StopMirrorBattle — 돌고 있던 미러를 먼저 끝내 _units를 비운다(Cleanup)
+        //   2) RefreshPartnerEnemyPreview — 그제서야 가드를 통과해 타일 + 프리뷰 유닛이 생긴다
+        //   3) ClearPartnerEnemyPreviewUnitsOnly — 프리뷰 유닛만 걷고 타일은 남긴다
+        //   4) StartMirrorBattle — 미러 적이 남은 타일 위에서 싸운다
+        //
+        // 미러를 상시 실행으로 바꾸기 전에는 2)를 관전을 여는 시점(ToggleExpanded)에만 했고, 그때는
+        // 미러가 아직 안 돌아 _units가 비어 있어서 우연히 통과했다. 상시 실행이 되면서 관전을 열 때
+        // 이미 미러가 돌고 있어 가드에 막혔고, 적 유닛이 바닥 타일 없이 떠 있는 버그가 났다
+        // (2026-08-22). 타일 생성을 관전 개방 시점이 아니라 미러 시작 시점에 묶어 해결한다.
         _mirrorController.StopMirrorBattle();
+        RefreshPartnerEnemyPreview();
+        _mirrorController.ClearPartnerEnemyPreviewUnitsOnly();
+
+        // 상시 실행 비용 측정용(2026-08-22) — 셋업(visual 생성)과 전투 전체에 걸린 실시간을 잰다.
+        // 관전을 안 켠 채로도 미러가 도는 게 감당 가능한지 판단할 근거.
+        float setupStart = Time.realtimeSinceStartup;
+
+        _runningMirrorRoundIndex = snapshot.roundIndex;
+        _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
 
         _mirrorController.StartMirrorBattle(
             snapshot,
             result =>
             {
+                _runningMirrorRoundIndex = null;
                 _completedMirrorRoundIndex = snapshot.roundIndex;
+
+                Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 종료 — " +
+                          $"{result.elapsedTicks}틱, 실시간 {Time.realtimeSinceStartup - setupStart:F1}초, " +
+                          $"관전 화면 {(_isExpanded ? "켜짐" : "꺼짐")}");
+
+                // 검증 전용(2026-08-22) — 미러가 낸 승패를 알려, NetworkManager가 파트너의 실제 보고값과
+                // 대조 로그를 남길 수 있게 한다. 이 클래스는 여전히 아무 판정에도 관여하지 않는다
+                // (값을 발행만 하고, 미러 결과가 실제 게임 상태를 바꾸는 경로는 만들지 않는다).
+                bool partnerWon = result.outcome == BattleEndReason.Victory ||
+                                  result.outcome == BattleEndReason.DecisionVictory;
+                GameEvents.PartnerMirrorBattleCompleted(snapshot.roundIndex, partnerWon);
+
                 if (_isExpanded) RefreshPartnerEnemyPreview();
             },
-            error => { if (_isExpanded) RefreshPartnerEnemyPreview(); });
+            error =>
+            {
+                // 실패는 "완료"가 아니므로 _completedMirrorRoundIndex는 건드리지 않는다 —
+                // _runningMirrorRoundIndex만 풀어 같은 라운드 재시도 여지를 남긴다.
+                _runningMirrorRoundIndex = null;
+                if (_isExpanded) RefreshPartnerEnemyPreview();
+            });
+
+        // 유닛 수는 여기서 찍는다 — 종료 콜백에서는 항상 0으로 나온다.
+        // BattleManager.FinishMirrorBattle이 Cleanup()을 onComplete 호출보다 먼저 실행하므로
+        // 그 시점엔 미러 visual이 전부 파괴된 뒤다. 반대로 StartMirrorBattle은 유닛/시너지 셋업을
+        // 동기적으로 끝낸 뒤 코루틴을 띄우므로(RunMirrorBattle), 호출 직후인 여기서는 실제 수가 잡힌다.
+        Debug.Log($"[MirrorCost] {snapshot.roundIndex}R 미러 전투 시작 — 유닛 {_mirrorController.MirrorVisualCount}기");
     }
 
     /// <summary>PartnerViewButton 하위 TMP 텍스트를 관전 상태에 맞게 갱신한다. 새 Inspector 참조를
