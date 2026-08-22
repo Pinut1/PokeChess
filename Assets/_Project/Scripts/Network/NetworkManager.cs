@@ -239,9 +239,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// 반드시 RestoreLocalPlayerStateAfterReconnect()의 레벨/XP 복원 <b>뒤</b>에 호출해야 한다 —
     /// 앞이면 복원이 덮어쓴다.
     /// </summary>
-    private void GrantMissedRoundXp(int currentRound)
+    private void GrantMissedRoundXpThrough(int resolvedThrough)
     {
-        int resolvedThrough = currentRound - 1;
         int missed = resolvedThrough - LastRoundXpGrantedRound;
         if (missed <= 0) return;
 
@@ -285,8 +284,11 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>게임 씬 로드 완료 여부를 Player CustomProperties에 저장할 때 쓰는 키(라운드 시작 핸드셰이크).</summary>
     private const string SCENE_READY_PROP_KEY = "SceneReady";
 
-    /// <summary>이번 라운드 전투 결과를 Player CustomProperties에 저장할 때 쓰는 키. -1=미보고, 0=패, 1=승.</summary>
+    /// <summary>전투 결과를 Player CustomProperties에 저장할 때 쓰는 키. -1=미보고, 0=패, 1=승.</summary>
     private const string BATTLE_RESULT_PROP_KEY = "BattleResult";
+    /// <summary>BATTLE_RESULT_PROP_KEY가 어느 라운드의 값인지 식별한다. 결과 값만으로는 재접속 시
+    /// 직전 라운드 승패를 현재 라운드 결과로 오인할 수 있으므로 항상 함께 기록한다.</summary>
+    private const string BATTLE_RESULT_ROUND_PROP_KEY = "BattleResultRound";
     private const int    RESULT_NOT_REPORTED = -1;
 
     /// <summary>현재 진행 라운드를 Room CustomProperties에 저장할 때 쓰는 키.
@@ -300,6 +302,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// RPC_OnBattleStart는 RpcTarget.All이라 접속이 끊긴 동안에는 유실되고, 재접속해도 다시 오지 않는다.
     /// Room 속성은 서버가 들고 있어 재입장 시 그대로 읽을 수 있다.</summary>
     private const string BATTLE_ACTIVE_PROP_KEY = "BattleActive";
+
+    /// <summary>가장 최근 팀 결과가 확정된 라운드와 결과. 비버퍼 RPC를 놓친 재접속자가 Result/Victory
+    /// 상태와 라운드 종료 효과를 복구하는 근거다.</summary>
+    private const string RESOLVED_ROUND_PROP_KEY = "ResolvedRound";
+    private const string ROUND_OUTCOME_PROP_KEY = "RoundOutcome";
+
+    /// <summary>최종 라운드 완주 여부. BroadcastGameCleared RPC를 놓친 재접속자도 승리 화면으로 수렴시킨다.</summary>
+    private const string GAME_CLEARED_PROP_KEY = "GameCleared";
+    private const string SESSION_END_REASON_PROP_KEY = "SessionEndReason";
+
+    /// <summary>파트너 실제 연결 상태와 별개로, 해당 라운드는 파트너 결과 대신 미러 결과를 써야 함을
+    /// 보존한다. 전투 중 이탈자가 결과 전에 돌아오더라도 이 값은 다음 라운드 시작까지 유지된다.</summary>
+    private const string MIRROR_SUBSTITUTION_ROUND_PROP_KEY = "MirrorSubRound";
 
     /// <summary>이 플레이어가 "라운드 시작 효과"(스테이지 보상·이자·상점 Roll·증강 라운드 효과)를
     /// 실제로 적용한 최고 라운드. 재접속 캐치업이 이미 처리한 라운드의 재실행인지, 자리를 비운 사이
@@ -361,10 +376,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>내가 마지막으로 보고한 전투 결과(승/패). 재전송 요청(RPC_RequestBattleResultResend) 응답용
     /// 캐시일 뿐, 승패 추측에는 쓰지 않는다. 아직 이번 라운드 전투를 안 끝냈으면 null. 라운드 시작 시 리셋.</summary>
     private bool? _lastLocalBattleResult;
+    private int _lastLocalBattleResultRound;
 
     /// <summary>DebugSuppressBattleResultReport가 켜져 있는 동안 ReportBattleResult가 실제로 보내지 않고
     /// 붙들어둔 결과. DebugSendSuppressedBattleResultNow()로 나중에 보낼 수 있다. 라운드 시작 시 리셋.</summary>
     private bool? _suppressedBattleResult;
+
+    /// <summary>재접속 중 Room에 보존된 팀 결과를 GameEvents로 재적용하는 좁은 구간.
+    /// ShopManager는 NetworkManager가 별도로 보정한 XP를 이 이벤트에서 중복 지급하지 않도록 사용한다.</summary>
+    private bool _isApplyingReconnectRoundResultCatchup;
+    public bool IsApplyingReconnectRoundResultCatchup => _isApplyingReconnectRoundResultCatchup;
+
+    /// <summary>한 매치에서 SessionEnded를 중복 발행하지 않기 위한 수렴 가드.</summary>
+    private bool _sessionEndRaised;
 
     /// <summary>지금 억제된(아직 안 보낸) 전투 결과가 있는지. QA 패널에서 "지금 보내기" 버튼 활성화 판정용.</summary>
     public bool HasSuppressedBattleResult => _suppressedBattleResult.HasValue;
@@ -494,6 +518,15 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void HandlePhaseChanged(GamePhase phase)
     {
         _isBattlePhase = phase == GamePhase.Battle;
+
+        // 정상 Ready 흐름은 RPC_OnAllPlayersReady → RoundPhaseManager.EnterPhase(Battle)로 들어오며
+        // BroadcastBattleStart()를 직접 호출하지 않는다. Room의 권위 phase 표시는 이 공통 이벤트에서
+        // 반드시 갱신해야 재접속자가 Battle/Result를 구분할 수 있다.
+        if (phase == GamePhase.Battle && !_soloMode && IsMasterClient && PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(
+                new Hashtable { { BATTLE_ACTIVE_PROP_KEY, true } });
+        }
 
         if (phase == GamePhase.Shopping)
         {
@@ -1078,6 +1111,39 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         SessionEndReason reason = _partnerResultUnresponsive
             ? SessionEndReason.PartnerResultUnresponsive
             : SessionEndReason.PartnerAbandoned;
+
+        // 로컬에서만 끝내면 상대는 실제 Leave를 새 이탈로 받아 다시 유예에 들어가고, 양쪽 전적의
+        // 종료 사유도 달라진다. 방에 남아 있는 동안 권위 종료 사유를 양쪽에 먼저 수렴시킨다.
+        if (PhotonNetwork.InRoom && !_isLeavingRoom)
+        {
+            PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+            {
+                { SESSION_END_REASON_PROP_KEY, (int)reason }
+            });
+            // 호출 직후 타이틀 이동/앱 종료가 이어지므로 로컬 전적은 즉시 확정하고, 상대에게만 RPC를 보낸다.
+            RaiseSessionEndedOnce(reason);
+            photonView.RPC(nameof(RPC_OnSessionEnded), RpcTarget.Others, (int)reason);
+        }
+        else
+            RaiseSessionEndedOnce(reason);
+    }
+
+    [PunRPC]
+    private void RPC_OnSessionEnded(int reasonValue)
+    {
+        if (!System.Enum.IsDefined(typeof(SessionEndReason), reasonValue))
+        {
+            Debug.LogError($"[Network] 알 수 없는 세션 종료 사유 수신: {reasonValue}");
+            return;
+        }
+
+        RaiseSessionEndedOnce((SessionEndReason)reasonValue);
+    }
+
+    private void RaiseSessionEndedOnce(SessionEndReason reason)
+    {
+        if (_sessionEndRaised) return;
+        _sessionEndRaised = true;
         GameEvents.SessionEnded(reason);
     }
 
@@ -1099,11 +1165,22 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (!IsMasterClient) return;
         // 재접속 클라이언트의 라운드 복구용으로 Room 속성에도 기록(RPC는 비접속자에게 유실됨).
         // 새 라운드는 항상 쇼핑부터 시작하므로 이전 라운드의 "Battle 진입됨" 흔적을 같이 지운다.
-        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        var roomProps = new Hashtable
         {
             { ROUND_PROP_KEY, round },
-            { BATTLE_ACTIVE_PROP_KEY, false }
-        });
+            { BATTLE_ACTIVE_PROP_KEY, false },
+            { MIRROR_SUBSTITUTION_ROUND_PROP_KEY, 0 },
+            { GAME_CLEARED_PROP_KEY, false }
+        };
+        // 일반 다음 라운드에서는 직전 확정 결과를 보존해야 재접속 XP 보정 근거로 쓸 수 있다.
+        if (round == 1)
+        {
+            roomProps[RESOLVED_ROUND_PROP_KEY] = 0;
+            roomProps[ROUND_OUTCOME_PROP_KEY] = -1;
+            roomProps[SESSION_END_REASON_PROP_KEY] = -1;
+        }
+        _mirrorSubstitutionRoundLocal = 0;
+        PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
         photonView.RPC(nameof(RPC_OnRoundStart), RpcTarget.All, round);
     }
 
@@ -1113,6 +1190,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (_soloMode) { GameEvents.BattleStart(); return; }
 
         if (!IsMasterClient) return;
+
+        // 비활성 플레이어의 Ready=true가 이전 라운드에서 남아 있어도 전투를 시작하면 안 된다.
+        // 파트너가 돌아오지 않았다면 다음 쇼핑 단계에서 명시적으로 기다린다.
+        foreach (var player in PhotonNetwork.PlayerList)
+        {
+            if (player.IsInactive)
+            {
+                Debug.LogWarning("[Network] 비활성 파트너가 남아 있어 전투 시작을 보류합니다.");
+                return;
+            }
+        }
 
         // 재접속 클라이언트의 "지금 전투 중인가" 판정용(RPC는 비접속자에게 유실됨).
         PhotonNetwork.CurrentRoom.SetCustomProperties(
@@ -1130,12 +1218,33 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                && v is bool active && active;
     }
 
+    private int GetRoomInt(string key, int fallback)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return fallback;
+        return PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(key, out object value) && value is int parsed
+            ? parsed
+            : fallback;
+    }
+
+    private bool GetRoomBool(string key, bool fallback = false)
+    {
+        if (_soloMode || !PhotonNetwork.InRoom) return fallback;
+        return PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(key, out object value) && value is bool parsed
+            ? parsed
+            : fallback;
+    }
+
     /// <summary>MasterClient가 챕터 완주(최종 라운드 클리어)를 전체에 알림. 다음 라운드 대신 호출.</summary>
     public void BroadcastGameCleared()
     {
         if (_soloMode) { GameEvents.GameCleared(); return; }
 
         if (!IsMasterClient) return;
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { BATTLE_ACTIVE_PROP_KEY, false },
+            { GAME_CLEARED_PROP_KEY, true }
+        });
         photonView.RPC(nameof(RPC_OnGameCleared), RpcTarget.All);
     }
 
@@ -1746,7 +1855,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
 
         _lastLocalBattleResult = isWin; // 재전송 요청(RPC_RequestBattleResultResend) 응답용 캐시
-        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        _lastLocalBattleResultRound = _lastKnownRound;
+        var props = new Hashtable
+        {
+            { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 },
+            { BATTLE_RESULT_ROUND_PROP_KEY, _lastKnownRound }
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
 
         // 미러가 먼저 끝나 있었다면 여기서 바로 판정된다(파트너 부재 시에만).
@@ -1768,7 +1882,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         bool isWin = _suppressedBattleResult.Value;
         _suppressedBattleResult = null;
         _lastLocalBattleResult = isWin;
-        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 } };
+        _lastLocalBattleResultRound = _lastKnownRound;
+        var props = new Hashtable
+        {
+            { BATTLE_RESULT_PROP_KEY, isWin ? 1 : 0 },
+            { BATTLE_RESULT_ROUND_PROP_KEY, _lastKnownRound }
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         Debug.Log($"[Network][QA] 억제됐던 결과({(isWin ? "승" : "패")}) 지금 전송");
     }
@@ -1857,7 +1976,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // 실제 타이틀 이동은 이 이벤트를 구독하는 OptionsPanelUI가
             // RequestCompletedMatchReturnToTitle을 통해 수행한다(양쪽 클라 모두 이 RPC를 실행하므로
             // 각자 독립적으로 자기 화면에서 복귀한다).
-            GameEvents.SessionEnded(SessionEndReason.Surrender);
+            RaiseSessionEndedOnce(SessionEndReason.Surrender);
         }
         else
             _surrenderRejectedNotice = true;
@@ -3087,7 +3206,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         {
             _soloTeamHp = Mathf.Max(0, _soloTeamHp - damage);
             GameEvents.HealthChanged(_soloTeamHp);
-            if (_soloTeamHp <= 0) GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
+            if (_soloTeamHp <= 0) RaiseSessionEndedOnce(SessionEndReason.TeamHpZero);
             return;
         }
 
@@ -3169,7 +3288,8 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         var props = new Hashtable
         {
             { READY_PROP_KEY, false },
-            { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED }
+            { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED },
+            { BATTLE_RESULT_ROUND_PROP_KEY, round }
         };
         if (round == 1) props[AUGMENTS_PROP_KEY] = System.Array.Empty<string>(); // 새 판 — 이전 판 증강 잔존 방지
 
@@ -3191,6 +3311,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         _roundResultResolved = false; // (MasterClient 집계 가드 리셋)
         _lastLocalBattleResult = null; // 이번 라운드 전투 결과 캐시도 새로 시작
+        _lastLocalBattleResultRound = 0;
         _mirrorPartnerResult = null;   // 미러 대체 판정 재료도 라운드마다 새로
         _suppressedBattleResult = null; // QA 억제 테스트 잔여값도 라운드마다 새로
         // 새 라운드가 시작됐는데 직전 라운드의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면
@@ -3203,6 +3324,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         if (round == 1)
         {
+            _sessionEndRaised = false;
             // 새 판 — 보드 스냅샷 revision 리셋(이전 판의 revision과 비교되지 않도록)
             _localBoardRevision = 0;
             _lastOpponentBoardRevision = -1;
@@ -3238,13 +3360,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     }
 
     [PunRPC]
-    private void RPC_OnTeamRoundResolved(int outcome)
+    private void RPC_OnTeamRoundResolved(int round, int outcome)
     {
+        if (round != _lastKnownRound)
+        {
+            Debug.LogWarning($"[Network] 늦은 팀 결과 무시 — 수신 {round}R, 현재 {_lastKnownRound}R");
+            return;
+        }
+
         GameEvents.TeamRoundResolved((TeamRoundOutcome)outcome);
 
         // 이 라운드의 종료 XP(ShopManager.HandleTeamRoundResolved)를 실제로 받았음을 남긴다 —
         // 재접속 보정(GrantMissedRoundXp)이 이중 지급하지 않게 하는 유일한 근거.
-        SetRoundXpGrantedRound(_lastKnownRound);
+        SetRoundXpGrantedRound(round);
     }
 
     /// <summary>솔로 모드(1인=팀) 즉시 판정. 승=BothWin, 패=BothLose(라이프 -1).</summary>
@@ -3520,6 +3648,17 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 둘 다 같은 재접속 대기 흐름(무한 대기 → 30초 후 포기하기)을 시작한다.
         _opponentDisconnected = true;
 
+        // 전투 중 이탈했다면 재입장 여부와 무관하게 이번 라운드는 미러 결과로 완결해야 한다.
+        // OnPlayerEnteredRoom이 물리 이탈 플래그를 지워도 이 라운드 단위 표시는 다음 라운드까지 남는다.
+        if (IsMasterClient && (_isBattlePhase || IsBattleActiveInRoom()))
+        {
+            _mirrorSubstitutionRoundLocal = _lastKnownRound;
+            PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+            {
+                { MIRROR_SUBSTITUTION_ROUND_PROP_KEY, _lastKnownRound }
+            });
+        }
+
         // 파트너 부재가 방금 확정됐다 — 미러 대체 판정을 다시 시도한다.
         // 이 재시도가 없으면 "내 전투가 Photon 이탈 감지(~10초)보다 먼저 끝난" 흔한 경우에
         // 대체 판정이 영영 안 걸린다: 결과 보고 시점과 미러 완료 시점에는 아직 이 플래그가
@@ -3705,10 +3844,19 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void RPC_RequestBattleResultResend()
     {
         if (!_lastLocalBattleResult.HasValue) return;
+        if (_lastLocalBattleResultRound != _lastKnownRound)
+        {
+            Debug.LogWarning($"[Network] 결과 재전송 거부 — 캐시 {_lastLocalBattleResultRound}R, 현재 {_lastKnownRound}R");
+            return;
+        }
         if (_isLeavingRoom) return; // Leaving 중 SetProperties 금지(다른 SetCustomProperties 호출부와 동일 가드)
 
         Debug.Log("[Network] 팀 결과 재전송 요청 수신 — 내 결과 다시 보고");
-        var props = new Hashtable { { BATTLE_RESULT_PROP_KEY, _lastLocalBattleResult.Value ? 1 : 0 } };
+        var props = new Hashtable
+        {
+            { BATTLE_RESULT_PROP_KEY, _lastLocalBattleResult.Value ? 1 : 0 },
+            { BATTLE_RESULT_ROUND_PROP_KEY, _lastLocalBattleResultRound }
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
@@ -3803,7 +3951,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 잘못 진단하면 정작 문제는 내 쪽인데 상대를 탓하는 모달이 뜬다(2026-08-22 코드리뷰 지적).
         // 아직 아무 결론도 못 냈으므로 false — ResultTimer가 안전 타임아웃을 계속 적용하며
         // 다음 프레임에 다시 시도하게 한다.
-        if (!_lastLocalBattleResult.HasValue) return false;
+        if (!_lastLocalBattleResult.HasValue || _lastLocalBattleResultRound != _lastKnownRound) return false;
 
         // 파트너가 진짜로 Photon 방을 나갔으면(IsInactive) OnPlayerLeftRoom 경로가 이미 처리 중이다 —
         // 여기서 또 진단을 띄우면 이미 뜬 "진짜 이탈" 모달 위에 우리 모달까지 겹쳐 뜨는 꼴이 된다.
@@ -3858,18 +4006,37 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         foreach (var player in PhotonNetwork.PlayerList)
         {
-            if (!player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) ||
-                (int)v == RESULT_NOT_REPORTED)
+            if (!TryGetReportedBattleResult(player, _lastKnownRound, out _))
                 return false;
         }
         return true;
     }
+
+    private static bool TryGetReportedBattleResult(Player player, int round, out bool won)
+    {
+        won = false;
+        if (player == null) return false;
+        if (!player.CustomProperties.TryGetValue(BATTLE_RESULT_ROUND_PROP_KEY, out object roundValue) ||
+            !(roundValue is int reportedRound) || reportedRound != round)
+            return false;
+        if (!player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object resultValue) ||
+            !(resultValue is int result) || result == RESULT_NOT_REPORTED)
+            return false;
+
+        won = result == 1;
+        return true;
+    }
+
+    private bool IsMirrorSubstitutionRequired(int round) =>
+        _mirrorSubstitutionRoundLocal == round ||
+        GetRoomInt(MIRROR_SUBSTITUTION_ROUND_PROP_KEY, 0) == round;
 
     /// <summary>
     /// 파트너가 자리를 비워 결과를 못 보낼 때 대신 쓸, 미러 전투가 계산한 파트너 승패.
     /// 이번 라운드 미러가 끝났고 파트너가 실제로 부재일 때만 판정에 쓰인다. 라운드 시작 시 리셋.
     /// </summary>
     private bool? _mirrorPartnerResult;
+    private int _mirrorSubstitutionRoundLocal;
 
     /// <summary>
     /// 파트너가 부재(실제 이탈 또는 응답 불능)라 결과를 못 보낸 상황에서, 미러가 계산한 파트너
@@ -3883,8 +4050,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     private void TryResolveTeamRoundWithMirror()
     {
         if (_soloMode || !IsMasterClient || _roundResultResolved) return;
-        if (!_opponentDisconnected && !_partnerResultUnresponsive) return; // 파트너가 붙어 있으면 기다린다
-        if (!_lastLocalBattleResult.HasValue) return;                      // 내 전투가 아직 안 끝났다
+        if (!_opponentDisconnected && !_partnerResultUnresponsive && !IsMirrorSubstitutionRequired(_lastKnownRound))
+            return;
+        if (!_lastLocalBattleResult.HasValue || _lastLocalBattleResultRound != _lastKnownRound) return;
         if (!_mirrorPartnerResult.HasValue) return;                        // 미러 결과가 아직 없다
 
         Debug.LogWarning("[Network] 파트너 부재 — 미러가 계산한 결과로 팀 라운드 판정 " +
@@ -3926,14 +4094,12 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         Player[] others = PhotonNetwork.PlayerListOthers;
         if (others == null || others.Length == 0) return;
 
-        if (!others[0].CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) ||
-            !(v is int reported) || reported == RESULT_NOT_REPORTED)
+        if (!TryGetReportedBattleResult(others[0], round, out bool actualWon))
         {
             Debug.Log($"[MirrorVerify] {round}R — 파트너 실제 보고값 없음, 대조 건너뜀");
             return;
         }
 
-        bool actualWon = reported == 1;
         bool match = actualWon == _mirrorVerifyPartnerWon;
 
         string line = $"[MirrorVerify] {round}R — 미러: 파트너 {(_mirrorVerifyPartnerWon ? "승" : "패")} / " +
@@ -3964,8 +4130,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         int wins = 0;
         foreach (var player in PhotonNetwork.PlayerList)
         {
-            bool reported = player.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object v) &&
-                            v is int r && r != RESULT_NOT_REPORTED;
+            bool reported = TryGetReportedBattleResult(player, _lastKnownRound, out bool reportedWon);
 
             // 파트너가 자리를 비워 보고를 못 한 경우, 미러 전투가 계산해둔 값을 대신 쓴다.
             // 추측이 아니라 계산이다 — 파트너의 실제 보드·적으로 같은 결정론적 시뮬레이션을 돌린
@@ -3976,7 +4141,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
                 continue;
             }
 
-            if (reported && (int)v == 1) wins++;
+            if (reported && reportedWon) wins++;
         }
 
         // 파트너가 PlayerList에서 아예 사라진 경우(PlayerTtl 60초 만료)는 일부러 보정하지 않는다.
@@ -3997,7 +4162,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         LogMirrorAccuracy(_lastKnownRound);
 
         Debug.Log($"[Network] 팀 라운드 결과: {outcome} (승 {wins}명)");
-        photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, (int)outcome);
+        PhotonNetwork.CurrentRoom.SetCustomProperties(new Hashtable
+        {
+            { BATTLE_ACTIVE_PROP_KEY, false },
+            { RESOLVED_ROUND_PROP_KEY, _lastKnownRound },
+            { ROUND_OUTCOME_PROP_KEY, (int)outcome }
+        });
+        photonView.RPC(nameof(RPC_OnTeamRoundResolved), RpcTarget.All, _lastKnownRound, (int)outcome);
     }
 
     /// <summary>모든 플레이어의 해당 bool CustomProperty가 true인지.</summary>
@@ -4005,6 +4176,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     {
         foreach (var player in PhotonNetwork.PlayerList)
         {
+            if (player.IsInactive) return false;
             bool on = player.CustomProperties.TryGetValue(key, out object v) && (bool)v;
             if (!on) return false;
         }
@@ -4026,6 +4198,13 @@ public class NetworkManager : MonoBehaviourPunCallbacks
     /// <summary>팀 공통 HP(Room 속성) 변경 수신 → 모든 클라가 UI 갱신, 0 이하면 세션 종료.</summary>
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
+        if (propertiesThatChanged.TryGetValue(SESSION_END_REASON_PROP_KEY, out object endReasonValue) &&
+            endReasonValue is int endReason && endReason >= 0 &&
+            System.Enum.IsDefined(typeof(SessionEndReason), endReason))
+        {
+            RaiseSessionEndedOnce((SessionEndReason)endReason);
+        }
+
         if (!propertiesThatChanged.TryGetValue(TEAM_HP_PROP_KEY, out object hp)) return;
 
         int health = (int)hp;
@@ -4036,7 +4215,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (health <= 0)
         {
             Debug.LogWarning("[Network] 팀 공통 HP 0 — 세션 종료(게임오버)");
-            GameEvents.SessionEnded(SessionEndReason.TeamHpZero);
+            RaiseSessionEndedOnce(SessionEndReason.TeamHpZero);
         }
     }
 
@@ -4095,7 +4274,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
         Debug.LogWarning("[Network] 재접속 실패 — 세션 종료(패배 처리)");
         _selfReconnectRoutine = null;
-        GameEvents.SessionEnded(SessionEndReason.ReconnectFailed);
+        RaiseSessionEndedOnce(SessionEndReason.ReconnectFailed);
     }
 
     /// <summary>
@@ -4127,8 +4306,21 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 없어 이번 단계 범위 밖.
         RestoreLocalPlayerStateAfterReconnect();
 
+        int savedEndReason = GetRoomInt(SESSION_END_REASON_PROP_KEY, -1);
+        if (savedEndReason >= 0 && System.Enum.IsDefined(typeof(SessionEndReason), savedEndReason))
+        {
+            RaiseSessionEndedOnce((SessionEndReason)savedEndReason);
+            return;
+        }
+
         int teamHp = TeamHealth;
         if (teamHp >= 0) GameEvents.HealthChanged(teamHp);
+
+        if (teamHp == 0 && !DebugInfiniteTeamHealth)
+        {
+            RaiseSessionEndedOnce(SessionEndReason.TeamHpZero);
+            return;
+        }
 
         // 끊긴 동안 라운드가 진행됐으면 현재 라운드로 재진입.
         // RPC_OnRoundStart를 로컬 직접 호출해 일반 라운드 시작과 같은 리셋 절차(준비/전투결과 속성 초기화)를 탄다.
@@ -4137,6 +4329,32 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(ROUND_PROP_KEY, out object roundObj))
         {
             int currentRound = (int)roundObj;
+            int resolvedRound = GetRoomInt(RESOLVED_ROUND_PROP_KEY, 0);
+            int outcomeValue = GetRoomInt(ROUND_OUTCOME_PROP_KEY, -1);
+            bool gameCleared = GetRoomBool(GAME_CLEARED_PROP_KEY);
+
+            // 이미 확정된 결과 RPC를 놓쳤다면 BattleActive의 늦은 캐시보다 이 상태가 우선이다.
+            // 라운드 시작 이벤트를 먼저 복구해야 RoundPhaseManager.CurrentRound/CurrentStage가 맞는다.
+            if (resolvedRound == currentRound && outcomeValue >= (int)TeamRoundOutcome.BothWin &&
+                outcomeValue <= (int)TeamRoundOutcome.BothLose)
+            {
+                ReplayRoundStartForReconnectIfNeeded(currentRound);
+                GrantMissedRoundXpThrough(resolvedRound);
+
+                _isApplyingReconnectRoundResultCatchup = true;
+                try { GameEvents.TeamRoundResolved((TeamRoundOutcome)outcomeValue); }
+                finally { _isApplyingReconnectRoundResultCatchup = false; }
+
+                if (gameCleared) GameEvents.GameCleared();
+                return;
+            }
+
+            if (gameCleared)
+            {
+                ReplayRoundStartForReconnectIfNeeded(currentRound);
+                GameEvents.GameCleared();
+                return;
+            }
 
             // 이번 라운드가 이미 Battle에 진입했고 내 결과가 아직 없다면, RPC_OnRoundStart(=쇼핑 강제
             // 진입)를 쏘면 안 된다 — 실제로는 파트너가 아직 싸우는 중이라 그 라운드에 낄 자리가 없다.
@@ -4145,39 +4363,48 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             // 내 전투 결과는 파트너 쪽 미러가 계산해 마스터가 대신 채운다
             // (TryResolveTeamRoundWithMirror). 2026-08-22 파트너 이탈 재설계.
             bool myResultReported =
-                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(BATTLE_RESULT_PROP_KEY, out object myR) &&
-                myR is int myResult && myResult != RESULT_NOT_REPORTED;
+                TryGetReportedBattleResult(PhotonNetwork.LocalPlayer, currentRound, out _);
 
             if (IsBattleActiveInRoom() && !myResultReported)
             {
                 Debug.LogWarning($"[Network][Rejoin] {currentRound}R 전투 진행 중 재접속 — 이번 라운드는 " +
                                   "참여하지 않고 결과를 기다린다(다음 라운드부터 합류)");
                 _lastKnownRound = currentRound;
+                _lastLocalBattleResult = null;
+                _lastLocalBattleResultRound = 0;
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+                {
+                    { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED },
+                    { BATTLE_RESULT_ROUND_PROP_KEY, currentRound }
+                });
                 GameEvents.AwaitingPartnerBattle();
                 return;
             }
 
-            if (currentRound > _lastKnownRound)
-            {
-                Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+            // 현재 쇼핑 라운드로 복귀. 종료 XP는 currentRound-1 추론 대신 Room의 실제 확정 라운드까지만 준다.
+            GrantMissedRoundXpThrough(resolvedRound);
+            ReplayRoundStartForReconnectIfNeeded(currentRound);
+        }
+    }
 
-                // 라운드 시작 효과(보상/이자)보다 먼저 — 시간 순서상 직전 라운드의 종료가 앞이다.
-                GrantMissedRoundXp(currentRound);
+    private void ReplayRoundStartForReconnectIfNeeded(int currentRound)
+    {
+        bool phaseAlreadyRestored = GameManager.TryGet(out var gm) && gm.Phase != null &&
+                                    gm.Phase.CurrentRound == currentRound;
+        if (currentRound <= _lastKnownRound && phaseAlreadyRestored) return;
 
-                // RPC_OnRoundStart가 PROCESSED_ROUND_PROP_KEY를 갱신하므로 반드시 호출 "전"에 판정한다.
-                _isCatchupRoundAlreadyProcessed = currentRound <= LastProcessedRoundStart;
-                Debug.Log($"[Network][Rejoin] 라운드 시작 효과 — 내가 마지막으로 처리한 라운드 " +
-                          $"{LastProcessedRoundStart}R, 복귀 대상 {currentRound}R → " +
-                          $"{(_isCatchupRoundAlreadyProcessed ? "이미 처리함(스킵)" : "미처리(지급)")}");
+        Debug.Log($"[Network] 재접속 라운드 복구: {_lastKnownRound} → {currentRound}");
+        _isCatchupRoundAlreadyProcessed = currentRound <= LastProcessedRoundStart;
+        Debug.Log($"[Network][Rejoin] 라운드 시작 효과 — 내가 마지막으로 처리한 라운드 " +
+                  $"{LastProcessedRoundStart}R, 복귀 대상 {currentRound}R → " +
+                  $"{(_isCatchupRoundAlreadyProcessed ? "이미 처리함(스킵)" : "미처리(지급)")}");
 
-                _isApplyingReconnectRoundCatchup = true;
-                try { RPC_OnRoundStart(currentRound); }
-                finally
-                {
-                    _isApplyingReconnectRoundCatchup = false;
-                    _isCatchupRoundAlreadyProcessed = false;
-                }
-            }
+        _isApplyingReconnectRoundCatchup = true;
+        try { RPC_OnRoundStart(currentRound); }
+        finally
+        {
+            _isApplyingReconnectRoundCatchup = false;
+            _isCatchupRoundAlreadyProcessed = false;
         }
     }
 
@@ -4495,6 +4722,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
             { SCENE_READY_PROP_KEY, false },
             { READY_PROP_KEY, false },
             { BATTLE_RESULT_PROP_KEY, RESULT_NOT_REPORTED },
+            { BATTLE_RESULT_ROUND_PROP_KEY, 0 },
             { GOLD_PROP_KEY, 0 },
             { AUGMENTS_PROP_KEY, System.Array.Empty<string>() }
             }
@@ -4504,6 +4732,7 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         _gameStarted = false;
         _roundResultResolved = false;
         _lastLocalBattleResult = null;
+        _lastLocalBattleResultRound = 0;
         _suppressedBattleResult = null;
         // 직전 판에서 기록한 팀 HP 임시값이 새 판으로 넘어오면, 아직 초기화(-1) 전인데도
         // 그 값이 읽혀 InitTeamHealth가 "이미 설정됨"으로 오판한다.
@@ -4511,7 +4740,9 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 미러 대체 판정 재료도 같이 비운다. 지금은 뒤따르는 RPC_OnRoundStart(1)이 지워주지만,
         // "다른 곳이 지워줄 것"에 기대는 대신 여기서 확실히 끊는다(2026-08-22 자체 리뷰).
         _mirrorPartnerResult = null;
+        _mirrorSubstitutionRoundLocal = 0;
         _mirrorVerifyRound = null;
+        _sessionEndRaised = false;
         // 재시작 시점에 직전 판의 "응답 불능" 진단이 아직 안 풀린 채로 남아있었다면(예: QA "게임 재시작"
         // 버튼) 대기 모달을 닫아줄 신호를 여기서 대신 쏴야 한다 — RPC_OnRoundStart와 동일한 이유
         // (2026-08-22 코드리뷰 지적).
@@ -4599,6 +4830,7 @@ public class NetworkManager : MonoBehaviour
     public bool IsResumingRejoinedMatch => false; // 오프라인은 재접속 개념 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsApplyingReconnectRoundCatchup => false; // 오프라인은 재접속 캐치업 자체가 없음(실구현과 동일 공개 API 유지용 스텁).
     public bool IsReplayingProcessedRound => false; // 위와 같은 이유(실구현과 동일 공개 API 유지용 스텁).
+    public bool IsApplyingReconnectRoundResultCatchup => false;
     public void AttemptRejoinSavedSession()          { }
     public void AcknowledgeRejoinFailure()           { }
     public void AbandonPreviousSession()             { }

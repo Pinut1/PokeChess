@@ -100,6 +100,16 @@ public class RoundPhaseManager : MonoBehaviour
     private void HandleTeamRoundResolved(TeamRoundOutcome outcome)
     {
         _teamRoundResolved = true;
+
+        // 재접속자가 비버퍼 결과 RPC를 놓친 경우 NetworkManager가 Room 상태에서 결과를 재적용한다.
+        // 새로 생성된 FSM도 Shopping/Lobby에 머물지 않고 실제 Result 상태로 복구한다.
+        if (GameManager.TryGet(out var gm) && gm.Network != null &&
+            gm.Network.IsApplyingReconnectRoundResultCatchup &&
+            CurrentPhase != GamePhase.Result && CurrentPhase != GamePhase.Victory &&
+            CurrentPhase != GamePhase.GameOver)
+        {
+            EnterPhase(GamePhase.Result);
+        }
     }
 
     // ─────────────────────────────────────────
@@ -167,6 +177,13 @@ public class RoundPhaseManager : MonoBehaviour
         if (CurrentPhase != GamePhase.Shopping)
             return;
 
+        if (GameManager.TryGet(out var networkOwner) && networkOwner.Network != null &&
+            networkOwner.Network.IsAwaitingPartnerReconnect)
+        {
+            Debug.LogWarning("[Phase] 파트너 재접속 대기 중 — 다음 전투 시작 보류");
+            return;
+        }
+
         AugmentManager augment =
             GameManager.TryGet(out var gm) ? gm.Augment : null;
 
@@ -181,12 +198,12 @@ public class RoundPhaseManager : MonoBehaviour
         EnterPhase(GamePhase.Battle);
     }
 
-    /// <summary>상대 연결 끊김 — 유예시간 동안 페이즈 타이머 일시정지</summary>
+    /// <summary>상대 연결 끊김 — 쇼핑 타이머만 일시정지한다. 이미 시작한 전투와 그 결과 수렴은 계속된다.</summary>
     private void HandleOpponentDisconnected(float graceSeconds)
     {
-        Debug.LogWarning($"[Phase] 상대 연결 끊김 — {graceSeconds}초 유예, 페이즈 일시정지");
+        Debug.LogWarning($"[Phase] 상대 연결 끊김 — {graceSeconds}초 유예");
 
-        if (_phaseTimer != null)
+        if (CurrentPhase == GamePhase.Shopping && _phaseTimer != null)
         {
             StopCoroutine(_phaseTimer);
             _phaseTimer = null;
@@ -202,9 +219,6 @@ public class RoundPhaseManager : MonoBehaviour
         {
             case GamePhase.Shopping:
                 _phaseTimer = StartCoroutine(ShoppingTimer());
-                break;
-            case GamePhase.Result:
-                _phaseTimer = StartCoroutine(ResultTimer());
                 break;
         }
     }
@@ -276,7 +290,9 @@ public class RoundPhaseManager : MonoBehaviour
             AugmentManager augment =
                 GameManager.TryGet(out var gm) ? gm.Augment : null;
 
-            if (augment == null || !augment.HasPendingChoice)
+            bool waitingForPartner = GameManager.TryGet(out var networkOwner) && networkOwner.Network != null &&
+                                     networkOwner.Network.IsAwaitingPartnerReconnect;
+            if (!waitingForPartner && (augment == null || !augment.HasPendingChoice))
                 elapsed += Time.deltaTime;
 
             yield return null;
@@ -286,6 +302,15 @@ public class RoundPhaseManager : MonoBehaviour
         while (GameManager.TryGet(out var gmPending)
                && gmPending.Augment != null
                && gmPending.Augment.HasPendingChoice)
+        {
+            yield return null;
+        }
+
+        // 타이머 마지막 프레임과 이탈 이벤트가 겹쳐도 비활성 파트너를 둔 채 Battle로 넘어가지 않는다.
+        // HandleOpponentDisconnected가 이 코루틴을 중단하는 것이 주 방어선이고, 이 확인은 그 경계
+        // 레이스 및 다른 코드가 대기 상태에서 타이머를 재시작한 경우를 막는 최종 방어선이다.
+        while (GameManager.TryGet(out var gmWaiting) && gmWaiting.Network != null &&
+               gmWaiting.Network.IsAwaitingPartnerReconnect)
         {
             yield return null;
         }
@@ -318,8 +343,10 @@ public class RoundPhaseManager : MonoBehaviour
         // 로직 자체가 안 불린" 진짜 이례적 상황에만 의미를 갖는다.
         float waited = 0f;
         float nextNudgeAt = TEAM_RESULT_NUDGE_START_AT;
+        float nextDiagnoseAt = TEAM_RESULT_DIAGNOSE_AT;
         bool diagnosed = false;
-        while (!_teamRoundResolved && (diagnosed || waited < TEAM_RESULT_SAFETY_TIMEOUT))
+        bool safetyTimeoutLogged = false;
+        while (!_teamRoundResolved)
         {
             yield return null;
             waited += Time.deltaTime;
@@ -329,24 +356,21 @@ public class RoundPhaseManager : MonoBehaviour
                 nextNudgeAt += TEAM_RESULT_NUDGE_INTERVAL;
                 network.RequestBattleResultResendIfNeeded();
             }
-            if (!diagnosed && waited >= TEAM_RESULT_DIAGNOSE_AT)
+            if (!diagnosed && waited >= nextDiagnoseAt)
             {
                 // 반환값이 true일 때만 래치한다 — false는 "아직 방장 자신 결과도 없어서 아무 것도
                 // 못 정했다"는 뜻이라, 여기서 무조건 true로 래치해버리면 화면에 아무 것도 안 뜬 채로
                 // 안전 타임아웃까지 무력화돼 영구 정지한다(2026-08-22 코드리뷰 지적 — 실제 회귀였음).
                 // false면 다음 프레임에 다시 시도한다.
                 diagnosed = network.DiagnosePartnerUnresponsiveIfNeeded();
+                if (!diagnosed) nextDiagnoseAt += TEAM_RESULT_NUDGE_INTERVAL;
             }
-        }
-        if (!_teamRoundResolved)
-        {
-            // diagnosed==true였다면 위 while 조건상 여기 도달할 수 없다(무기한 대기) — 그러므로 여기
-            // 도달했다는 건 진단 로직 자체가 안 불린 채로 안전 타임아웃에 걸렸다는 뜻이다(진짜 이례적
-            // 상황). 그래도 승패를 지어내지 않는다는 원칙은 끝까지 지킨다: 방송하지 않고 그냥 스킵한다
-            // (QA 로그로 반드시 잡아야 하는 상황).
-            Debug.LogError("[Phase] 팀 라운드 결과 미수신(안전 타임아웃 도달, 응답불능 진단 자체가 안 불림) — " +
-                            "승패를 추측하지 않고 다음 라운드 방송을 스킵한다.");
-            yield break;
+            if (!safetyTimeoutLogged && !diagnosed && waited >= TEAM_RESULT_SAFETY_TIMEOUT)
+            {
+                safetyTimeoutLogged = true;
+                Debug.LogError("[Phase] 팀 라운드 결과 미수신(안전 타임아웃 도달) — " +
+                               "승패를 추측하지 않고 늦은 실제 결과를 계속 기다립니다.");
+            }
         }
 
         // 팀 라이프가 이번 라운드로 완전히 소진됐으면(TeamHealth==0) 여기서는 다음 라운드/완주 어느

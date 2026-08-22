@@ -446,9 +446,14 @@ public class PartnerSpectateView : MonoBehaviour
 
     private void HandleMirrorStarted()
     {
-        EnsureSpectatorCamera();
-        PositionSpectatorCameraAtPartnerBoard();
-        EnsureSpectatorTexture();
+        // 권위 판정용 미러는 관전 UI가 닫혀 있어도 상시 실행된다. 표시 요청이 없으면 두 번째
+        // 카메라와 고해상도 RenderTexture를 만들지 않는다.
+        if (_isExpanded || _debugShowPip)
+        {
+            EnsureSpectatorCamera();
+            PositionSpectatorCameraAtPartnerBoard();
+            EnsureSpectatorTexture();
+        }
         UpdatePipContent();
     }
 
@@ -494,7 +499,7 @@ public class PartnerSpectateView : MonoBehaviour
     {
         if (_spectatorCamera == null || _mirrorController == null) return;
 
-        bool shouldPresent = _isExpanded || _debugShowPip || _mirrorController.IsRunning;
+        bool shouldPresent = _isExpanded || _debugShowPip;
         bool hasContent = _mirrorController.IsRunning || _mirrorController.HasPartnerBoardSnapshot;
 
         _spectatorCamera.enabled = shouldPresent && hasContent;
@@ -516,6 +521,8 @@ public class PartnerSpectateView : MonoBehaviour
     public void SetDebugPipVisible(bool visible)
     {
         _debugShowPip = visible;
+        if (_mirrorController != null)
+            _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
         RefreshPanelVisibility();
         UpdatePipContent();
     }
@@ -802,6 +809,9 @@ public class PartnerSpectateView : MonoBehaviour
         if (_isExpanded == expanded) return;
         _isExpanded = expanded;
 
+        if (_mirrorController != null)
+            _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
+
         if (_isExpanded)
         {
             // 미러가 아직 안 돌고 있어도 버튼만으로 열 수 있으니 방어적으로 보장.
@@ -952,6 +962,7 @@ public class PartnerSpectateView : MonoBehaviour
         float setupStart = Time.realtimeSinceStartup;
 
         _runningMirrorRoundIndex = snapshot.roundIndex;
+        _mirrorController.SetMirrorVisualsVisible(_isExpanded || _debugShowPip);
 
         _mirrorController.StartMirrorBattle(
             snapshot,
