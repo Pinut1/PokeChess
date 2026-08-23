@@ -10,6 +10,8 @@ using UnityEngine.UI;
 ///   (2) 단계별 효과 설명
 ///   (4) 단계별 효과 설명
 ///   효과를 받는 유닛 아이콘들 — 코스트별 테두리, 필드에 배치돼 있으면 채색·아니면 흑백
+///   (어느 필드를 볼지는 SetBoardSpeciesOverride로 정해진다 — 기본은 내 보드, 파트너 관전 중에는
+///    SynergyPanelUI가 파트너 보드를 꽂아 준다)
 ///
 /// 여닫기와 위치는 SynergyTooltipController가 맡고, 이 컴포넌트는 <b>내용만</b> 그린다.
 /// 스크립트는 툴팁 루트(껐다 켜지는 오브젝트)에 붙인다.
@@ -80,6 +82,10 @@ public class SynergyTooltipUI : MonoBehaviour
     private readonly HashSet<int> _boardSpecies = new();
     private readonly HashSet<int> _boardRoots = new();
 
+    // 채색 기준으로 삼을 "필드 위 유닛 종" 목록. null이면 내 보드(GameManager.Board)를 읽는다.
+    // 파트너 관전 중에는 SynergyPanelUI가 파트너 BoardSnapshot에서 뽑은 목록을 여기 꽂아 준다.
+    private IReadOnlyList<PokemonData> _boardSpeciesOverride;
+
     // 경고는 종류당 1회만(호버할 때마다 로그가 쏟아지지 않게).
     private bool _warnedTierOverflow;
     private bool _warnedSlotShortage;
@@ -92,6 +98,18 @@ public class SynergyTooltipUI : MonoBehaviour
         if (_unitSlotRoot != null)
             _slots.AddRange(_unitSlotRoot.GetComponentsInChildren<SynergyTooltipUnitSlot>(true));
     }
+
+    /// <summary>
+    /// 유닛 아이콘 채색의 기준이 될 "필드 위 유닛 종" 목록을 갈아끼운다. null이면 내 보드
+    /// (GameManager.Board.GetUnitsOnBoard)를 읽는 기존 동작이다.
+    ///
+    /// ⚠️ 이 컴포넌트는 <b>관전 중인지 스스로 판단하지 않는다.</b> 판단은 시너지 행을 채우는
+    /// SynergyPanelUI 한 곳에만 있고, 행에 넘긴 것과 <b>같은 목록</b>을 여기에도 넣어 준다 —
+    /// 행은 파트너 보드로 계산했는데 툴팁 아이콘만 내 보드를 읽어 "파트너 시너지 툴팁에 내 유닛이
+    /// 켜져 있는" 버그가 났던 자리라(2026-08-24), 출처를 둘로 나누지 않는 것이 요점이다.
+    /// </summary>
+    public void SetBoardSpeciesOverride(IReadOnlyList<PokemonData> boardSpecies)
+        => _boardSpeciesOverride = boardSpecies;
 
     /// <summary>시너지 하나를 그린다. status가 null이면 보유 0으로 취급(전 단계 비활성).</summary>
     public void Bind(SynergyStatus status) => Bind(status?.data, status);
@@ -218,6 +236,19 @@ public class SynergyTooltipUI : MonoBehaviour
     {
         _boardSpecies.Clear();
         _boardRoots.Clear();
+
+        // 파트너 관전 중 등, 볼 보드를 밖에서 지정해 준 경우(SetBoardSpeciesOverride).
+        if (_boardSpeciesOverride != null)
+        {
+            foreach (var data in _boardSpeciesOverride)
+            {
+                if (data == null) continue;
+
+                _boardSpecies.Add(data.id);
+                _boardRoots.Add(EvolutionFamily.RootId(data));
+            }
+            return;
+        }
 
         if (!GameManager.TryGet(out var gm)) return;
 

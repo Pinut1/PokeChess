@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -55,6 +56,16 @@ public class SynergyTooltipController : MonoBehaviour
     // ─────────────────────────────────────────
     // 행이 부르는 API
     // ─────────────────────────────────────────
+
+    /// <summary>
+    /// 툴팁 유닛 아이콘의 채색 기준이 될 보드를 지정한다(SynergyTooltipUI.SetBoardSpeciesOverride로
+    /// 그대로 전달). null이면 내 보드를 읽는 기본 동작. 시너지 행을 채우는 SynergyPanelUI가
+    /// <b>행에 넘긴 것과 같은 목록</b>을 여기에도 넣어, 행과 툴팁이 서로 다른 보드를 읽지 않게 한다.
+    /// </summary>
+    public void SetBoardSpeciesOverride(IReadOnlyList<PokemonData> boardSpecies)
+    {
+        if (_panel != null) _panel.SetBoardSpeciesOverride(boardSpecies);
+    }
 
     /// <summary>행에 커서가 들어왔을 때. 표시할 시너지가 없으면(빈 슬롯) 아무것도 열지 않는다.</summary>
     public void Show(SynergyRowUI owner, SynergyStatus status)
