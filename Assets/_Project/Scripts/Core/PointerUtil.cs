@@ -28,13 +28,25 @@ public static class PointerUtil
     /// 지적). 아무 UI도 없거나 allowedRoot 소속만 잡히면 false(클릭을 그대로 인정).
     /// </summary>
     public static bool IsBlockedByOtherUI(Vector2 screenPos, GameObject allowedRoot)
+        => IsBlockedByOtherUI(screenPos, allowedRoot, out _);
+
+    /// <summary>
+    /// 위와 같은 판정에 <b>실제로 맨 위에 잡힌 UI</b>를 함께 돌려주는 버전. 막힌 이유를 로그로 남겨야
+    /// 하는 진단 경로에서 쓴다 — 판정 자체를 두 번 계산(RaycastAll 중복 호출)하지 않도록 여기 한
+    /// 곳에서만 레이캐스트한다. 아무것도 안 잡히면 topMost는 null이다.
+    /// </summary>
+    public static bool IsBlockedByOtherUI(Vector2 screenPos, GameObject allowedRoot, out GameObject topMost)
     {
+        topMost = null;
         if (EventSystem.current == null) return false;
 
         var pointerData = new PointerEventData(EventSystem.current) { position = screenPos };
         s_uiRaycastBuffer.Clear();
         EventSystem.current.RaycastAll(pointerData, s_uiRaycastBuffer);
 
-        return s_uiRaycastBuffer.Count > 0 && !s_uiRaycastBuffer[0].gameObject.transform.IsChildOf(allowedRoot.transform);
+        if (s_uiRaycastBuffer.Count == 0) return false;
+
+        topMost = s_uiRaycastBuffer[0].gameObject;
+        return !topMost.transform.IsChildOf(allowedRoot.transform);
     }
 }
