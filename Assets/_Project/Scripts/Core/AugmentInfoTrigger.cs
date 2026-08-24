@@ -147,7 +147,8 @@ public class AugmentInfoTrigger : MonoBehaviour
         // 실제로 아무것도 안 보이는 상태라 클릭을 받을 이유도 없으니, 여기서 먼저 걸러낸다.
         if (!spectateView.IsShowingContent)
         {
-            Diag($"IsShowingContent=false (관전 카메라 꺼짐 — 카메라 {(spectateView.SpectatorCamera == null ? "없음" : "있음")})");
+            if (_logPartnerClickDiagnostics)
+                Diag($"IsShowingContent=false (관전 카메라 꺼짐 — 카메라 {(spectateView.SpectatorCamera == null ? "없음" : "있음")})");
             return;
         }
 
@@ -156,7 +157,8 @@ public class AugmentInfoTrigger : MonoBehaviour
         // 🚨 transform.position(발밑 피벗)이 아니라 콜라이더 중심을 투영한다 — 클래스 doc의 🚨 참고.
         if (!spectateView.TryProjectWorldToScreen(_collider.bounds.center, out Vector2 point))
         {
-            Diag($"화면 투영 실패 (콜라이더 중심 {_collider.bounds.center} — 카메라 뒤이거나 RawImage 미준비)");
+            if (_logPartnerClickDiagnostics)
+                Diag($"화면 투영 실패 (콜라이더 중심 {_collider.bounds.center} — 카메라 뒤이거나 RawImage 미준비)");
             return;
         }
 
@@ -165,7 +167,8 @@ public class AugmentInfoTrigger : MonoBehaviour
         float distance = Vector2.Distance(screenPos, point);
         if (distance > radius)
         {
-            Diag($"반경 밖 — 커서 {screenPos}, 콜라이더 중심 투영 {point}, 거리 {distance:F0}px > 허용 {radius:F0}px");
+            if (_logPartnerClickDiagnostics)
+                Diag($"반경 밖 — 커서 {screenPos}, 콜라이더 중심 투영 {point}, 거리 {distance:F0}px > 허용 {radius:F0}px");
             return;
         }
 
@@ -173,14 +176,16 @@ public class AugmentInfoTrigger : MonoBehaviour
         // 클릭한 것으로 보고 넘긴다 — 클래스 doc 참고.
         if (PointerUtil.IsBlockedByOtherUI(screenPos, spectateView.PipRawImage.gameObject, out GameObject topMost))
         {
-            Diag($"다른 UI에 막힘 — 맨 위 UI '{(topMost == null ? "(없음)" : topMost.name)}', " +
-                 $"허용 루트 '{spectateView.PipRawImage.gameObject.name}'");
+            if (_logPartnerClickDiagnostics)
+                Diag($"다른 UI에 막힘 — 맨 위 UI '{(topMost == null ? "(없음)" : topMost.name)}', " +
+                     $"허용 루트 '{spectateView.PipRawImage.gameObject.name}'");
             return;
         }
 
         AugmentData data = ResolvePartnerAugmentData();
-        Diag($"열기 — 파트너 증강 {(data == null ? "없음(미선택 표시)" : data.augmentNameEn)}, " +
-             $"거리 {distance:F0}px / 허용 {radius:F0}px");
+        if (_logPartnerClickDiagnostics)
+            Diag($"열기 — 파트너 증강 {(data == null ? "없음(미선택 표시)" : data.augmentNameEn)}, " +
+                 $"거리 {distance:F0}px / 허용 {radius:F0}px");
         if (_toggleOnClick) _panel.TogglePartner(data);
         else _panel.OpenPartner(data);
     }

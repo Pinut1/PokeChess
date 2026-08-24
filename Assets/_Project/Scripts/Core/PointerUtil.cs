@@ -32,7 +32,10 @@ public static class PointerUtil
     public static float ScaledRadius(float referenceRadiusAt1080p)
     {
         Camera mainCamera = Camera.main;
-        float viewHeight = mainCamera != null ? mainCamera.pixelHeight : Screen.height;
+        // 창 리사이즈/최소화 복귀 등 과도기 프레임에 렌더 높이가 비정상적으로 작게(또는 0으로) 보고될
+        // 수 있다 — 그대로 나누면 반경이 0에 수렴해 정상 클릭까지 막아버린다(PartnerSpectateView.
+        // ComputeDesiredRenderTextureSize와 동일하게 최소 1px로 바닥을 둔다).
+        float viewHeight = Mathf.Max(mainCamera != null ? mainCamera.pixelHeight : Screen.height, 1f);
         return referenceRadiusAt1080p * (viewHeight / REFERENCE_VIEW_HEIGHT_PX);
     }
 
