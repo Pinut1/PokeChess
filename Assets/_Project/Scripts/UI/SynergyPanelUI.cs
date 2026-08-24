@@ -71,6 +71,7 @@ public class SynergyPanelUI : MonoBehaviour
         // (정상 경로는 HandlePartnerSpectateExpandedChanged(false)가 되돌리지만, 이 컴포넌트 자신이
         // 먼저 비활성화되는 경우를 대비한 방어 처리 — ItemInventoryUI와 동일 원칙).
         _showingPartnerSynergy = false;
+        SetTooltipBoardSpecies(null); // 파트너 보드를 물고 있던 툴팁도 같이 되돌린다
 
         // 패널이 꺼지면 설명창도 같이 닫는다 — 안 그러면 Exit 이벤트를 못 받고 떠 있게 된다.
         if (_tooltip != null) _tooltip.HideAll();
@@ -126,7 +127,23 @@ public class SynergyPanelUI : MonoBehaviour
     private void Refresh()
     {
         var synergy = GameManager.TryGet(out var gm) ? gm.Synergy : null;
+
+        // 내 시너지를 보여주는 중 — 툴팁도 기본값(내 보드)으로 되돌린다.
+        SetTooltipBoardSpecies(null);
+
         BindStatuses(synergy != null ? synergy.GetAllSynergyStatuses() : null);
+    }
+
+    /// <summary>
+    /// 툴팁 유닛 아이콘의 채색 기준 보드를 행과 동일하게 맞춘다. null = 내 보드.
+    /// "지금 무엇을 보여주는가"를 실제로 분기하는 곳은 Refresh(내 보드)/RefreshFromPartner(파트너 보드)
+    /// 뿐이다 — 툴팁이 관전 여부를 따로 판단하지 않게 하려는 것이 요점이다(SynergyTooltipUI.
+    /// SetBoardSpeciesOverride 주석 참고). OnDisable도 null로 부르지만 이는 컴포넌트가 꺼질 때 Refresh와
+    /// 같은 값으로 되돌리는 방어용 호출일 뿐 새로운 분기가 아니다.
+    /// </summary>
+    private void SetTooltipBoardSpecies(IReadOnlyList<PokemonData> boardSpecies)
+    {
+        if (_tooltip != null) _tooltip.SetBoardSpeciesOverride(boardSpecies);
     }
 
     /// <summary>
@@ -137,9 +154,16 @@ public class SynergyPanelUI : MonoBehaviour
     private void RefreshFromPartner(BoardSnapshot snap)
     {
         var synergy = GameManager.TryGet(out var gm) ? gm.Synergy : null;
-        if (synergy == null) { BindStatuses(null); return; }
+        if (synergy == null) { SetTooltipBoardSpecies(null); BindStatuses(null); return; }
 
-        BindStatuses(synergy.ComputeSynergyStatuses(ResolveBoardSpecies(snap)).Values);
+        List<PokemonData> boardSpecies = ResolveBoardSpecies(snap);
+
+        // 행과 툴팁이 반드시 같은 목록을 봐야 한다 — 여기서 한 번 뽑아 양쪽에 같이 넘긴다.
+        // 예전에는 행만 이 목록으로 계산하고 툴팁은 제 손으로 내 보드를 읽어서, 파트너 시너지
+        // 툴팁에 내 유닛 아이콘이 켜져 있었다(2026-08-24 수정).
+        SetTooltipBoardSpecies(boardSpecies);
+
+        BindStatuses(synergy.ComputeSynergyStatuses(boardSpecies).Values);
     }
 
     /// <summary>BoardSnapshot에서 보드 위(벤치 제외) 유닛의 종만 추린다 — 로컬 계산(board.GetUnitsOnBoard())과
