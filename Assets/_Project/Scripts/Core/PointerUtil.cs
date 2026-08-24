@@ -27,7 +27,10 @@ public static class PointerUtil
     /// 실제로 그려지는 높이가 다르고, 관전 화면(RawImage)이 따르는 것은 후자다
     /// (PartnerSpectateView.RefreshTextureOnScreenChange도 같은 이유로 Screen이 아니라 Main Camera의
     /// 렌더 크기를 감시한다). Main Camera가 없는 프레임(씬 전환 중)에만 Screen.height로 폴백한다.
-    /// 화면 좌표 거리로 클릭을 판정하는 곳(AugmentInfoTrigger·StatInfoController)이 공통으로 쓴다.
+    ///
+    /// 현재 호출처는 AugmentInfoTrigger.ScaledClickRadius 하나뿐이다. StatInfoController의
+    /// _battlePickRadius도 같은 함정(1080p 기준으로 튜닝된 고정 픽셀 반경)을 그대로 안고 있으므로,
+    /// 그쪽을 고칠 때 이 함수를 부르면 된다 — 공식을 다시 옮겨 적지 말 것.
     /// </summary>
     public static float ScaledRadius(float referenceRadiusAt1080p)
     {
