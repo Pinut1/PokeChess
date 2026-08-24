@@ -437,11 +437,13 @@ public class ShopManager : MonoBehaviour
     /// 이자 설명 툴팁(<see cref="TextTooltipTrigger"/> id="GoldInterest")에 쓰는 본문 문구를 만든다.
     /// _interestPerTenGold/_interestGoldCap을 그대로 읽어 만들기 때문에, 이 값을 바꾸는 이자 증강이
     /// 몇 개가 되든 항상 실제 적용된 수치와 같은 문구가 나온다 — 증강 쪽에 숫자를 따로 박아두지 말 것.
+    /// "이자수익" 접두어는 붙이지 않는다 — 씬(Coin_Panel)의 TextTooltipTrigger._title이 이미
+    /// "이자수익"이라, 여기서 또 붙이면 커서를 올렸을 때 "이자수익"이 두 번 나온다.
     /// </summary>
     public string FormatInterestTooltipBody()
     {
         int maxInterest = (_interestGoldCap / 10) * _interestPerTenGold;
-        return $"이자수익: 10골드 보유마다 {_interestPerTenGold}골드만큼 이자로 획득 (최대 {maxInterest})";
+        return $"10골드 보유마다 {_interestPerTenGold}골드만큼 이자로 획득 (최대 {maxInterest})";
     }
 
     // ──────────────────────────────────────────
