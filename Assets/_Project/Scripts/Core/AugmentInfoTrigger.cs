@@ -82,6 +82,11 @@ public class AugmentInfoTrigger : MonoBehaviour
     // 갱신되는 표시 전용 캐시. 로컬 AugmentManager 상태와는 완전히 분리돼 있다.
     private string[] _partnerAugmentNamesEn = System.Array.Empty<string>();
 
+    // Update()의 설정 오류 진단(_panel/_partnerSpectateView 미배선)이 매 좌클릭마다 재검사되는 탓에
+    // 그대로 두면 로그가 도배된다 — 종류당 1회로 제한한다.
+    private bool _warnedPanelMissing;
+    private bool _warnedSpectateViewMissing;
+
     private void Awake()
     {
         if (_panel == null)
@@ -133,12 +138,24 @@ public class AugmentInfoTrigger : MonoBehaviour
     private void Update()
     {
         if (!_partnerClickAction.WasPressedThisFrame()) return;
-        if (_panel == null) { Diag("_panel 미배선"); return; }
+
+        // 이 둘은 관전 여부와 무관하게 매 좌클릭마다 거치는 설정 오류 진단이라, 아래처럼 관전 중에만
+        // 남기는 가드를 적용할 수 없다 — 대신 종류당 1회로 도배를 막는다(SynergyTooltipUI._warnedTierOverflow
+        // 와 동일 패턴). _panel 미배선은 Awake에서 이미 LogError로 한 번 알리므로 여기선 보조 신호일 뿐이다.
+        if (_panel == null)
+        {
+            if (_logPartnerClickDiagnostics && !_warnedPanelMissing) { _warnedPanelMissing = true; Diag("_panel 미배선"); }
+            return;
+        }
 
         PartnerSpectateView spectateView = EnsurePartnerSpectateView();
-        if (spectateView == null) { Diag("PartnerSpectateView를 씬에서 못 찾음"); return; }
+        if (spectateView == null)
+        {
+            if (_logPartnerClickDiagnostics && !_warnedSpectateViewMissing) { _warnedSpectateViewMissing = true; Diag("PartnerSpectateView를 씬에서 못 찾음"); }
+            return;
+        }
 
-        // 관전 중이 아닐 때의 평범한 클릭까지 로그로 도배하지 않도록, 진단은 전체화면 관전 중에만 남긴다.
+        // 관전 중이 아닐 때의 평범한 클릭까지 로그로 도배하지 않도록, 아래 진단들은 전체화면 관전 중에만 남긴다.
         if (!spectateView.IsExpanded) return;
 
         // "준비 중"(파트너 컨텐츠를 아직 한 번도 못 받음) 상태면 PipRawImage 자체가 꺼져있다 —
