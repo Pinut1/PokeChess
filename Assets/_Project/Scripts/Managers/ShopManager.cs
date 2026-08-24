@@ -419,6 +419,10 @@ public class ShopManager : MonoBehaviour
     /// <summary>현재 10골드당 이자율(원). base 1, '이자 +1' 증강 스택마다 +1. UI/디버그 표시용.</summary>
     public int InterestPerTenGold => _interestPerTenGold;
 
+    /// <summary>이자 계산에 인정되는 보유 골드 상한. CalculateInterest와 같은 값 — UI가 "최대 이자"를
+    /// 계산해 보여줄 때(현재 이자율 × 상한/10) 쓴다. 상수를 UI 쪽에 별도로 박지 않기 위해 공개.</summary>
+    public int InterestGoldCap => _interestGoldCap;
+
     /// <summary>
     /// 10골드당 이자율을 delta만큼 가산. '이자 +1' 증강 seam(덮어쓰기 아님 — 여러 이자 증강이 있으면 스택).
     /// 경제 증강 예: AddInterestPerTenGold(1) → 10골드당 2원(50골드에서 최대 10원) + 별도 AddGold(50) 즉시지급.
@@ -427,6 +431,17 @@ public class ShopManager : MonoBehaviour
     {
         _interestPerTenGold = Mathf.Max(0, _interestPerTenGold + delta);
         Debug.Log($"[Shop] 이자율 {(delta >= 0 ? "+" : "")}{delta} => 10G당 {_interestPerTenGold}원");
+    }
+
+    /// <summary>
+    /// 이자 설명 툴팁(<see cref="TextTooltipTrigger"/> id="GoldInterest")에 쓰는 본문 문구를 만든다.
+    /// _interestPerTenGold/_interestGoldCap을 그대로 읽어 만들기 때문에, 이 값을 바꾸는 이자 증강이
+    /// 몇 개가 되든 항상 실제 적용된 수치와 같은 문구가 나온다 — 증강 쪽에 숫자를 따로 박아두지 말 것.
+    /// </summary>
+    public string FormatInterestTooltipBody()
+    {
+        int maxInterest = (_interestGoldCap / 10) * _interestPerTenGold;
+        return $"이자수익: 10골드 보유마다 {_interestPerTenGold}골드만큼 이자로 획득 (최대 {maxInterest})";
     }
 
     // ──────────────────────────────────────────

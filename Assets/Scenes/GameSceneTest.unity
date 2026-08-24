@@ -1200,6 +1200,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "\uD604\uC7AC \uB77C\uC6B4\uB4DC"
   _footer: 
@@ -7984,6 +7985,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: "<b> \uC0C8\uB85C\uACE0\uCE68 {key}</b>"
   _text: "\uD3EC\uCF13\uBAAC \uC13C\uD130 \uC0C1\uC810\uC744 \uC0C8\uB85C\uACE0\uCE68\uD574\uC11C
     \uC0C8\uB85C\uC6B4 \uD3EC\uCF13\uBAAC\uC744 \uB9CC\uB098 \uBCF4\uC138\uC694."
@@ -14809,6 +14811,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "\uC804\uD22C\uC81C\uD55C\uC2DC\uAC04"
   _footer: 
@@ -19622,6 +19625,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "1-2 \uC99D\uAC15"
   _footer: 
@@ -19838,6 +19842,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "1-4 \uB4DC\uB798\uACE4 \uC870\uB828\uC0AC"
   _footer: 
@@ -21131,6 +21136,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "1-3 \uB9D0\uAD04\uB7C9\uC774 \uC778\uC5B4"
   _footer: 
@@ -21626,6 +21632,7 @@ MonoBehaviour:
       m_Flags: 0
     m_Flags: 0
   _partnerClickRadius: 60
+  _logPartnerClickDiagnostics: 0
 --- !u!136 &1275930329
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -22278,6 +22285,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "1-1 \uC57C\uC0DD\uD3EC\uCF13\uBAAC"
   _footer: 
@@ -25389,6 +25397,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "\uACAC\uBCF8\uB371"
   _footer: 
@@ -27987,6 +27996,7 @@ GameObject:
   - component: {fileID: 1744945002}
   - component: {fileID: 1744945004}
   - component: {fileID: 1744945003}
+  - component: {fileID: 1744945005}
   m_Layer: 5
   m_Name: Coin_Panel
   m_TagString: Untagged
@@ -28054,6 +28064,27 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1744945001}
   m_CullTransparentMesh: 1
+--- !u!114 &1744945005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1744945001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: GoldInterest
+  _title: "<b> \uC774\uC790\uC218\uC775 </b>"
+  _text: "10\uACE8\uB4DC \uBCF4\uC720\uB9C8\uB2E4 1\uACE8\uB4DC\uB9CC\uD07C \uC774\uC790\uB85C
+    \uD68D\uB4DD (\uCD5C\uB300 5)                               "
+  _footer: 
+  _blankLines: 2
+  _hotkey: {fileID: 0}
+  _keyLabelFormat: '[{0}]'
+  _tooltip: {fileID: 1775971243}
 --- !u!1 &1745802811
 GameObject:
   m_ObjectHideFlags: 0
@@ -29678,6 +29709,10 @@ MonoBehaviour:
   _spawnPosition: {x: 0, y: -9, z: 0}
   _spawnEuler: {x: -90, y: 0, z: 0}
   _positionSpread: {x: 4, y: 0, z: 4}
+  _clearSound: 27
+  _stopBgm: 1
+  _playSeconds: 7
+  _fadeOutSeconds: 1
   _burstCount: 1
   _interval: 0.22
   _lifetime: 4
@@ -30468,6 +30503,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "\uC635\uC158"
   _footer: 
@@ -30797,6 +30833,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d7235cdd3544bc499b3e6ee5f99a1eb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextTooltipTrigger
+  _id: 
   _title: 
   _text: "1-5 \uB77C\uC774\uBC8C"
   _footer: 

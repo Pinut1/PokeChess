@@ -345,7 +345,7 @@ public class UnitStatusBarHud : MonoBehaviour
             float mana = view.effectiveManaCost > 0 ? 0f : -1f;
 
             if (PlaceMirror(used, pipImage, view.visual.position, 1f, mana,
-                            true, 0f, view.items, null))
+                            true, 0f, view.items, view.equippedStone))
                 used++;
         }
         return used;
