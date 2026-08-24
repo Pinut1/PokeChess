@@ -62,7 +62,7 @@ public class AugmentInfoTrigger : MonoBehaviour
         new InputAction("AugmentPartnerClick", InputActionType.Button, "<Mouse>/leftButton");
 
     [Tooltip("파트너 관전 화면에서 이 오브젝트를 클릭했다고 인정할 화면 반경(픽셀). " +
-             "아래 REFERENCE_VIEW_HEIGHT(1080px) 기준값이고, 실제 판정은 렌더 높이에 비례해 자동으로 늘어난다. " +
+             "PointerUtil.REFERENCE_VIEW_HEIGHT_PX(1080px) 기준값이고, 실제 판정은 렌더 높이에 비례해 자동으로 늘어난다. " +
              "판정 중심은 발밑 피벗이 아니라 콜라이더 중심이라, 오브젝트를 감싸는 데 반지름 약 50px이면 충분하다.")]
     [SerializeField] private float _partnerClickRadius = 60f;
 
@@ -81,13 +81,6 @@ public class AugmentInfoTrigger : MonoBehaviour
     // 파트너(상대 클라이언트)가 선택한 증강의 영문명 배열 — GameEvents.OnPartnerAugmentsChanged로
     // 갱신되는 표시 전용 캐시. 로컬 AugmentManager 상태와는 완전히 분리돼 있다.
     private string[] _partnerAugmentNamesEn = System.Array.Empty<string>();
-
-    /// <summary>
-    /// <see cref="_partnerClickRadius"/>가 기준으로 삼는 렌더 높이(px). 실제 렌더 높이가 이보다
-    /// 크면 그 비율만큼 반경도 커진다 — 월드 거리가 몇 픽셀이 되는지는 렌더 크기에 비례하므로,
-    /// 반경을 고정 픽셀로 두면 해상도가 올라갈수록 판정이 좁아진다(클래스 doc의 🚨 참고).
-    /// </summary>
-    private const float REFERENCE_VIEW_HEIGHT = 1080f;
 
     private void Awake()
     {
@@ -192,19 +185,9 @@ public class AugmentInfoTrigger : MonoBehaviour
         else _panel.OpenPartner(data);
     }
 
-    /// <summary>
-    /// 렌더 높이에 비례해 보정한 클릭 반경. <b>Screen.height를 쓰면 안 된다</b> — CameraLetterbox가
-    /// 뷰포트를 16:9로 줄여 놓으면 화면 높이와 실제로 그려지는 높이가 다르고, 관전 화면(RawImage)이
-    /// 따르는 것은 후자다. PartnerSpectateView.RefreshTextureOnScreenChange도 같은 이유로 Screen이
-    /// 아니라 Main Camera의 렌더 크기를 감시한다.
-    /// Main Camera가 없는 프레임(씬 전환 중)에만 Screen.height로 폴백한다.
-    /// </summary>
-    private float ScaledClickRadius()
-    {
-        Camera mainCamera = Camera.main;
-        float viewHeight = mainCamera != null ? mainCamera.pixelHeight : Screen.height;
-        return _partnerClickRadius * (viewHeight / REFERENCE_VIEW_HEIGHT);
-    }
+    /// <summary>렌더 높이에 비례해 보정한 클릭 반경(PointerUtil.ScaledRadius 참고 — StatInfoController도
+    /// 같은 함정을 안고 있어 공용 헬퍼로 뽑아뒀다).</summary>
+    private float ScaledClickRadius() => PointerUtil.ScaledRadius(_partnerClickRadius);
 
     /// <summary>관전 중 클릭이 어디서 걸렀는지 남긴다(<see cref="_logPartnerClickDiagnostics"/>가 켜졌을 때만).</summary>
     private void Diag(string message)

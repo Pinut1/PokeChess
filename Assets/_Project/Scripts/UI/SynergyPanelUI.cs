@@ -136,9 +136,10 @@ public class SynergyPanelUI : MonoBehaviour
 
     /// <summary>
     /// 툴팁 유닛 아이콘의 채색 기준 보드를 행과 동일하게 맞춘다. null = 내 보드.
-    /// Refresh/RefreshFromPartner 두 곳에서만 부르며, 그 둘이 곧 "지금 무엇을 보여주는가"의
-    /// 유일한 분기다 — 툴팁이 관전 여부를 따로 판단하지 않게 하려는 것이 요점이다
-    /// (SynergyTooltipUI.SetBoardSpeciesOverride 주석 참고).
+    /// "지금 무엇을 보여주는가"를 실제로 분기하는 곳은 Refresh(내 보드)/RefreshFromPartner(파트너 보드)
+    /// 뿐이다 — 툴팁이 관전 여부를 따로 판단하지 않게 하려는 것이 요점이다(SynergyTooltipUI.
+    /// SetBoardSpeciesOverride 주석 참고). OnDisable도 null로 부르지만 이는 컴포넌트가 꺼질 때 Refresh와
+    /// 같은 값으로 되돌리는 방어용 호출일 뿐 새로운 분기가 아니다.
     /// </summary>
     private void SetTooltipBoardSpecies(IReadOnlyList<PokemonData> boardSpecies)
     {

@@ -15,6 +15,27 @@ public static class PointerUtil
     public static bool IsOverUI() =>
         EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
+    /// <summary>
+    /// 화면 좌표 클릭 반경 값을 튜닝할 때 기준으로 삼은 렌더 높이(px). 반경을 이 값에 대해 비례시키면
+    /// 해상도가 달라져도 같은 월드 거리가 같은 비율로 잡힌다(<see cref="ScaledRadius"/> 참고).
+    /// </summary>
+    public const float REFERENCE_VIEW_HEIGHT_PX = 1080f;
+
+    /// <summary>
+    /// <see cref="REFERENCE_VIEW_HEIGHT_PX"/> 기준으로 튜닝된 반경을 실제 렌더 높이에 비례시킨다.
+    /// <b>Screen.height를 쓰면 안 된다</b> — CameraLetterbox가 뷰포트를 16:9로 줄여 놓으면 화면 높이와
+    /// 실제로 그려지는 높이가 다르고, 관전 화면(RawImage)이 따르는 것은 후자다
+    /// (PartnerSpectateView.RefreshTextureOnScreenChange도 같은 이유로 Screen이 아니라 Main Camera의
+    /// 렌더 크기를 감시한다). Main Camera가 없는 프레임(씬 전환 중)에만 Screen.height로 폴백한다.
+    /// 화면 좌표 거리로 클릭을 판정하는 곳(AugmentInfoTrigger·StatInfoController)이 공통으로 쓴다.
+    /// </summary>
+    public static float ScaledRadius(float referenceRadiusAt1080p)
+    {
+        Camera mainCamera = Camera.main;
+        float viewHeight = mainCamera != null ? mainCamera.pixelHeight : Screen.height;
+        return referenceRadiusAt1080p * (viewHeight / REFERENCE_VIEW_HEIGHT_PX);
+    }
+
     // RaycastAll 호출마다 새로 할당하지 않도록 재사용 — 프레임당 호출자가 많지 않은 폴링/클릭
     // 경로에서만 쓰여 경쟁이 없다.
     private static readonly List<RaycastResult> s_uiRaycastBuffer = new();
